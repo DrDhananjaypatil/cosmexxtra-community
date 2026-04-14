@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Analytics } from "@vercel/analytics/react";
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, addDoc, updateDoc, serverTimestamp } from "firebase/firestore";
@@ -427,5 +428,6 @@ export default function App(){
 
       </div>
       {toast&&<div style={{position:"fixed",bottom:20,left:"50%",transform:"translateX(-50%)",padding:"10px 24px",background:c.teal,color:"#fff",borderRadius:10,fontSize:".88rem",zIndex:1000,boxShadow:"0 4px 20px rgba(0,0,0,.4)"}}>{toast}</div>}
+      <Analytics />
     </div>);
 }
