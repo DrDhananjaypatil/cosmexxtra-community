@@ -3,7 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updateProfile } from "firebase/auth";
 import { getFirestore, doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, addDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 
-const firebaseConfig={apiKey:"AIzaSyBFaxZyhRvucfaZACl68SdNFb_CKPlkZBU",authDomain:"cosmexxtra-1b08e.firebaseapp.com",projectId:"cosmexxtra-1b08e",storageBucket:"cosmexxtra-1b08e.firebasestorage.app",messagingSenderId:"419443766419",appId:"1:419443766419:web:5ca9336401284094060966"};
+const firebaseConfig={apiKey:"AIzaSyAzW8kouNGmK11tLIDftwlg5QEtffecYEM",authDomain:"skinario-369.firebaseapp.com",projectId:"skinario-369",storageBucket:"skinario-369.firebasestorage.app",messagingSenderId:"647411585151",appId:"1:647411585151:web:210827226e649d96b42f4a"};
 const fbApp=initializeApp(firebaseConfig);const auth=getAuth(fbApp);const db=getFirestore(fbApp);const gProv=new GoogleAuthProvider();
 const ADMINS=["drjpatil@gmail.com","absoluteinstituteedu@gmail.com"];
 const TOPICS=["Skin Disorders","Chemical Peels","Botox & Fillers","Laser Treatments","Hair Restoration","Body Contouring","Ethics","Patient Safety"];
