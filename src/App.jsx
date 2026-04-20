@@ -38,10 +38,11 @@ async function fbGet(c,id){try{const s=await getDoc(doc(db,c,id));return s.exist
 
 async function genQuizAI(date){
   const tp=TOPICS[Math.floor(Math.random()*TOPICS.length)];const df=Math.random()>.5?"Advanced":"Moderate";
-  try{const r=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:`Master cosmetologist 20+ yrs. Clinical quiz.\nTopic:${tp}|Diff:${df}\nCase scenario, 3 options, 1 correct.\nJSON ONLY:\n{"category":"${tp}","difficulty":"${df}","scenario":"...","question":"...","options":["A","B","C"],"correctIndex":0,"explanation":"<p>...</p>"}`}]})});
-    const data=await r.json();const q=JSON.parse(data.content[0].text.replace(/```json\s*/g,"").replace(/```/g,"").trim());
+  try{const r=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:`You are a master cosmetologist and dermatologist with 20+ years of clinical experience. Generate a clinical quiz question.\nTopic: ${tp} | Difficulty: ${df}\nCreate a realistic CASE SCENARIO with patient demographics, history, and complaint. Provide exactly 3 options, only 1 correct.\nRESPOND IN PURE JSON ONLY (no markdown, no backticks, no extra text):\n{"category":"${tp}","difficulty":"${df}","scenario":"detailed case scenario here","question":"clinical question here","options":["Option A full text","Option B full text","Option C full text"],"correctIndex":0,"explanation":"<p>Detailed explanation with reasoning for correct and incorrect answers</p>"}`})});
+    const data=await r.json();if(data.error)throw new Error(data.error);
+    const q=JSON.parse(data.text.replace(/```json\s*/g,"").replace(/```/g,"").trim());
     return{date,cat:q.category,diff:q.difficulty,scen:q.scenario,question:q.question,opts:q.options,ci:q.correctIndex,expl:q.explanation,answers:{},comments:[]}
-  }catch{return null}}
+  }catch(e){console.error("Quiz gen error:",e);return null}}
 
 export default function App(){
   const[au,setAu]=useState(null);const[prof,setProf]=useState(null);const[scr,setScr]=useState("loading");const[pg,setPg]=useState("home");
