@@ -38,10 +38,28 @@ async function fbGet(c,id){try{const s=await getDoc(doc(db,c,id));return s.exist
 
 async function genQuizAI(date){
   const tp=TOPICS[Math.floor(Math.random()*TOPICS.length)];const df=Math.random()>.5?"Advanced":"Moderate";
-  try{const r=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:`You are a master cosmetologist and dermatologist with 20+ years of clinical experience. Generate a clinical quiz question.\nTopic: ${tp} | Difficulty: ${df}\nCreate a realistic CASE SCENARIO with patient demographics, history, and complaint. Provide exactly 3 options, only 1 correct.\nRESPOND IN PURE JSON ONLY (no markdown, no backticks, no extra text):\n{"category":"${tp}","difficulty":"${df}","scenario":"detailed case scenario here","question":"clinical question here","options":["Option A full text","Option B full text","Option C full text"],"correctIndex":0,"explanation":"<p>Detailed explanation with reasoning for correct and incorrect answers</p>"}`})});
-    const data=await r.json();if(data.error)throw new Error(data.error);
-    const q=JSON.parse(data.text.replace(/```json\s*/g,"").replace(/```/g,"").trim());
-    return{date,cat:q.category,diff:q.difficulty,scen:q.scenario,question:q.question,opts:q.options,ci:q.correctIndex,expl:q.explanation,answers:{},comments:[]}
+  try{const r=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:`Generate a clinical dermatology/aesthetic medicine quiz question as JSON.
+Topic: ${tp}
+Difficulty: ${df}
+
+Rules:
+- Create a realistic case scenario with patient age, gender, skin type, history
+- Provide exactly 3 answer options, only 1 correct
+- Keep all text short - scenario under 200 chars, each option under 100 chars, explanation under 300 chars
+- Use straight quotes only, no special characters, no newlines within strings
+- correctIndex is 0, 1, or 2
+
+Return ONLY this JSON, nothing else:
+{"category":"${tp}","difficulty":"${df}","scenario":"case here","question":"question here","options":["A","B","C"],"correctIndex":0,"explanation":"explanation here"}`})});
+    const data=await r.json();if(data.error)throw new Error(JSON.stringify(data));
+    let txt=data.text||"";
+    txt=txt.replace(/```json\s*/g,"").replace(/```/g,"").trim();
+    txt=txt.replace(/[\x00-\x1F]/g," ");
+    const jsonMatch=txt.match(/\{[\s\S]*\}/);
+    if(!jsonMatch)throw new Error("No JSON found in response");
+    const q=JSON.parse(jsonMatch[0]);
+    if(!q.question||!q.options||q.options.length<3)throw new Error("Invalid quiz structure");
+    return{date,cat:q.category||tp,diff:q.difficulty||df,scen:q.scenario||"",question:q.question,opts:q.options.slice(0,3),ci:typeof q.correctIndex==="number"?q.correctIndex:0,expl:q.explanation||"",answers:{},comments:[]}
   }catch(e){console.error("Quiz gen error:",e);return null}}
 
 export default function App(){
