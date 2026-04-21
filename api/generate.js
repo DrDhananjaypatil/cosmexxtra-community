@@ -16,42 +16,25 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'No prompt provided' });
     }
 
-    const models = [
-      'gemini-1.5-flash',
-      'gemini-1.5-pro',
-      'gemini-2.0-flash',
-      'gemini-pro'
-    ];
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
 
-    let lastError = null;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.8, maxOutputTokens: 2000 }
+      })
+    });
 
-    for (const model of models) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
-        
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.8, maxOutputTokens: 2000 }
-          })
-        });
+    const data = await response.json();
 
-        const data = await response.json();
-
-        if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-          const text = data.candidates[0].content.parts[0].text;
-          return res.status(200).json({ text, model });
-        }
-
-        lastError = data.error || data;
-      } catch (e) {
-        lastError = e.message;
-      }
+    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+      const text = data.candidates[0].content.parts[0].text;
+      return res.status(200).json({ text });
+    } else {
+      return res.status(500).json({ error: 'No response', details: data });
     }
-
-    return res.status(500).json({ error: 'All models failed', details: lastError });
   } catch (error) {
     return res.status(500).json({ error: 'Generation failed', message: error.message });
   }
