@@ -116,6 +116,7 @@ export default function App(){
   const[selD,setSelD]=useState(ds(getIST()));const[selA,setSelA]=useState(null);const[selV,setSelV]=useState(null);const[toast,setToast]=useState(null);const[cmt,setCmt]=useState("");const[ld,setLd]=useState(false);const[aTab,setATab]=useState("stats");
   const[authMode,setAuthMode]=useState("signin");const[authEmail,setAuthEmail]=useState("");const[authPass,setAuthPass]=useState("");const[authName,setAuthName]=useState("");const[authBusy,setAuthBusy]=useState(false);const[authErr,setAuthErr]=useState("");
   const[pf,setPf]=useState({degree:"",clinic:"",address:""});const[edForm,setEdForm]=useState(null);
+  const[edImgs,setEdImgs]=useState([]);const[edImgUp,setEdImgUp]=useState(false);
   // Forum/Cases new post state
   const[newForum,setNewForum]=useState(false);const[fpT,setFpT]=useState("");const[fpB,setFpB]=useState("");const[fpC,setFpC]=useState(TOPICS[0]);const[fpImgs,setFpImgs]=useState([]);const[fpUp,setFpUp]=useState(false);
   const[newCase,setNewCase]=useState(false);const[ccT,setCcT]=useState("");const[ccB,setCcB]=useState("");const[ccC,setCcC]=useState(TOPICS[0]);const[ccImgs,setCcImgs]=useState([]);const[ccUp,setCcUp]=useState(false);const[ccDiag,setCcDiag]=useState("");
@@ -234,10 +235,7 @@ export default function App(){
   // ═══ ADMIN FORM — uses ref to avoid remount cursor bug ═══
   const edFormData=edForm?.data||{};
   const edSet=(k,v)=>setEdForm(p=>({...p,data:{...p.data,[k]:v}}));
-  const[edImgs,setEdImgs]=useState([]);
-  const[edImgUp,setEdImgUp]=useState(false);
   useEffect(()=>{setEdImgs(edFormData.images||[])},[edForm?.editing,edForm?.type]);
-  const edSaveWithImgs=(type)=>{const d={...edForm.data,images:edImgs};setEdForm(p=>({...p,data:d}));setTimeout(()=>saveContent(type),50)};
   const renderAdminForm=(type,fields,showImages)=>(<div style={{...T.card,borderLeft:"3px solid "+T.teal}}>
       <h4 style={{color:T.teal,fontWeight:700,marginBottom:12}}>{edForm?.editing?"Edit":"New"} {type}</h4>
       {fields.map(([k,l,tp])=><div key={k} style={{marginBottom:10}}><label style={{display:"block",fontSize:".75rem",color:T.teal,marginBottom:4}}>{l}</label>
