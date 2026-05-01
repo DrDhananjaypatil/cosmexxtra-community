@@ -37,7 +37,7 @@ const LikeBtn=({liked,count,onToggle})=>(
   </button>
 );
 
-// ═══ IMAGE UPLOAD COMPONENT ═══
+// ═══ MULTI-IMAGE UPLOAD (used in forum/cases) ═══
 const ImgUpload=({images,setImages,uploading,setUploading})=>{
   const fileRef=useRef();
   const handleFile=async(e)=>{
@@ -82,6 +82,61 @@ const ImgGallery=({images})=>{
   </>)
 };
 
+// ═══ ADMIN SINGLE-IMAGE FIELD (for cover/thumbnail in articles & resources) ═══
+const AdminImgField=({value,onChange})=>{
+  const fileRef=useRef();
+  const[busy,setBusy]=useState(false);
+  const handleFile=async(e)=>{
+    const f=e.target.files?.[0];if(!f)return;
+    setBusy(true);
+    try{
+      const path=`covers/${Date.now()}_${f.name}`;
+      const sRef=ref(storage,path);
+      await uploadBytes(sRef,f);
+      const url=await getDownloadURL(sRef);
+      onChange(url);
+    }catch(err){console.error("Upload error:",err);alert("Upload failed")}
+    setBusy(false);
+    if(fileRef.current)fileRef.current.value="";
+  };
+  return(<div>
+    {value&&<div style={{position:"relative",width:140,height:90,borderRadius:8,overflow:"hidden",border:"1px solid "+T.border,marginBottom:6}}>
+      <img src={value} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+      <button onClick={()=>onChange("")} style={{position:"absolute",top:3,right:3,width:20,height:20,borderRadius:"50%",background:"rgba(0,0,0,.65)",color:"#fff",border:"none",fontSize:".65rem",cursor:"pointer"}}>✕</button>
+    </div>}
+    <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{display:"none"}}/>
+    <button onClick={()=>fileRef.current?.click()} disabled={busy} style={{...T.btnO,...T.btnSm,opacity:busy?.5:1}}>{busy?"⏳ Uploading...":value?"🔄 Replace image":"📷 Upload image"}</button>
+  </div>)
+};
+
+// ═══ ADMIN FORM (moved outside App to fix cursor focus bug) ═══
+const AdminForm=({type,fields,edForm,setEdForm,onSave})=>{
+  const d=edForm?.data||{};
+  const set=(k,v)=>setEdForm(p=>({...p,data:{...p.data,[k]:v}}));
+  return(<div style={{...T.card,borderLeft:"3px solid "+T.teal}}>
+    <h4 style={{color:T.teal,fontWeight:700,marginBottom:12}}>{edForm?.editing?"Edit":"New"} {type}</h4>
+    {fields.map(([k,l,tp])=><div key={k} style={{marginBottom:10}}>
+      <label style={{display:"block",fontSize:".75rem",color:T.teal,marginBottom:4}}>{l}</label>
+      {tp==="textarea"?<textarea value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.txa}/>
+      :tp==="select"?<select value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.inp}>{TOPICS.map(t=><option key={t} value={t}>{t}</option>)}<option value="General">General</option></select>
+      :tp==="check"?<label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}><input type="checkbox" checked={!!d[k]} onChange={e=>set(k,e.target.checked)}/> {l}</label>
+      :tp==="image"?<AdminImgField value={d[k]} onChange={url=>set(k,url)}/>
+      :<input value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.inp}/>}
+    </div>)}
+    <div style={{display:"flex",gap:8}}><button onClick={onSave} style={T.btn}>{edForm?.editing?"Update":"Create"}</button><button onClick={()=>setEdForm(null)} style={T.btnO}>Cancel</button></div>
+  </div>)
+};
+
+// ═══ CASE COMMENT INPUT (moved outside App to fix cursor focus bug) ═══
+const CaseCmtInput=({caseId,caseObj,addCaseComment})=>{
+  const[txt,setTxt]=useState("");
+  const submit=()=>{addCaseComment(caseId,caseObj,txt);setTxt("")};
+  return(<div style={{display:"flex",gap:6,marginTop:10}}>
+    <input value={txt} onChange={e=>setTxt(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="Your thoughts..." style={{...T.inp,borderRadius:20,padding:"9px 14px",fontSize:".82rem",flex:1}}/>
+    <button onClick={submit} style={{...T.btn,...T.btnSm}}>Post</button>
+  </div>)
+};
+
 // ═══ FIRESTORE ═══
 const fbCol=n=>collection(db,n);
 async function fbGetAll(c,ord="date",dir="desc",lim=100){try{const q=query(fbCol(c),orderBy(ord,dir),limit(lim));const s=await getDocs(q);return s.docs.map(d=>({id:d.id,...d.data()}))}catch(e){console.log("fb",c,e);return[]}}
@@ -112,6 +167,7 @@ Return ONLY this JSON, nothing else:
 
 export default function App(){
   const[au,setAu]=useState(null);const[prof,setProf]=useState(null);const[scr,setScr]=useState("loading");const[pg,setPg]=useState("home");
+  const[welcomeSeen,setWelcomeSeen]=useState(()=>localStorage.getItem("sk_welcome")==="1");
   const[quizzes,setQuizzes]=useState([]);const[articles,setArticles]=useState([]);const[resources,setResources]=useState([]);const[videos,setVideos]=useState([]);const[forumPosts,setForumPosts]=useState([]);const[cases,setCases]=useState([]);const[allUsers,setAllUsers]=useState([]);
   const[selD,setSelD]=useState(ds(getIST()));const[selA,setSelA]=useState(null);const[selV,setSelV]=useState(null);const[toast,setToast]=useState(null);const[cmt,setCmt]=useState("");const[ld,setLd]=useState(false);const[aTab,setATab]=useState("stats");
   const[authMode,setAuthMode]=useState("signin");const[authEmail,setAuthEmail]=useState("");const[authPass,setAuthPass]=useState("");const[authName,setAuthName]=useState("");const[authBusy,setAuthBusy]=useState(false);const[authErr,setAuthErr]=useState("");
@@ -137,7 +193,7 @@ export default function App(){
   const doEmailSignup=async()=>{setAuthErr("");if(!authName.trim())return setAuthErr("Enter name");if(!authEmail.trim())return setAuthErr("Enter email");if(authPass.length<6)return setAuthErr("6+ chars");setAuthBusy(true);try{const c=await createUserWithEmailAndPassword(auth,authEmail,authPass);await updateProfile(c.user,{displayName:authName})}catch(e){setAuthErr(e.code==="auth/email-already-in-use"?"Email registered":"Failed")}setAuthBusy(false)};
   const doEmailSignin=async()=>{setAuthErr("");if(!authEmail.trim())return setAuthErr("Enter email");if(!authPass)return setAuthErr("Enter password");setAuthBusy(true);try{await signInWithEmailAndPassword(auth,authEmail,authPass)}catch(e){setAuthErr(e.code==="auth/invalid-credential"?"Wrong email/password":"Failed")}setAuthBusy(false)};
   const doForgot=async()=>{setAuthErr("");if(!authEmail.trim())return setAuthErr("Enter email");setAuthBusy(true);try{await sendPasswordResetEmail(auth,authEmail);sh("📧 Reset sent!");setAuthMode("signin")}catch{setAuthErr("Failed")}setAuthBusy(false)};
-  const doLogout=async()=>{if(confirm("Sign out?"))await signOut(auth)};
+  const doLogout=async()=>{if(confirm("Sign out?")){localStorage.removeItem("sk_welcome");setWelcomeSeen(false);await signOut(auth)}};
   const savePf=async()=>{if(!pf.degree){sh("Degree required");return}const p={name:au.displayName||authName||"Doctor",email:au.email,photo:au.photoURL||"",degree:pf.degree,clinic:pf.clinic,address:pf.address,paid:false,joined:ds(getIST()),initials:uIni,totalCorrect:0,totalAnswered:0,streak:0};await fbSet("users",au.uid,p);localStorage.setItem("sk_p_"+au.uid,JSON.stringify(p));setProf(p);setScr("main");sh("Welcome to SKINARIO!");loadData()};
 
   // ═══ LIKE TOGGLE (works for any collection) ═══
@@ -184,6 +240,17 @@ export default function App(){
 
   if(scr==="loading")return(<div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui"}}><div style={{textAlign:"center"}}><Logo size={60}/><p style={{color:T.mute,marginTop:12}}>Loading...</p></div></div>);
 
+  // ═══ WELCOME SCREEN (shown once before login — fits screen, click anywhere to enter) ═══
+  if(scr==="login"&&!welcomeSeen)return(
+    <div onClick={()=>{localStorage.setItem("sk_welcome","1");setWelcomeSeen(true)}} style={{height:"100vh",width:"100vw",background:"#f5ede2",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontFamily:"system-ui",overflow:"hidden",position:"relative"}} title="Click to enter">
+      <picture style={{display:"flex",alignItems:"center",justifyContent:"center",width:"100%",height:"100%"}}>
+        <source media="(max-width: 768px)" srcSet="/welcome-mobile.png"/>
+        <img src="/welcome-desktop.png" alt="Welcome to SKINARIO — click to enter" style={{maxWidth:"100%",maxHeight:"100%",width:"auto",height:"auto",objectFit:"contain",display:"block"}}/>
+      </picture>
+      <div style={{position:"absolute",bottom:24,right:24,background:"rgba(74,31,61,0.92)",color:"#fff",padding:"10px 22px",borderRadius:999,fontSize:".85rem",fontWeight:600,zIndex:5,pointerEvents:"none",boxShadow:"0 4px 14px rgba(0,0,0,0.2)"}}>👆 Click anywhere to enter</div>
+    </div>
+  );
+
   if(scr==="login")return(
     <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#f8f7f4,#fdf6e3 40%,#e1f5ee 70%,#f8f7f4)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"system-ui"}}>
       <Logo size={100}/><h1 style={{fontSize:"2.8rem",fontWeight:300,color:T.txt,marginTop:8,letterSpacing:6,fontFamily:"Georgia,serif"}}>SKINARIO</h1>
@@ -224,22 +291,6 @@ export default function App(){
   // ═══ MAIN NAV — added "Cases" section ═══
   const navs=[{id:"home",ic:"🏠",l:"Home"},{id:"quiz",ic:"🧠",l:"Quiz"},{id:"library",ic:"📚",l:"Library"},{id:"videos",ic:"🎥",l:"Videos"},{id:"cases",ic:"🔬",l:"Cases"},{id:"forum",ic:"💬",l:"Forum"},{id:"rank",ic:"🏆",l:"Rank"},{id:"me",ic:"👤",l:"Me"},...(isAdm?[{id:"admin",ic:"⚙️",l:"Admin"}]:[])];
 
-  const AdminForm=({type,fields,onSave})=>{const d=edForm?.data||{};const set=(k,v)=>setEdForm(p=>({...p,data:{...p.data,[k]:v}}));
-    return(<div style={{...T.card,borderLeft:"3px solid "+T.teal}}>
-      <h4 style={{color:T.teal,fontWeight:700,marginBottom:12}}>{edForm?.editing?"Edit":"New"} {type}</h4>
-      {fields.map(([k,l,tp])=><div key={k} style={{marginBottom:10}}><label style={{display:"block",fontSize:".75rem",color:T.teal,marginBottom:4}}>{l}</label>
-        {tp==="textarea"?<textarea value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.txa}/>
-        :tp==="select"?<select value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.inp}>{TOPICS.map(t=><option key={t} value={t}>{t}</option>)}<option value="General">General</option></select>
-        :tp==="check"?<label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}><input type="checkbox" checked={!!d[k]} onChange={e=>set(k,e.target.checked)}/> {l}</label>
-        :<input value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.inp}/>}</div>)}
-      <div style={{display:"flex",gap:8}}><button onClick={onSave} style={T.btn}>{edForm?.editing?"Update":"Create"}</button><button onClick={()=>setEdForm(null)} style={T.btnO}>Cancel</button></div>
-    </div>)};
-
-  // ═══ CASE COMMENT INPUT (local state per case) ═══
-  const CaseCmtInput=({caseId,caseObj})=>{const[txt,setTxt]=useState("");return(
-    <div style={{display:"flex",gap:6,marginTop:10}}><input value={txt} onChange={e=>setTxt(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){addCaseComment(caseId,caseObj,txt);setTxt("")}}} placeholder="Your thoughts..." style={{...T.inp,borderRadius:20,padding:"9px 14px",fontSize:".82rem",flex:1}}/><button onClick={()=>{addCaseComment(caseId,caseObj,txt);setTxt("")}} style={{...T.btn,...T.btnSm}}>Post</button></div>
-  )};
-
   return(
     <div style={{minHeight:"100vh",background:T.bg,fontFamily:"system-ui",color:T.txt}}>
       <div style={{position:"sticky",top:0,zIndex:100,background:"#ffffffee",backdropFilter:"blur(16px)",borderBottom:"1px solid "+T.border,padding:"6px 24px"}}>
@@ -268,15 +319,18 @@ export default function App(){
         <h3 style={{fontSize:"1.05rem",fontWeight:700,marginBottom:12}}>Latest articles</h3>
         {articles.length===0&&<p style={{color:T.mute}}>No articles yet. Admins can create them from Admin panel.</p>}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-          {articles.slice(0,6).map(a=><div key={a.id} onClick={()=>setSelA(a)} style={{...T.card,cursor:"pointer",marginBottom:0}}>
-            <div style={{display:"flex",gap:5,marginBottom:8}}><span style={T.tag(T.tealBg,T.teal)}>{a.cat||"General"}</span>{a.feat&&<span style={T.tag(T.goldBg,T.goldD)}>Featured</span>}</div>
-            <h4 style={{fontSize:".95rem",fontWeight:600,lineHeight:1.4}}>{a.title}</h4>
-            <p style={{fontSize:".78rem",color:T.txt2,marginTop:6,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{a.body}</p>
-            <p style={{fontSize:".72rem",color:T.mute,marginTop:6}}>{a.author||"Admin"} · {fD(a.date)}</p>
+          {articles.slice(0,6).map(a=><div key={a.id} onClick={()=>setSelA(a)} style={{...T.card,cursor:"pointer",marginBottom:0,overflow:"hidden",padding:0}}>
+            {a.cover&&<img src={a.cover} style={{width:"100%",height:140,objectFit:"cover"}}/>}
+            <div style={{padding:18}}>
+              <div style={{display:"flex",gap:5,marginBottom:8}}><span style={T.tag(T.tealBg,T.teal)}>{a.cat||"General"}</span>{a.feat&&<span style={T.tag(T.goldBg,T.goldD)}>Featured</span>}</div>
+              <h4 style={{fontSize:".95rem",fontWeight:600,lineHeight:1.4}}>{a.title}</h4>
+              <p style={{fontSize:".78rem",color:T.txt2,marginTop:6,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{a.body}</p>
+              <p style={{fontSize:".72rem",color:T.mute,marginTop:6}}>{a.author||"Admin"} · {fD(a.date)}</p>
+            </div>
           </div>)}
         </div>
       </div>}
-      {pg==="home"&&selA&&<div><button onClick={()=>setSelA(null)} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back</button><div style={{...T.card,maxWidth:720}}><span style={T.tag(T.tealBg,T.teal)}>{selA.cat}</span><h2 style={{fontSize:"1.5rem",fontWeight:700,marginTop:10,lineHeight:1.35}}>{selA.title}</h2><p style={{fontSize:".82rem",color:T.mute,marginTop:8}}>{selA.author} · {fD(selA.date)}</p><div style={{marginTop:20,fontSize:"1rem",color:T.txt2,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{selA.body}</div></div></div>}
+      {pg==="home"&&selA&&<div><button onClick={()=>setSelA(null)} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back</button><div style={{...T.card,maxWidth:720,overflow:"hidden",padding:0}}>{selA.cover&&<img src={selA.cover} style={{width:"100%",maxHeight:340,objectFit:"cover"}}/>}<div style={{padding:24}}><span style={T.tag(T.tealBg,T.teal)}>{selA.cat}</span><h2 style={{fontSize:"1.5rem",fontWeight:700,marginTop:10,lineHeight:1.35}}>{selA.title}</h2><p style={{fontSize:".82rem",color:T.mute,marginTop:8}}>{selA.author} · {fD(selA.date)}</p><div style={{marginTop:20,fontSize:"1rem",color:T.txt2,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{selA.body}</div></div></div></div>}
 
       {/* QUIZ */}
       {pg==="quiz"&&<div>
@@ -311,7 +365,7 @@ export default function App(){
         {resources.length===0&&<p style={{color:T.mute}}>No resources yet.</p>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))",gap:14}}>
           {resources.map(r=><div key={r.id} style={{...T.card,display:"flex",gap:14,alignItems:"center",marginBottom:0}}>
-            <div style={{fontSize:"2rem"}}>{r.icon||"📄"}</div>
+            {r.thumb?<img src={r.thumb} style={{width:60,height:60,borderRadius:8,objectFit:"cover"}}/>:<div style={{fontSize:"2rem"}}>{r.icon||"📄"}</div>}
             <div style={{flex:1}}><h4 style={{fontSize:".9rem",fontWeight:600,lineHeight:1.3}}>{r.title||r.t}</h4><div style={{fontSize:".72rem",color:T.mute,marginTop:3}}>{r.pages?r.pages+"p · ":""}{r.size||""}</div>
               <div style={{marginTop:6}}>{r.free||isPd?<button onClick={()=>r.url?window.open(r.url,"_blank"):sh("No URL")} style={{...T.btn,...T.btnSm}}>📥 Download</button>:<button style={{...T.btnO,...T.btnSm,color:T.gold,borderColor:T.gold}}>🔒 Premium</button>}</div></div>
           </div>)}
@@ -332,7 +386,7 @@ export default function App(){
           <h3 style={{fontWeight:700,fontSize:"1.2rem"}}>{selV.title||selV.t}</h3><p style={{color:T.mute,fontSize:".82rem",marginTop:4}}>{selV.dur}</p><p style={{color:T.txt2,marginTop:12,lineHeight:1.8}}>{selV.desc}</p></div>
       </div>}
 
-      {/* ═══ CLINICAL CASES — NEW SECTION ═══ */}
+      {/* ═══ CLINICAL CASES ═══ */}
       {pg==="cases"&&<div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
           <div><h3 style={{fontSize:"1.15rem",fontWeight:700}}>🔬 Clinical cases</h3><p style={{color:T.mute,fontSize:".82rem",marginTop:2}}>Share cases with images for peer discussion</p></div>
@@ -361,17 +415,16 @@ export default function App(){
                 <LikeBtn liked={(cs.likedBy||[]).includes(au?.uid)} count={cs.likes||0} onToggle={()=>toggleLike("cases",cs.id,cs,setCases)}/>
                 <span style={{fontSize:".75rem",color:T.mute}}>💬 {cs.comments?.length||0} comments</span>
               </div>
-              {/* Case comments */}
               {(cs.comments||[]).length>0&&<div style={{marginTop:8,paddingLeft:10,borderLeft:"2px solid "+T.border}}>
                 {cs.comments.map((x,i)=><div key={i} style={{padding:"5px 0",fontSize:".82rem"}}><b style={{color:T.txt}}>{x.n}</b> <span style={{color:T.mute,fontSize:".6rem"}}>{x.tm}</span><div style={{color:T.txt2}}>{x.txt}</div></div>)}
               </div>}
-              <CaseCmtInput caseId={cs.id} caseObj={cs}/>
+              <CaseCmtInput caseId={cs.id} caseObj={cs} addCaseComment={addCaseComment}/>
             </div>
           </div>
         </div>)}
       </div>}
 
-      {/* FORUM with LIKES + IMAGES */}
+      {/* FORUM */}
       {pg==="forum"&&<div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}><h3 style={{fontSize:"1.15rem",fontWeight:700}}>💬 Discussion forum</h3><button onClick={()=>setNewForum(!newForum)} style={T.btn}>{newForum?"Cancel":"+ New post"}</button></div>
         {newForum&&<div style={{...T.card,borderLeft:"3px solid "+T.teal}}>
@@ -436,13 +489,13 @@ export default function App(){
         {aTab==="stats"&&<div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>}
         {aTab==="quiz"&&<div style={T.card}><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{quizzes.length} questions</span><button onClick={genQuiz} style={T.btn}>🤖 Generate today</button></div>
           {quizzes.map(q=><div key={q.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div><div style={{fontWeight:500,fontSize:".88rem"}}>{q.cat} — {q.diff}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(q.date)} · {Object.keys(q.answers||{}).length} answers</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>{setSelD(q.date);go("quiz")}} style={{...T.btnO,...T.btnSm}}>View</button><button onClick={()=>deleteContent("quizzes",q.id,q.cat)} style={T.btnDanger}>Del</button></div></div>)}</div>}
-        {aTab==="articles"&&<div style={T.card}>{edForm?.type==="articles"?<AdminForm type="Article" fields={[["title","Title"],["cat","Category","select"],["author","Author"],["date","Date (YYYY-MM-DD)"],["body","Content","textarea"],["feat","Featured","check"]]} onSave={()=>saveContent("articles")}/>
+        {aTab==="articles"&&<div style={T.card}>{edForm?.type==="articles"?<AdminForm type="Article" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["cat","Category","select"],["author","Author"],["date","Date (YYYY-MM-DD)"],["cover","Cover image","image"],["body","Content","textarea"],["feat","Featured","check"]]} onSave={()=>saveContent("articles")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{articles.length}</span><button onClick={()=>setEdForm({type:"articles",data:{date:today,author:uName,cat:TOPICS[0]},editing:false})} style={T.btn}>+ New</button></div>
-          {articles.map(a=><div key={a.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div><div style={{fontWeight:500,fontSize:".88rem"}}>{a.title}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(a.date)}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"articles",data:{...a},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("articles",a.id,a.title)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
-        {aTab==="resources"&&<div style={T.card}>{edForm?.type==="resources"?<AdminForm type="Resource" fields={[["title","Title"],["url","Download URL"],["pages","Pages"],["size","Size"],["icon","Emoji"],["free","Free","check"]]} onSave={()=>saveContent("resources")}/>
+          {articles.map(a=><div key={a.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div style={{display:"flex",gap:10,alignItems:"center"}}>{a.cover&&<img src={a.cover} style={{width:50,height:36,objectFit:"cover",borderRadius:6}}/>}<div><div style={{fontWeight:500,fontSize:".88rem"}}>{a.title}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(a.date)}</div></div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"articles",data:{...a},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("articles",a.id,a.title)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
+        {aTab==="resources"&&<div style={T.card}>{edForm?.type==="resources"?<AdminForm type="Resource" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["url","Download URL"],["pages","Pages"],["size","Size"],["icon","Emoji (fallback)"],["thumb","Thumbnail image","image"],["free","Free","check"]]} onSave={()=>saveContent("resources")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{resources.length}</span><button onClick={()=>setEdForm({type:"resources",data:{icon:"📄",free:true},editing:false})} style={T.btn}>+ New</button></div>
-          {resources.map(r=><div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div><div style={{fontWeight:500,fontSize:".88rem"}}>{r.icon||"📄"} {r.title||r.t}</div><div style={{fontSize:".72rem",color:T.mute}}>{r.free?"Free":"Premium"}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"resources",data:{...r},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("resources",r.id,r.title||r.t)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
-        {aTab==="videos"&&<div style={T.card}>{edForm?.type==="videos"?<AdminForm type="Video" fields={[["title","Title"],["cat","Category","select"],["dur","Duration"],["desc","Description","textarea"],["embedUrl","Embed URL"],["icon","Emoji"],["free","Free","check"]]} onSave={()=>saveContent("videos")}/>
+          {resources.map(r=><div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div style={{display:"flex",gap:10,alignItems:"center"}}>{r.thumb?<img src={r.thumb} style={{width:36,height:36,objectFit:"cover",borderRadius:6}}/>:<span style={{fontSize:"1.4rem"}}>{r.icon||"📄"}</span>}<div><div style={{fontWeight:500,fontSize:".88rem"}}>{r.title||r.t}</div><div style={{fontSize:".72rem",color:T.mute}}>{r.free?"Free":"Premium"}</div></div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"resources",data:{...r},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("resources",r.id,r.title||r.t)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
+        {aTab==="videos"&&<div style={T.card}>{edForm?.type==="videos"?<AdminForm type="Video" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["cat","Category","select"],["dur","Duration"],["desc","Description","textarea"],["embedUrl","Embed URL"],["icon","Emoji"],["free","Free","check"]]} onSave={()=>saveContent("videos")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{videos.length}</span><button onClick={()=>setEdForm({type:"videos",data:{icon:"🎥",free:true,cat:TOPICS[0]},editing:false})} style={T.btn}>+ New</button></div>
           {videos.map(v=><div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div><div style={{fontWeight:500,fontSize:".88rem"}}>{v.title||v.t}</div><div style={{fontSize:".72rem",color:T.mute}}>{v.cat} · {v.free?"Free":"Premium"}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"videos",data:{...v},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("videos",v.id,v.title||v.t)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
         {aTab==="users"&&<div style={T.card}><p style={{color:T.mute,fontSize:".82rem",marginBottom:10}}>{allUsers.length} users</p>
