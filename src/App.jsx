@@ -165,7 +165,7 @@ export default function App(){
   const genQuiz=async()=>{if(quizzes.find(q=>q.date===today)){sh("Already exists!");return}setLd(true);const q=await genQuizAI(today);if(q){const id=await fbAdd("quizzes",q);if(id){setQuizzes(p=>[{id,...q},...p]);sh("Question live!")}}else sh("Failed");setLd(false)};
 
   // ═══ CONTENT ═══
-  const saveContent=async(type)=>{const d=edForm.data;if(!d.title){sh("Title required");return}if(edForm.editing){await fbSet(type,d.id,d);sh("Updated!")}else{await fbAdd(type,{...d,order:Date.now()});sh("Created!")}setEdForm(null);loadData()};
+  const saveContent=async(type)=>{const d={...edForm.data,images:edImgs};if(!d.title){sh("Title required");return}if(edForm.editing){await fbSet(type,d.id,d);sh("Updated!")}else{await fbAdd(type,{...d,order:Date.now()});sh("Created!")}setEdForm(null);setEdImgs([]);loadData()};
   const deleteContent=async(type,id,name)=>{if(!confirm(`Delete "${name}"?`))return;await fbDel(type,id);sh("Deleted");loadData()};
 
   // ═══ FORUM POST ═══
@@ -231,16 +231,23 @@ export default function App(){
   // ═══ MAIN NAV — added "Cases" section ═══
   const navs=[{id:"home",ic:"🏠",l:"Home"},{id:"quiz",ic:"🧠",l:"Quiz"},{id:"library",ic:"📚",l:"Library"},{id:"videos",ic:"🎥",l:"Videos"},{id:"cases",ic:"🔬",l:"Cases"},{id:"forum",ic:"💬",l:"Forum"},{id:"rank",ic:"🏆",l:"Rank"},{id:"me",ic:"👤",l:"Me"},...(isAdm?[{id:"admin",ic:"⚙️",l:"Admin"}]:[])];
 
-  const AdminForm=({type,fields,onSave})=>{const d=edForm?.data||{};const set=(k,v)=>setEdForm(p=>({...p,data:{...p.data,[k]:v}}));
-    return(<div style={{...T.card,borderLeft:"3px solid "+T.teal}}>
+  // ═══ ADMIN FORM — uses ref to avoid remount cursor bug ═══
+  const edFormData=edForm?.data||{};
+  const edSet=(k,v)=>setEdForm(p=>({...p,data:{...p.data,[k]:v}}));
+  const[edImgs,setEdImgs]=useState([]);
+  const[edImgUp,setEdImgUp]=useState(false);
+  useEffect(()=>{setEdImgs(edFormData.images||[])},[edForm?.editing,edForm?.type]);
+  const edSaveWithImgs=(type)=>{const d={...edForm.data,images:edImgs};setEdForm(p=>({...p,data:d}));setTimeout(()=>saveContent(type),50)};
+  const renderAdminForm=(type,fields,showImages)=>(<div style={{...T.card,borderLeft:"3px solid "+T.teal}}>
       <h4 style={{color:T.teal,fontWeight:700,marginBottom:12}}>{edForm?.editing?"Edit":"New"} {type}</h4>
       {fields.map(([k,l,tp])=><div key={k} style={{marginBottom:10}}><label style={{display:"block",fontSize:".75rem",color:T.teal,marginBottom:4}}>{l}</label>
-        {tp==="textarea"?<textarea value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.txa}/>
-        :tp==="select"?<select value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.inp}>{TOPICS.map(t=><option key={t} value={t}>{t}</option>)}<option value="General">General</option></select>
-        :tp==="check"?<label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}><input type="checkbox" checked={!!d[k]} onChange={e=>set(k,e.target.checked)}/> {l}</label>
-        :<input value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.inp}/>}</div>)}
-      <div style={{display:"flex",gap:8}}><button onClick={onSave} style={T.btn}>{edForm?.editing?"Update":"Create"}</button><button onClick={()=>setEdForm(null)} style={T.btnO}>Cancel</button></div>
-    </div>)};
+        {tp==="textarea"?<textarea value={edFormData[k]||""} onChange={e=>edSet(k,e.target.value)} style={T.txa}/>
+        :tp==="select"?<select value={edFormData[k]||""} onChange={e=>edSet(k,e.target.value)} style={T.inp}>{TOPICS.map(t=><option key={t} value={t}>{t}</option>)}<option value="General">General</option></select>
+        :tp==="check"?<label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}><input type="checkbox" checked={!!edFormData[k]} onChange={e=>edSet(k,e.target.checked)}/> {l}</label>
+        :<input value={edFormData[k]||""} onChange={e=>edSet(k,e.target.value)} style={T.inp}/>}</div>)}
+      {showImages&&<div style={{marginBottom:12}}><label style={{display:"block",fontSize:".75rem",color:T.teal,marginBottom:6}}>Images</label><ImgUpload images={edImgs} setImages={setEdImgs} uploading={edImgUp} setUploading={setEdImgUp}/></div>}
+      <div style={{display:"flex",gap:8}}><button onClick={()=>{setEdForm(p=>({...p,data:{...p.data,images:edImgs}}));setTimeout(()=>saveContent(type==="Article"?"articles":type==="Resource"?"resources":"videos"),50)}} style={T.btn}>{edForm?.editing?"Update":"Create"}</button><button onClick={()=>setEdForm(null)} style={T.btnO}>Cancel</button></div>
+    </div>);
 
   // ═══ CASE COMMENT INPUT (local state per case) ═══
   const CaseCmtInput=({caseId,caseObj})=>{const[txt,setTxt]=useState("");return(
@@ -275,15 +282,21 @@ export default function App(){
         <h3 style={{fontSize:"1.05rem",fontWeight:700,marginBottom:12}}>Latest articles</h3>
         {articles.length===0&&<p style={{color:T.mute}}>No articles yet. Admins can create them from Admin panel.</p>}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-          {articles.slice(0,6).map(a=><div key={a.id} onClick={()=>setSelA(a)} style={{...T.card,cursor:"pointer",marginBottom:0}}>
+          {articles.slice(0,6).map(a=><div key={a.id} onClick={()=>setSelA(a)} style={{...T.card,cursor:"pointer",marginBottom:0,padding:0,overflow:"hidden"}}>
+            {a.images?.length>0&&<img src={a.images[0]} style={{width:"100%",height:160,objectFit:"cover",borderRadius:"14px 14px 0 0"}}/>}
+            <div style={{padding:"16px 18px"}}>
             <div style={{display:"flex",gap:5,marginBottom:8}}><span style={T.tag(T.tealBg,T.teal)}>{a.cat||"General"}</span>{a.feat&&<span style={T.tag(T.goldBg,T.goldD)}>Featured</span>}</div>
             <h4 style={{fontSize:".95rem",fontWeight:600,lineHeight:1.4}}>{a.title}</h4>
             <p style={{fontSize:".78rem",color:T.txt2,marginTop:6,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{a.body}</p>
             <p style={{fontSize:".72rem",color:T.mute,marginTop:6}}>{a.author||"Admin"} · {fD(a.date)}</p>
+            </div>
           </div>)}
         </div>
       </div>}
-      {pg==="home"&&selA&&<div><button onClick={()=>setSelA(null)} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back</button><div style={{...T.card,maxWidth:720}}><span style={T.tag(T.tealBg,T.teal)}>{selA.cat}</span><h2 style={{fontSize:"1.5rem",fontWeight:700,marginTop:10,lineHeight:1.35}}>{selA.title}</h2><p style={{fontSize:".82rem",color:T.mute,marginTop:8}}>{selA.author} · {fD(selA.date)}</p><div style={{marginTop:20,fontSize:"1rem",color:T.txt2,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{selA.body}</div></div></div>}
+      {pg==="home"&&selA&&<div><button onClick={()=>setSelA(null)} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back</button><div style={{...T.card,maxWidth:720,padding:0,overflow:"hidden"}}>
+        {selA.images?.length>0&&<div style={{display:"flex",gap:0,overflow:"hidden",borderRadius:"14px 14px 0 0"}}>{selA.images.map((img,i)=><img key={i} src={img} style={{width:selA.images.length===1?"100%":"50%",height:240,objectFit:"cover"}}/>)}</div>}
+        <div style={{padding:"20px 24px"}}><span style={T.tag(T.tealBg,T.teal)}>{selA.cat}</span><h2 style={{fontSize:"1.5rem",fontWeight:700,marginTop:10,lineHeight:1.35}}>{selA.title}</h2><p style={{fontSize:".82rem",color:T.mute,marginTop:8}}>{selA.author} · {fD(selA.date)}</p><div style={{marginTop:20,fontSize:"1rem",color:T.txt2,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{selA.body}</div></div>
+      </div></div>}
 
       {/* QUIZ */}
       {pg==="quiz"&&<div>
@@ -318,7 +331,7 @@ export default function App(){
         {resources.length===0&&<p style={{color:T.mute}}>No resources yet.</p>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))",gap:14}}>
           {resources.map(r=><div key={r.id} style={{...T.card,display:"flex",gap:14,alignItems:"center",marginBottom:0}}>
-            <div style={{fontSize:"2rem"}}>{r.icon||"📄"}</div>
+            {r.images?.length>0?<img src={r.images[0]} style={{width:70,height:70,objectFit:"cover",borderRadius:10,flexShrink:0}}/>:<div style={{fontSize:"2rem",flexShrink:0,width:70,textAlign:"center"}}>{r.icon||"📄"}</div>}
             <div style={{flex:1}}><h4 style={{fontSize:".9rem",fontWeight:600,lineHeight:1.3}}>{r.title||r.t}</h4><div style={{fontSize:".72rem",color:T.mute,marginTop:3}}>{r.pages?r.pages+"p · ":""}{r.size||""}</div>
               <div style={{marginTop:6}}>{r.free||isPd?<button onClick={()=>r.url?window.open(r.url,"_blank"):sh("No URL")} style={{...T.btn,...T.btnSm}}>📥 Download</button>:<button style={{...T.btnO,...T.btnSm,color:T.gold,borderColor:T.gold}}>🔒 Premium</button>}</div></div>
           </div>)}
@@ -443,13 +456,13 @@ export default function App(){
         {aTab==="stats"&&<div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>}
         {aTab==="quiz"&&<div style={T.card}><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{quizzes.length} questions</span><button onClick={genQuiz} style={T.btn}>🤖 Generate today</button></div>
           {quizzes.map(q=><div key={q.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div><div style={{fontWeight:500,fontSize:".88rem"}}>{q.cat} — {q.diff}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(q.date)} · {Object.keys(q.answers||{}).length} answers</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>{setSelD(q.date);go("quiz")}} style={{...T.btnO,...T.btnSm}}>View</button><button onClick={()=>deleteContent("quizzes",q.id,q.cat)} style={T.btnDanger}>Del</button></div></div>)}</div>}
-        {aTab==="articles"&&<div style={T.card}>{edForm?.type==="articles"?<AdminForm type="Article" fields={[["title","Title"],["cat","Category","select"],["author","Author"],["date","Date (YYYY-MM-DD)"],["body","Content","textarea"],["feat","Featured","check"]]} onSave={()=>saveContent("articles")}/>
+        {aTab==="articles"&&<div style={T.card}>{edForm?.type==="articles"?renderAdminForm("Article",[["title","Title"],["cat","Category","select"],["author","Author"],["date","Date (YYYY-MM-DD)"],["body","Content","textarea"],["feat","Featured","check"]],true)
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{articles.length}</span><button onClick={()=>setEdForm({type:"articles",data:{date:today,author:uName,cat:TOPICS[0]},editing:false})} style={T.btn}>+ New</button></div>
           {articles.map(a=><div key={a.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div><div style={{fontWeight:500,fontSize:".88rem"}}>{a.title}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(a.date)}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"articles",data:{...a},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("articles",a.id,a.title)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
-        {aTab==="resources"&&<div style={T.card}>{edForm?.type==="resources"?<AdminForm type="Resource" fields={[["title","Title"],["url","Download URL"],["pages","Pages"],["size","Size"],["icon","Emoji"],["free","Free","check"]]} onSave={()=>saveContent("resources")}/>
+        {aTab==="resources"&&<div style={T.card}>{edForm?.type==="resources"?renderAdminForm("Resource",[["title","Title"],["url","Download URL"],["pages","Pages"],["size","Size"],["icon","Emoji"],["free","Free","check"]],true)
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{resources.length}</span><button onClick={()=>setEdForm({type:"resources",data:{icon:"📄",free:true},editing:false})} style={T.btn}>+ New</button></div>
           {resources.map(r=><div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div><div style={{fontWeight:500,fontSize:".88rem"}}>{r.icon||"📄"} {r.title||r.t}</div><div style={{fontSize:".72rem",color:T.mute}}>{r.free?"Free":"Premium"}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"resources",data:{...r},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("resources",r.id,r.title||r.t)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
-        {aTab==="videos"&&<div style={T.card}>{edForm?.type==="videos"?<AdminForm type="Video" fields={[["title","Title"],["cat","Category","select"],["dur","Duration"],["desc","Description","textarea"],["embedUrl","Embed URL"],["icon","Emoji"],["free","Free","check"]]} onSave={()=>saveContent("videos")}/>
+        {aTab==="videos"&&<div style={T.card}>{edForm?.type==="videos"?renderAdminForm("Video",[["title","Title"],["cat","Category","select"],["dur","Duration"],["desc","Description","textarea"],["embedUrl","Embed URL"],["icon","Emoji"],["free","Free","check"]],false)
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{videos.length}</span><button onClick={()=>setEdForm({type:"videos",data:{icon:"🎥",free:true,cat:TOPICS[0]},editing:false})} style={T.btn}>+ New</button></div>
           {videos.map(v=><div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div><div style={{fontWeight:500,fontSize:".88rem"}}>{v.title||v.t}</div><div style={{fontSize:".72rem",color:T.mute}}>{v.cat} · {v.free?"Free":"Premium"}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"videos",data:{...v},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("videos",v.id,v.title||v.t)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
         {aTab==="users"&&<div style={T.card}><p style={{color:T.mute,fontSize:".82rem",marginBottom:10}}>{allUsers.length} users</p>
