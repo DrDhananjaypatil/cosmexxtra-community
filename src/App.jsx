@@ -116,7 +116,6 @@ export default function App(){
   const[selD,setSelD]=useState(ds(getIST()));const[selA,setSelA]=useState(null);const[selV,setSelV]=useState(null);const[toast,setToast]=useState(null);const[cmt,setCmt]=useState("");const[ld,setLd]=useState(false);const[aTab,setATab]=useState("stats");
   const[authMode,setAuthMode]=useState("signin");const[authEmail,setAuthEmail]=useState("");const[authPass,setAuthPass]=useState("");const[authName,setAuthName]=useState("");const[authBusy,setAuthBusy]=useState(false);const[authErr,setAuthErr]=useState("");
   const[pf,setPf]=useState({degree:"",clinic:"",address:""});const[edForm,setEdForm]=useState(null);
-  const[edImgs,setEdImgs]=useState([]);const[edImgUp,setEdImgUp]=useState(false);
   // Forum/Cases new post state
   const[newForum,setNewForum]=useState(false);const[fpT,setFpT]=useState("");const[fpB,setFpB]=useState("");const[fpC,setFpC]=useState(TOPICS[0]);const[fpImgs,setFpImgs]=useState([]);const[fpUp,setFpUp]=useState(false);
   const[newCase,setNewCase]=useState(false);const[ccT,setCcT]=useState("");const[ccB,setCcB]=useState("");const[ccC,setCcC]=useState(TOPICS[0]);const[ccImgs,setCcImgs]=useState([]);const[ccUp,setCcUp]=useState(false);const[ccDiag,setCcDiag]=useState("");
@@ -166,7 +165,7 @@ export default function App(){
   const genQuiz=async()=>{if(quizzes.find(q=>q.date===today)){sh("Already exists!");return}setLd(true);const q=await genQuizAI(today);if(q){const id=await fbAdd("quizzes",q);if(id){setQuizzes(p=>[{id,...q},...p]);sh("Question live!")}}else sh("Failed");setLd(false)};
 
   // ═══ CONTENT ═══
-  const saveContent=async(type)=>{const d={...edForm.data,images:edImgs};if(!d.title){sh("Title required");return}if(edForm.editing){await fbSet(type,d.id,d);sh("Updated!")}else{await fbAdd(type,{...d,order:Date.now()});sh("Created!")}setEdForm(null);setEdImgs([]);loadData()};
+  const saveContent=async(type)=>{const d=edForm.data;if(!d.title){sh("Title required");return}if(edForm.editing){await fbSet(type,d.id,d);sh("Updated!")}else{await fbAdd(type,{...d,order:Date.now()});sh("Created!")}setEdForm(null);loadData()};
   const deleteContent=async(type,id,name)=>{if(!confirm(`Delete "${name}"?`))return;await fbDel(type,id);sh("Deleted");loadData()};
 
   // ═══ FORUM POST ═══
@@ -186,34 +185,27 @@ export default function App(){
   if(scr==="loading")return(<div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui"}}><div style={{textAlign:"center"}}><Logo size={60}/><p style={{color:T.mute,marginTop:12}}>Loading...</p></div></div>);
 
   if(scr==="login")return(
-    <div style={{minHeight:"100vh",fontFamily:"system-ui",position:"relative",overflow:"hidden",background:"#f5ede4"}}>
-      {/* Desktop background */}
-      <img src="/welcome-desktop.png" style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",objectFit:"contain",objectPosition:"center top"}}className="wbg-desk"/>
-      {/* Mobile background */}
-      <img src="/welcome-mobile.png" style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",objectFit:"contain",objectPosition:"center top"}}className="wbg-mob"/>
-      <style>{`
-        .wbg-mob{display:none}
-        @media(max-width:768px){.wbg-desk{display:none}.wbg-mob{display:block}}
-      `}</style>
-      {/* Login card overlay */}
-      <div style={{position:"relative",zIndex:10,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"flex-end",padding:"20px 5% 20px 20px"}}>
-        <div style={{width:"100%",maxWidth:360,background:"rgba(255,255,255,.93)",backdropFilter:"blur(16px)",borderRadius:18,padding:26,boxShadow:"0 8px 40px rgba(0,0,0,.12)"}}>
-          <h2 style={{color:T.txt,fontSize:"1.1rem",fontWeight:700,textAlign:"center",marginBottom:4}}>{authMode==="signin"?"Welcome to SKINARIO":authMode==="signup"?"Join SKINARIO":"Reset password"}</h2>
-          <p style={{color:T.mute,fontSize:".78rem",textAlign:"center",marginBottom:18}}>{authMode==="signin"?"Sign in to continue":authMode==="signup"?"Create your account":"We'll send a reset link"}</p>
-          {authMode!=="forgot"&&<><button onClick={doGoogleLogin} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,background:"#fff",color:"#333",border:"1px solid #ddd",padding:"12px",borderRadius:10,fontSize:".9rem",fontWeight:500,cursor:"pointer",width:"100%",fontFamily:"inherit",boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}><svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>Continue with Google</button>
-          <div style={{display:"flex",alignItems:"center",gap:10,margin:"14px 0",color:T.mute,fontSize:".75rem"}}><div style={{flex:1,height:1,background:T.border}}/>or<div style={{flex:1,height:1,background:T.border}}/></div></>}
-          {authMode==="signup"&&<input value={authName} onChange={e=>setAuthName(e.target.value)} placeholder="Full name (Dr. ...)" style={{...T.inp,marginBottom:10,background:"rgba(255,255,255,.8)"}}/>}
-          <input value={authEmail} onChange={e=>setAuthEmail(e.target.value)} type="email" placeholder="Email address" style={{...T.inp,marginBottom:10,background:"rgba(255,255,255,.8)"}}/>
-          {authMode!=="forgot"&&<input value={authPass} onChange={e=>setAuthPass(e.target.value)} type="password" placeholder="Password (6+ chars)" style={{...T.inp,marginBottom:10,background:"rgba(255,255,255,.8)"}} onKeyDown={e=>e.key==="Enter"&&(authMode==="signin"?doEmailSignin():doEmailSignup())}/>}
-          {authErr&&<div style={{background:T.errBg,color:T.err,padding:"8px 12px",borderRadius:8,fontSize:".8rem",marginBottom:10}}>⚠ {authErr}</div>}
-          <button onClick={authMode==="signin"?doEmailSignin:authMode==="signup"?doEmailSignup:doForgot} disabled={authBusy} style={{...T.btn,width:"100%",opacity:authBusy?.6:1,background:"linear-gradient(135deg,#5a3d6e,#0d6b6e)"}}>{authBusy?"Please wait...":authMode==="signin"?"Sign in":authMode==="signup"?"Create account":"Send reset email"}</button>
-          <div style={{marginTop:12,textAlign:"center",fontSize:".8rem"}}>
-            {authMode==="signin"&&<><span style={{color:T.mute}}>New here? </span><span onClick={()=>{setAuthMode("signup");setAuthErr("")}} style={{color:T.teal,cursor:"pointer",fontWeight:600}}>Create account</span><div style={{marginTop:5}}><span onClick={()=>{setAuthMode("forgot");setAuthErr("")}} style={{color:T.mute,cursor:"pointer",fontSize:".75rem"}}>Forgot password?</span></div></>}
-            {authMode==="signup"&&<><span style={{color:T.mute}}>Have an account? </span><span onClick={()=>{setAuthMode("signin");setAuthErr("")}} style={{color:T.teal,cursor:"pointer",fontWeight:600}}>Sign in</span></>}
-            {authMode==="forgot"&&<span onClick={()=>{setAuthMode("signin");setAuthErr("")}} style={{color:T.teal,cursor:"pointer",fontWeight:600}}>← Back to sign in</span>}
-          </div>
+    <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#f8f7f4,#fdf6e3 40%,#e1f5ee 70%,#f8f7f4)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"system-ui"}}>
+      <Logo size={100}/><h1 style={{fontSize:"2.8rem",fontWeight:300,color:T.txt,marginTop:8,letterSpacing:6,fontFamily:"Georgia,serif"}}>SKINARIO</h1>
+      <p style={{fontSize:".72rem",color:T.gold,letterSpacing:4,textTransform:"uppercase",margin:"6px 0 10px",fontWeight:600}}>{BRAND.tagline}</p>
+      <p style={{color:T.txt2,fontSize:".92rem",textAlign:"center",maxWidth:440,lineHeight:1.7,marginBottom:28}}>Daily clinical quizzes, expert articles, resources, video masterclasses & a vibrant community of aesthetic medicine professionals.</p>
+      <div style={{...T.card,width:"100%",maxWidth:400,padding:24}}>
+        <h2 style={{color:T.txt,fontSize:"1.05rem",fontWeight:700,textAlign:"center",marginBottom:4}}>{authMode==="signin"?"Welcome back":authMode==="signup"?"Join SKINARIO":"Reset password"}</h2>
+        <p style={{color:T.mute,fontSize:".78rem",textAlign:"center",marginBottom:16}}>{authMode==="signin"?"Sign in to continue":authMode==="signup"?"Create your account":"We'll send a reset link"}</p>
+        {authMode!=="forgot"&&<><button onClick={doGoogleLogin} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,background:"#fff",color:"#333",border:"1px solid #ddd",padding:"11px",borderRadius:10,fontSize:".9rem",fontWeight:500,cursor:"pointer",width:"100%",fontFamily:"inherit"}}><svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>Continue with Google</button>
+        <div style={{display:"flex",alignItems:"center",gap:10,margin:"14px 0",color:T.mute,fontSize:".75rem"}}><div style={{flex:1,height:1,background:T.border}}/>or<div style={{flex:1,height:1,background:T.border}}/></div></>}
+        {authMode==="signup"&&<input value={authName} onChange={e=>setAuthName(e.target.value)} placeholder="Full name (Dr. ...)" style={{...T.inp,marginBottom:10}}/>}
+        <input value={authEmail} onChange={e=>setAuthEmail(e.target.value)} type="email" placeholder="Email address" style={{...T.inp,marginBottom:10}}/>
+        {authMode!=="forgot"&&<input value={authPass} onChange={e=>setAuthPass(e.target.value)} type="password" placeholder="Password (6+ chars)" style={{...T.inp,marginBottom:10}} onKeyDown={e=>e.key==="Enter"&&(authMode==="signin"?doEmailSignin():doEmailSignup())}/>}
+        {authErr&&<div style={{background:T.errBg,color:T.err,padding:"8px 12px",borderRadius:8,fontSize:".8rem",marginBottom:10}}>⚠ {authErr}</div>}
+        <button onClick={authMode==="signin"?doEmailSignin:authMode==="signup"?doEmailSignup:doForgot} disabled={authBusy} style={{...T.btn,width:"100%",opacity:authBusy?.6:1}}>{authBusy?"Please wait...":authMode==="signin"?"Sign in":authMode==="signup"?"Create account":"Send reset email"}</button>
+        <div style={{marginTop:12,textAlign:"center",fontSize:".8rem"}}>
+          {authMode==="signin"&&<><span style={{color:T.mute}}>New here? </span><span onClick={()=>{setAuthMode("signup");setAuthErr("")}} style={{color:T.teal,cursor:"pointer",fontWeight:600}}>Create account</span><div style={{marginTop:5}}><span onClick={()=>{setAuthMode("forgot");setAuthErr("")}} style={{color:T.mute,cursor:"pointer",fontSize:".75rem"}}>Forgot password?</span></div></>}
+          {authMode==="signup"&&<><span style={{color:T.mute}}>Have an account? </span><span onClick={()=>{setAuthMode("signin");setAuthErr("")}} style={{color:T.teal,cursor:"pointer",fontWeight:600}}>Sign in</span></>}
+          {authMode==="forgot"&&<span onClick={()=>{setAuthMode("signin");setAuthErr("")}} style={{color:T.teal,cursor:"pointer",fontWeight:600}}>← Back to sign in</span>}
         </div>
       </div>
+      <p style={{marginTop:20,fontSize:".6rem",color:T.light,letterSpacing:2,textTransform:"uppercase"}}>{BRAND.sub}</p>
     </div>);
 
   if(scr==="setup")return(
@@ -232,20 +224,16 @@ export default function App(){
   // ═══ MAIN NAV — added "Cases" section ═══
   const navs=[{id:"home",ic:"🏠",l:"Home"},{id:"quiz",ic:"🧠",l:"Quiz"},{id:"library",ic:"📚",l:"Library"},{id:"videos",ic:"🎥",l:"Videos"},{id:"cases",ic:"🔬",l:"Cases"},{id:"forum",ic:"💬",l:"Forum"},{id:"rank",ic:"🏆",l:"Rank"},{id:"me",ic:"👤",l:"Me"},...(isAdm?[{id:"admin",ic:"⚙️",l:"Admin"}]:[])];
 
-  // ═══ ADMIN FORM — uses ref to avoid remount cursor bug ═══
-  const edFormData=edForm?.data||{};
-  const edSet=(k,v)=>setEdForm(p=>({...p,data:{...p.data,[k]:v}}));
-  useEffect(()=>{setEdImgs(edFormData.images||[])},[edForm?.editing,edForm?.type]);
-  const renderAdminForm=(type,fields,showImages)=>(<div style={{...T.card,borderLeft:"3px solid "+T.teal}}>
+  const AdminForm=({type,fields,onSave})=>{const d=edForm?.data||{};const set=(k,v)=>setEdForm(p=>({...p,data:{...p.data,[k]:v}}));
+    return(<div style={{...T.card,borderLeft:"3px solid "+T.teal}}>
       <h4 style={{color:T.teal,fontWeight:700,marginBottom:12}}>{edForm?.editing?"Edit":"New"} {type}</h4>
       {fields.map(([k,l,tp])=><div key={k} style={{marginBottom:10}}><label style={{display:"block",fontSize:".75rem",color:T.teal,marginBottom:4}}>{l}</label>
-        {tp==="textarea"?<textarea value={edFormData[k]||""} onChange={e=>edSet(k,e.target.value)} style={T.txa}/>
-        :tp==="select"?<select value={edFormData[k]||""} onChange={e=>edSet(k,e.target.value)} style={T.inp}>{TOPICS.map(t=><option key={t} value={t}>{t}</option>)}<option value="General">General</option></select>
-        :tp==="check"?<label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}><input type="checkbox" checked={!!edFormData[k]} onChange={e=>edSet(k,e.target.checked)}/> {l}</label>
-        :<input value={edFormData[k]||""} onChange={e=>edSet(k,e.target.value)} style={T.inp}/>}</div>)}
-      {showImages&&<div style={{marginBottom:12}}><label style={{display:"block",fontSize:".75rem",color:T.teal,marginBottom:6}}>Images</label><ImgUpload images={edImgs} setImages={setEdImgs} uploading={edImgUp} setUploading={setEdImgUp}/></div>}
-      <div style={{display:"flex",gap:8}}><button onClick={()=>{setEdForm(p=>({...p,data:{...p.data,images:edImgs}}));setTimeout(()=>saveContent(type==="Article"?"articles":type==="Resource"?"resources":"videos"),50)}} style={T.btn}>{edForm?.editing?"Update":"Create"}</button><button onClick={()=>setEdForm(null)} style={T.btnO}>Cancel</button></div>
-    </div>);
+        {tp==="textarea"?<textarea value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.txa}/>
+        :tp==="select"?<select value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.inp}>{TOPICS.map(t=><option key={t} value={t}>{t}</option>)}<option value="General">General</option></select>
+        :tp==="check"?<label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}><input type="checkbox" checked={!!d[k]} onChange={e=>set(k,e.target.checked)}/> {l}</label>
+        :<input value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.inp}/>}</div>)}
+      <div style={{display:"flex",gap:8}}><button onClick={onSave} style={T.btn}>{edForm?.editing?"Update":"Create"}</button><button onClick={()=>setEdForm(null)} style={T.btnO}>Cancel</button></div>
+    </div>)};
 
   // ═══ CASE COMMENT INPUT (local state per case) ═══
   const CaseCmtInput=({caseId,caseObj})=>{const[txt,setTxt]=useState("");return(
@@ -280,21 +268,15 @@ export default function App(){
         <h3 style={{fontSize:"1.05rem",fontWeight:700,marginBottom:12}}>Latest articles</h3>
         {articles.length===0&&<p style={{color:T.mute}}>No articles yet. Admins can create them from Admin panel.</p>}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-          {articles.slice(0,6).map(a=><div key={a.id} onClick={()=>setSelA(a)} style={{...T.card,cursor:"pointer",marginBottom:0,padding:0,overflow:"hidden"}}>
-            {a.images?.length>0&&<img src={a.images[0]} style={{width:"100%",height:160,objectFit:"cover",borderRadius:"14px 14px 0 0"}}/>}
-            <div style={{padding:"16px 18px"}}>
+          {articles.slice(0,6).map(a=><div key={a.id} onClick={()=>setSelA(a)} style={{...T.card,cursor:"pointer",marginBottom:0}}>
             <div style={{display:"flex",gap:5,marginBottom:8}}><span style={T.tag(T.tealBg,T.teal)}>{a.cat||"General"}</span>{a.feat&&<span style={T.tag(T.goldBg,T.goldD)}>Featured</span>}</div>
             <h4 style={{fontSize:".95rem",fontWeight:600,lineHeight:1.4}}>{a.title}</h4>
             <p style={{fontSize:".78rem",color:T.txt2,marginTop:6,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{a.body}</p>
             <p style={{fontSize:".72rem",color:T.mute,marginTop:6}}>{a.author||"Admin"} · {fD(a.date)}</p>
-            </div>
           </div>)}
         </div>
       </div>}
-      {pg==="home"&&selA&&<div><button onClick={()=>setSelA(null)} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back</button><div style={{...T.card,maxWidth:720,padding:0,overflow:"hidden"}}>
-        {selA.images?.length>0&&<div style={{display:"flex",gap:0,overflow:"hidden",borderRadius:"14px 14px 0 0"}}>{selA.images.map((img,i)=><img key={i} src={img} style={{width:selA.images.length===1?"100%":"50%",height:240,objectFit:"cover"}}/>)}</div>}
-        <div style={{padding:"20px 24px"}}><span style={T.tag(T.tealBg,T.teal)}>{selA.cat}</span><h2 style={{fontSize:"1.5rem",fontWeight:700,marginTop:10,lineHeight:1.35}}>{selA.title}</h2><p style={{fontSize:".82rem",color:T.mute,marginTop:8}}>{selA.author} · {fD(selA.date)}</p><div style={{marginTop:20,fontSize:"1rem",color:T.txt2,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{selA.body}</div></div>
-      </div></div>}
+      {pg==="home"&&selA&&<div><button onClick={()=>setSelA(null)} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back</button><div style={{...T.card,maxWidth:720}}><span style={T.tag(T.tealBg,T.teal)}>{selA.cat}</span><h2 style={{fontSize:"1.5rem",fontWeight:700,marginTop:10,lineHeight:1.35}}>{selA.title}</h2><p style={{fontSize:".82rem",color:T.mute,marginTop:8}}>{selA.author} · {fD(selA.date)}</p><div style={{marginTop:20,fontSize:"1rem",color:T.txt2,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{selA.body}</div></div></div>}
 
       {/* QUIZ */}
       {pg==="quiz"&&<div>
@@ -329,7 +311,7 @@ export default function App(){
         {resources.length===0&&<p style={{color:T.mute}}>No resources yet.</p>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))",gap:14}}>
           {resources.map(r=><div key={r.id} style={{...T.card,display:"flex",gap:14,alignItems:"center",marginBottom:0}}>
-            {r.images?.length>0?<img src={r.images[0]} style={{width:70,height:70,objectFit:"cover",borderRadius:10,flexShrink:0}}/>:<div style={{fontSize:"2rem",flexShrink:0,width:70,textAlign:"center"}}>{r.icon||"📄"}</div>}
+            <div style={{fontSize:"2rem"}}>{r.icon||"📄"}</div>
             <div style={{flex:1}}><h4 style={{fontSize:".9rem",fontWeight:600,lineHeight:1.3}}>{r.title||r.t}</h4><div style={{fontSize:".72rem",color:T.mute,marginTop:3}}>{r.pages?r.pages+"p · ":""}{r.size||""}</div>
               <div style={{marginTop:6}}>{r.free||isPd?<button onClick={()=>r.url?window.open(r.url,"_blank"):sh("No URL")} style={{...T.btn,...T.btnSm}}>📥 Download</button>:<button style={{...T.btnO,...T.btnSm,color:T.gold,borderColor:T.gold}}>🔒 Premium</button>}</div></div>
           </div>)}
@@ -454,13 +436,13 @@ export default function App(){
         {aTab==="stats"&&<div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>}
         {aTab==="quiz"&&<div style={T.card}><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{quizzes.length} questions</span><button onClick={genQuiz} style={T.btn}>🤖 Generate today</button></div>
           {quizzes.map(q=><div key={q.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div><div style={{fontWeight:500,fontSize:".88rem"}}>{q.cat} — {q.diff}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(q.date)} · {Object.keys(q.answers||{}).length} answers</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>{setSelD(q.date);go("quiz")}} style={{...T.btnO,...T.btnSm}}>View</button><button onClick={()=>deleteContent("quizzes",q.id,q.cat)} style={T.btnDanger}>Del</button></div></div>)}</div>}
-        {aTab==="articles"&&<div style={T.card}>{edForm?.type==="articles"?renderAdminForm("Article",[["title","Title"],["cat","Category","select"],["author","Author"],["date","Date (YYYY-MM-DD)"],["body","Content","textarea"],["feat","Featured","check"]],true)
+        {aTab==="articles"&&<div style={T.card}>{edForm?.type==="articles"?<AdminForm type="Article" fields={[["title","Title"],["cat","Category","select"],["author","Author"],["date","Date (YYYY-MM-DD)"],["body","Content","textarea"],["feat","Featured","check"]]} onSave={()=>saveContent("articles")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{articles.length}</span><button onClick={()=>setEdForm({type:"articles",data:{date:today,author:uName,cat:TOPICS[0]},editing:false})} style={T.btn}>+ New</button></div>
           {articles.map(a=><div key={a.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div><div style={{fontWeight:500,fontSize:".88rem"}}>{a.title}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(a.date)}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"articles",data:{...a},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("articles",a.id,a.title)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
-        {aTab==="resources"&&<div style={T.card}>{edForm?.type==="resources"?renderAdminForm("Resource",[["title","Title"],["url","Download URL"],["pages","Pages"],["size","Size"],["icon","Emoji"],["free","Free","check"]],true)
+        {aTab==="resources"&&<div style={T.card}>{edForm?.type==="resources"?<AdminForm type="Resource" fields={[["title","Title"],["url","Download URL"],["pages","Pages"],["size","Size"],["icon","Emoji"],["free","Free","check"]]} onSave={()=>saveContent("resources")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{resources.length}</span><button onClick={()=>setEdForm({type:"resources",data:{icon:"📄",free:true},editing:false})} style={T.btn}>+ New</button></div>
           {resources.map(r=><div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div><div style={{fontWeight:500,fontSize:".88rem"}}>{r.icon||"📄"} {r.title||r.t}</div><div style={{fontSize:".72rem",color:T.mute}}>{r.free?"Free":"Premium"}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"resources",data:{...r},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("resources",r.id,r.title||r.t)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
-        {aTab==="videos"&&<div style={T.card}>{edForm?.type==="videos"?renderAdminForm("Video",[["title","Title"],["cat","Category","select"],["dur","Duration"],["desc","Description","textarea"],["embedUrl","Embed URL"],["icon","Emoji"],["free","Free","check"]],false)
+        {aTab==="videos"&&<div style={T.card}>{edForm?.type==="videos"?<AdminForm type="Video" fields={[["title","Title"],["cat","Category","select"],["dur","Duration"],["desc","Description","textarea"],["embedUrl","Embed URL"],["icon","Emoji"],["free","Free","check"]]} onSave={()=>saveContent("videos")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{videos.length}</span><button onClick={()=>setEdForm({type:"videos",data:{icon:"🎥",free:true,cat:TOPICS[0]},editing:false})} style={T.btn}>+ New</button></div>
           {videos.map(v=><div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div><div style={{fontWeight:500,fontSize:".88rem"}}>{v.title||v.t}</div><div style={{fontSize:".72rem",color:T.mute}}>{v.cat} · {v.free?"Free":"Premium"}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"videos",data:{...v},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("videos",v.id,v.title||v.t)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
         {aTab==="users"&&<div style={T.card}><p style={{color:T.mute,fontSize:".82rem",marginBottom:10}}>{allUsers.length} users</p>
