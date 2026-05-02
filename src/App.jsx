@@ -185,10 +185,10 @@ const AdminForm=({type,fields,edForm,setEdForm,onSave})=>{
   const set=(k,v)=>setEdForm(p=>({...p,data:{...p.data,[k]:v}}));
   return(<div style={{...T.card,borderLeft:"3px solid "+T.teal}}>
     <h4 style={{color:T.teal,fontWeight:700,marginBottom:12}}>{edForm?.editing?"Edit":"New"} {type}</h4>
-    {fields.map(([k,l,tp])=><div key={k} style={{marginBottom:10}}>
+    {fields.map(([k,l,tp,opts])=><div key={k} style={{marginBottom:10}}>
       <label style={{display:"block",fontSize:".75rem",color:T.teal,marginBottom:4}}>{l}</label>
       {tp==="textarea"?<textarea value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.txa}/>
-      :tp==="select"?<select value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.inp}>{TOPICS.map(t=><option key={t} value={t}>{t}</option>)}<option value="General">General</option></select>
+      :tp==="select"?<select value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.inp}>{(opts||TOPICS).map(t=><option key={t} value={t}>{t}</option>)}{!opts&&<option value="General">General</option>}</select>
       :tp==="check"?<label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}><input type="checkbox" checked={!!d[k]} onChange={e=>set(k,e.target.checked)}/> {l}</label>
       :tp==="image"?<AdminImgField value={d[k]} onChange={url=>set(k,url)}/>
       :<input value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.inp}/>}
@@ -246,21 +246,27 @@ export default function App(){
   const[newForum,setNewForum]=useState(false);const[fpT,setFpT]=useState("");const[fpB,setFpB]=useState("");const[fpC,setFpC]=useState(TOPICS[0]);const[fpImgs,setFpImgs]=useState([]);const[fpUp,setFpUp]=useState(false);
   const[newCase,setNewCase]=useState(false);const[ccT,setCcT]=useState("");const[ccB,setCcB]=useState("");const[ccC,setCcC]=useState(TOPICS[0]);const[ccImgs,setCcImgs]=useState([]);const[ccUp,setCcUp]=useState(false);const[ccDiag,setCcDiag]=useState("");
 
-  const sh=m=>setToast(m);const go=p=>{setPg(p);setSelA(null);setSelV(null);setEdForm(null)};
+  const sh=m=>setToast(m);const go=p=>{setPg(p);setSelA(null);setSelV(null);setSelAd(null);setSelE(null);setEdForm(null)};
   useEffect(()=>{if(toast){const t=setTimeout(()=>setToast(null),3000);return()=>clearTimeout(t)}},[toast]);
 
   const[ads,setAds]=useState([]);
-  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad]=await Promise.all([fbGetAll("quizzes","date","desc"),fbGetAll("articles","date","desc"),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc"),fbGetAll("cases","createdAt","desc"),fbGetAll("users","joined","desc"),fbGetAll("ads","createdAt","desc")]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad)},[]);
+  const[events,setEvents]=useState([]);
+  const[selAd,setSelAd]=useState(null);
+  const[selE,setSelE]=useState(null);
+  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev]=await Promise.all([fbGetAll("quizzes","date","desc"),fbGetAll("articles","date","desc"),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc"),fbGetAll("cases","createdAt","desc"),fbGetAll("users","joined","desc"),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev)},[]);
 
   useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){setProf(p);setScr("main");loadData()}else{setPf({degree:"",clinic:"",address:""});setScr("setup")}}else{setAu(null);setProf(null);setScr("login")}});return()=>unsub()},[loadData]);
 
-  // ═══ DEEP-LINK: open shared article/video/forum from URL (?article=ID, ?video=ID, ?forum=ID) ═══
+  // ═══ DEEP-LINK: open shared article/video/forum/event/ad/quiz from URL ═══
   useEffect(()=>{
     if(scr!=="main")return;
     const params=new URLSearchParams(window.location.search);
     const articleId=params.get("article");
     const videoId=params.get("video");
     const forumId=params.get("forum");
+    const eventId=params.get("event");
+    const adId=params.get("ad");
+    const quizId=params.get("quiz");
     if(articleId&&articles.length){
       const found=articles.find(a=>a.id===articleId);
       if(found){setPg("home");setSelA(found);window.history.replaceState({},"",window.location.pathname)}
@@ -269,11 +275,22 @@ export default function App(){
       const found=videos.find(v=>v.id===videoId);
       if(found){setPg("videos");setSelV(found);window.history.replaceState({},"",window.location.pathname)}
       else{sh("Video not found");window.history.replaceState({},"",window.location.pathname)}
+    }else if(eventId&&events.length){
+      const found=events.find(e=>e.id===eventId);
+      if(found){setPg("events");setSelE(found);window.history.replaceState({},"",window.location.pathname)}
+      else{sh("Event not found");window.history.replaceState({},"",window.location.pathname)}
+    }else if(adId&&ads.length){
+      const found=ads.find(a=>a.id===adId);
+      if(found&&found.adType==="internal"){setPg("ad");setSelAd(found);window.history.replaceState({},"",window.location.pathname)}
+      else{window.history.replaceState({},"",window.location.pathname)}
+    }else if(quizId&&quizzes.length){
+      const found=quizzes.find(q=>q.id===quizId);
+      if(found){setPg("quiz");setSelD(found.date);window.history.replaceState({},"",window.location.pathname)}
+      else{sh("Quiz not found");window.history.replaceState({},"",window.location.pathname)}
     }else if(forumId&&forumPosts.length){
-      // Forum doesn't have a detail view yet, just navigate to forum tab
       setPg("forum");window.history.replaceState({},"",window.location.pathname);
     }
-  },[scr,articles,videos,forumPosts]);
+  },[scr,articles,videos,forumPosts,events,ads,quizzes]);
 
   const isAdm=prof&&ADMINS.includes(au?.email);const isPd=prof?.paid;const today=ds(getIST());const hr=getIST().getHours();
   const uName=prof?.name||au?.displayName||"Doctor";const uIni=(uName.replace(/^Dr\.?\s*/i,"").split(" ").map(w=>w[0]).join("").toUpperCase()||"D").slice(0,2);const uPhoto=au?.photoURL;
@@ -309,6 +326,18 @@ export default function App(){
     sh(has?"Removed from saved":"🔖 Saved to your profile");
   };
 
+  // ═══ RSVP for events ═══
+  const toggleRsvp=async(ev)=>{
+    if(!au)return;
+    const attendees=ev.attendees||[];
+    const has=attendees.find(a=>a.uid===au.uid);
+    const newAttendees=has?attendees.filter(a=>a.uid!==au.uid):[...attendees,{uid:au.uid,name:uName,ini:uIni,photo:uPhoto||"",joined:ds(getIST())}];
+    await fbSet("events",ev.id,{attendees:newAttendees});
+    setEvents(p=>p.map(x=>x.id===ev.id?{...x,attendees:newAttendees}:x));
+    if(selE?.id===ev.id)setSelE(p=>({...p,attendees:newAttendees}));
+    sh(has?"RSVP cancelled":"✓ You're going!");
+  };
+
   // ═══ QUIZ COMMENT LIKE ═══
   const toggleCommentLike=async(quizId,qObj,cmtIdx)=>{
     const comments=[...(qObj.comments||[])];const c=comments[cmtIdx];
@@ -340,7 +369,7 @@ export default function App(){
 
   const leaderboard=allUsers.filter(u=>u.totalAnswered>0).sort((a,b)=>{const aA=a.totalAnswered?Math.round(a.totalCorrect/a.totalAnswered*100):0;const bA=b.totalAnswered?Math.round(b.totalCorrect/b.totalAnswered*100):0;return bA-aA||(b.streak||0)-(a.streak||0)}).slice(0,20);
 
-  const W="1100px";const dates=Array.from({length:14},(_,i)=>{let d=new Date(getIST());d.setDate(d.getDate()-(13-i));return ds(d)});
+  const W="1400px";const dates=Array.from({length:14},(_,i)=>{let d=new Date(getIST());d.setDate(d.getDate()-(13-i));return ds(d)});
   const qObj=quizzes.find(q=>q.date===selD);const uA=qObj?.answers?.[au?.uid];const isT=selD===today;const rev=!isT||hr>=21;const dd=Math.floor((new Date(today)-new Date(selD))/864e5);const canA=uA===undefined&&(isT||(dd<=3&&dd>0));
 
   if(scr==="loading")return(<div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui"}}><div style={{textAlign:"center"}}><Logo size={60}/><p style={{color:T.mute,marginTop:12}}>Loading...</p></div></div>);
@@ -394,7 +423,7 @@ export default function App(){
       </div></div></div>);
 
   // ═══ MAIN NAV — added "Cases" section ═══
-  const navs=[{id:"home",ic:"🏠",l:"Home"},{id:"quiz",ic:"🧠",l:"Quiz"},{id:"library",ic:"📚",l:"Library"},{id:"videos",ic:"🎥",l:"Videos"},{id:"cases",ic:"🔬",l:"Cases"},{id:"forum",ic:"💬",l:"Forum"},{id:"rank",ic:"🏆",l:"Rank"},{id:"me",ic:"👤",l:"Me"},...(isAdm?[{id:"admin",ic:"⚙️",l:"Admin"}]:[])];
+  const navs=[{id:"home",ic:"🏠",l:"Home"},{id:"quiz",ic:"🧠",l:"Quiz"},{id:"library",ic:"📚",l:"Library"},{id:"videos",ic:"🎥",l:"Videos"},{id:"events",ic:"📅",l:"Events"},{id:"cases",ic:"🔬",l:"Cases"},{id:"forum",ic:"💬",l:"Forum"},{id:"rank",ic:"🏆",l:"Rank"},{id:"me",ic:"👤",l:"Me"},...(isAdm?[{id:"admin",ic:"⚙️",l:"Admin"}]:[])];
 
   return(
     <div style={{minHeight:"100vh",background:T.bg,fontFamily:"system-ui",color:T.txt}}>
@@ -474,7 +503,7 @@ export default function App(){
             // Random selection so users see different ads on each visit
             const showAds=[...liveAds].sort(()=>Math.random()-0.5).slice(0,2);
             return(<div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {showAds.map(ad=><div key={ad.id} style={{...T.card,marginBottom:0,padding:0,overflow:"hidden",cursor:"pointer"}} onClick={async()=>{await fbSet("ads",ad.id,{clicks:(ad.clicks||0)+1});if(ad.url)window.open(ad.url,"_blank")}}>
+              {showAds.map(ad=><div key={ad.id} style={{...T.card,marginBottom:0,padding:0,overflow:"hidden",cursor:"pointer"}} onClick={async()=>{await fbSet("ads",ad.id,{clicks:(ad.clicks||0)+1});if(ad.adType==="internal"){setPg("ad");setSelAd(ad);window.scrollTo(0,0)}else if(ad.url){window.open(ad.url,"_blank")}}}>
                 <div style={{position:"relative"}}>
                   {ad.image&&<img src={ad.image} style={{width:"100%",height:140,objectFit:"cover",display:"block"}}/>}
                   <span style={{position:"absolute",top:6,left:6,background:"rgba(0,0,0,0.55)",color:"#fff",padding:"2px 8px",borderRadius:4,fontSize:".58rem",letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>Sponsored</span>
@@ -507,6 +536,30 @@ export default function App(){
                 <div style={{fontSize:".82rem",fontWeight:500,lineHeight:1.4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden",marginBottom:4}}>{p.title}</div>
                 <div style={{display:"flex",gap:10,fontSize:".68rem",color:T.mute}}><span>❤️ {p.likes||0}</span><span>{p.author?p.author.split(" ")[0]:"User"}</span></div>
               </div>)}
+            </div>)
+          })()}
+
+          {/* Upcoming events widget */}
+          {(()=>{
+            const todayStr=ds(getIST());
+            const upcoming=events.filter(e=>e.date&&e.date>=todayStr).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,3);
+            if(!upcoming.length)return null;
+            return(<div style={{...T.card,marginBottom:0,padding:16}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <h4 style={{fontSize:".88rem",fontWeight:700,margin:0,display:"flex",alignItems:"center",gap:6}}>📅 Upcoming events</h4>
+                <span onClick={()=>go("events")} style={{fontSize:".7rem",color:T.teal,cursor:"pointer",fontWeight:500}}>All →</span>
+              </div>
+              {upcoming.map((e,i)=>{const dt=new Date(e.date+"T12:00:00");const day=dt.getDate();const mo=dt.toLocaleDateString("en-IN",{month:"short"}).toUpperCase();return<div key={e.id} onClick={()=>{setSelE(e);go("events");setSelE(e)}} style={{display:"flex",gap:10,alignItems:"center",padding:"8px 0",borderBottom:i<upcoming.length-1?"1px solid "+T.border:"none",cursor:"pointer"}}>
+                <div style={{minWidth:42,height:48,borderRadius:8,background:T.tealBg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flexShrink:0,border:"1px solid "+T.teal+"33"}}>
+                  <div style={{fontSize:".55rem",color:T.teal,fontWeight:700,letterSpacing:1}}>{mo}</div>
+                  <div style={{fontSize:"1.15rem",fontWeight:700,color:T.teal,lineHeight:1}}>{day}</div>
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:".58rem",color:T.gold,textTransform:"uppercase",fontWeight:600,letterSpacing:1,marginBottom:2}}>{e.cat||"Event"}</div>
+                  <div style={{fontSize:".8rem",fontWeight:500,lineHeight:1.3,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{e.title}</div>
+                  {e.location&&<div style={{fontSize:".68rem",color:T.mute,marginTop:2}}>📍 {e.location}</div>}
+                </div>
+              </div>})}
             </div>)
           })()}
 
@@ -543,6 +596,10 @@ export default function App(){
               return<div key={i} onClick={()=>canA&&submitAnswer(qObj.id,qObj,i)} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 16px",background:co?T.okBg:wr?T.errBg:"#fff",border:`1.5px solid ${co?"#1a7d42":wr?"#c0392b":T.border}`,borderRadius:12,marginBottom:10,cursor:canA?"pointer":"default",opacity:!canA&&!sr?.5:1}}><div style={{...T.av(28,co?"#1a7d42":wr?"#c0392b":T.tealBg,co||wr?"#fff":T.teal),fontSize:".78rem",flexShrink:0}}>{l}</div><div style={{fontSize:".92rem",lineHeight:1.55}}>{o}</div></div>})}
             {uA!==undefined&&<p style={{color:uA===qObj.ci?T.ok:T.err,fontWeight:600,marginTop:10}}>{uA===qObj.ci?"✓ Correct!":"✗ Incorrect."}</p>}
             {((uA!==undefined&&rev)||(!canA&&rev&&dd>0))&&qObj.expl&&<div style={{background:T.goldBg,border:"1px solid #f0e6c8",borderRadius:12,padding:16,marginTop:12}}><div style={{color:T.goldD,fontWeight:700,marginBottom:8}}>💡 Explanation</div><div style={{fontSize:".88rem",color:T.txt2,lineHeight:1.75}} dangerouslySetInnerHTML={{__html:qObj.expl}}/></div>}
+            <div style={{display:"flex",alignItems:"center",gap:12,marginTop:14,paddingTop:12,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
+              <LikeBtn liked={(qObj.likedBy||[]).includes(au?.uid)} count={qObj.likes||0} onToggle={()=>toggleLike("quizzes",qObj.id,qObj,setQuizzes)}/>
+              <ShareBar title={`SKINARIO Daily Quiz: ${qObj.cat} (${qObj.diff})`} url={`${window.location.origin}/?quiz=${qObj.id}`} description={qObj.question?.slice(0,120)} itemId={qObj.id} itemType="quizzes" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>
+            </div>
           </div>
           {/* Comments with LIKE buttons */}
           <div style={T.card}><div style={{fontSize:".88rem",color:T.teal,fontWeight:600,marginBottom:10}}>💬 Discussion ({qObj.comments?.length||0})</div>
@@ -599,6 +656,141 @@ export default function App(){
           <CommentThread collection="videos" itemId={selV.id} item={selV} currentUser={au} uName={uName} uIni={uIni} onUpdate={(id,comments)=>{setVideos(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelV(p=>({...p,comments}))}}/>
         </div>
       </div>}
+
+      {/* ═══ AD DETAIL PAGE (internal-type ads) ═══ */}
+      {pg==="ad"&&selAd&&<div>
+        <button onClick={()=>{setSelAd(null);go("home")}} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back</button>
+        <div style={{...T.card,maxWidth:760,padding:0,overflow:"hidden"}}>
+          {selAd.image&&<img src={selAd.image} style={{width:"100%",maxHeight:340,objectFit:"cover",display:"block"}}/>}
+          <div style={{padding:24}}>
+            <div style={{display:"flex",gap:6,marginBottom:10,alignItems:"center"}}>
+              <span style={{background:"rgba(0,0,0,0.55)",color:"#fff",padding:"3px 10px",borderRadius:4,fontSize:".62rem",letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>Sponsored</span>
+              {selAd.tag&&<span style={T.tag(T.goldBg,T.goldD)}>{selAd.tag}</span>}
+            </div>
+            <h2 style={{fontSize:"1.6rem",fontWeight:700,marginBottom:6,lineHeight:1.3}}>{selAd.title}</h2>
+            {selAd.desc&&<p style={{fontSize:".95rem",color:T.txt2,lineHeight:1.6,marginBottom:14}}>{selAd.desc}</p>}
+            {selAd.body&&<div style={{fontSize:".95rem",color:T.txt2,lineHeight:1.8,whiteSpace:"pre-wrap",marginBottom:18}}>{selAd.body}</div>}
+            {selAd.gallery?.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:10,marginBottom:18}}>
+              {selAd.gallery.map((url,i)=><img key={i} src={url} style={{width:"100%",height:140,objectFit:"cover",borderRadius:8}}/>)}
+            </div>}
+            {selAd.video&&<div style={{position:"relative",paddingBottom:"56.25%",height:0,borderRadius:12,overflow:"hidden",marginBottom:18}}><iframe src={selAd.video} style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:0}} allowFullScreen/></div>}
+            <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:8}}>
+              {selAd.url&&<a href={selAd.url} target="_blank" rel="noopener noreferrer" style={{...T.btn,display:"inline-block",textDecoration:"none"}} onClick={async()=>{await fbSet("ads",selAd.id,{visits:(selAd.visits||0)+1})}}>{selAd.cta||"Visit website"} →</a>}
+              {selAd.brochure&&<a href={selAd.brochure} target="_blank" rel="noopener noreferrer" style={{...T.btnO,display:"inline-block",textDecoration:"none"}}>📄 Download brochure</a>}
+            </div>
+            {selAd.contact&&<div style={{marginTop:18,padding:14,background:T.bg,borderRadius:10,fontSize:".85rem",color:T.txt2}}><b style={{color:T.txt}}>Contact:</b> {selAd.contact}</div>}
+            <div style={{display:"flex",alignItems:"center",gap:12,marginTop:18,paddingTop:14,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
+              <LikeBtn liked={(selAd.likedBy||[]).includes(au?.uid)} count={selAd.likes||0} onToggle={()=>{toggleLike("ads",selAd.id,selAd,setAds);setSelAd(p=>{const lb=p.likedBy||[];const has=lb.includes(au.uid);const nlb=has?lb.filter(u=>u!==au.uid):[...lb,au.uid];return{...p,likedBy:nlb,likes:nlb.length}})}}/>
+              <ShareBar title={selAd.title} url={`${window.location.origin}/?ad=${selAd.id}`} description={selAd.desc?.slice(0,120)} itemId={selAd.id} itemType="ads" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>
+            </div>
+          </div>
+        </div>
+      </div>}
+
+      {/* ═══ EVENTS PAGE ═══ */}
+      {pg==="events"&&!selE&&(()=>{
+        const todayStr=ds(getIST());
+        const upcoming=events.filter(e=>e.date&&e.date>=todayStr).sort((a,b)=>a.date.localeCompare(b.date));
+        const past=events.filter(e=>e.date&&e.date<todayStr).sort((a,b)=>b.date.localeCompare(a.date));
+        const evTab=aTab.startsWith("ev_")?aTab.replace("ev_",""):"upcoming";
+        const list=evTab==="upcoming"?upcoming:evTab==="past"?past:upcoming;
+        return(<div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
+            <div><h3 style={{fontSize:"1.3rem",fontWeight:700,margin:0}}>📅 Events</h3><p style={{color:T.mute,fontSize:".85rem",marginTop:3}}>Conferences, workshops, webinars & masterclasses</p></div>
+            {isAdm&&<button onClick={()=>{setATab("events");go("admin")}} style={T.btnO}>⚙️ Manage events</button>}
+          </div>
+          <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
+            {[["upcoming","Upcoming",upcoming.length],["past","Past events",past.length]].map(([id,l,n])=><button key={id} onClick={()=>setATab("ev_"+id)} style={{padding:"7px 14px",borderRadius:10,border:`1.5px solid ${evTab===id?T.teal:T.border}`,background:evTab===id?T.tealBg:"#fff",color:evTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".82rem",fontWeight:evTab===id?600:400,fontFamily:"inherit"}}>{l} ({n})</button>)}
+          </div>
+          {list.length===0&&<div style={{...T.card,textAlign:"center",padding:40}}><div style={{fontSize:"2rem",marginBottom:8}}>📅</div><p style={{color:T.mute}}>{evTab==="upcoming"?"No upcoming events. Check back soon!":"No past events yet."}</p></div>}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:14}}>
+            {list.map(e=>{const dt=new Date(e.date+"T12:00:00");const day=dt.getDate();const mo=dt.toLocaleDateString("en-IN",{month:"short"}).toUpperCase();const isPast=e.date<todayStr;const attending=(e.attendees||[]).find(a=>a.uid===au?.uid);
+              return<div key={e.id} onClick={()=>setSelE(e)} style={{...T.card,cursor:"pointer",marginBottom:0,padding:0,overflow:"hidden",opacity:isPast?.85:1}}>
+                {e.banner?<img src={e.banner} style={{width:"100%",height:140,objectFit:"cover"}}/>:<div style={{height:140,background:"linear-gradient(135deg,"+T.tealBg+","+T.goldBg+")",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"3rem"}}>📅</div>}
+                <div style={{padding:16}}>
+                  <div style={{display:"flex",gap:10,alignItems:"flex-start",marginBottom:8}}>
+                    <div style={{minWidth:50,height:54,borderRadius:8,background:T.tealBg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",border:"1px solid "+T.teal+"33"}}>
+                      <div style={{fontSize:".58rem",color:T.teal,fontWeight:700,letterSpacing:1}}>{mo}</div>
+                      <div style={{fontSize:"1.3rem",fontWeight:700,color:T.teal,lineHeight:1}}>{day}</div>
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <span style={T.tag(T.goldBg,T.goldD)}>{e.cat||"Event"}</span>
+                      <h4 style={{fontSize:"1rem",fontWeight:600,marginTop:6,lineHeight:1.35}}>{e.title}</h4>
+                    </div>
+                  </div>
+                  <div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.6}}>
+                    {e.time&&<div>🕐 {e.time}</div>}
+                    {e.location&&<div>📍 {e.location}</div>}
+                    {e.attendees?.length>0&&<div style={{marginTop:6,color:T.teal,fontWeight:500}}>👥 {e.attendees.length} attending{attending?" · You're going":""}</div>}
+                  </div>
+                  {e.sponsor&&<div style={{display:"flex",alignItems:"center",gap:8,marginTop:10,paddingTop:10,borderTop:"1px dashed "+T.border}}>
+                    {e.sponsorLogo&&<img src={e.sponsorLogo} style={{height:24,maxWidth:60,objectFit:"contain"}}/>}
+                    <span style={{fontSize:".68rem",color:T.mute}}>Sponsored by <b style={{color:T.txt2}}>{e.sponsor}</b></span>
+                  </div>}
+                </div>
+              </div>})}
+          </div>
+        </div>);
+      })()}
+
+      {/* ═══ EVENT DETAIL ═══ */}
+      {pg==="events"&&selE&&(()=>{
+        const dt=new Date(selE.date+"T12:00:00");const day=dt.getDate();const mo=dt.toLocaleDateString("en-IN",{month:"long"});const wd=dt.toLocaleDateString("en-IN",{weekday:"long"});
+        const isPast=selE.date<ds(getIST());
+        const attending=(selE.attendees||[]).find(a=>a.uid===au?.uid);
+        return(<div>
+          <button onClick={()=>setSelE(null)} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back to events</button>
+          <div style={{...T.card,maxWidth:760,padding:0,overflow:"hidden"}}>
+            {selE.banner&&<img src={selE.banner} style={{width:"100%",maxHeight:340,objectFit:"cover",display:"block"}}/>}
+            <div style={{padding:24}}>
+              <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:10,flexWrap:"wrap"}}>
+                <span style={T.tag(T.goldBg,T.goldD)}>{selE.cat||"Event"}</span>
+                {isPast&&<span style={T.tag(T.errBg,T.err)}>Past event</span>}
+              </div>
+              <h2 style={{fontSize:"1.6rem",fontWeight:700,marginBottom:14,lineHeight:1.3}}>{selE.title}</h2>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,padding:14,background:T.bg,borderRadius:10,marginBottom:18}}>
+                <div><div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Date</div><div style={{fontSize:".88rem",fontWeight:600}}>{wd}, {mo} {day}</div></div>
+                {selE.time&&<div><div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Time</div><div style={{fontSize:".88rem",fontWeight:600}}>{selE.time}</div></div>}
+                {selE.location&&<div><div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Location</div><div style={{fontSize:".88rem",fontWeight:600}}>{selE.location}</div></div>}
+                {selE.organizer&&<div><div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Organizer</div><div style={{fontSize:".88rem",fontWeight:600}}>{selE.organizer}</div></div>}
+              </div>
+              {selE.body&&<div style={{fontSize:".95rem",color:T.txt2,lineHeight:1.8,whiteSpace:"pre-wrap",marginBottom:18}}>{selE.body}</div>}
+              {selE.speakers&&<div style={{marginBottom:18}}><div style={{fontSize:".82rem",color:T.teal,fontWeight:600,marginBottom:6}}>Speakers</div><div style={{fontSize:".9rem",color:T.txt2,lineHeight:1.7}}>{selE.speakers}</div></div>}
+              {selE.sponsor&&<div style={{display:"flex",alignItems:"center",gap:14,padding:14,background:T.goldBg,borderRadius:10,marginBottom:18,border:"1px solid #f0e6c8"}}>
+                {selE.sponsorLogo&&<img src={selE.sponsorLogo} style={{height:40,maxWidth:120,objectFit:"contain"}}/>}
+                <div><div style={{fontSize:".7rem",color:T.goldD,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>Sponsored by</div><div style={{fontSize:"1rem",fontWeight:600,color:T.txt}}>{selE.sponsor}</div></div>
+              </div>}
+
+              {/* Registration */}
+              {!isPast&&<div style={{padding:16,background:T.tealBg,borderRadius:12,marginBottom:14}}>
+                {selE.regType==="external"&&selE.regUrl?<>
+                  <p style={{fontSize:".88rem",color:T.teal,marginBottom:10,fontWeight:500}}>Registration via partner site:</p>
+                  <a href={selE.regUrl} target="_blank" rel="noopener noreferrer" style={{...T.btn,display:"inline-block",textDecoration:"none"}}>{selE.regCta||"Register now"} →</a>
+                </>:<>
+                  <p style={{fontSize:".88rem",color:T.teal,marginBottom:10,fontWeight:500}}>{attending?"You're registered for this event!":"Will you attend?"}</p>
+                  <button onClick={()=>toggleRsvp(selE)} style={attending?{...T.btnO,color:T.err,borderColor:"#f0c0c0"}:T.btn}>{attending?"✓ Cancel RSVP":"📌 I'll attend"}</button>
+                </>}
+              </div>}
+
+              {/* Attendees */}
+              {selE.attendees?.length>0&&<div style={{marginBottom:14}}>
+                <div style={{fontSize:".82rem",color:T.teal,fontWeight:600,marginBottom:8}}>👥 {selE.attendees.length} attending</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {selE.attendees.slice(0,12).map((a,i)=>a.photo?<img key={i} src={a.photo} title={a.name} style={{width:32,height:32,borderRadius:"50%",border:"2px solid "+T.tealBg}}/>:<div key={i} title={a.name} style={T.av(32,T.tealBg,T.teal)}>{a.ini}</div>)}
+                  {selE.attendees.length>12&&<div style={{...T.av(32,T.bg,T.mute),fontSize:".7rem"}}>+{selE.attendees.length-12}</div>}
+                </div>
+              </div>}
+
+              {/* Like + share */}
+              <div style={{display:"flex",alignItems:"center",gap:12,marginTop:18,paddingTop:14,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
+                <LikeBtn liked={(selE.likedBy||[]).includes(au?.uid)} count={selE.likes||0} onToggle={()=>{toggleLike("events",selE.id,selE,setEvents);setSelE(p=>{const lb=p.likedBy||[];const has=lb.includes(au.uid);const nlb=has?lb.filter(u=>u!==au.uid):[...lb,au.uid];return{...p,likedBy:nlb,likes:nlb.length}})}}/>
+                <ShareBar title={selE.title} url={`${window.location.origin}/?event=${selE.id}`} description={selE.body?.slice(0,120)} itemId={selE.id} itemType="events" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>
+              </div>
+              <CommentThread collection="events" itemId={selE.id} item={selE} currentUser={au} uName={uName} uIni={uIni} onUpdate={(id,comments)=>{setEvents(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelE(p=>({...p,comments}))}}/>
+            </div>
+          </div>
+        </div>);
+      })()}
 
       {/* ═══ CLINICAL CASES ═══ */}
       {pg==="cases"&&<div>
@@ -720,9 +912,9 @@ export default function App(){
       {pg==="admin"&&isAdm&&<div>
         <h3 style={{fontSize:"1.15rem",fontWeight:700,marginBottom:12}}>⚙️ Admin dashboard</h3>
         <div style={{display:"flex",gap:5,marginBottom:16,flexWrap:"wrap"}}>
-          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["ads","📢 Ads"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null)}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
+          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["ads","📢 Ads"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null)}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
         </div>
-        {aTab==="stats"&&<div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length],["Ads",ads.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>}
+        {aTab==="stats"&&<div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length],["Events",events.length],["Ads",ads.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>}
         {aTab==="quiz"&&<div style={T.card}><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{quizzes.length} questions</span><button onClick={genQuiz} style={T.btn}>🤖 Generate today</button></div>
           {quizzes.map(q=><div key={q.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div><div style={{fontWeight:500,fontSize:".88rem"}}>{q.cat} — {q.diff}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(q.date)} · {Object.keys(q.answers||{}).length} answers</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>{setSelD(q.date);go("quiz")}} style={{...T.btnO,...T.btnSm}}>View</button><button onClick={()=>deleteContent("quizzes",q.id,q.cat)} style={T.btnDanger}>Del</button></div></div>)}</div>}
         {aTab==="articles"&&<div style={T.card}>{edForm?.type==="articles"?<AdminForm type="Article" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["cat","Category","select"],["author","Author"],["date","Date (YYYY-MM-DD)"],["cover","Cover image","image"],["body","Content","textarea"],["feat","Featured","check"]]} onSave={()=>saveContent("articles")}/>
@@ -734,10 +926,14 @@ export default function App(){
         {aTab==="videos"&&<div style={T.card}>{edForm?.type==="videos"?<AdminForm type="Video" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["cat","Category","select"],["dur","Duration"],["desc","Description","textarea"],["embedUrl","Embed URL"],["icon","Emoji"],["free","Free","check"]]} onSave={()=>saveContent("videos")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{videos.length}</span><button onClick={()=>setEdForm({type:"videos",data:{icon:"🎥",free:true,cat:TOPICS[0]},editing:false})} style={T.btn}>+ New</button></div>
           {videos.map(v=><div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div><div style={{fontWeight:500,fontSize:".88rem"}}>{v.title||v.t}</div><div style={{fontSize:".72rem",color:T.mute}}>{v.cat} · {v.free?"Free":"Premium"}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"videos",data:{...v},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("videos",v.id,v.title||v.t)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
-        {aTab==="ads"&&<div style={T.card}>{edForm?.type==="ads"?<AdminForm type="Ad" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title (e.g. 'Advanced Botox Course')"],["desc","Short description","textarea"],["image","Banner image (recommended 600x340)","image"],["url","Click-through URL"],["tag","Category tag (e.g. Course, Pharma, Institute)"],["expiry","Expiry date (YYYY-MM-DD, leave blank = no expiry)"],["active","Active (uncheck to pause without deleting)","check"]]} onSave={()=>saveContent("ads")}/>
-          :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><div><span style={{color:T.mute}}>{ads.length} ads · {ads.filter(a=>a.active!==false&&(!a.expiry||new Date(a.expiry)>=new Date())).length} live</span></div><button onClick={()=>setEdForm({type:"ads",data:{active:true,tag:"Course"},editing:false})} style={T.btn}>+ New ad</button></div>
+        {aTab==="events"&&<div style={T.card}>{edForm?.type==="events"?<AdminForm type="Event" edForm={edForm} setEdForm={setEdForm} fields={[["title","Event title"],["cat","Category","select",["Conference","Workshop","Masterclass","Webinar","Product Launch","Course Deadline","Other"]],["date","Date (YYYY-MM-DD)"],["time","Time (e.g. '10:00 AM - 4:00 PM IST')"],["location","Location (or 'Online')"],["organizer","Organizer / Host"],["banner","Banner image","image"],["body","Description","textarea"],["speakers","Speakers (comma-separated)","textarea"],["sponsor","Sponsored by (e.g. 'Sun Pharma') — leave blank if not sponsored"],["sponsorLogo","Sponsor logo image","image"],["regType","Registration type","select",["internal","external"]],["regUrl","External registration URL (if regType is external)"],["regCta","CTA button text (e.g. 'Buy ticket', 'Register on Eventbrite')"]]} onSave={()=>saveContent("events")}/>
+          :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{events.length} events</span><button onClick={()=>setEdForm({type:"events",data:{cat:"Conference",regType:"internal"},editing:false})} style={T.btn}>+ New event</button></div>
+          {events.length===0&&<p style={{color:T.mute,fontSize:".85rem",padding:"12px 0"}}>No events yet. Click "+ New event" to add your first event.</p>}
+          {events.map(e=>{const isPast=e.date<ds(getIST());return<div key={e.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border,gap:10}}><div style={{display:"flex",gap:10,alignItems:"center",flex:1,minWidth:0}}>{e.banner?<img src={e.banner} style={{width:60,height:42,objectFit:"cover",borderRadius:6}}/>:<div style={{width:60,height:42,background:T.bg,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center"}}>📅</div>}<div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,fontSize:".88rem"}}>{e.title}</div><div style={{fontSize:".7rem",color:T.mute,display:"flex",gap:8,flexWrap:"wrap"}}><span style={T.tag(isPast?T.errBg:T.okBg,isPast?T.err:T.ok)}>{isPast?"Past":"Upcoming"}</span><span>{e.cat}</span><span>{e.date}</span><span>👥 {e.attendees?.length||0}</span></div></div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"events",data:{...e},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("events",e.id,e.title)} style={T.btnDanger}>Del</button></div></div>})}</>}</div>}
+        {aTab==="ads"&&<div style={T.card}>{edForm?.type==="ads"?<AdminForm type="Ad" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title (e.g. 'Advanced Botox Course')"],["adType","Ad type","select",["external","internal"]],["desc","Short description (shown in sidebar)","textarea"],["image","Banner image (recommended 600x340)","image"],["url","Click-through URL (for external ads OR 'Visit website' button on internal pages)"],["tag","Category tag (e.g. Course, Pharma, Institute)"],["body","Full description (only for internal-page ads)","textarea"],["video","Video embed URL (only for internal-page ads, optional)"],["brochure","Brochure download URL (only for internal-page ads, optional)"],["contact","Contact info (only for internal-page ads, optional)"],["cta","CTA button text (default: 'Visit website')"],["expiry","Expiry date (YYYY-MM-DD, leave blank = no expiry)"],["active","Active (uncheck to pause without deleting)","check"]]} onSave={()=>saveContent("ads")}/>
+          :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><div><span style={{color:T.mute}}>{ads.length} ads · {ads.filter(a=>a.active!==false&&(!a.expiry||new Date(a.expiry)>=new Date())).length} live</span></div><button onClick={()=>setEdForm({type:"ads",data:{active:true,tag:"Course",adType:"external",cta:"Visit website"},editing:false})} style={T.btn}>+ New ad</button></div>
           {ads.length===0&&<p style={{color:T.mute,fontSize:".85rem",padding:"12px 0"}}>No ads yet. Click "+ New ad" to add your first sponsored placement. Ads appear in the home page sidebar.</p>}
-          {ads.map(ad=>{const expired=ad.expiry&&new Date(ad.expiry)<new Date();const live=ad.active!==false&&!expired;return<div key={ad.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border,gap:10}}><div style={{display:"flex",gap:10,alignItems:"center",flex:1,minWidth:0}}>{ad.image?<img src={ad.image} style={{width:60,height:42,objectFit:"cover",borderRadius:6}}/>:<div style={{width:60,height:42,background:T.bg,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",color:T.mute}}>📢</div>}<div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,fontSize:".88rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ad.title}</div><div style={{fontSize:".7rem",color:T.mute,display:"flex",gap:8,flexWrap:"wrap"}}><span style={T.tag(live?T.okBg:T.errBg,live?T.ok:T.err)}>{live?"● Live":expired?"Expired":"Paused"}</span><span>{ad.tag||"—"}</span><span>👆 {ad.clicks||0} clicks</span>{ad.expiry&&<span>Until {ad.expiry}</span>}</div></div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"ads",data:{...ad},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("ads",ad.id,ad.title)} style={T.btnDanger}>Del</button></div></div>})}</>}</div>}
+          {ads.map(ad=>{const expired=ad.expiry&&new Date(ad.expiry)<new Date();const live=ad.active!==false&&!expired;return<div key={ad.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border,gap:10}}><div style={{display:"flex",gap:10,alignItems:"center",flex:1,minWidth:0}}>{ad.image?<img src={ad.image} style={{width:60,height:42,objectFit:"cover",borderRadius:6}}/>:<div style={{width:60,height:42,background:T.bg,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",color:T.mute}}>📢</div>}<div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,fontSize:".88rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ad.title}</div><div style={{fontSize:".7rem",color:T.mute,display:"flex",gap:8,flexWrap:"wrap"}}><span style={T.tag(live?T.okBg:T.errBg,live?T.ok:T.err)}>{live?"● Live":expired?"Expired":"Paused"}</span><span style={T.tag(T.tealBg,T.teal)}>{ad.adType==="internal"?"📄 Page":"🔗 Link"}</span><span>{ad.tag||"—"}</span><span>👆 {ad.clicks||0} clicks</span>{ad.expiry&&<span>Until {ad.expiry}</span>}</div></div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"ads",data:{...ad},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("ads",ad.id,ad.title)} style={T.btnDanger}>Del</button></div></div>})}</>}</div>}
         {aTab==="users"&&<div style={T.card}><p style={{color:T.mute,fontSize:".82rem",marginBottom:10}}>{allUsers.length} users</p>
           {allUsers.map(u=>{const a2=u.totalAnswered?Math.round(u.totalCorrect/u.totalAnswered*100):0;return<div key={u.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid "+T.border}}>
             {u.photo?<img src={u.photo} style={{width:30,height:30,borderRadius:"50%"}}/>:<div style={T.av(30,T.tealBg,T.teal)}>{u.initials||"?"}</div>}
