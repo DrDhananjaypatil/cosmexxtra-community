@@ -445,7 +445,7 @@ export default function App(){
       {pg==="home"&&!selA&&<div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 300px",gap:20,alignItems:"start"}} className="home-grid">
         <div style={{minWidth:0}}>{/* MAIN COLUMN */}
         <div style={{...T.card,borderLeft:"3px solid "+T.gold,padding:24}}><div style={{display:"flex",alignItems:"center",gap:16,marginBottom:14}}>{uPhoto?<img src={uPhoto} style={{width:52,height:52,borderRadius:"50%",border:"2px solid "+T.teal}}/>:<div style={T.av(52,T.tealBg,T.teal)}>{uIni}</div>}<div><h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0}}>Welcome, {uName.split(" ")[0]} 👋</h2><p style={{color:T.txt2,fontSize:".9rem",marginTop:3}}>Daily quizzes, clinical cases & community.</p></div></div>
-          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}><button onClick={()=>go("quiz")} style={T.btn}>🧠 Today's quiz</button><button onClick={()=>go("cases")} style={T.btnO}>🔬 Clinical cases</button><button onClick={()=>go("forum")} style={T.btnO}>💬 Forum</button></div>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}><button onClick={()=>go("quiz")} style={T.btn}>🧠 Today's quiz</button><button onClick={()=>go("events")} style={T.btnO}>📅 Events</button><button onClick={()=>go("cases")} style={T.btnO}>🔬 Clinical cases</button><button onClick={()=>go("forum")} style={T.btnO}>💬 Forum</button></div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,margin:"16px 0"}}>
           {[["🧠",totA,"Quizzes"],["✅",acc+"%","Accuracy"],["🔬",cases.length,"Cases"],["📚",resources.length,"PDFs"],["🎥",videos.length,"Videos"]].map(([i,v,l])=>
