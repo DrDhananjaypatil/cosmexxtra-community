@@ -20,6 +20,38 @@ const fDateRange=(start,end)=>{
   if(ds.getFullYear()===de.getFullYear()){return`${ds.toLocaleDateString("en-IN",{day:"numeric",month:"short"})} – ${de.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}`}
   return`${ds.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})} – ${de.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}`;
 };
+
+// ═══ NORMALIZE VIDEO URL — accepts any YouTube/Vimeo format and returns proper embed URL ═══
+const normalizeVideoUrl=(url)=>{
+  if(!url)return"";
+  url=url.trim();
+  // Already an embed URL — pass through
+  if(url.includes("/embed/")||url.includes("player.vimeo.com"))return url.split("?")[0];
+  // youtu.be/VIDEOID or youtu.be/VIDEOID?si=...
+  let m=url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if(m)return`https://www.youtube.com/embed/${m[1]}`;
+  // youtube.com/watch?v=VIDEOID
+  m=url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if(m)return`https://www.youtube.com/embed/${m[1]}`;
+  // youtube.com/shorts/VIDEOID
+  m=url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
+  if(m)return`https://www.youtube.com/embed/${m[1]}`;
+  // vimeo.com/12345
+  m=url.match(/vimeo\.com\/(\d+)/);
+  if(m)return`https://player.vimeo.com/video/${m[1]}`;
+  // Already a direct .mp4 or other valid URL — return as-is
+  return url;
+};
+
+// ═══ EXTRACT THUMBNAIL URL from any YouTube embed URL ═══
+const getVideoThumbnail=(embedUrl)=>{
+  if(!embedUrl)return null;
+  // Match YouTube embed format: youtube.com/embed/VIDEOID
+  const m=embedUrl.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
+  if(m)return`https://i.ytimg.com/vi/${m[1]}/hqdefault.jpg`;
+  // Vimeo doesn't expose thumbnails without an API call — return null and use fallback UI
+  return null;
+};
 const dN=s=>{try{return new Date(s+"T12:00:00").toLocaleDateString("en-IN",{weekday:"short"})}catch{return""}};
 
 const BRAND={name:"SKINARIO",tagline:"Professional Aesthetic & Cosmetology Community",sub:"By Absolute Institute",logo:"/skinario-logo.jpg"};
@@ -187,6 +219,46 @@ const AdminImgField=({value,onChange})=>{
   </div>)
 };
 
+// ═══ ADMIN VIDEO FIELD (direct upload .mp4 to Firebase Storage) ═══
+const AdminVideoField=({value,onChange})=>{
+  const fileRef=useRef();
+  const[busy,setBusy]=useState(false);
+  const[progress,setProgress]=useState(0);
+  const handleFile=async(e)=>{
+    const f=e.target.files?.[0];if(!f)return;
+    // Sanity check on file size — warn at 200MB
+    if(f.size>200*1024*1024){
+      if(!confirm(`This file is ${(f.size/1024/1024).toFixed(1)}MB. Large files cost more to host and stream. Continue?`)){
+        if(fileRef.current)fileRef.current.value="";
+        return;
+      }
+    }
+    setBusy(true);setProgress(0);
+    try{
+      const path=`videos/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;
+      const sRef=ref(storage,path);
+      // Simulate progress for UX (uploadBytes doesn't provide progress; uploadBytesResumable does but more complex)
+      const interval=setInterval(()=>setProgress(p=>Math.min(p+5,90)),300);
+      await uploadBytes(sRef,f);
+      clearInterval(interval);setProgress(100);
+      const url=await getDownloadURL(sRef);
+      onChange(url);
+    }catch(err){console.error("Video upload error:",err);alert("Upload failed: "+err.message)}
+    setBusy(false);setProgress(0);
+    if(fileRef.current)fileRef.current.value="";
+  };
+  const isDirectVideo=value&&!value.includes("youtube.com")&&!value.includes("vimeo.com")&&!value.includes("youtu.be");
+  return(<div>
+    {value&&isDirectVideo&&<div style={{position:"relative",borderRadius:8,overflow:"hidden",border:"1px solid "+T.border,marginBottom:8,background:"#000"}}>
+      <video src={value} controls style={{width:"100%",maxHeight:200,display:"block"}}/>
+      <button onClick={()=>onChange("")} style={{position:"absolute",top:6,right:6,width:24,height:24,borderRadius:"50%",background:"rgba(0,0,0,.75)",color:"#fff",border:"none",fontSize:".75rem",cursor:"pointer",zIndex:2}}>✕</button>
+    </div>}
+    <input ref={fileRef} type="file" accept="video/mp4,video/webm,video/ogg" onChange={handleFile} style={{display:"none"}}/>
+    <button onClick={()=>fileRef.current?.click()} disabled={busy} style={{...T.btnO,...T.btnSm,opacity:busy?.5:1}}>{busy?`⏳ Uploading ${progress}%...`:value&&isDirectVideo?"🔄 Replace video":"📤 Upload video file (.mp4)"}</button>
+    <p style={{fontSize:".68rem",color:T.mute,marginTop:6,lineHeight:1.5}}>For premium content. ⚠️ Large videos increase hosting costs — prefer YouTube/Vimeo embed for free content.</p>
+  </div>)
+};
+
 // ═══ ADMIN FORM (moved outside App to fix cursor focus bug) ═══
 const AdminForm=({type,fields,edForm,setEdForm,onSave})=>{
   const d=edForm?.data||{};
@@ -199,6 +271,7 @@ const AdminForm=({type,fields,edForm,setEdForm,onSave})=>{
       :tp==="select"?<select value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.inp}>{(opts||TOPICS).map(t=><option key={t} value={t}>{t}</option>)}{!opts&&<option value="General">General</option>}</select>
       :tp==="check"?<label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}><input type="checkbox" checked={!!d[k]} onChange={e=>set(k,e.target.checked)}/> {l}</label>
       :tp==="image"?<AdminImgField value={d[k]} onChange={url=>set(k,url)}/>
+      :tp==="videofile"?<AdminVideoField value={d[k]} onChange={url=>set(k,url)}/>
       :tp==="date"?<input type="date" value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.inp}/>
       :<input value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.inp}/>}
     </div>)}
@@ -367,7 +440,15 @@ export default function App(){
   const genQuiz=async()=>{if(quizzes.find(q=>q.date===today)){sh("Already exists!");return}setLd(true);const q=await genQuizAI(today);if(q){const id=await fbAdd("quizzes",q);if(id){setQuizzes(p=>[{id,...q},...p]);sh("Question live!")}}else sh("Failed");setLd(false)};
 
   // ═══ CONTENT ═══
-  const saveContent=async(type)=>{const d=edForm.data;if(!d.title){sh("Title required");return}if(edForm.editing){await fbSet(type,d.id,d);sh("Updated!")}else{await fbAdd(type,{...d,order:Date.now()});sh("Created!")}setEdForm(null);loadData()};
+  const saveContent=async(type)=>{
+    let d={...edForm.data};
+    if(!d.title){sh("Title required");return}
+    // Auto-normalize embed URLs for videos (and ad video field) so admins can paste any YouTube format
+    if(d.embedUrl&&!d.embedUrl.includes("firebasestorage")&&!d.embedUrl.includes("storage.googleapis"))d.embedUrl=normalizeVideoUrl(d.embedUrl);
+    if(d.video&&!d.video.includes("firebasestorage")&&!d.video.includes("storage.googleapis"))d.video=normalizeVideoUrl(d.video);
+    if(edForm.editing){await fbSet(type,d.id,d);sh("Updated!")}else{await fbAdd(type,{...d,order:Date.now()});sh("Created!")}
+    setEdForm(null);loadData()
+  };
   const deleteContent=async(type,id,name)=>{if(!confirm(`Delete "${name}"?`))return;await fbDel(type,id);sh("Deleted");loadData()};
 
   // ═══ FORUM POST ═══
@@ -497,7 +578,7 @@ export default function App(){
           {(()=>{
             const items=[];
             (prof?.saved?.articles||[]).forEach(id=>{const a=articles.find(x=>x.id===id);if(a)items.push({icon:"📰",label:a.cat||"Article",title:a.title,onClick:()=>setSelA(a),thumb:a.cover})});
-            (prof?.saved?.videos||[]).forEach(id=>{const v=videos.find(x=>x.id===id);if(v)items.push({icon:"🎥",label:"Video",title:v.title||v.t,onClick:()=>{go("videos");setSelV(v)},thumb:null})});
+            (prof?.saved?.videos||[]).forEach(id=>{const v=videos.find(x=>x.id===id);if(v)items.push({icon:"🎥",label:"Video",title:v.title||v.t,onClick:()=>{go("videos");setSelV(v)},thumb:getVideoThumbnail(v.embedUrl)})});
             (prof?.saved?.resources||[]).forEach(id=>{const r=resources.find(x=>x.id===id);if(r)items.push({icon:r.icon||"📚",label:"Resource",title:r.title||r.t,onClick:()=>go("library"),thumb:r.thumb})});
             (prof?.saved?.forum||[]).forEach(id=>{const f=forumPosts.find(x=>x.id===id);if(f)items.push({icon:"💬",label:"Forum",title:f.title,onClick:()=>go("forum"),thumb:null})});
             return(<div style={{...T.card,marginBottom:0,padding:18}}>
@@ -700,7 +781,7 @@ export default function App(){
             {(()=>{
               const items=[];
               (prof?.saved?.articles||[]).forEach(id=>{const a=articles.find(x=>x.id===id);if(a&&a.id!==selA.id)items.push({icon:"📰",label:a.cat||"Article",title:a.title,onClick:()=>{setSelA(a);window.scrollTo(0,0)},thumb:a.cover})});
-              (prof?.saved?.videos||[]).forEach(id=>{const v=videos.find(x=>x.id===id);if(v)items.push({icon:"🎥",label:"Video",title:v.title||v.t,onClick:()=>{go("videos");setSelV(v)},thumb:null})});
+              (prof?.saved?.videos||[]).forEach(id=>{const v=videos.find(x=>x.id===id);if(v)items.push({icon:"🎥",label:"Video",title:v.title||v.t,onClick:()=>{go("videos");setSelV(v)},thumb:getVideoThumbnail(v.embedUrl)})});
               (prof?.saved?.resources||[]).forEach(id=>{const r=resources.find(x=>x.id===id);if(r)items.push({icon:r.icon||"📚",label:"Resource",title:r.title||r.t,onClick:()=>go("library"),thumb:r.thumb})});
               if(!items.length)return null;
               return(<div style={{...T.card,marginBottom:0,padding:18}}>
@@ -844,14 +925,39 @@ export default function App(){
       {pg==="videos"&&!selV&&<div><h3 style={{fontSize:"1.15rem",fontWeight:700,marginBottom:14}}>🎥 Video gallery</h3>
         {videos.length===0&&<p style={{color:T.mute}}>No videos yet.</p>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
-          {videos.map(v=><div key={v.id} onClick={()=>setSelV(v)} style={{...T.card,cursor:"pointer",marginBottom:0}}>
-            <div style={{height:100,borderRadius:10,background:"linear-gradient(135deg,#e1f5ee,#d0ede5)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2.5rem",marginBottom:10,position:"relative"}}>{v.icon||"🎥"}{!v.free&&!isPd&&<div style={{position:"absolute",top:6,right:6,...T.tag(T.goldBg,T.goldD)}}>🔒</div>}<div style={{position:"absolute",bottom:6,right:6,fontSize:".65rem",background:"rgba(0,0,0,.6)",padding:"2px 6px",borderRadius:5,color:"#fff"}}>{v.dur||""}</div></div>
-            <span style={T.tag(T.tealBg,T.teal)}>{v.cat||"General"}</span><h4 style={{fontSize:".9rem",fontWeight:600,marginTop:6,lineHeight:1.3}}>{v.title||v.t}</h4>
-            <div style={{display:"flex",gap:10,marginTop:8,fontSize:".7rem",color:T.mute}}><span>❤️ {v.likes||0}</span><span>💬 {v.comments?.length||0}</span></div>
-          </div>)}
+          {videos.map(v=>{const thumb=getVideoThumbnail(v.embedUrl);return(<div key={v.id} onClick={()=>setSelV(v)} style={{...T.card,cursor:"pointer",marginBottom:0,padding:0,overflow:"hidden"}}>
+            {/* Thumbnail area — real YouTube thumbnail OR gradient fallback */}
+            <div style={{height:160,position:"relative",background:thumb?"#000":"linear-gradient(135deg,#e1f5ee,#d0ede5)",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+              {thumb?<img src={thumb} alt={v.title||v.t} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={(e)=>{e.target.style.display="none"}}/>:<span style={{fontSize:"2.5rem"}}>{v.icon||"🎥"}</span>}
+              {/* Play button overlay */}
+              {thumb&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.15)",transition:"background 0.2s"}}>
+                <div style={{width:54,height:54,borderRadius:"50%",background:"rgba(0,0,0,0.78)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px rgba(0,0,0,0.35)"}}>
+                  <div style={{width:0,height:0,borderLeft:"16px solid #fff",borderTop:"10px solid transparent",borderBottom:"10px solid transparent",marginLeft:4}}/>
+                </div>
+              </div>}
+              {/* Premium lock badge */}
+              {!v.free&&!isPd&&<div style={{position:"absolute",top:8,right:8,...T.tag(T.goldBg,T.goldD),fontWeight:600}}>🔒 Premium</div>}
+              {/* Duration badge */}
+              {v.dur&&<div style={{position:"absolute",bottom:8,right:8,fontSize:".7rem",background:"rgba(0,0,0,0.78)",padding:"3px 8px",borderRadius:4,color:"#fff",fontWeight:500}}>{v.dur}</div>}
+            </div>
+            <div style={{padding:14}}>
+              <span style={T.tag(T.tealBg,T.teal)}>{v.cat||"General"}</span>
+              <h4 style={{fontSize:".95rem",fontWeight:600,marginTop:8,lineHeight:1.35}}>{v.title||v.t}</h4>
+              <div style={{display:"flex",gap:12,marginTop:8,fontSize:".72rem",color:T.mute}}><span>❤️ {v.likes||0}</span><span>💬 {v.comments?.length||0}</span></div>
+            </div>
+          </div>)})}
         </div></div>}
       {pg==="videos"&&selV&&<div><button onClick={()=>setSelV(null)} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back</button>
-        <div style={{...T.card,maxWidth:720}}>{selV.embedUrl&&(selV.free||isPd)?<div style={{position:"relative",paddingBottom:"56.25%",height:0,borderRadius:12,overflow:"hidden",marginBottom:16}}><iframe src={selV.embedUrl} style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:0}} allowFullScreen/></div>:<div style={{height:200,borderRadius:12,background:"linear-gradient(135deg,#e1f5ee,#c8ebe0)",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16}}>{selV.free||isPd?<p style={{color:T.teal}}>▶️ {selV.embedUrl?"Loading":"No URL set"}</p>:<div style={{textAlign:"center"}}><p style={{color:T.teal,fontWeight:600}}>🔒 Premium</p><button style={{...T.btnGold,marginTop:8}}>₹999/mo</button></div>}</div>}
+        <div style={{...T.card,maxWidth:720}}>{(()=>{
+          const videoSrc=selV.videoFile||selV.embedUrl;
+          const isDirect=videoSrc&&(videoSrc.includes("firebasestorage")||videoSrc.includes("storage.googleapis")||/\.(mp4|webm|ogg|mov)(\?|$)/i.test(videoSrc));
+          const canPlay=videoSrc&&(selV.free||isPd);
+          if(canPlay&&isDirect)return(<div style={{position:"relative",paddingBottom:"56.25%",height:0,borderRadius:12,overflow:"hidden",marginBottom:16,background:"#000"}}><video src={videoSrc} controls style={{position:"absolute",top:0,left:0,width:"100%",height:"100%"}}/></div>);
+          if(canPlay)return(<div style={{position:"relative",paddingBottom:"56.25%",height:0,borderRadius:12,overflow:"hidden",marginBottom:16}}><iframe src={videoSrc} style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:0}} allowFullScreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"/></div>);
+          if(!videoSrc)return(<div style={{height:200,borderRadius:12,background:"linear-gradient(135deg,#e1f5ee,#c8ebe0)",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16}}><p style={{color:T.teal}}>▶️ No video URL set</p></div>);
+          // Premium gate
+          return(<div style={{height:200,borderRadius:12,background:"linear-gradient(135deg,#e1f5ee,#c8ebe0)",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16}}><div style={{textAlign:"center"}}><p style={{color:T.teal,fontWeight:600}}>🔒 Premium</p><button style={{...T.btnGold,marginTop:8}}>₹999/mo</button></div></div>);
+        })()}
           <h3 style={{fontWeight:700,fontSize:"1.2rem"}}>{selV.title||selV.t}</h3><p style={{color:T.mute,fontSize:".82rem",marginTop:4}}>{selV.dur}</p><p style={{color:T.txt2,marginTop:12,lineHeight:1.8}}>{selV.desc}</p>
           <div style={{display:"flex",alignItems:"center",gap:12,marginTop:16,paddingTop:14,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
             <LikeBtn liked={(selV.likedBy||[]).includes(au?.uid)} count={selV.likes||0} onToggle={()=>{toggleLike("videos",selV.id,selV,setVideos);setSelV(p=>{const lb=p.likedBy||[];const has=lb.includes(au.uid);const nlb=has?lb.filter(u=>u!==au.uid):[...lb,au.uid];return{...p,likedBy:nlb,likes:nlb.length}})}}/>
@@ -1306,7 +1412,7 @@ export default function App(){
         {aTab==="resources"&&<div style={T.card}>{edForm?.type==="resources"?<AdminForm type="Resource" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["url","Download URL"],["pages","Pages"],["size","Size"],["icon","Emoji (fallback)"],["thumb","Thumbnail image","image"],["free","Free","check"]]} onSave={()=>saveContent("resources")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{resources.length}</span><button onClick={()=>setEdForm({type:"resources",data:{icon:"📄",free:true},editing:false})} style={T.btn}>+ New</button></div>
           {resources.map(r=><div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div style={{display:"flex",gap:10,alignItems:"center"}}>{r.thumb?<img src={r.thumb} style={{width:36,height:36,objectFit:"cover",borderRadius:6}}/>:<span style={{fontSize:"1.4rem"}}>{r.icon||"📄"}</span>}<div><div style={{fontWeight:500,fontSize:".88rem"}}>{r.title||r.t}</div><div style={{fontSize:".72rem",color:T.mute}}>{r.free?"Free":"Premium"}</div></div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"resources",data:{...r},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("resources",r.id,r.title||r.t)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
-        {aTab==="videos"&&<div style={T.card}>{edForm?.type==="videos"?<AdminForm type="Video" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["cat","Category","select"],["dur","Duration"],["desc","Description","textarea"],["embedUrl","Embed URL"],["icon","Emoji"],["free","Free","check"]]} onSave={()=>saveContent("videos")}/>
+        {aTab==="videos"&&<div style={T.card}>{edForm?.type==="videos"?<AdminForm type="Video" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["cat","Category","select"],["dur","Duration (e.g. '12:34')"],["desc","Description","textarea"],["embedUrl","YouTube/Vimeo URL (paste any format — share link, watch URL, or embed URL)"],["icon","Emoji thumbnail"],["free","Free","check"]]} onSave={()=>saveContent("videos")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{videos.length}</span><button onClick={()=>setEdForm({type:"videos",data:{icon:"🎥",free:true,cat:TOPICS[0]},editing:false})} style={T.btn}>+ New</button></div>
           {videos.map(v=><div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div><div style={{fontWeight:500,fontSize:".88rem"}}>{v.title||v.t}</div><div style={{fontSize:".72rem",color:T.mute}}>{v.cat} · {v.free?"Free":"Premium"}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"videos",data:{...v},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("videos",v.id,v.title||v.t)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
         {aTab==="events"&&<div style={T.card}>{edForm?.type==="events"?<AdminForm type="Event" edForm={edForm} setEdForm={setEdForm} fields={[["title","Event title"],["cat","Category","select",["Conference","Workshop","Masterclass","Webinar","Product Launch","Course Deadline","Other"]],["date","Start date","date"],["endDate","End date (leave blank for single-day event)","date"],["time","Time (e.g. '10:00 AM - 4:00 PM IST')"],["location","Location (or 'Online')"],["organizer","Organizer / Host"],["banner","Banner image","image"],["body","Description","textarea"],["speakers","Speakers (comma-separated)","textarea"],["sponsor","Sponsored by (e.g. 'Sun Pharma') — leave blank if not sponsored"],["sponsorLogo","Sponsor logo image","image"],["regType","Registration type","select",["internal","external"]],["regUrl","External registration URL (if regType is external)"],["regCta","CTA button text (e.g. 'Buy ticket', 'Register on Eventbrite')"]]} onSave={()=>saveContent("events")}/>
