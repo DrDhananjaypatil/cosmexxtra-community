@@ -259,6 +259,7 @@ export default function App(){
   useEffect(()=>{if(toast){const t=setTimeout(()=>setToast(null),3000);return()=>clearTimeout(t)}},[toast]);
 
   const[ads,setAds]=useState([]);
+  const[articleLimit,setArticleLimit]=useState(6);
   const[events,setEvents]=useState([]);
   const[selAd,setSelAd]=useState(null);
   const[selE,setSelE]=useState(null);
@@ -298,8 +299,10 @@ export default function App(){
       else{sh("Quiz not found");window.history.replaceState({},"",window.location.pathname)}
     }else if(forumId&&forumPosts.length){
       setPg("forum");window.history.replaceState({},"",window.location.pathname);
+    }else if(params.get("case")&&cases.length){
+      setPg("cases");window.history.replaceState({},"",window.location.pathname);
     }
-  },[scr,articles,videos,forumPosts,events,ads,quizzes]);
+  },[scr,articles,videos,forumPosts,events,ads,quizzes,cases]);
 
   const isAdm=prof&&ADMINS.includes(au?.email);const isPd=prof?.paid;const today=ds(getIST());const hr=getIST().getHours();
   const uName=prof?.name||au?.displayName||"Doctor";const uIni=(uName.replace(/^Dr\.?\s*/i,"").split(" ").map(w=>w[0]).join("").toUpperCase()||"D").slice(0,2);const uPhoto=au?.photoURL;
@@ -463,8 +466,9 @@ export default function App(){
         <h3 style={{fontSize:"1.05rem",fontWeight:700,marginBottom:12}}>Latest articles</h3>
         {articles.length===0&&<p style={{color:T.mute}}>No articles yet. Admins can create them from Admin panel.</p>}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-          {articles.slice(0,6).map(a=><div key={a.id} onClick={()=>setSelA(a)} style={{...T.card,cursor:"pointer",marginBottom:0,overflow:"hidden",padding:0}}>
+          {articles.slice(0,articleLimit).map(a=><div key={a.id} onClick={()=>setSelA(a)} style={{...T.card,cursor:"pointer",marginBottom:0,overflow:"hidden",padding:0,position:"relative"}}>
             {a.cover&&<img src={a.cover} style={{width:"100%",height:140,objectFit:"cover"}}/>}
+            {a.sponsored&&<div style={{position:"absolute",top:8,right:8,background:"rgba(168,128,48,0.95)",color:"#fff",padding:"3px 9px",borderRadius:4,fontSize:".58rem",letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,zIndex:2}}>Sponsored</div>}
             <div style={{padding:18}}>
               <div style={{display:"flex",gap:5,marginBottom:8}}><span style={T.tag(T.tealBg,T.teal)}>{a.cat||"General"}</span>{a.feat&&<span style={T.tag(T.goldBg,T.goldD)}>Featured</span>}</div>
               <h4 style={{fontSize:"1rem",fontWeight:700,lineHeight:1.35,fontFamily:"Georgia, serif"}}>{a.title}</h4>
@@ -473,7 +477,7 @@ export default function App(){
               <div style={{display:"flex",alignItems:"center",gap:8,marginTop:10,paddingTop:10,borderTop:"1px solid "+T.border}}>
                 {a.authorPhoto?<img src={a.authorPhoto} style={{width:28,height:28,borderRadius:"50%",objectFit:"cover",border:"1.5px solid "+T.tealBg}}/>:<div style={{...T.av(28,T.tealBg,T.teal),fontSize:".62rem"}}>{(a.author||"?").replace(/^Dr\.?\s*/i,"").split(" ").map(w=>w[0]).join("").toUpperCase().slice(0,2)}</div>}
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:".74rem",fontWeight:600,color:T.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.author||"Admin"}</div>
+                  <div style={{fontSize:".74rem",fontWeight:600,color:T.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.sponsored&&a.sponsor?<>by {a.sponsor}</>:a.author||"Admin"}</div>
                   <div style={{fontSize:".66rem",color:T.mute}}>{fD(a.date)}</div>
                 </div>
                 <div style={{display:"flex",gap:8,fontSize:".7rem",color:T.mute,flexShrink:0}}><span>❤️ {a.likes||0}</span><span>💬 {a.comments?.length||0}</span></div>
@@ -481,6 +485,9 @@ export default function App(){
             </div>
           </div>)}
         </div>
+        {articles.length>articleLimit&&<div style={{textAlign:"center",marginTop:18}}>
+          <button onClick={()=>setArticleLimit(p=>p+6)} style={{...T.btnO,padding:"11px 28px"}}>Load more articles ({articles.length-articleLimit} remaining) ↓</button>
+        </div>}
         </div>{/* END MAIN COLUMN */}
 
         {/* ═══ RIGHT SIDEBAR ═══ */}
@@ -596,6 +603,15 @@ export default function App(){
           {selA.cover&&<img src={selA.cover} style={{width:"100%",maxHeight:380,objectFit:"cover",display:"block"}}/>}
 
           <div style={{padding:"32px 36px",maxWidth:780,margin:"0 auto"}}>
+            {/* Sponsored disclosure banner */}
+            {selA.sponsored&&<div style={{background:T.goldBg,border:"1px solid #f0e6c8",borderRadius:8,padding:"10px 14px",marginBottom:18,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+              {selA.sponsorLogo&&<img src={selA.sponsorLogo} style={{height:32,maxWidth:90,objectFit:"contain"}}/>}
+              <div style={{flex:1,minWidth:140}}>
+                <div style={{fontSize:".62rem",color:T.goldD,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:2}}>Sponsored content</div>
+                <div style={{fontSize:".82rem",color:T.txt}}>This article is sponsored by {selA.sponsorUrl?<a href={selA.sponsorUrl} target="_blank" rel="noopener noreferrer" style={{color:T.goldD,fontWeight:600,textDecoration:"underline"}}>{selA.sponsor}</a>:<b>{selA.sponsor}</b>}</div>
+              </div>
+            </div>}
+
             {/* Category & Featured */}
             <div style={{display:"flex",gap:6,marginBottom:14,alignItems:"center"}}>
               <span style={{...T.tag(T.tealBg,T.teal),fontSize:".68rem",letterSpacing:1.5,textTransform:"uppercase",fontWeight:700}}>{selA.cat||"General"}</span>
@@ -765,7 +781,16 @@ export default function App(){
         {ld&&<div style={{...T.card,textAlign:"center",padding:50}}><p style={{color:T.mute}}>⏳ Generating...</p></div>}
         {!ld&&!qObj&&<div style={{...T.card,textAlign:"center",padding:40}}>{selD===today?<><div style={{fontSize:"2rem",marginBottom:10}}>🔬</div><p style={{color:T.teal,fontWeight:600}}>Today's question</p><p style={{color:T.mute,fontSize:".88rem",margin:"8px 0 16px"}}>10 AM IST daily</p>{isAdm&&<button onClick={genQuiz} style={T.btn}>🤖 Generate now</button>}</>:<p style={{color:T.mute}}>No question for this date</p>}</div>}
         {!ld&&qObj&&<div style={{display:"grid",gridTemplateColumns:"1fr 340px",gap:16,alignItems:"start"}}>
-          <div style={{...T.card,borderLeft:"3px solid "+T.teal}}>
+          <div style={{...T.card,borderLeft:"3px solid "+T.teal,padding:0,overflow:"hidden"}}>
+            {/* Sponsored quiz banner */}
+            {qObj.sponsored&&qObj.sponsor&&<div style={{background:"linear-gradient(135deg,"+T.goldBg+","+T.tealBg+")",borderBottom:"1px solid "+T.border,padding:"10px 18px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+              {qObj.sponsorLogo&&<img src={qObj.sponsorLogo} style={{height:32,maxWidth:90,objectFit:"contain"}}/>}
+              <div style={{flex:1,minWidth:140}}>
+                <div style={{fontSize:".62rem",color:T.goldD,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:1}}>Today's quiz powered by</div>
+                <div style={{fontSize:".88rem",color:T.txt,fontWeight:600}}>{qObj.sponsorUrl?<a href={qObj.sponsorUrl} target="_blank" rel="noopener noreferrer" style={{color:T.txt,textDecoration:"none"}}>{qObj.sponsor} →</a>:qObj.sponsor}</div>
+              </div>
+            </div>}
+            <div style={{padding:20}}>
             <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}><span style={{fontSize:".8rem",color:T.mute}}>📅 {fD(qObj.date)}</span>{isT&&hr<21&&<span style={T.tag(T.okBg,T.ok)}>● LIVE</span>}{rev&&!isT&&<span style={T.tag(T.errBg,T.err)}>Closed</span>}<span style={{fontSize:".72rem",color:T.mute,marginLeft:"auto"}}>{Object.keys(qObj.answers||{}).length} answered</span></div>
             <div style={{display:"flex",gap:6,marginBottom:12}}><span style={T.tag(T.tealBg,T.teal)}>{qObj.cat}</span><span style={T.tag(T.warnBg,T.warn)}>{qObj.diff}</span></div>
             {qObj.scen&&<div style={{background:T.bg,borderLeft:"3px solid "+T.gold,padding:"12px 16px",marginBottom:16,borderRadius:"0 10px 10px 0",fontSize:".9rem",color:T.txt2,lineHeight:1.65}}>{qObj.scen}</div>}
@@ -777,6 +802,7 @@ export default function App(){
             <div style={{display:"flex",alignItems:"center",gap:12,marginTop:14,paddingTop:12,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
               <LikeBtn liked={(qObj.likedBy||[]).includes(au?.uid)} count={qObj.likes||0} onToggle={()=>toggleLike("quizzes",qObj.id,qObj,setQuizzes)}/>
               <ShareBar title={`SKINARIO Daily Quiz: ${qObj.cat} (${qObj.diff})`} url={`${window.location.origin}/?quiz=${qObj.id}`} description={qObj.question?.slice(0,120)} itemId={qObj.id} itemType="quizzes" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>
+            </div>
             </div>
           </div>
           {/* Comments with LIKE buttons */}
@@ -981,30 +1007,74 @@ export default function App(){
 
       {/* ═══ CLINICAL CASES ═══ */}
       {pg==="cases"&&<div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-          <div><h3 style={{fontSize:"1.15rem",fontWeight:700}}>🔬 Clinical cases</h3><p style={{color:T.mute,fontSize:".82rem",marginTop:2}}>Share cases with images for peer discussion</p></div>
-          <button onClick={()=>setNewCase(!newCase)} style={T.btn}>{newCase?"Cancel":"+ Post case"}</button>
+        {/* Header with prominent CTA */}
+        <div style={{...T.card,padding:24,background:"linear-gradient(135deg,#fff,"+T.goldBg+"77)",borderLeft:"3px solid "+T.gold,marginBottom:14}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:14}}>
+            <div>
+              <h3 style={{fontSize:"1.4rem",fontWeight:700,margin:0}}>🔬 Clinical Cases</h3>
+              <p style={{color:T.txt2,fontSize:".88rem",marginTop:6,maxWidth:560}}>Share interesting cases with images for peer discussion. Get insights from colleagues across India.</p>
+              <div style={{display:"flex",gap:14,marginTop:10,fontSize:".75rem",color:T.mute}}>
+                <span><b style={{color:T.teal,fontSize:".9rem"}}>{cases.length}</b> cases shared</span>
+                <span><b style={{color:T.teal,fontSize:".9rem"}}>{cases.reduce((s,c)=>s+(c.comments?.length||0),0)}</b> discussions</span>
+              </div>
+            </div>
+            <button onClick={()=>setNewCase(true)} style={{...T.btn,padding:"13px 26px",fontSize:".95rem",background:"linear-gradient(135deg,"+T.gold+","+T.goldD+")"}}>📋 Post a new case</button>
+          </div>
         </div>
-        {newCase&&<div style={{...T.card,borderLeft:"3px solid "+T.gold}}>
-          <h4 style={{fontSize:".95rem",fontWeight:700,color:T.gold,marginBottom:12}}>📋 New clinical case</h4>
-          <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:500,textTransform:"uppercase",letterSpacing:1}}>Title <span style={{color:T.err}}>*</span></label>
-          <input value={ccT} onChange={e=>setCcT(e.target.value)} placeholder="e.g. 'Unusual pigmentation pattern on forearm'" style={{...T.inp,marginBottom:12}}/>
-          <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:500,textTransform:"uppercase",letterSpacing:1}}>Category</label>
-          <select value={ccC} onChange={e=>setCcC(e.target.value)} style={{...T.inp,marginBottom:12}}>{TOPICS.map(t=><option key={t} value={t}>{t}</option>)}</select>
-          <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:500,textTransform:"uppercase",letterSpacing:1}}>Clinical images <span style={{color:T.err}}>*</span></label>
-          <div style={{marginBottom:14,padding:12,background:T.bg,borderRadius:10}}><ImgUpload images={ccImgs} setImages={setCcImgs} uploading={ccUp} setUploading={setCcUp}/></div>
-          <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:500,textTransform:"uppercase",letterSpacing:1}}>📝 History & presentation</label>
-          <textarea value={ccHistory} onChange={e=>setCcHistory(e.target.value)} placeholder="Patient demographics, chief complaint, duration of symptoms, relevant past history..." rows={3} style={{...T.txa,marginBottom:12}}/>
-          <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:500,textTransform:"uppercase",letterSpacing:1}}>💊 Treatment given</label>
-          <textarea value={ccTreatment} onChange={e=>setCcTreatment(e.target.value)} placeholder="Medications prescribed, procedures performed, dosage, duration..." rows={3} style={{...T.txa,marginBottom:12}}/>
-          <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:500,textTransform:"uppercase",letterSpacing:1}}>📈 Outcome</label>
-          <textarea value={ccOutcome} onChange={e=>setCcOutcome(e.target.value)} placeholder="Response to treatment, follow-up findings, current status..." rows={2} style={{...T.txa,marginBottom:12}}/>
-          <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:500,textTransform:"uppercase",letterSpacing:1}}>💡 Discussion question</label>
-          <input value={ccDiag} onChange={e=>setCcDiag(e.target.value)} placeholder="What's your differential? Any thoughts on management?" style={{...T.inp,marginBottom:14}}/>
-          <textarea value={ccB} onChange={e=>setCcB(e.target.value)} placeholder="Any additional notes or context (optional)..." rows={2} style={{...T.txa,marginBottom:12}}/>
-          <button onClick={postCase} style={T.btn}>Publish case</button>
+
+        {/* MODAL — case posting form opens as overlay */}
+        {newCase&&<div onClick={(e)=>{if(e.target===e.currentTarget)setNewCase(false)}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:1500,display:"flex",alignItems:"flex-start",justifyContent:"center",overflowY:"auto",padding:"40px 20px",backdropFilter:"blur(4px)"}}>
+          <div style={{background:"#fff",borderRadius:16,width:"100%",maxWidth:640,boxShadow:"0 12px 48px rgba(0,0,0,0.25)",overflow:"hidden",animation:"slideIn 0.25s ease-out"}}>
+            {/* Modal header */}
+            <div style={{padding:"18px 24px",background:"linear-gradient(135deg,"+T.goldBg+","+T.tealBg+")",borderBottom:"1px solid "+T.border,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <h3 style={{fontSize:"1.1rem",fontWeight:700,margin:0,color:T.txt}}>📋 New Clinical Case</h3>
+                <p style={{fontSize:".78rem",color:T.txt2,margin:"3px 0 0"}}>Fill in what's relevant — only title and image are required</p>
+              </div>
+              <button onClick={()=>setNewCase(false)} style={{background:"rgba(255,255,255,0.6)",border:"none",width:32,height:32,borderRadius:"50%",cursor:"pointer",fontSize:"1rem",color:T.txt2,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+            </div>
+
+            {/* Modal body */}
+            <div style={{padding:24,maxHeight:"65vh",overflowY:"auto"}}>
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Title <span style={{color:T.err}}>*</span></label>
+              <input value={ccT} onChange={e=>setCcT(e.target.value)} placeholder="e.g. 'Unusual pigmentation pattern on forearm'" style={{...T.inp,marginBottom:14,fontSize:".95rem"}}/>
+
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Category</label>
+              <select value={ccC} onChange={e=>setCcC(e.target.value)} style={{...T.inp,marginBottom:14}}>{TOPICS.map(t=><option key={t} value={t}>{t}</option>)}</select>
+
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Clinical images <span style={{color:T.err}}>*</span></label>
+              <div style={{marginBottom:16,padding:12,background:T.bg,borderRadius:10}}><ImgUpload images={ccImgs} setImages={setCcImgs} uploading={ccUp} setUploading={setCcUp}/></div>
+
+              <div style={{padding:"12px 14px",background:T.bg,borderRadius:8,marginBottom:14,fontSize:".75rem",color:T.txt2,lineHeight:1.5}}>💡 The fields below are optional — fill in what's relevant for your case. You can always edit later.</div>
+
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>📝 History &amp; presentation</label>
+              <textarea value={ccHistory} onChange={e=>setCcHistory(e.target.value)} placeholder="Patient demographics, chief complaint, duration of symptoms, relevant past history..." rows={3} style={{...T.txa,marginBottom:12}}/>
+
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>💊 Treatment given</label>
+              <textarea value={ccTreatment} onChange={e=>setCcTreatment(e.target.value)} placeholder="Medications prescribed, procedures performed, dosage, duration..." rows={3} style={{...T.txa,marginBottom:12}}/>
+
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>📈 Outcome</label>
+              <textarea value={ccOutcome} onChange={e=>setCcOutcome(e.target.value)} placeholder="Response to treatment, follow-up findings, current status..." rows={2} style={{...T.txa,marginBottom:12}}/>
+
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>💡 Discussion question</label>
+              <input value={ccDiag} onChange={e=>setCcDiag(e.target.value)} placeholder="What's your differential? Any thoughts on management?" style={{...T.inp,marginBottom:14}}/>
+
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Additional notes</label>
+              <textarea value={ccB} onChange={e=>setCcB(e.target.value)} placeholder="Any additional context (optional)..." rows={2} style={{...T.txa,marginBottom:4}}/>
+            </div>
+
+            {/* Modal footer */}
+            <div style={{padding:"14px 24px",borderTop:"1px solid "+T.border,background:T.bg,display:"flex",justifyContent:"flex-end",gap:10}}>
+              <button onClick={()=>setNewCase(false)} style={T.btnO}>Cancel</button>
+              <button onClick={postCase} style={T.btn}>📋 Publish case</button>
+            </div>
+          </div>
+          <style>{`
+            @keyframes slideIn { from { transform: translateY(-20px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+          `}</style>
         </div>}
-        {cases.length===0&&!newCase&&<p style={{color:T.mute}}>No cases yet. Be the first to share a clinical case!</p>}
+
+        {cases.length===0&&!newCase&&<div style={{...T.card,textAlign:"center",padding:48}}><div style={{fontSize:"2.4rem",marginBottom:8}}>🔬</div><p style={{color:T.mute,fontSize:".95rem"}}>No cases yet. Be the first to share a clinical case!</p></div>}
         {cases.map(cs=><div key={cs.id} style={{...T.card,padding:0,overflow:"hidden"}}>
           {/* IMAGES AT TOP — gallery layout */}
           {cs.images?.length>0&&<div style={{padding:14,paddingBottom:0}}>
@@ -1220,9 +1290,10 @@ export default function App(){
           {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null)}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
         </div>
         {aTab==="stats"&&<div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length],["Events",events.length],["Ads",ads.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>}
-        {aTab==="quiz"&&<div style={T.card}><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{quizzes.length} questions</span><button onClick={genQuiz} style={T.btn}>🤖 Generate today</button></div>
-          {quizzes.map(q=><div key={q.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div><div style={{fontWeight:500,fontSize:".88rem"}}>{q.cat} — {q.diff}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(q.date)} · {Object.keys(q.answers||{}).length} answers</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>{setSelD(q.date);go("quiz")}} style={{...T.btnO,...T.btnSm}}>View</button><button onClick={()=>deleteContent("quizzes",q.id,q.cat)} style={T.btnDanger}>Del</button></div></div>)}</div>}
-        {aTab==="articles"&&<div style={T.card}>{edForm?.type==="articles"?<AdminForm type="Article" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["subtitle","Subtitle / Tagline (italic, shown below title — optional)"],["cat","Category","select"],["author","Author name (e.g. 'Dr. Dhananjay Patil, MD')"],["authorPhoto","Author profile photo","image"],["authorAffiliation","Author affiliation (e.g. 'Absolute Institute of Aesthetic Medicine, Pune')"],["date","Publication date","date"],["cover","Cover image","image"],["abstract","Abstract / Summary (italic boxed quote — optional)","textarea"],["body","Article body","textarea"],["refs","References (optional)","textarea"],["authorBio","Author bio (shown at end of article — optional)","textarea"],["feat","Featured","check"]]} onSave={()=>saveContent("articles")}/>
+        {aTab==="quiz"&&<div style={T.card}>{edForm?.type==="quizzes"?<AdminForm type="Quiz sponsor" edForm={edForm} setEdForm={setEdForm} fields={[["sponsored","Mark as sponsored quiz","check"],["sponsor","Sponsor name (e.g. 'Sun Pharma')"],["sponsorLogo","Sponsor logo","image"],["sponsorUrl","Sponsor URL (optional — makes name clickable)"]]} onSave={()=>saveContent("quizzes")}/>
+          :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{quizzes.length} questions</span><button onClick={genQuiz} style={T.btn}>🤖 Generate today</button></div>
+          {quizzes.map(q=><div key={q.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border,gap:10}}><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,fontSize:".88rem"}}>{q.cat} — {q.diff} {q.sponsored&&<span style={{...T.tag(T.goldBg,T.goldD),marginLeft:6}}>📢 {q.sponsor||"Sponsored"}</span>}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(q.date)} · {Object.keys(q.answers||{}).length} answers · ❤️ {q.likes||0}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>{setSelD(q.date);go("quiz")}} style={{...T.btnO,...T.btnSm}}>View</button><button onClick={()=>setEdForm({type:"quizzes",data:{...q},editing:true})} style={{...T.btnO,...T.btnSm}}>📢 Sponsor</button><button onClick={()=>deleteContent("quizzes",q.id,q.cat)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
+        {aTab==="articles"&&<div style={T.card}>{edForm?.type==="articles"?<AdminForm type="Article" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["subtitle","Subtitle / Tagline (italic, shown below title — optional)"],["cat","Category","select"],["author","Author name (e.g. 'Dr. Dhananjay Patil, MD')"],["authorPhoto","Author profile photo","image"],["authorAffiliation","Author affiliation (e.g. 'Absolute Institute of Aesthetic Medicine, Pune')"],["date","Publication date","date"],["cover","Cover image","image"],["abstract","Abstract / Summary (italic boxed quote — optional)","textarea"],["body","Article body","textarea"],["refs","References (optional)","textarea"],["authorBio","Author bio (shown at end of article — optional)","textarea"],["sponsored","Sponsored content (paid editorial)","check"],["sponsor","Sponsored by — brand name (e.g. 'Sun Pharma') — only if Sponsored is checked"],["sponsorLogo","Sponsor logo","image"],["sponsorUrl","Sponsor website URL (optional — makes sponsor name clickable)"],["feat","Featured","check"]]} onSave={()=>saveContent("articles")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{articles.length}</span><button onClick={()=>setEdForm({type:"articles",data:{date:today,author:uName,cat:TOPICS[0]},editing:false})} style={T.btn}>+ New</button></div>
           {articles.map(a=><div key={a.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div style={{display:"flex",gap:10,alignItems:"center"}}>{a.cover&&<img src={a.cover} style={{width:50,height:36,objectFit:"cover",borderRadius:6}}/>}<div><div style={{fontWeight:500,fontSize:".88rem"}}>{a.title}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(a.date)}</div></div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"articles",data:{...a},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("articles",a.id,a.title)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
         {aTab==="resources"&&<div style={T.card}>{edForm?.type==="resources"?<AdminForm type="Resource" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["url","Download URL"],["pages","Pages"],["size","Size"],["icon","Emoji (fallback)"],["thumb","Thumbnail image","image"],["free","Free","check"]]} onSave={()=>saveContent("resources")}/>
