@@ -111,7 +111,71 @@ const ShareBar=({title,url,description,itemId,itemType,currentUser,prof,onSaveTo
 };
 
 // ═══ COMMENT THREAD (reusable for articles/resources) ═══
-const CommentThread=({collection,itemId,item,currentUser,uName,uIni,onUpdate})=>{
+// ═══ RENDER COMMENT TEXT — highlights @mentions in teal ═══
+const renderTextWithMentions=(text)=>{
+  if(!text)return text;
+  const parts=text.split(/(@[a-zA-Z][a-zA-Z0-9._]{1,30})/g);
+  return parts.map((p,i)=>p.startsWith("@")?<span key={i} style={{color:T.teal,fontWeight:600,background:T.tealBg,padding:"1px 5px",borderRadius:4}}>{p}</span>:p);
+};
+
+// ═══ MENTION INPUT — input with @ autocomplete dropdown ═══
+const MentionInput=({value,onChange,onSubmit,placeholder,allUsers,style})=>{
+  const[matches,setMatches]=useState([]);
+  const[selIdx,setSelIdx]=useState(0);
+  const inputRef=useRef();
+  const handleChange=(e)=>{
+    const v=e.target.value;
+    onChange(v);
+    // Detect @ trigger at cursor position
+    const cur=e.target.selectionStart;
+    const before=v.slice(0,cur);
+    const m=before.match(/@([a-zA-Z][a-zA-Z0-9._]{0,30})$/);
+    if(m&&allUsers){
+      const search=m[1].toLowerCase();
+      const filtered=allUsers.filter(u=>{
+        const n=(u.name||"").replace(/^Dr\.?\s*/i,"").toLowerCase();
+        return n.includes(search)||n.split(" ").some(w=>w.startsWith(search));
+      }).slice(0,5);
+      setMatches(filtered);setSelIdx(0);
+    }else{
+      setMatches([]);
+    }
+  };
+  const insertMention=(user)=>{
+    const handle=(user.name||"").replace(/^Dr\.?\s*/i,"").split(" ")[0];
+    const v=value;
+    const cur=inputRef.current?.selectionStart||v.length;
+    const before=v.slice(0,cur);
+    const after=v.slice(cur);
+    const newBefore=before.replace(/@([a-zA-Z][a-zA-Z0-9._]{0,30})$/,`@${handle} `);
+    onChange(newBefore+after);
+    setMatches([]);
+    setTimeout(()=>inputRef.current?.focus(),10);
+  };
+  const handleKey=(e)=>{
+    if(matches.length){
+      if(e.key==="ArrowDown"){e.preventDefault();setSelIdx(i=>(i+1)%matches.length)}
+      else if(e.key==="ArrowUp"){e.preventDefault();setSelIdx(i=>(i-1+matches.length)%matches.length)}
+      else if(e.key==="Enter"||e.key==="Tab"){e.preventDefault();insertMention(matches[selIdx])}
+      else if(e.key==="Escape"){setMatches([])}
+    }else if(e.key==="Enter"&&onSubmit){onSubmit()}
+  };
+  return(<div style={{position:"relative",flex:1}}>
+    <input ref={inputRef} value={value} onChange={handleChange} onKeyDown={handleKey} placeholder={placeholder} style={style}/>
+    {matches.length>0&&<div style={{position:"absolute",bottom:"calc(100% + 4px)",left:0,right:0,background:"#fff",border:"1px solid "+T.border,borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,0.12)",zIndex:200,maxHeight:240,overflowY:"auto"}}>
+      <div style={{padding:"5px 10px",fontSize:".66rem",color:T.mute,letterSpacing:1,textTransform:"uppercase",fontWeight:600,borderBottom:"1px solid "+T.border}}>Mention</div>
+      {matches.map((u,i)=><div key={u.id} onMouseDown={(e)=>{e.preventDefault();insertMention(u)}} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",cursor:"pointer",background:i===selIdx?T.tealBg:"#fff",fontSize:".82rem"}}>
+        {u.photo?<img src={u.photo} style={{width:26,height:26,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(26,T.tealBg,T.teal)}>{u.initials||"?"}</div>}
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontWeight:500,color:T.txt,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{u.name}</div>
+          {u.degree&&<div style={{fontSize:".7rem",color:T.mute,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{u.degree}</div>}
+        </div>
+      </div>)}
+    </div>}
+  </div>);
+};
+
+const CommentThread=({collection,itemId,item,currentUser,uName,uIni,uPhoto,allUsers,onUpdate})=>{
   const[txt,setTxt]=useState("");
   const comments=item.comments||[];
   const submit=async()=>{
@@ -120,6 +184,19 @@ const CommentThread=({collection,itemId,item,currentUser,uName,uIni,onUpdate})=>
     const updated=[...comments,c];
     await fbSet(collection,itemId,{comments:updated});
     onUpdate(itemId,updated);
+    // Notify the author of the original post (if not self)
+    if(item.uid&&item.uid!==currentUser.uid){
+      const linkTypeMap={articles:"article",cases:"case",videos:"video",forum:"forum",events:"event"};
+      createNotif({toUid:item.uid,fromUid:currentUser.uid,fromName:uName,fromIni:uIni,fromPhoto:uPhoto,type:"comment",text:`commented on your ${linkTypeMap[collection]||"post"}`,linkType:linkTypeMap[collection],linkId:itemId,linkLabel:item.title||"your post"});
+    }
+    // Notify any @mentioned users
+    const mentioned=parseMentions(txt,allUsers||[]);
+    mentioned.forEach(u=>{
+      if(u.id!==currentUser.uid&&u.id!==item.uid){
+        const linkTypeMap={articles:"article",cases:"case",videos:"video",forum:"forum",events:"event"};
+        createNotif({toUid:u.id,fromUid:currentUser.uid,fromName:uName,fromIni:uIni,fromPhoto:uPhoto,type:"mention",text:`mentioned you in a comment`,linkType:linkTypeMap[collection],linkId:itemId,linkLabel:item.title||"a post"});
+      }
+    });
     setTxt("");
   };
   const toggleCmtLike=async(idx)=>{
@@ -131,17 +208,21 @@ const CommentThread=({collection,itemId,item,currentUser,uName,uIni,onUpdate})=>
     updated[idx]=c;
     await fbSet(collection,itemId,{comments:updated});
     onUpdate(itemId,updated);
+    // Notify the comment author when liked
+    if(!has&&c.uid&&c.uid!==currentUser.uid){
+      createNotif({toUid:c.uid,fromUid:currentUser.uid,fromName:uName,fromIni:uIni,fromPhoto:uPhoto,type:"like",text:`liked your comment`,linkType:({articles:"article",cases:"case",videos:"video",forum:"forum",events:"event"})[collection]||"",linkId:itemId,linkLabel:item.title||""});
+    }
   };
   return(<div style={{marginTop:14,paddingTop:14,borderTop:"1px solid "+T.border}}>
     <div style={{fontSize:".88rem",color:T.teal,fontWeight:600,marginBottom:10}}>💬 Discussion ({comments.length})</div>
     {comments.length===0&&<p style={{color:T.mute,fontSize:".82rem",marginBottom:10}}>No comments yet. Be the first!</p>}
     {comments.map((c,i)=><div key={i} style={{padding:"8px 0",borderBottom:"1px solid "+T.border}}>
       <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}><div style={T.av(22,T.tealBg,T.teal)}>{c.ini}</div><b style={{fontSize:".82rem"}}>{c.n}</b><span style={{fontSize:".62rem",color:T.mute}}>{c.tm}</span></div>
-      <div style={{fontSize:".85rem",color:T.txt2,paddingLeft:28,lineHeight:1.5}}>{c.txt}</div>
+      <div style={{fontSize:".85rem",color:T.txt2,paddingLeft:28,lineHeight:1.5}}>{renderTextWithMentions(c.txt)}</div>
       <div style={{paddingLeft:28,marginTop:4}}><LikeBtn liked={(c.likedBy||[]).includes(currentUser?.uid)} count={c.likes||0} onToggle={()=>toggleCmtLike(i)}/></div>
     </div>)}
-    <div style={{display:"flex",gap:6,marginTop:10}}>
-      <input value={txt} onChange={e=>setTxt(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="Share your thoughts..." style={{...T.inp,borderRadius:20,padding:"9px 14px",fontSize:".82rem",flex:1}}/>
+    <div style={{display:"flex",gap:6,marginTop:10,position:"relative"}}>
+      <MentionInput value={txt} onChange={setTxt} onSubmit={submit} placeholder="Share your thoughts... (use @name to mention)" allUsers={allUsers} style={{...T.inp,borderRadius:20,padding:"9px 14px",fontSize:".82rem",width:"100%"}}/>
       <button onClick={submit} style={{...T.btn,...T.btnSm}}>Post</button>
     </div>
   </div>);
@@ -280,11 +361,11 @@ const AdminForm=({type,fields,edForm,setEdForm,onSave})=>{
 };
 
 // ═══ CASE COMMENT INPUT (moved outside App to fix cursor focus bug) ═══
-const CaseCmtInput=({caseId,caseObj,addCaseComment})=>{
+const CaseCmtInput=({caseId,caseObj,addCaseComment,allUsers})=>{
   const[txt,setTxt]=useState("");
   const submit=()=>{addCaseComment(caseId,caseObj,txt);setTxt("")};
-  return(<div style={{display:"flex",gap:6,marginTop:10}}>
-    <input value={txt} onChange={e=>setTxt(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="Your thoughts..." style={{...T.inp,borderRadius:20,padding:"9px 14px",fontSize:".82rem",flex:1}}/>
+  return(<div style={{display:"flex",gap:6,marginTop:10,position:"relative"}}>
+    <MentionInput value={txt} onChange={setTxt} onSubmit={submit} placeholder="Your thoughts... (use @name to mention)" allUsers={allUsers} style={{...T.inp,borderRadius:20,padding:"9px 14px",fontSize:".82rem",width:"100%"}}/>
     <button onClick={submit} style={{...T.btn,...T.btnSm}}>Post</button>
   </div>)
 };
@@ -296,6 +377,58 @@ async function fbAdd(c,data){try{const r=await addDoc(fbCol(c),{...data,createdA
 async function fbSet(c,id,data){try{await setDoc(doc(db,c,id),{...data,updatedAt:serverTimestamp()},{merge:true});return true}catch{return false}}
 async function fbDel(c,id){try{await deleteDoc(doc(db,c,id));return true}catch{return false}}
 async function fbGet(c,id){try{const s=await getDoc(doc(db,c,id));return s.exists()?{id:s.id,...s.data()}:null}catch{return null}}
+
+// ═══ NOTIFICATION CREATOR — creates a notif if recipient ≠ sender ═══
+async function createNotif({toUid,fromUid,fromName,fromIni,fromPhoto,type,text,linkType,linkId,linkLabel}){
+  if(!toUid||!fromUid||toUid===fromUid)return; // never notify yourself
+  await fbAdd("notifications",{
+    toUid,fromUid,fromName:fromName||"Someone",fromIni:fromIni||"?",fromPhoto:fromPhoto||"",
+    type, // "comment" | "like" | "mention" | "reply" | "event_reminder"
+    text:text||"",
+    linkType:linkType||"", // "article" | "case" | "video" | "forum" | "event" | "quiz"
+    linkId:linkId||"",
+    linkLabel:linkLabel||"",
+    read:false
+  });
+}
+
+// ═══ PARSE @MENTIONS from text — returns array of matched users ═══
+function parseMentions(text,allUsers){
+  if(!text||!allUsers)return[];
+  // Match @firstname or @first.last patterns
+  const matches=[...text.matchAll(/@([a-zA-Z][a-zA-Z0-9._]{1,30})/g)];
+  if(!matches.length)return[];
+  const mentioned=[];
+  matches.forEach(m=>{
+    const handle=m[1].toLowerCase();
+    // Try matching against user names: "Dr. Sharma Patil" → "sharma" or "sharmapatil" or "sharma.patil"
+    const found=allUsers.find(u=>{
+      const cleanName=(u.name||"").replace(/^Dr\.?\s*/i,"").toLowerCase();
+      const collapsed=cleanName.replace(/\s+/g,"");
+      const dotted=cleanName.replace(/\s+/g,".");
+      const firstWord=cleanName.split(" ")[0];
+      return handle===collapsed||handle===dotted||handle===firstWord;
+    });
+    if(found&&!mentioned.find(x=>x.id===found.id))mentioned.push(found);
+  });
+  return mentioned;
+}
+
+// ═══ FORMAT relative time (just now, 5m ago, 2h ago, 3d ago) ═══
+function relTime(ts){
+  if(!ts)return"";
+  const t=ts.seconds?ts.seconds*1000:typeof ts==="number"?ts:Date.parse(ts);
+  if(isNaN(t))return"";
+  const diff=Date.now()-t;
+  const mins=Math.floor(diff/60000);
+  if(mins<1)return"just now";
+  if(mins<60)return`${mins}m ago`;
+  const hrs=Math.floor(mins/60);
+  if(hrs<24)return`${hrs}h ago`;
+  const days=Math.floor(hrs/24);
+  if(days<7)return`${days}d ago`;
+  return new Date(t).toLocaleDateString("en-IN",{day:"numeric",month:"short"});
+}
 
 async function genQuizAI(date){
   const tp=TOPICS[Math.floor(Math.random()*TOPICS.length)];const df=Math.random()>.5?"Advanced":"Moderate";
@@ -332,6 +465,9 @@ export default function App(){
   useEffect(()=>{if(toast){const t=setTimeout(()=>setToast(null),3000);return()=>clearTimeout(t)}},[toast]);
 
   const[ads,setAds]=useState([]);
+  const[notifs,setNotifs]=useState([]);
+  const[notifsOpen,setNotifsOpen]=useState(false);
+  const[mentionMatches,setMentionMatches]=useState([]);
   const[articleLimit,setArticleLimit]=useState(6);
   const[events,setEvents]=useState([]);
   const[selAd,setSelAd]=useState(null);
@@ -339,6 +475,37 @@ export default function App(){
   const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev]=await Promise.all([fbGetAll("quizzes","date","desc"),fbGetAll("articles","date","desc"),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc"),fbGetAll("cases","createdAt","desc"),fbGetAll("users","joined","desc"),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev)},[]);
 
   useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){setProf(p);setScr("main");loadData()}else{setPf({degree:"",clinic:"",address:""});setScr("setup")}}else{setAu(null);setProf(null);setScr("login")}});return()=>unsub()},[loadData]);
+
+  // ═══ NOTIFICATIONS LOADER — fetches current user's notifications, polls every 30s ═══
+  useEffect(()=>{
+    if(!au)return;
+    const fetchNotifs=async()=>{
+      try{
+        const q=query(fbCol("notifications"),orderBy("createdAt","desc"),limit(50));
+        const snap=await getDocs(q);
+        const all=snap.docs.map(d=>({id:d.id,...d.data()}));
+        // Filter to notifications for this user only (Firestore doesn't easily allow where + orderBy without index, so we filter client-side)
+        const mine=all.filter(n=>n.toUid===au.uid).slice(0,30);
+        setNotifs(mine);
+      }catch(e){console.log("notifs",e)}
+    };
+    fetchNotifs();
+    const interval=setInterval(fetchNotifs,30000);
+    return()=>clearInterval(interval);
+  },[au]);
+
+  // Click outside to close notification dropdown
+  useEffect(()=>{
+    if(!notifsOpen)return;
+    const handler=(e)=>{
+      // If click is on the bell button or inside the dropdown, ignore
+      if(e.target.closest('[title="Notifications"]'))return;
+      if(e.target.closest('[data-notif-dropdown]'))return;
+      setNotifsOpen(false);
+    };
+    setTimeout(()=>document.addEventListener("click",handler),0);
+    return()=>document.removeEventListener("click",handler);
+  },[notifsOpen]);
 
   // ═══ DEEP-LINK: open shared article/video/forum/event/ad/quiz from URL ═══
   useEffect(()=>{
@@ -396,6 +563,11 @@ export default function App(){
     const newLikedBy=hasLiked?likedBy.filter(u=>u!==au.uid):[...likedBy,au.uid];
     await fbSet(colName,id,{likedBy:newLikedBy,likes:newLikedBy.length});
     stateUpdater(p=>p.map(x=>x.id===id?{...x,likedBy:newLikedBy,likes:newLikedBy.length}:x));
+    // Notify the author when liked (not on unlike)
+    if(!hasLiked&&item.uid&&item.uid!==au.uid){
+      const linkTypeMap={articles:"article",cases:"case",videos:"video",forum:"forum",events:"event",quizzes:"quiz",ads:"ad",resources:"resource"};
+      createNotif({toUid:item.uid,fromUid:au.uid,fromName:uName,fromIni:uIni,fromPhoto:uPhoto,type:"like",text:`liked your ${linkTypeMap[colName]||"post"}`,linkType:linkTypeMap[colName],linkId:id,linkLabel:item.title||"your post"});
+    }
   };
 
   // ═══ SAVE / BOOKMARK TOGGLE (per-user, stored on user profile) ═══
@@ -458,7 +630,24 @@ export default function App(){
   const postCase=async()=>{if(!ccT.trim()){sh("Title required");return}if(!ccImgs.length){sh("Add at least 1 image");return}await fbAdd("cases",{author:uName,ini:uIni,uid:au.uid,photo:uPhoto||"",title:ccT,cat:ccC,body:ccB,history:ccHistory,treatment:ccTreatment,outcome:ccOutcome,diagnosis:ccDiag,images:ccImgs,likedBy:[],likes:0,comments:[],date:ds(getIST())});setCcT("");setCcB("");setCcImgs([]);setCcDiag("");setCcHistory("");setCcTreatment("");setCcOutcome("");setNewCase(false);sh("Case posted!");loadData()};
 
   // ═══ CASE COMMENT ═══
-  const addCaseComment=async(caseId,caseObj,txt)=>{if(!txt.trim())return;const c={n:uName,ini:uIni,txt,tm:getIST().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",hour12:true}),uid:au.uid,likedBy:[],likes:0};const comments=[...(caseObj.comments||[]),c];await fbSet("cases",caseId,{comments});setCases(p=>p.map(x=>x.id===caseId?{...x,comments}:x))};
+  const addCaseComment=async(caseId,caseObj,txt)=>{
+    if(!txt.trim())return;
+    const c={n:uName,ini:uIni,txt,tm:getIST().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",hour12:true}),uid:au.uid,likedBy:[],likes:0};
+    const comments=[...(caseObj.comments||[]),c];
+    await fbSet("cases",caseId,{comments});
+    setCases(p=>p.map(x=>x.id===caseId?{...x,comments}:x));
+    // Notify case author
+    if(caseObj.uid&&caseObj.uid!==au.uid){
+      createNotif({toUid:caseObj.uid,fromUid:au.uid,fromName:uName,fromIni:uIni,fromPhoto:uPhoto,type:"comment",text:"commented on your case",linkType:"case",linkId:caseId,linkLabel:caseObj.title});
+    }
+    // Notify mentions
+    const mentioned=parseMentions(txt,allUsers);
+    mentioned.forEach(u=>{
+      if(u.id!==au.uid&&u.id!==caseObj.uid){
+        createNotif({toUid:u.id,fromUid:au.uid,fromName:uName,fromIni:uIni,fromPhoto:uPhoto,type:"mention",text:"mentioned you in a case discussion",linkType:"case",linkId:caseId,linkLabel:caseObj.title});
+      }
+    });
+  };
 
   const leaderboard=allUsers.filter(u=>u.totalAnswered>0).sort((a,b)=>{const aA=a.totalAnswered?Math.round(a.totalCorrect/a.totalAnswered*100):0;const bA=b.totalAnswered?Math.round(b.totalCorrect/b.totalAnswered*100):0;return bA-aA||(b.streak||0)-(a.streak||0)}).slice(0,20);
 
@@ -527,6 +716,47 @@ export default function App(){
           </div>
           <div style={{display:"flex",alignItems:"center",gap:1}}>
             {navs.map(n=><button key={n.id} onClick={()=>go(n.id)} style={{background:pg===n.id?T.tealBg:"none",border:"none",color:pg===n.id?T.teal:T.mute,padding:"5px 9px",borderRadius:9,cursor:"pointer",fontSize:".6rem",fontFamily:"inherit",fontWeight:pg===n.id?600:400,display:"flex",flexDirection:"column",alignItems:"center",gap:1,minWidth:40}}><span style={{fontSize:".85rem"}}>{n.ic}</span>{n.l}</button>)}
+
+            {/* 🔔 Notifications bell */}
+            {(()=>{const unread=notifs.filter(n=>!n.read).length;return(<div style={{position:"relative",marginLeft:6}}>
+              <button onClick={()=>setNotifsOpen(o=>!o)} style={{background:notifsOpen?T.tealBg:"none",border:"none",padding:"5px 9px",borderRadius:9,cursor:"pointer",fontSize:".85rem",position:"relative"}} title="Notifications">
+                🔔
+                {unread>0&&<span style={{position:"absolute",top:1,right:1,minWidth:16,height:16,borderRadius:8,background:"#dc3545",color:"#fff",fontSize:".58rem",fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px",border:"2px solid #fff"}}>{unread>9?"9+":unread}</span>}
+              </button>
+              {/* Notification dropdown */}
+              {notifsOpen&&<div data-notif-dropdown style={{position:"absolute",top:"calc(100% + 8px)",right:-10,width:340,maxHeight:480,background:"#fff",borderRadius:12,boxShadow:"0 8px 32px rgba(0,0,0,0.18)",border:"1px solid "+T.border,zIndex:500,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+                <div style={{padding:"12px 16px",borderBottom:"1px solid "+T.border,display:"flex",justifyContent:"space-between",alignItems:"center",background:T.bg}}>
+                  <div style={{fontWeight:700,fontSize:".92rem"}}>🔔 Notifications</div>
+                  {unread>0&&<button onClick={async()=>{await Promise.all(notifs.filter(n=>!n.read).map(n=>fbSet("notifications",n.id,{read:true})));setNotifs(p=>p.map(n=>({...n,read:true})))}} style={{background:"none",border:"none",color:T.teal,fontSize:".74rem",cursor:"pointer",fontWeight:500,fontFamily:"inherit"}}>Mark all read</button>}
+                </div>
+                <div style={{flex:1,overflowY:"auto"}}>
+                  {notifs.length===0?<div style={{padding:30,textAlign:"center",color:T.mute,fontSize:".85rem"}}><div style={{fontSize:"2rem",marginBottom:6}}>🔕</div>No notifications yet.<div style={{fontSize:".72rem",marginTop:4}}>You'll see comments, likes, and mentions here.</div></div>
+                  :notifs.map(n=><div key={n.id} onClick={async()=>{
+                    if(!n.read){await fbSet("notifications",n.id,{read:true});setNotifs(p=>p.map(x=>x.id===n.id?{...x,read:true}:x))}
+                    // Navigate to source
+                    if(n.linkType==="article"){const a=articles.find(x=>x.id===n.linkId);if(a){setSelA(a);go("home")}}
+                    else if(n.linkType==="case"){go("cases")}
+                    else if(n.linkType==="video"){const v=videos.find(x=>x.id===n.linkId);if(v){setSelV(v);go("videos")}}
+                    else if(n.linkType==="forum"){go("forum")}
+                    else if(n.linkType==="event"){const e=events.find(x=>x.id===n.linkId);if(e){setSelE(e);go("events")}}
+                    else if(n.linkType==="quiz"){go("quiz")}
+                    setNotifsOpen(false);
+                  }} style={{padding:"12px 14px",borderBottom:"1px solid "+T.border,cursor:"pointer",background:n.read?"#fff":"#fef9ef",display:"flex",gap:10,alignItems:"flex-start"}}>
+                    {n.fromPhoto?<img src={n.fromPhoto} style={{width:36,height:36,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(36,T.tealBg,T.teal),flexShrink:0}}>{n.fromIni}</div>}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:".82rem",lineHeight:1.4}}><b>{n.fromName}</b> <span style={{color:T.txt2}}>{n.text}</span></div>
+                      {n.linkLabel&&<div style={{fontSize:".74rem",color:T.mute,marginTop:2,fontStyle:"italic",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>"{n.linkLabel}"</div>}
+                      <div style={{fontSize:".68rem",color:T.mute,marginTop:3,display:"flex",gap:6,alignItems:"center"}}>
+                        <span style={{fontSize:".7rem"}}>{n.type==="like"?"❤️":n.type==="comment"?"💬":n.type==="mention"?"@":n.type==="reply"?"↩️":"🔔"}</span>
+                        <span>{relTime(n.createdAt)}</span>
+                        {!n.read&&<span style={{width:6,height:6,borderRadius:"50%",background:T.teal,marginLeft:"auto"}}/>}
+                      </div>
+                    </div>
+                  </div>)}
+                </div>
+              </div>}
+            </div>)})()}
+
             {uPhoto?<img src={uPhoto} onClick={()=>go("me")} style={{width:30,height:30,borderRadius:"50%",border:"2px solid "+T.tealBg,marginLeft:6,cursor:"pointer"}}/>:<div onClick={()=>go("me")} style={{...T.av(30,T.tealBg,T.teal),marginLeft:6,cursor:"pointer"}}>{uIni}</div>}
           </div>
         </div>
@@ -747,7 +977,7 @@ export default function App(){
               </div>
             </div>}
 
-            <CommentThread collection="articles" itemId={selA.id} item={selA} currentUser={au} uName={uName} uIni={uIni} onUpdate={(id,comments)=>{setArticles(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelA(p=>({...p,comments}))}}/>
+            <CommentThread collection="articles" itemId={selA.id} item={selA} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} onUpdate={(id,comments)=>{setArticles(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelA(p=>({...p,comments}))}}/>
           </div>
         </article>
           </div>{/* END MAIN ARTICLE COLUMN */}
@@ -916,7 +1146,7 @@ export default function App(){
               <span style={{fontSize:".75rem",color:T.mute}}>💬 {r.comments?.length||0}</span>
               {r.url&&<ShareBar title={r.title||r.t} url={r.url} description={`Resource from SKINARIO: ${r.title||r.t}`} itemId={r.id} itemType="resources" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>}
             </div>
-            <CommentThread collection="resources" itemId={r.id} item={r} currentUser={au} uName={uName} uIni={uIni} onUpdate={(id,comments)=>setResources(p=>p.map(x=>x.id===id?{...x,comments}:x))}/>
+            <CommentThread collection="resources" itemId={r.id} item={r} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} onUpdate={(id,comments)=>setResources(p=>p.map(x=>x.id===id?{...x,comments}:x))}/>
           </div>)}
         </div>
       </div>}
@@ -963,7 +1193,7 @@ export default function App(){
             <LikeBtn liked={(selV.likedBy||[]).includes(au?.uid)} count={selV.likes||0} onToggle={()=>{toggleLike("videos",selV.id,selV,setVideos);setSelV(p=>{const lb=p.likedBy||[];const has=lb.includes(au.uid);const nlb=has?lb.filter(u=>u!==au.uid):[...lb,au.uid];return{...p,likedBy:nlb,likes:nlb.length}})}}/>
             <ShareBar title={selV.title||selV.t} url={`${window.location.origin}/?video=${selV.id}`} description={selV.desc?.slice(0,120)} itemId={selV.id} itemType="videos" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>
           </div>
-          <CommentThread collection="videos" itemId={selV.id} item={selV} currentUser={au} uName={uName} uIni={uIni} onUpdate={(id,comments)=>{setVideos(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelV(p=>({...p,comments}))}}/>
+          <CommentThread collection="videos" itemId={selV.id} item={selV} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} onUpdate={(id,comments)=>{setVideos(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelV(p=>({...p,comments}))}}/>
         </div>
       </div>}
 
@@ -1105,7 +1335,7 @@ export default function App(){
                 <LikeBtn liked={(selE.likedBy||[]).includes(au?.uid)} count={selE.likes||0} onToggle={()=>{toggleLike("events",selE.id,selE,setEvents);setSelE(p=>{const lb=p.likedBy||[];const has=lb.includes(au.uid);const nlb=has?lb.filter(u=>u!==au.uid):[...lb,au.uid];return{...p,likedBy:nlb,likes:nlb.length}})}}/>
                 <ShareBar title={selE.title} url={`${window.location.origin}/?event=${selE.id}`} description={selE.body?.slice(0,120)} itemId={selE.id} itemType="events" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>
               </div>
-              <CommentThread collection="events" itemId={selE.id} item={selE} currentUser={au} uName={uName} uIni={uIni} onUpdate={(id,comments)=>{setEvents(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelE(p=>({...p,comments}))}}/>
+              <CommentThread collection="events" itemId={selE.id} item={selE} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} onUpdate={(id,comments)=>{setEvents(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelE(p=>({...p,comments}))}}/>
             </div>
           </div>
         </div>);
@@ -1245,10 +1475,10 @@ export default function App(){
             {(cs.comments||[]).length>0&&<div style={{marginTop:12,paddingLeft:10,borderLeft:"2px solid "+T.border}}>
               {cs.comments.map((x,i)=><div key={i} style={{padding:"6px 0",fontSize:".85rem"}}>
                 <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}><div style={T.av(20,T.tealBg,T.teal)}>{x.ini}</div><b style={{color:T.txt,fontSize:".82rem"}}>{x.n}</b><span style={{color:T.mute,fontSize:".62rem"}}>{x.tm}</span></div>
-                <div style={{color:T.txt2,paddingLeft:26,lineHeight:1.5}}>{x.txt}</div>
+                <div style={{color:T.txt2,paddingLeft:26,lineHeight:1.5}}>{renderTextWithMentions(x.txt)}</div>
               </div>)}
             </div>}
-            <CaseCmtInput caseId={cs.id} caseObj={cs} addCaseComment={addCaseComment}/>
+            <CaseCmtInput caseId={cs.id} caseObj={cs} addCaseComment={addCaseComment} allUsers={allUsers}/>
           </div>
         </div>)}
       </div>}
