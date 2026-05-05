@@ -20,6 +20,40 @@ const ACCOUNT_TYPES=[
 // ═══ MEDICAL DEGREES (alphabetized) ═══
 const DEGREES=["MBBS","BAMS","BHMS","BDS","BUMS","MD - Dermatology","MD - General Medicine","MS - Surgery","DDV (Diploma in Dermatology)","DNB - Dermatology","Diploma in Aesthetic Medicine","Diploma in Cosmetology","Fellowship in Aesthetic Medicine","Fellowship in Cosmetology","Other"];
 
+// ═══ COUNTRIES — India default + top markets for aesthetic medicine ═══
+const COUNTRIES=[
+  "India",
+  "United Arab Emirates",
+  "Saudi Arabia",
+  "Qatar",
+  "Kuwait",
+  "Oman",
+  "Bahrain",
+  "Singapore",
+  "Malaysia",
+  "Thailand",
+  "Indonesia",
+  "Philippines",
+  "Vietnam",
+  "Sri Lanka",
+  "Bangladesh",
+  "Nepal",
+  "Pakistan",
+  "United Kingdom",
+  "United States",
+  "Canada",
+  "Australia",
+  "New Zealand",
+  "South Africa",
+  "Nigeria",
+  "Kenya",
+  "Egypt",
+  "Turkey",
+  "Brazil",
+  "Mexico",
+  "Other"
+];
+
 // ═══ INDIAN MEDICAL COUNCILS ═══
 const COUNCILS=["NMC (National Medical Commission)","SMC - Maharashtra","SMC - Karnataka","SMC - Tamil Nadu","SMC - Andhra Pradesh","SMC - Telangana","SMC - Gujarat","SMC - Delhi","SMC - West Bengal","SMC - Kerala","SMC - Rajasthan","SMC - Uttar Pradesh","SMC - Madhya Pradesh","SMC - Punjab","SMC - Haryana","SMC - Bihar","SMC - Odisha","SMC - Other","CCH (Central Council of Homoeopathy)","CCIM (Central Council of Indian Medicine)","DCI (Dental Council of India)","Other"];
 
@@ -475,7 +509,7 @@ export default function App(){
   const[quizzes,setQuizzes]=useState([]);const[articles,setArticles]=useState([]);const[resources,setResources]=useState([]);const[videos,setVideos]=useState([]);const[forumPosts,setForumPosts]=useState([]);const[cases,setCases]=useState([]);const[allUsers,setAllUsers]=useState([]);
   const[selD,setSelD]=useState(ds(getIST()));const[selA,setSelA]=useState(null);const[selV,setSelV]=useState(null);const[toast,setToast]=useState(null);const[cmt,setCmt]=useState("");const[ld,setLd]=useState(false);const[aTab,setATab]=useState("stats");
   const[authMode,setAuthMode]=useState("signin");const[authEmail,setAuthEmail]=useState("");const[authPass,setAuthPass]=useState("");const[authName,setAuthName]=useState("");const[authBusy,setAuthBusy]=useState(false);const[authErr,setAuthErr]=useState("");
-  const[pf,setPf]=useState({accountType:"",name:"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});const[edForm,setEdForm]=useState(null);const[setupStep,setSetupStep]=useState(0);const[setupErr,setSetupErr]=useState("");
+  const[pf,setPf]=useState({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});const[edForm,setEdForm]=useState(null);const[setupStep,setSetupStep]=useState(0);const[setupErr,setSetupErr]=useState("");
   // Forum/Cases new post state
   const[newForum,setNewForum]=useState(false);const[fpT,setFpT]=useState("");const[fpB,setFpB]=useState("");const[fpC,setFpC]=useState(TOPICS[0]);const[fpImgs,setFpImgs]=useState([]);const[fpUp,setFpUp]=useState(false);
   const[newCase,setNewCase]=useState(false);const[ccT,setCcT]=useState("");const[ccB,setCcB]=useState("");const[ccC,setCcC]=useState(TOPICS[0]);const[ccImgs,setCcImgs]=useState([]);const[ccUp,setCcUp]=useState(false);const[ccDiag,setCcDiag]=useState("");const[ccHistory,setCcHistory]=useState("");const[ccTreatment,setCcTreatment]=useState("");const[ccOutcome,setCcOutcome]=useState("");
@@ -499,7 +533,7 @@ export default function App(){
   const[selE,setSelE]=useState(null);
   const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev]=await Promise.all([fbGetAll("quizzes","date","desc"),fbGetAll("articles","date","desc"),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc"),fbGetAll("cases","createdAt","desc"),fbGetAll("users","joined","desc"),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev)},[]);
 
-  useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){setProf(p);setScr("main");loadData()}else{setPf({accountType:"",name:au?.displayName||"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});setSetupStep(0);setSetupErr("");setScr("setup")}}else{setAu(null);setProf(null);setScr("login")}});return()=>unsub()},[loadData]);
+  useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){setProf(p);setScr("main");loadData()}else{setPf({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:au?.displayName||"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});setSetupStep(0);setSetupErr("");setScr("setup")}}else{setAu(null);setProf(null);setScr("login")}});return()=>unsub()},[loadData]);
 
   // ═══ NOTIFICATIONS LOADER — fetches current user's notifications + broadcast announcements ═══
   useEffect(()=>{
@@ -594,9 +628,16 @@ export default function App(){
     if(!pf.accountType){setSetupErr("Pick your account type to continue");return}
     if(!pf.name?.trim()){setSetupErr("Name is required");return}
     if(!pf.mobile?.trim()){setSetupErr("Mobile number is required");return}
+    if(!pf.country){setSetupErr("Country is required");return}
     if(pf.accountType==="doctor"){
       if(!pf.degree){setSetupErr("Degree is required");return}
-      if(!pf.council){setSetupErr("Medical council is required");return}
+      // India uses dropdown, others use free-text
+      if(pf.country==="India"){
+        if(!pf.council){setSetupErr("Medical council is required");return}
+      }else{
+        if(!pf.internationalCouncil?.trim()){setSetupErr("Medical council/board name is required");return}
+        if(!pf.city?.trim()){setSetupErr("City is required");return}
+      }
       if(!pf.regNumber?.trim()){setSetupErr("Registration number is required");return}
       if(!pf.clinic?.trim()){setSetupErr("Clinic name is required");return}
     }
@@ -611,25 +652,27 @@ export default function App(){
       if(!pf.directorName?.trim()){setSetupErr("Director / principal name is required");return}
     }
 
-    // ═══ MCI DUPLICATE CHECK (for doctors) ═══
+    // ═══ MCI / international DUPLICATE CHECK (for doctors) ═══
     let regFlagged=false;
     if(pf.accountType==="doctor"&&pf.regNumber){
       const cleaned=pf.regNumber.replace(/\s+/g,"").toLowerCase();
-      // Look for existing user with same council + regNumber
-      const dup=allUsers.find(u=>u.accountType==="doctor"&&u.regNumber&&u.regNumber.replace(/\s+/g,"").toLowerCase()===cleaned&&u.council===pf.council&&u.id!==au.uid);
+      const councilToCheck=pf.country==="India"?pf.council:pf.internationalCouncil;
+      const dup=allUsers.find(u=>u.accountType==="doctor"&&u.regNumber&&u.regNumber.replace(/\s+/g,"").toLowerCase()===cleaned&&((u.country==="India"&&u.council===councilToCheck)||(u.country!=="India"&&u.internationalCouncil===councilToCheck))&&u.id!==au.uid);
       if(dup){
         regFlagged=true;
-        // Flag the OTHER user too so admin sees both as suspicious
         await fbSet("users",dup.id,{regFlagged:true,regFlagReason:"Duplicate registration number detected. Match against another account."});
       }
     }
 
     const initials=(pf.name||"D").replace(/^Dr\.?\s*/i,"").split(" ").map(w=>w[0]||"").join("").toUpperCase().slice(0,2)||"D";
+    const isInternational=pf.country!=="India";
     const p={
       name:pf.name.trim(),
       email:au.email,
       mobile:pf.mobile.trim(),
       photo:au.photoURL||"",
+      country:pf.country,
+      isInternational,
       accountType:pf.accountType,
       visibility:pf.visibility||"public",
       verified:false,
@@ -638,9 +681,16 @@ export default function App(){
       paid:false,
       joined:ds(getIST()),
       initials,
-      totalCorrect:0,totalAnswered:0,streak:0,
+      totalCorrect:0,totalAnswered:0,streak:0,points:0,
       // Type-specific
-      ...(pf.accountType==="doctor"?{degree:pf.degree,council:pf.council,regNumber:pf.regNumber.trim(),clinic:pf.clinic.trim(),address:pf.address?.trim()||""}:{}),
+      ...(pf.accountType==="doctor"?{
+        degree:pf.degree,
+        regNumber:pf.regNumber.trim(),
+        clinic:pf.clinic.trim(),
+        address:pf.address?.trim()||"",
+        // India-specific OR international-specific council
+        ...(pf.country==="India"?{council:pf.council}:{internationalCouncil:pf.internationalCouncil.trim(),city:pf.city.trim(),region:pf.region?.trim()||""})
+      }:{}),
       ...(pf.accountType==="pharma"?{companyName:pf.companyName.trim(),brandCategory:pf.brandCategory,contactPerson:pf.contactPerson.trim(),website:pf.website?.trim()||"",address:pf.address?.trim()||""}:{}),
       ...(pf.accountType==="institute"?{instituteName:pf.instituteName.trim(),instituteType:pf.instituteType,directorName:pf.directorName.trim(),address:pf.address?.trim()||"",website:pf.website?.trim()||""}:{})
     };
@@ -945,28 +995,57 @@ export default function App(){
 
           {/* ═══ DOCTOR-SPECIFIC FIELDS ═══ */}
           {pf.accountType==="doctor"&&<>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Country <span style={{color:T.err}}>*</span></label>
+            <select value={pf.country} onChange={e=>setPf(p=>({...p,country:e.target.value,council:"",internationalCouncil:""}))} style={{...T.inp,marginBottom:12}}>
+              {COUNTRIES.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Primary Degree <span style={{color:T.err}}>*</span></label>
             <select value={pf.degree} onChange={e=>setPf(p=>({...p,degree:e.target.value}))} style={{...T.inp,marginBottom:12}}>
               <option value="">— Select —</option>{DEGREES.map(d=><option key={d} value={d}>{d}</option>)}
             </select>
 
-            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Medical Council <span style={{color:T.err}}>*</span></label>
-            <select value={pf.council} onChange={e=>setPf(p=>({...p,council:e.target.value}))} style={{...T.inp,marginBottom:12}}>
-              <option value="">— Select —</option>{COUNCILS.map(c=><option key={c} value={c}>{c}</option>)}
-            </select>
+            {/* India: dropdown of councils. Other countries: free-text council name + city/region */}
+            {pf.country==="India"?<>
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Medical Council <span style={{color:T.err}}>*</span></label>
+              <select value={pf.council} onChange={e=>setPf(p=>({...p,council:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+                <option value="">— Select —</option>{COUNCILS.map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+            </>:<>
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Medical Council / Board <span style={{color:T.err}}>*</span></label>
+              <input value={pf.internationalCouncil} onChange={e=>setPf(p=>({...p,internationalCouncil:e.target.value}))} placeholder="e.g. GMC (UK), DHA (Dubai), Singapore Medical Council" style={{...T.inp,marginBottom:12}}/>
 
-            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Registration Number <span style={{color:T.err}}>*</span></label>
-            <input value={pf.regNumber} onChange={e=>setPf(p=>({...p,regNumber:e.target.value}))} placeholder="Your council registration number" style={{...T.inp,marginBottom:12}}/>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+                <div>
+                  <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>City <span style={{color:T.err}}>*</span></label>
+                  <input value={pf.city} onChange={e=>setPf(p=>({...p,city:e.target.value}))} placeholder="e.g. Dubai" style={T.inp}/>
+                </div>
+                <div>
+                  <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>State / Region</label>
+                  <input value={pf.region} onChange={e=>setPf(p=>({...p,region:e.target.value}))} placeholder="e.g. Greater London" style={T.inp}/>
+                </div>
+              </div>
+            </>}
 
-            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Clinic Name <span style={{color:T.err}}>*</span></label>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Registration / License Number <span style={{color:T.err}}>*</span></label>
+            <input value={pf.regNumber} onChange={e=>setPf(p=>({...p,regNumber:e.target.value}))} placeholder={pf.country==="India"?"Your council registration number":"Your medical license number"} style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Clinic / Practice Name <span style={{color:T.err}}>*</span></label>
             <input value={pf.clinic} onChange={e=>setPf(p=>({...p,clinic:e.target.value}))} placeholder="e.g. Absolute Aesthetic Clinic" style={{...T.inp,marginBottom:12}}/>
 
-            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>City, State (optional)</label>
-            <input value={pf.address} onChange={e=>setPf(p=>({...p,address:e.target.value}))} placeholder="e.g. Pune, Maharashtra" style={{...T.inp,marginBottom:12}}/>
+            {pf.country==="India"&&<>
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>City, State (optional)</label>
+              <input value={pf.address} onChange={e=>setPf(p=>({...p,address:e.target.value}))} placeholder="e.g. Pune, Maharashtra" style={{...T.inp,marginBottom:12}}/>
+            </>}
           </>}
 
           {/* ═══ PHARMA-SPECIFIC FIELDS ═══ */}
           {pf.accountType==="pharma"&&<>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Country <span style={{color:T.err}}>*</span></label>
+            <select value={pf.country} onChange={e=>setPf(p=>({...p,country:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+              {COUNTRIES.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Company / Brand Name <span style={{color:T.err}}>*</span></label>
             <input value={pf.companyName} onChange={e=>setPf(p=>({...p,companyName:e.target.value}))} placeholder="e.g. Sun Pharma Aesthetics" style={{...T.inp,marginBottom:12}}/>
 
@@ -987,6 +1066,11 @@ export default function App(){
 
           {/* ═══ INSTITUTE-SPECIFIC FIELDS ═══ */}
           {pf.accountType==="institute"&&<>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Country <span style={{color:T.err}}>*</span></label>
+            <select value={pf.country} onChange={e=>setPf(p=>({...p,country:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+              {COUNTRIES.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Institute Name <span style={{color:T.err}}>*</span></label>
             <input value={pf.instituteName} onChange={e=>setPf(p=>({...p,instituteName:e.target.value}))} placeholder="e.g. Absolute Institute of Aesthetic Medicine" style={{...T.inp,marginBottom:12}}/>
 
