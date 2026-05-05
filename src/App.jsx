@@ -468,6 +468,12 @@ export default function App(){
   const[notifs,setNotifs]=useState([]);
   const[notifsOpen,setNotifsOpen]=useState(false);
   const[mentionMatches,setMentionMatches]=useState([]);
+  const[announceTitle,setAnnounceTitle]=useState("");
+  const[announceText,setAnnounceText]=useState("");
+  const[announceLinkType,setAnnounceLinkType]=useState("");
+  const[announceLinkId,setAnnounceLinkId]=useState("");
+  const[broadcastList,setBroadcastList]=useState([]);
+  const[announceBusy,setAnnounceBusy]=useState(false);
   const[articleLimit,setArticleLimit]=useState(6);
   const[events,setEvents]=useState([]);
   const[selAd,setSelAd]=useState(null);
@@ -476,7 +482,7 @@ export default function App(){
 
   useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){setProf(p);setScr("main");loadData()}else{setPf({degree:"",clinic:"",address:""});setScr("setup")}}else{setAu(null);setProf(null);setScr("login")}});return()=>unsub()},[loadData]);
 
-  // ═══ NOTIFICATIONS LOADER — fetches current user's notifications, polls every 30s ═══
+  // ═══ NOTIFICATIONS LOADER — fetches current user's notifications + broadcast announcements ═══
   useEffect(()=>{
     if(!au)return;
     const fetchNotifs=async()=>{
@@ -484,15 +490,23 @@ export default function App(){
         const q=query(fbCol("notifications"),orderBy("createdAt","desc"),limit(50));
         const snap=await getDocs(q);
         const all=snap.docs.map(d=>({id:d.id,...d.data()}));
-        // Filter to notifications for this user only (Firestore doesn't easily allow where + orderBy without index, so we filter client-side)
-        const mine=all.filter(n=>n.toUid===au.uid).slice(0,30);
-        setNotifs(mine);
+        // Personal notifications: addressed to this user
+        const personal=all.filter(n=>n.toUid===au.uid);
+        // Broadcast announcements: visible to everyone, read state tracked in user's prof.readBroadcasts
+        const readBroadcasts=prof?.readBroadcasts||[];
+        const broadcasts=all.filter(n=>n.broadcast===true).map(n=>({...n,read:readBroadcasts.includes(n.id)}));
+        // Merge and sort by createdAt desc
+        const merged=[...personal,...broadcasts].sort((a,b)=>{
+          const at=a.createdAt?.seconds||0,bt=b.createdAt?.seconds||0;
+          return bt-at;
+        }).slice(0,30);
+        setNotifs(merged);
       }catch(e){console.log("notifs",e)}
     };
     fetchNotifs();
     const interval=setInterval(fetchNotifs,30000);
     return()=>clearInterval(interval);
-  },[au]);
+  },[au,prof?.readBroadcasts]);
 
   // Click outside to close notification dropdown
   useEffect(()=>{
@@ -727,12 +741,33 @@ export default function App(){
               {notifsOpen&&<div data-notif-dropdown style={{position:"absolute",top:"calc(100% + 8px)",right:-10,width:340,maxHeight:480,background:"#fff",borderRadius:12,boxShadow:"0 8px 32px rgba(0,0,0,0.18)",border:"1px solid "+T.border,zIndex:500,overflow:"hidden",display:"flex",flexDirection:"column"}}>
                 <div style={{padding:"12px 16px",borderBottom:"1px solid "+T.border,display:"flex",justifyContent:"space-between",alignItems:"center",background:T.bg}}>
                   <div style={{fontWeight:700,fontSize:".92rem"}}>🔔 Notifications</div>
-                  {unread>0&&<button onClick={async()=>{await Promise.all(notifs.filter(n=>!n.read).map(n=>fbSet("notifications",n.id,{read:true})));setNotifs(p=>p.map(n=>({...n,read:true})))}} style={{background:"none",border:"none",color:T.teal,fontSize:".74rem",cursor:"pointer",fontWeight:500,fontFamily:"inherit"}}>Mark all read</button>}
+                  {unread>0&&<button onClick={async()=>{
+                    // Mark personal notifs as read in their docs
+                    const personalUnread=notifs.filter(n=>!n.read&&!n.broadcast);
+                    await Promise.all(personalUnread.map(n=>fbSet("notifications",n.id,{read:true})));
+                    // Mark broadcasts as read by appending their IDs to user's readBroadcasts list
+                    const broadcastUnread=notifs.filter(n=>!n.read&&n.broadcast);
+                    if(broadcastUnread.length){
+                      const newReadBroadcasts=[...(prof?.readBroadcasts||[]),...broadcastUnread.map(b=>b.id)];
+                      await fbSet("users",au.uid,{readBroadcasts:newReadBroadcasts});
+                      setProf(p=>({...p,readBroadcasts:newReadBroadcasts}));
+                    }
+                    setNotifs(p=>p.map(n=>({...n,read:true})));
+                  }} style={{background:"none",border:"none",color:T.teal,fontSize:".74rem",cursor:"pointer",fontWeight:500,fontFamily:"inherit"}}>Mark all read</button>}
                 </div>
                 <div style={{flex:1,overflowY:"auto"}}>
                   {notifs.length===0?<div style={{padding:30,textAlign:"center",color:T.mute,fontSize:".85rem"}}><div style={{fontSize:"2rem",marginBottom:6}}>🔕</div>No notifications yet.<div style={{fontSize:".72rem",marginTop:4}}>You'll see comments, likes, and mentions here.</div></div>
                   :notifs.map(n=><div key={n.id} onClick={async()=>{
-                    if(!n.read){await fbSet("notifications",n.id,{read:true});setNotifs(p=>p.map(x=>x.id===n.id?{...x,read:true}:x))}
+                    if(!n.read){
+                      if(n.broadcast){
+                        const newReadBroadcasts=[...(prof?.readBroadcasts||[]),n.id];
+                        await fbSet("users",au.uid,{readBroadcasts:newReadBroadcasts});
+                        setProf(p=>({...p,readBroadcasts:newReadBroadcasts}));
+                      }else{
+                        await fbSet("notifications",n.id,{read:true});
+                      }
+                      setNotifs(p=>p.map(x=>x.id===n.id?{...x,read:true}:x));
+                    }
                     // Navigate to source
                     if(n.linkType==="article"){const a=articles.find(x=>x.id===n.linkId);if(a){setSelA(a);go("home")}}
                     else if(n.linkType==="case"){go("cases")}
@@ -741,15 +776,21 @@ export default function App(){
                     else if(n.linkType==="event"){const e=events.find(x=>x.id===n.linkId);if(e){setSelE(e);go("events")}}
                     else if(n.linkType==="quiz"){go("quiz")}
                     setNotifsOpen(false);
-                  }} style={{padding:"12px 14px",borderBottom:"1px solid "+T.border,cursor:"pointer",background:n.read?"#fff":"#fef9ef",display:"flex",gap:10,alignItems:"flex-start"}}>
-                    {n.fromPhoto?<img src={n.fromPhoto} style={{width:36,height:36,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(36,T.tealBg,T.teal),flexShrink:0}}>{n.fromIni}</div>}
+                  }} style={{padding:"12px 14px",borderBottom:"1px solid "+T.border,cursor:"pointer",background:n.read?"#fff":(n.type==="announcement"?"#fdf6e3":"#fef9ef"),borderLeft:n.type==="announcement"?"3px solid "+T.gold:"none",display:"flex",gap:10,alignItems:"flex-start"}}>
+                    {n.type==="announcement"?<div style={{...T.av(36,T.goldBg,T.goldD),flexShrink:0,fontSize:"1.1rem"}}>📣</div>:n.fromPhoto?<img src={n.fromPhoto} style={{width:36,height:36,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(36,T.tealBg,T.teal),flexShrink:0}}>{n.fromIni}</div>}
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:".82rem",lineHeight:1.4}}><b>{n.fromName}</b> <span style={{color:T.txt2}}>{n.text}</span></div>
-                      {n.linkLabel&&<div style={{fontSize:".74rem",color:T.mute,marginTop:2,fontStyle:"italic",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>"{n.linkLabel}"</div>}
+                      {n.type==="announcement"?<>
+                        <div style={{fontSize:".68rem",color:T.goldD,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:3}}>📣 Announcement{n.fromName?` from ${n.fromName}`:""}</div>
+                        {n.title&&<div style={{fontSize:".88rem",fontWeight:600,color:T.txt,marginBottom:3,lineHeight:1.35}}>{n.title}</div>}
+                        <div style={{fontSize:".82rem",color:T.txt2,lineHeight:1.5,whiteSpace:"pre-wrap"}}>{n.text}</div>
+                      </>:<>
+                        <div style={{fontSize:".82rem",lineHeight:1.4}}><b>{n.fromName}</b> <span style={{color:T.txt2}}>{n.text}</span></div>
+                        {n.linkLabel&&<div style={{fontSize:".74rem",color:T.mute,marginTop:2,fontStyle:"italic",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>"{n.linkLabel}"</div>}
+                      </>}
                       <div style={{fontSize:".68rem",color:T.mute,marginTop:3,display:"flex",gap:6,alignItems:"center"}}>
-                        <span style={{fontSize:".7rem"}}>{n.type==="like"?"❤️":n.type==="comment"?"💬":n.type==="mention"?"@":n.type==="reply"?"↩️":"🔔"}</span>
+                        <span style={{fontSize:".7rem"}}>{n.type==="like"?"❤️":n.type==="comment"?"💬":n.type==="mention"?"@":n.type==="reply"?"↩️":n.type==="announcement"?"📣":"🔔"}</span>
                         <span>{relTime(n.createdAt)}</span>
-                        {!n.read&&<span style={{width:6,height:6,borderRadius:"50%",background:T.teal,marginLeft:"auto"}}/>}
+                        {!n.read&&<span style={{width:6,height:6,borderRadius:"50%",background:n.type==="announcement"?T.gold:T.teal,marginLeft:"auto"}}/>}
                       </div>
                     </div>
                   </div>)}
@@ -1091,7 +1132,7 @@ export default function App(){
         <div style={{display:"flex",gap:6,overflowX:"auto",padding:"4px 0 14px"}}>{dates.map(d=>{const dt=new Date(d+"T12:00:00");const sun=dt.getDay()===0;const on=d===selD;return<div key={d} onClick={()=>!sun&&setSelD(d)} style={{minWidth:52,padding:"8px 4px",textAlign:"center",borderRadius:10,border:`1.5px solid ${on?T.teal:T.border}`,cursor:sun?"not-allowed":"pointer",background:on?T.tealBg:"#fff",opacity:sun?.3:1}}><div style={{fontSize:".58rem",color:on?T.teal:T.mute,textTransform:"uppercase",fontWeight:on?600:400}}>{dN(d)}</div><div style={{fontSize:"1rem",fontWeight:700,color:on?T.teal:T.txt}}>{dt.getDate()}</div></div>})}</div>
         {ld&&<div style={{...T.card,textAlign:"center",padding:50}}><p style={{color:T.mute}}>⏳ Generating...</p></div>}
         {!ld&&!qObj&&<div style={{...T.card,textAlign:"center",padding:40}}>{selD===today?<><div style={{fontSize:"2rem",marginBottom:10}}>🔬</div><p style={{color:T.teal,fontWeight:600}}>Today's question</p><p style={{color:T.mute,fontSize:".88rem",margin:"8px 0 16px"}}>10 AM IST daily</p>{isAdm&&<button onClick={genQuiz} style={T.btn}>🤖 Generate now</button>}</>:<p style={{color:T.mute}}>No question for this date</p>}</div>}
-        {!ld&&qObj&&<div style={{display:"grid",gridTemplateColumns:"1fr 340px",gap:16,alignItems:"start"}}>
+        {!ld&&qObj&&<div className="quiz-grid" style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 340px",gap:16,alignItems:"start"}}>
           <div style={{...T.card,borderLeft:"3px solid "+T.teal,padding:0,overflow:"hidden"}}>
             {/* Sponsored quiz banner */}
             {qObj.sponsored&&qObj.sponsor&&<div style={{background:"linear-gradient(135deg,"+T.goldBg+","+T.tealBg+")",borderBottom:"1px solid "+T.border,padding:"10px 18px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
@@ -1125,6 +1166,11 @@ export default function App(){
             </div>)}{!qObj.comments?.length&&<p style={{color:T.mute,fontSize:".8rem"}}>No comments yet.</p>}</div>
             <div style={{display:"flex",gap:6,marginTop:10}}><input value={cmt} onChange={e=>setCmt(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addComment(qObj.id,qObj)} placeholder="Your thoughts..." style={{...T.inp,borderRadius:20,padding:"9px 14px",fontSize:".82rem",flex:1}}/><button onClick={()=>addComment(qObj.id,qObj)} style={{...T.btn,...T.btnSm}}>Post</button></div>
           </div>
+          <style>{`
+            @media (max-width: 900px) {
+              .quiz-grid { grid-template-columns: 1fr !important; }
+            }
+          `}</style>
         </div>}
       </div>}
 
@@ -1630,7 +1676,7 @@ export default function App(){
       {pg==="admin"&&isAdm&&<div>
         <h3 style={{fontSize:"1.15rem",fontWeight:700,marginBottom:12}}>⚙️ Admin dashboard</h3>
         <div style={{display:"flex",gap:5,marginBottom:16,flexWrap:"wrap"}}>
-          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null)}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
+          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["announce","📣 Announce"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null)}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
         </div>
         {aTab==="stats"&&<div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length],["Events",events.length],["Ads",ads.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>}
         {aTab==="quiz"&&<div style={T.card}>{edForm?.type==="quizzes"?<AdminForm type="Quiz sponsor" edForm={edForm} setEdForm={setEdForm} fields={[["sponsored","Mark as sponsored quiz","check"],["sponsor","Sponsor name (e.g. 'Sun Pharma')"],["sponsorLogo","Sponsor logo","image"],["sponsorUrl","Sponsor URL (optional — makes name clickable)"]]} onSave={()=>saveContent("quizzes")}/>
@@ -1703,6 +1749,96 @@ export default function App(){
               <button onClick={()=>deleteContent("cases",cs.id,cs.title)} style={T.btnDanger}>Del</button>
             </div>
           </div>)}</>}</div>}
+
+        {/* ═══ ANNOUNCEMENTS ADMIN — broadcast notifications to all users ═══ */}
+        {aTab==="announce"&&<div style={T.card}>
+          <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>📣 Send Announcement to All Users</h4>
+          <p style={{fontSize:".82rem",color:T.txt2,marginBottom:18,lineHeight:1.55}}>Broadcasts a notification to every registered user on SKINARIO. They'll see it in their 🔔 bell with a gold accent. Use sparingly — too many announcements train users to ignore them.</p>
+
+          <div style={{padding:"14px 18px",background:T.goldBg,borderLeft:"3px solid "+T.gold,borderRadius:"0 8px 8px 0",marginBottom:20}}>
+            <div style={{fontSize:".7rem",color:T.goldD,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:6}}>📋 Compose announcement</div>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Headline (optional)</label>
+            <input value={announceTitle} onChange={e=>setAnnounceTitle(e.target.value)} placeholder="e.g. 'New course launching next week'" style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Message <span style={{color:T.err}}>*</span></label>
+            <textarea value={announceText} onChange={e=>setAnnounceText(e.target.value)} placeholder="What do you want to tell everyone?" rows={4} style={{...T.txa,marginBottom:12,fontSize:".9rem",lineHeight:1.6}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Link to (optional — clicking the notification will navigate here)</label>
+            <div style={{display:"grid",gridTemplateColumns:"160px 1fr",gap:8,marginBottom:14}}>
+              <select value={announceLinkType} onChange={e=>{setAnnounceLinkType(e.target.value);setAnnounceLinkId("")}} style={T.inp}>
+                <option value="">No link</option>
+                <option value="article">Article</option>
+                <option value="event">Event</option>
+                <option value="case">Cases page</option>
+                <option value="forum">Forum page</option>
+                <option value="quiz">Quiz page</option>
+              </select>
+              {(announceLinkType==="article"||announceLinkType==="event")&&<select value={announceLinkId} onChange={e=>setAnnounceLinkId(e.target.value)} style={T.inp}>
+                <option value="">— Select —</option>
+                {announceLinkType==="article"&&articles.map(a=><option key={a.id} value={a.id}>{a.title}</option>)}
+                {announceLinkType==="event"&&events.map(e=><option key={e.id} value={e.id}>{e.title}</option>)}
+              </select>}
+            </div>
+
+            <button onClick={async()=>{
+              if(!announceText.trim()){sh("Message required");return}
+              if((announceLinkType==="article"||announceLinkType==="event")&&!announceLinkId){sh("Pick the linked item or remove link");return}
+              setAnnounceBusy(true);
+              try{
+                let linkLabel="";
+                if(announceLinkType==="article"&&announceLinkId){const a=articles.find(x=>x.id===announceLinkId);if(a)linkLabel=a.title}
+                if(announceLinkType==="event"&&announceLinkId){const e=events.find(x=>x.id===announceLinkId);if(e)linkLabel=e.title}
+                await fbAdd("notifications",{
+                  broadcast:true,
+                  type:"announcement",
+                  title:announceTitle.trim(),
+                  text:announceText.trim(),
+                  fromUid:au.uid,
+                  fromName:uName,
+                  fromIni:uIni,
+                  fromPhoto:uPhoto||"",
+                  linkType:announceLinkType||"",
+                  linkId:announceLinkId||"",
+                  linkLabel,
+                  toUid:"all"
+                });
+                sh("📣 Announcement sent to all users!");
+                setAnnounceTitle("");setAnnounceText("");setAnnounceLinkType("");setAnnounceLinkId("");
+                const all=await fbGetAll("notifications","createdAt","desc",100);
+                setBroadcastList(all.filter(n=>n.broadcast===true));
+              }catch(e){sh("Failed: "+e.message)}
+              setAnnounceBusy(false);
+            }} disabled={announceBusy||!announceText.trim()} style={{...T.btn,padding:"11px 22px",opacity:(announceBusy||!announceText.trim())?.5:1}}>{announceBusy?"⏳ Sending...":"📣 Send to All Users"}</button>
+          </div>
+
+          {/* Past announcements */}
+          <div style={{marginTop:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <h4 style={{fontSize:".88rem",fontWeight:700,margin:0}}>📜 Past announcements</h4>
+              <button onClick={async()=>{const all=await fbGetAll("notifications","createdAt","desc",100);setBroadcastList(all.filter(n=>n.broadcast===true))}} style={{...T.btnO,...T.btnSm}}>↻ Refresh</button>
+            </div>
+            {broadcastList.length===0?<p style={{color:T.mute,fontSize:".82rem",padding:"12px 0"}}>No announcements sent yet. Or click ↻ Refresh to load.</p>
+            :broadcastList.map(b=><div key={b.id} style={{padding:"10px 14px",background:T.bg,borderLeft:"3px solid "+T.gold,borderRadius:"0 8px 8px 0",marginBottom:8,display:"flex",justifyContent:"space-between",gap:10}}>
+              <div style={{flex:1,minWidth:0}}>
+                {b.title&&<div style={{fontWeight:600,fontSize:".88rem",marginBottom:2}}>{b.title}</div>}
+                <div style={{fontSize:".82rem",color:T.txt2,lineHeight:1.5,whiteSpace:"pre-wrap"}}>{b.text}</div>
+                <div style={{fontSize:".7rem",color:T.mute,marginTop:4,display:"flex",gap:10,flexWrap:"wrap"}}>
+                  <span>{relTime(b.createdAt)}</span>
+                  {b.fromName&&<span>by {b.fromName}</span>}
+                  {b.linkLabel&&<span style={{fontStyle:"italic"}}>→ "{b.linkLabel}"</span>}
+                </div>
+              </div>
+              <button onClick={async()=>{
+                if(!confirm("Delete this announcement? Users who saw it will no longer see it in their bell."))return;
+                await fbDel("notifications",b.id);
+                setBroadcastList(p=>p.filter(x=>x.id!==b.id));
+                sh("Deleted");
+              }} style={T.btnDanger}>Del</button>
+            </div>)}
+          </div>
+        </div>}
+
         {aTab==="users"&&<div style={T.card}><p style={{color:T.mute,fontSize:".82rem",marginBottom:10}}>{allUsers.length} users</p>
           {allUsers.map(u=>{const a2=u.totalAnswered?Math.round(u.totalCorrect/u.totalAnswered*100):0;return<div key={u.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid "+T.border}}>
             {u.photo?<img src={u.photo} style={{width:30,height:30,borderRadius:"50%"}}/>:<div style={T.av(30,T.tealBg,T.teal)}>{u.initials||"?"}</div>}
