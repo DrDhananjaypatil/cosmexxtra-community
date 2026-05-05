@@ -9,6 +9,25 @@ const fbApp=initializeApp(firebaseConfig);const auth=getAuth(fbApp);const db=get
 const storage=getStorage(fbApp);
 const ADMINS=["drjpatil@gmail.com","absoluteinstituteedu@gmail.com"];
 const TOPICS=["Botox & Neurotoxins","Dermal Fillers","Threads","PDRN & Polynucleotides","Peptides & Skin Boosters","Chemical Peels","Laser & Energy Devices","Hair Restoration","Body Contouring","Anti-Aging & Regenerative","Skincare Science","Pigmentation & Melasma","Acne & Scars","Practice Management"];
+
+// ═══ ACCOUNT TYPES ═══
+const ACCOUNT_TYPES=[
+  {id:"doctor",label:"Doctor",icon:"🩺",desc:"Practicing physician — derms, aesthetic doctors, cosmetologists"},
+  {id:"institute",label:"Institute",icon:"🏛️",desc:"Medical college, aesthetic academy, training center, hospital"},
+  {id:"pharma",label:"Pharma / Brand",icon:"🏢",desc:"Pharmaceutical, device, or skincare company"}
+];
+
+// ═══ MEDICAL DEGREES (alphabetized) ═══
+const DEGREES=["MBBS","BAMS","BHMS","BDS","BUMS","MD - Dermatology","MD - General Medicine","MS - Surgery","DDV (Diploma in Dermatology)","DNB - Dermatology","Diploma in Aesthetic Medicine","Diploma in Cosmetology","Fellowship in Aesthetic Medicine","Fellowship in Cosmetology","Other"];
+
+// ═══ INDIAN MEDICAL COUNCILS ═══
+const COUNCILS=["NMC (National Medical Commission)","SMC - Maharashtra","SMC - Karnataka","SMC - Tamil Nadu","SMC - Andhra Pradesh","SMC - Telangana","SMC - Gujarat","SMC - Delhi","SMC - West Bengal","SMC - Kerala","SMC - Rajasthan","SMC - Uttar Pradesh","SMC - Madhya Pradesh","SMC - Punjab","SMC - Haryana","SMC - Bihar","SMC - Odisha","SMC - Other","CCH (Central Council of Homoeopathy)","CCIM (Central Council of Indian Medicine)","DCI (Dental Council of India)","Other"];
+
+// ═══ INSTITUTE TYPES ═══
+const INSTITUTE_TYPES=["Medical College","Aesthetic Academy / Training Center","Hospital","Skin Clinic Chain","Beauty / Cosmetology School","Other"];
+
+// ═══ PHARMA / BRAND CATEGORIES ═══
+const BRAND_CATEGORIES=["Pharmaceutical","Aesthetic Devices","Cosmeceuticals / Skincare","Injectables (Toxin/Filler)","Threads","Energy Devices (Laser/RF/HIFU)","Distributor / Retailer","Other"];
 const getIST=()=>new Date(new Date().toLocaleString("en-US",{timeZone:"Asia/Kolkata"}));
 const ds=d=>d.toISOString().split("T")[0];
 const fD=s=>{try{return new Date(s+"T12:00:00").toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}catch{return s}};
@@ -456,7 +475,7 @@ export default function App(){
   const[quizzes,setQuizzes]=useState([]);const[articles,setArticles]=useState([]);const[resources,setResources]=useState([]);const[videos,setVideos]=useState([]);const[forumPosts,setForumPosts]=useState([]);const[cases,setCases]=useState([]);const[allUsers,setAllUsers]=useState([]);
   const[selD,setSelD]=useState(ds(getIST()));const[selA,setSelA]=useState(null);const[selV,setSelV]=useState(null);const[toast,setToast]=useState(null);const[cmt,setCmt]=useState("");const[ld,setLd]=useState(false);const[aTab,setATab]=useState("stats");
   const[authMode,setAuthMode]=useState("signin");const[authEmail,setAuthEmail]=useState("");const[authPass,setAuthPass]=useState("");const[authName,setAuthName]=useState("");const[authBusy,setAuthBusy]=useState(false);const[authErr,setAuthErr]=useState("");
-  const[pf,setPf]=useState({degree:"",clinic:"",address:""});const[edForm,setEdForm]=useState(null);
+  const[pf,setPf]=useState({accountType:"",name:"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});const[edForm,setEdForm]=useState(null);const[setupStep,setSetupStep]=useState(0);const[setupErr,setSetupErr]=useState("");
   // Forum/Cases new post state
   const[newForum,setNewForum]=useState(false);const[fpT,setFpT]=useState("");const[fpB,setFpB]=useState("");const[fpC,setFpC]=useState(TOPICS[0]);const[fpImgs,setFpImgs]=useState([]);const[fpUp,setFpUp]=useState(false);
   const[newCase,setNewCase]=useState(false);const[ccT,setCcT]=useState("");const[ccB,setCcB]=useState("");const[ccC,setCcC]=useState(TOPICS[0]);const[ccImgs,setCcImgs]=useState([]);const[ccUp,setCcUp]=useState(false);const[ccDiag,setCcDiag]=useState("");const[ccHistory,setCcHistory]=useState("");const[ccTreatment,setCcTreatment]=useState("");const[ccOutcome,setCcOutcome]=useState("");
@@ -480,7 +499,7 @@ export default function App(){
   const[selE,setSelE]=useState(null);
   const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev]=await Promise.all([fbGetAll("quizzes","date","desc"),fbGetAll("articles","date","desc"),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc"),fbGetAll("cases","createdAt","desc"),fbGetAll("users","joined","desc"),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev)},[]);
 
-  useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){setProf(p);setScr("main");loadData()}else{setPf({degree:"",clinic:"",address:""});setScr("setup")}}else{setAu(null);setProf(null);setScr("login")}});return()=>unsub()},[loadData]);
+  useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){setProf(p);setScr("main");loadData()}else{setPf({accountType:"",name:au?.displayName||"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});setSetupStep(0);setSetupErr("");setScr("setup")}}else{setAu(null);setProf(null);setScr("login")}});return()=>unsub()},[loadData]);
 
   // ═══ NOTIFICATIONS LOADER — fetches current user's notifications + broadcast announcements ═══
   useEffect(()=>{
@@ -569,7 +588,73 @@ export default function App(){
   const doEmailSignin=async()=>{setAuthErr("");if(!authEmail.trim())return setAuthErr("Enter email");if(!authPass)return setAuthErr("Enter password");setAuthBusy(true);try{await signInWithEmailAndPassword(auth,authEmail,authPass)}catch(e){setAuthErr(e.code==="auth/invalid-credential"?"Wrong email/password":"Failed")}setAuthBusy(false)};
   const doForgot=async()=>{setAuthErr("");if(!authEmail.trim())return setAuthErr("Enter email");setAuthBusy(true);try{await sendPasswordResetEmail(auth,authEmail);sh("📧 Reset sent!");setAuthMode("signin")}catch{setAuthErr("Failed")}setAuthBusy(false)};
   const doLogout=async()=>{if(confirm("Sign out?")){localStorage.removeItem("sk_welcome");setWelcomeSeen(false);await signOut(auth)}};
-  const savePf=async()=>{if(!pf.degree){sh("Degree required");return}const p={name:au.displayName||authName||"Doctor",email:au.email,photo:au.photoURL||"",degree:pf.degree,clinic:pf.clinic,address:pf.address,paid:false,joined:ds(getIST()),initials:uIni,totalCorrect:0,totalAnswered:0,streak:0};await fbSet("users",au.uid,p);localStorage.setItem("sk_p_"+au.uid,JSON.stringify(p));setProf(p);setScr("main");sh("Welcome to SKINARIO!");loadData()};
+  const savePf=async()=>{
+    setSetupErr("");
+    // Validate by account type
+    if(!pf.accountType){setSetupErr("Pick your account type to continue");return}
+    if(!pf.name?.trim()){setSetupErr("Name is required");return}
+    if(!pf.mobile?.trim()){setSetupErr("Mobile number is required");return}
+    if(pf.accountType==="doctor"){
+      if(!pf.degree){setSetupErr("Degree is required");return}
+      if(!pf.council){setSetupErr("Medical council is required");return}
+      if(!pf.regNumber?.trim()){setSetupErr("Registration number is required");return}
+      if(!pf.clinic?.trim()){setSetupErr("Clinic name is required");return}
+    }
+    if(pf.accountType==="pharma"){
+      if(!pf.companyName?.trim()){setSetupErr("Company name is required");return}
+      if(!pf.brandCategory){setSetupErr("Pick a brand category");return}
+      if(!pf.contactPerson?.trim()){setSetupErr("Contact person is required");return}
+    }
+    if(pf.accountType==="institute"){
+      if(!pf.instituteName?.trim()){setSetupErr("Institute name is required");return}
+      if(!pf.instituteType){setSetupErr("Pick an institute type");return}
+      if(!pf.directorName?.trim()){setSetupErr("Director / principal name is required");return}
+    }
+
+    // ═══ MCI DUPLICATE CHECK (for doctors) ═══
+    let regFlagged=false;
+    if(pf.accountType==="doctor"&&pf.regNumber){
+      const cleaned=pf.regNumber.replace(/\s+/g,"").toLowerCase();
+      // Look for existing user with same council + regNumber
+      const dup=allUsers.find(u=>u.accountType==="doctor"&&u.regNumber&&u.regNumber.replace(/\s+/g,"").toLowerCase()===cleaned&&u.council===pf.council&&u.id!==au.uid);
+      if(dup){
+        regFlagged=true;
+        // Flag the OTHER user too so admin sees both as suspicious
+        await fbSet("users",dup.id,{regFlagged:true,regFlagReason:"Duplicate registration number detected. Match against another account."});
+      }
+    }
+
+    const initials=(pf.name||"D").replace(/^Dr\.?\s*/i,"").split(" ").map(w=>w[0]||"").join("").toUpperCase().slice(0,2)||"D";
+    const p={
+      name:pf.name.trim(),
+      email:au.email,
+      mobile:pf.mobile.trim(),
+      photo:au.photoURL||"",
+      accountType:pf.accountType,
+      visibility:pf.visibility||"public",
+      verified:false,
+      regFlagged,
+      regFlagReason:regFlagged?"Duplicate registration number detected. Please verify or correct it.":"",
+      paid:false,
+      joined:ds(getIST()),
+      initials,
+      totalCorrect:0,totalAnswered:0,streak:0,
+      // Type-specific
+      ...(pf.accountType==="doctor"?{degree:pf.degree,council:pf.council,regNumber:pf.regNumber.trim(),clinic:pf.clinic.trim(),address:pf.address?.trim()||""}:{}),
+      ...(pf.accountType==="pharma"?{companyName:pf.companyName.trim(),brandCategory:pf.brandCategory,contactPerson:pf.contactPerson.trim(),website:pf.website?.trim()||"",address:pf.address?.trim()||""}:{}),
+      ...(pf.accountType==="institute"?{instituteName:pf.instituteName.trim(),instituteType:pf.instituteType,directorName:pf.directorName.trim(),address:pf.address?.trim()||"",website:pf.website?.trim()||""}:{})
+    };
+    await fbSet("users",au.uid,p);
+    localStorage.setItem("sk_p_"+au.uid,JSON.stringify(p));
+    setProf(p);
+    setScr("main");
+    if(regFlagged){
+      sh("⚠️ Welcome — but your registration number was flagged. Please review your profile.");
+    }else{
+      sh("Welcome to SKINARIO!");
+    }
+    loadData();
+  };
 
   // ═══ LIKE TOGGLE (works for any collection) ═══
   const toggleLike=async(colName,id,item,stateUpdater)=>{
@@ -706,17 +791,149 @@ export default function App(){
     </div>);
 
   if(scr==="setup")return(
-    <div style={{minHeight:"100vh",background:T.bg,padding:24,fontFamily:"system-ui",color:T.txt}}>
-      <div style={{maxWidth:520,margin:"0 auto"}}><div style={{...T.card,borderLeft:"3px solid "+T.gold}}>
-        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:18}}>
-          {uPhoto?<img src={uPhoto} style={{width:50,height:50,borderRadius:"50%",border:"2px solid "+T.teal}}/>:<div style={T.av(50,T.tealBg,T.teal)}>{uIni}</div>}
-          <div><div style={{fontWeight:700,fontSize:"1.1rem"}}>{au?.displayName||authName||"Doctor"}</div><div style={{fontSize:".8rem",color:T.mute}}>{au?.email}</div></div>
+    <div style={{minHeight:"100vh",background:T.bg,padding:"24px 18px",fontFamily:"system-ui",color:T.txt}}>
+      <div style={{maxWidth:560,margin:"0 auto"}}>
+
+        {/* Logo + welcome */}
+        <div style={{textAlign:"center",marginBottom:20}}>
+          <Logo size={50}/>
+          <h1 style={{fontSize:"1.4rem",fontWeight:300,color:T.txt,letterSpacing:4,fontFamily:"Georgia,serif",marginTop:6}}>SKINARIO</h1>
+          <p style={{color:T.mute,fontSize:".82rem",marginTop:4}}>Cosmetology &amp; Aesthetic Community</p>
         </div>
-        <h2 style={{color:T.teal,fontSize:"1.15rem",fontWeight:700,marginBottom:16}}>Complete your profile</h2>
-        {[["degree","Degree / Qualification *"],["clinic","Clinic Name"],["address","City, State"]].map(([k,l])=>
-          <div key={k} style={{marginBottom:14}}><label style={{display:"block",fontSize:".78rem",color:T.teal,marginBottom:5,fontWeight:500}}>{l}</label><input value={pf[k]} onChange={e=>setPf(p=>({...p,[k]:e.target.value}))} placeholder={l.replace(" *","")} style={T.inp}/></div>)}
-        <button onClick={savePf} style={{...T.btn,width:"100%",marginTop:8}}>Save & enter SKINARIO →</button>
-      </div></div></div>);
+
+        {/* Step indicator */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:18}}>
+          {[0,1].map(i=><div key={i} style={{width:setupStep===i?28:8,height:8,borderRadius:4,background:setupStep>=i?T.teal:T.border,transition:"all .2s"}}/>)}
+        </div>
+
+        {/* ═══ STEP 0: Pick account type ═══ */}
+        {setupStep===0&&<div style={{...T.card,padding:24}}>
+          <h2 style={{fontSize:"1.15rem",fontWeight:700,marginBottom:6,color:T.txt}}>Welcome! Pick your account type</h2>
+          <p style={{color:T.txt2,fontSize:".88rem",marginBottom:20,lineHeight:1.5}}>This helps us tailor SKINARIO for you. You can&apos;t change it later, so pick carefully.</p>
+
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {ACCOUNT_TYPES.map(t=><button key={t.id} onClick={()=>setPf(p=>({...p,accountType:t.id}))} style={{textAlign:"left",padding:"14px 16px",border:`2px solid ${pf.accountType===t.id?T.teal:T.border}`,background:pf.accountType===t.id?T.tealBg:"#fff",borderRadius:12,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"flex-start",gap:14,transition:"all .15s"}}>
+              <div style={{fontSize:"1.8rem",lineHeight:1}}>{t.icon}</div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:600,fontSize:".96rem",color:T.txt,marginBottom:3}}>{t.label}</div>
+                <div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.45}}>{t.desc}</div>
+              </div>
+              {pf.accountType===t.id&&<div style={{color:T.teal,fontSize:"1.1rem",fontWeight:700}}>✓</div>}
+            </button>)}
+          </div>
+
+          <button onClick={()=>{
+            if(!pf.accountType){setSetupErr("Pick an account type to continue");return}
+            setSetupErr("");setSetupStep(1);
+          }} style={{...T.btn,width:"100%",marginTop:18,padding:"12px 20px",opacity:pf.accountType?1:.5}}>Continue →</button>
+          {setupErr&&<div style={{color:T.err,fontSize:".82rem",marginTop:10,textAlign:"center"}}>⚠️ {setupErr}</div>}
+        </div>}
+
+        {/* ═══ STEP 1: Type-specific form ═══ */}
+        {setupStep===1&&<div style={{...T.card,padding:24}}>
+          <button onClick={()=>{setSetupStep(0);setSetupErr("")}} style={{background:"none",border:"none",color:T.mute,fontSize:".82rem",cursor:"pointer",marginBottom:14,padding:0,fontFamily:"inherit"}}>← Back</button>
+
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:18,paddingBottom:14,borderBottom:"1px solid "+T.border}}>
+            {uPhoto?<img src={uPhoto} style={{width:46,height:46,borderRadius:"50%",border:"2px solid "+T.tealBg}}/>:<div style={T.av(46,T.tealBg,T.teal)}>{uIni}</div>}
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:".66rem",color:T.gold,letterSpacing:1.5,textTransform:"uppercase",fontWeight:700,marginBottom:2}}>{ACCOUNT_TYPES.find(t=>t.id===pf.accountType)?.icon} {ACCOUNT_TYPES.find(t=>t.id===pf.accountType)?.label}</div>
+              <div style={{fontSize:".82rem",color:T.txt2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{au?.email}</div>
+            </div>
+          </div>
+
+          {/* COMMON FIELDS — name + mobile for everyone */}
+          <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Full Name <span style={{color:T.err}}>*</span></label>
+          <input value={pf.name} onChange={e=>setPf(p=>({...p,name:e.target.value}))} placeholder={pf.accountType==="doctor"?"e.g. Dr. Dhananjay Patil":pf.accountType==="institute"?"Your name (registered with institute)":"Your name"} style={{...T.inp,marginBottom:12}}/>
+
+          <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Mobile <span style={{color:T.err}}>*</span></label>
+          <input value={pf.mobile} onChange={e=>setPf(p=>({...p,mobile:e.target.value.replace(/[^0-9+\- ]/g,"")}))} placeholder="+91 98765 43210" style={{...T.inp,marginBottom:12}}/>
+
+          {/* ═══ DOCTOR-SPECIFIC FIELDS ═══ */}
+          {pf.accountType==="doctor"&&<>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Primary Degree <span style={{color:T.err}}>*</span></label>
+            <select value={pf.degree} onChange={e=>setPf(p=>({...p,degree:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+              <option value="">— Select —</option>{DEGREES.map(d=><option key={d} value={d}>{d}</option>)}
+            </select>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Medical Council <span style={{color:T.err}}>*</span></label>
+            <select value={pf.council} onChange={e=>setPf(p=>({...p,council:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+              <option value="">— Select —</option>{COUNCILS.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Registration Number <span style={{color:T.err}}>*</span></label>
+            <input value={pf.regNumber} onChange={e=>setPf(p=>({...p,regNumber:e.target.value}))} placeholder="Your council registration number" style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Clinic Name <span style={{color:T.err}}>*</span></label>
+            <input value={pf.clinic} onChange={e=>setPf(p=>({...p,clinic:e.target.value}))} placeholder="e.g. Absolute Aesthetic Clinic" style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>City, State (optional)</label>
+            <input value={pf.address} onChange={e=>setPf(p=>({...p,address:e.target.value}))} placeholder="e.g. Pune, Maharashtra" style={{...T.inp,marginBottom:12}}/>
+          </>}
+
+          {/* ═══ PHARMA-SPECIFIC FIELDS ═══ */}
+          {pf.accountType==="pharma"&&<>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Company / Brand Name <span style={{color:T.err}}>*</span></label>
+            <input value={pf.companyName} onChange={e=>setPf(p=>({...p,companyName:e.target.value}))} placeholder="e.g. Sun Pharma Aesthetics" style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Brand Category <span style={{color:T.err}}>*</span></label>
+            <select value={pf.brandCategory} onChange={e=>setPf(p=>({...p,brandCategory:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+              <option value="">— Select —</option>{BRAND_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Contact Person Name <span style={{color:T.err}}>*</span></label>
+            <input value={pf.contactPerson} onChange={e=>setPf(p=>({...p,contactPerson:e.target.value}))} placeholder="Person handling SKINARIO partnerships" style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Website (optional)</label>
+            <input value={pf.website} onChange={e=>setPf(p=>({...p,website:e.target.value}))} placeholder="https://yourcompany.com" style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Address (optional)</label>
+            <input value={pf.address} onChange={e=>setPf(p=>({...p,address:e.target.value}))} placeholder="City, State" style={{...T.inp,marginBottom:12}}/>
+          </>}
+
+          {/* ═══ INSTITUTE-SPECIFIC FIELDS ═══ */}
+          {pf.accountType==="institute"&&<>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Institute Name <span style={{color:T.err}}>*</span></label>
+            <input value={pf.instituteName} onChange={e=>setPf(p=>({...p,instituteName:e.target.value}))} placeholder="e.g. Absolute Institute of Aesthetic Medicine" style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Institute Type <span style={{color:T.err}}>*</span></label>
+            <select value={pf.instituteType} onChange={e=>setPf(p=>({...p,instituteType:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+              <option value="">— Select —</option>{INSTITUTE_TYPES.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Director / Principal Name <span style={{color:T.err}}>*</span></label>
+            <input value={pf.directorName} onChange={e=>setPf(p=>({...p,directorName:e.target.value}))} placeholder="Head of institute" style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Website (optional)</label>
+            <input value={pf.website} onChange={e=>setPf(p=>({...p,website:e.target.value}))} placeholder="https://yourinstitute.com" style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Address (optional)</label>
+            <input value={pf.address} onChange={e=>setPf(p=>({...p,address:e.target.value}))} placeholder="City, State" style={{...T.inp,marginBottom:12}}/>
+          </>}
+
+          {/* ═══ PROFILE VISIBILITY (everyone) ═══ */}
+          <div style={{padding:"14px 16px",background:T.bg,borderRadius:10,marginTop:6,marginBottom:14}}>
+            <div style={{fontSize:".72rem",color:T.teal,fontWeight:600,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Profile Visibility</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {[
+                {id:"public",icon:"🌐",label:"Public",desc:"Other doctors can see your profile"},
+                {id:"private",icon:"🔒",label:"Private",desc:"Only you and admins can see your profile details"}
+              ].map(opt=><label key={opt.id} style={{display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer",padding:"8px 10px",borderRadius:8,border:`1.5px solid ${pf.visibility===opt.id?T.teal:"transparent"}`,background:pf.visibility===opt.id?"#fff":"transparent"}}>
+                <input type="radio" name="visibility" checked={pf.visibility===opt.id} onChange={()=>setPf(p=>({...p,visibility:opt.id}))} style={{marginTop:3}}/>
+                <div>
+                  <div style={{fontSize:".88rem",fontWeight:500,color:T.txt}}>{opt.icon} {opt.label}</div>
+                  <div style={{fontSize:".74rem",color:T.txt2,marginTop:1}}>{opt.desc}</div>
+                </div>
+              </label>)}
+            </div>
+          </div>
+
+          {setupErr&&<div style={{color:T.err,fontSize:".84rem",marginBottom:10,padding:"8px 12px",background:T.errBg,borderRadius:8}}>⚠️ {setupErr}</div>}
+
+          <button onClick={savePf} style={{...T.btn,width:"100%",padding:"12px 20px",fontSize:".95rem"}}>Complete signup →</button>
+          <p style={{fontSize:".7rem",color:T.mute,marginTop:10,textAlign:"center",lineHeight:1.5}}>By signing up you agree to use SKINARIO professionally and respectfully. You can edit additional details (bio, photo, social links) anytime from your profile.</p>
+        </div>}
+      </div>
+    </div>);
 
   // ═══ MAIN NAV — added "Cases" section ═══
   const navs=[{id:"home",ic:"🏠",l:"Home"},{id:"quiz",ic:"🧠",l:"Quiz"},{id:"library",ic:"📚",l:"Library"},{id:"videos",ic:"🎥",l:"Videos"},{id:"events",ic:"📅",l:"Events"},{id:"cases",ic:"🔬",l:"Cases"},{id:"forum",ic:"💬",l:"Forum"},{id:"rank",ic:"🏆",l:"Rank"},{id:"me",ic:"👤",l:"Me"},...(isAdm?[{id:"admin",ic:"⚙️",l:"Admin"}]:[])];
