@@ -706,7 +706,85 @@ export default function App(){
   };
 
   // ═══ QUIZ ═══
-  const submitAnswer=async(qid,qObj,idx)=>{if(!au)return;const ok=idx===qObj.ci;const answers={...(qObj.answers||{}),[au.uid]:idx};await fbSet("quizzes",qid,{answers});const upd={totalAnswered:(prof.totalAnswered||0)+1,totalCorrect:(prof.totalCorrect||0)+(ok?1:0),streak:ok?(prof.streak||0)+1:0};await fbSet("users",au.uid,upd);setProf(p=>({...p,...upd}));setQuizzes(p=>p.map(q=>q.id===qid?{...q,answers}:q));sh(ok?"🎉 Correct!":"Answer recorded.")};
+  // ═══ RECOMPUTE POINTS for all users from quiz history ═══
+  // Admin-only, run once after deploying new scoring system to fairly assign points to existing users.
+  const recomputeAllPoints=async()=>{
+    if(!confirm("This will recompute ALL users' points from their quiz answer history. It rewards 1pt (Easy), 2pt (Moderate), 3pt (Hard) per correct answer. Streak bonuses are NOT retroactive (no way to know historical streak order). Continue?"))return;
+    sh("⏳ Recomputing... please wait");
+    try{
+      // Build a map: userId -> { points, totalAnswered, totalCorrect }
+      const userStats={};
+      // Read all quizzes (we already have them in `quizzes` state)
+      quizzes.forEach(q=>{
+        if(!q.answers||!q.ci===undefined)return;
+        const diff=q.diff||"Easy";
+        const pointsForCorrect=diff==="Hard"?3:diff==="Moderate"?2:1;
+        Object.entries(q.answers).forEach(([uid,answerIdx])=>{
+          if(!userStats[uid])userStats[uid]={points:0,totalAnswered:0,totalCorrect:0};
+          userStats[uid].totalAnswered++;
+          if(answerIdx===q.ci){
+            userStats[uid].totalCorrect++;
+            userStats[uid].points+=pointsForCorrect;
+          }
+        });
+      });
+      // Save back to each user
+      const updates=Object.entries(userStats);
+      let success=0,failed=0;
+      for(const[uid,stats]of updates){
+        try{
+          await fbSet("users",uid,{points:stats.points,totalAnswered:stats.totalAnswered,totalCorrect:stats.totalCorrect});
+          success++;
+        }catch(e){failed++}
+      }
+      // Also update users with no answers — set points to 0 (in case they had stale data)
+      for(const u of allUsers){
+        if(!userStats[u.id]){
+          try{await fbSet("users",u.id,{points:0});}catch{}
+        }
+      }
+      // Update local current user if affected
+      if(userStats[au.uid]){
+        setProf(p=>({...p,...userStats[au.uid]}));
+      }
+      loadData();
+      sh(`✅ Recomputed ${success} users${failed>0?` (${failed} failed)`:""}`);
+    }catch(e){
+      sh("❌ Recompute failed: "+e.message);
+    }
+  };
+
+  const submitAnswer=async(qid,qObj,idx)=>{
+    if(!au)return;
+    const ok=idx===qObj.ci;
+    const answers={...(qObj.answers||{}),[au.uid]:idx};
+    await fbSet("quizzes",qid,{answers});
+    // ═══ DIFFICULTY-WEIGHTED POINTS ═══
+    let pointsEarned=0;
+    if(ok){
+      pointsEarned=qObj.diff==="Hard"?3:qObj.diff==="Moderate"?2:1;
+    }
+    const newStreak=ok?(prof.streak||0)+1:0;
+    // Streak bonus: +5 every 7 consecutive days
+    let streakBonus=0;
+    if(ok&&newStreak>0&&newStreak%7===0){streakBonus=5}
+    const totalEarned=pointsEarned+streakBonus;
+    const upd={
+      totalAnswered:(prof.totalAnswered||0)+1,
+      totalCorrect:(prof.totalCorrect||0)+(ok?1:0),
+      streak:newStreak,
+      points:(prof.points||0)+totalEarned
+    };
+    await fbSet("users",au.uid,upd);
+    setProf(p=>({...p,...upd}));
+    setQuizzes(p=>p.map(q=>q.id===qid?{...q,answers}:q));
+    if(ok){
+      if(streakBonus>0){sh(`🎉 Correct! +${pointsEarned} points • 🔥 ${newStreak}-day streak bonus +${streakBonus}!`)}
+      else{sh(`🎉 Correct! +${pointsEarned} points`)}
+    }else{
+      sh("Answer recorded. Try again tomorrow!");
+    }
+  };
   const addComment=async(qid,qObj)=>{if(!cmt.trim())return;const c={n:uName,ini:uIni,txt:cmt,tm:getIST().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",hour12:true}),uid:au.uid,likedBy:[],likes:0};const comments=[...(qObj.comments||[]),c];await fbSet("quizzes",qid,{comments});setQuizzes(p=>p.map(q=>q.id===qid?{...q,comments}:q));setCmt("")};
   const genQuiz=async()=>{if(quizzes.find(q=>q.date===today)){sh("Already exists!");return}setLd(true);const q=await genQuizAI(today);if(q){const id=await fbAdd("quizzes",q);if(id){setQuizzes(p=>[{id,...q},...p]);sh("Question live!")}}else sh("Failed");setLd(false)};
 
@@ -748,7 +826,24 @@ export default function App(){
     });
   };
 
-  const leaderboard=allUsers.filter(u=>u.totalAnswered>0).sort((a,b)=>{const aA=a.totalAnswered?Math.round(a.totalCorrect/a.totalAnswered*100):0;const bA=b.totalAnswered?Math.round(b.totalCorrect/b.totalAnswered*100):0;return bA-aA||(b.streak||0)-(a.streak||0)}).slice(0,20);
+  const MIN_Q_FOR_RANK=5;
+  const leaderboard=allUsers
+    .filter(u=>(u.totalAnswered||0)>=MIN_Q_FOR_RANK)
+    .sort((a,b)=>{
+      // Primary: points
+      const pDiff=(b.points||0)-(a.points||0);
+      if(pDiff!==0)return pDiff;
+      // Tiebreaker 1: accuracy
+      const aAcc=a.totalAnswered?a.totalCorrect/a.totalAnswered:0;
+      const bAcc=b.totalAnswered?b.totalCorrect/b.totalAnswered:0;
+      if(bAcc!==aAcc)return bAcc-aAcc;
+      // Tiebreaker 2: streak
+      return(b.streak||0)-(a.streak||0);
+    })
+    .slice(0,20);
+  const risingStars=allUsers
+    .filter(u=>(u.totalAnswered||0)>0&&(u.totalAnswered||0)<MIN_Q_FOR_RANK)
+    .sort((a,b)=>(b.totalAnswered||0)-(a.totalAnswered||0));
 
   const W="1400px";const dates=Array.from({length:14},(_,i)=>{let d=new Date(getIST());d.setDate(d.getDate()-(13-i));return ds(d)});
   const qObj=quizzes.find(q=>q.date===selD);const uA=qObj?.answers?.[au?.uid];const isT=selD===today;const rev=!isT||hr>=21;const dd=Math.floor((new Date(today)-new Date(selD))/864e5);const canA=uA===undefined&&(isT||(dd<=3&&dd>0));
@@ -1678,12 +1773,12 @@ export default function App(){
           {/* IMAGES AT TOP — full image (no cropping) for clinical accuracy */}
           {cs.images?.length>0&&<div style={{padding:14,paddingBottom:0}}>
             {cs.images.length===1?
-              <div style={{position:"relative",background:"#f4f1ea",borderRadius:10,overflow:"hidden",cursor:"zoom-in",height:380,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=cs.images[0];im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v)}}>
-                <img src={cs.images[0]} style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain",display:"block"}}/>
+              <div style={{position:"relative",background:"#f4f1ea",borderRadius:10,overflow:"hidden",cursor:"zoom-in",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=cs.images[0];im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v)}}>
+                <img src={cs.images[0]} style={{width:"100%",maxHeight:600,objectFit:"contain",display:"block"}}/>
                 <div style={{position:"absolute",bottom:8,right:8,background:"rgba(0,0,0,0.55)",color:"#fff",padding:"3px 9px",borderRadius:4,fontSize:".62rem",letterSpacing:.5,fontWeight:500,pointerEvents:"none"}}>🔍 Click to enlarge</div>
               </div>
             :<div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:6,scrollSnapType:"x mandatory"}}>
-              {cs.images.map((url,i)=><div key={i} style={{flexShrink:0,width:cs.images.length===2?"calc(50% - 4px)":300,height:cs.images.length===2?320:280,background:"#f4f1ea",borderRadius:10,scrollSnapAlign:"start",cursor:"zoom-in",position:"relative",overflow:"hidden"}} onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=url;im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v)}}>
+              {cs.images.map((url,i)=><div key={i} style={{flexShrink:0,width:cs.images.length===2?"calc(50% - 4px)":300,height:cs.images.length===2?340:300,background:"#f4f1ea",borderRadius:10,scrollSnapAlign:"start",cursor:"zoom-in",position:"relative",overflow:"hidden"}} onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=url;im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v)}}>
                 <img src={url} style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}}/>
                 <div style={{position:"absolute",bottom:6,right:6,background:"rgba(0,0,0,0.55)",color:"#fff",padding:"2px 7px",borderRadius:3,fontSize:".58rem",fontWeight:500,pointerEvents:"none"}}>🔍 {i+1}/{cs.images.length}</div>
               </div>)}
@@ -1794,9 +1889,12 @@ export default function App(){
 
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
           {filtered.map(p=>{const hasImg=p.images?.length>0;const isHot=(p.likes||0)>=3;return(<div key={p.id} style={{...T.card,padding:0,overflow:"hidden",marginBottom:0}}>
-            {/* Hero image — same big layout as articles */}
+            {/* Hero image — single posters/photos display full image, never cropped */}
             {hasImg&&(p.images.length===1?
-              <img src={p.images[0]} style={{width:"100%",maxHeight:380,objectFit:"cover",display:"block",cursor:"pointer"}} onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=p.images[0];im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v)}}/>
+              <div style={{width:"100%",background:"#f4f1ea",cursor:"zoom-in",position:"relative",display:"flex",justifyContent:"center",alignItems:"center"}} onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=p.images[0];im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v)}}>
+                <img src={p.images[0]} style={{width:"100%",maxHeight:640,objectFit:"contain",display:"block"}}/>
+                <div style={{position:"absolute",bottom:8,right:8,background:"rgba(0,0,0,0.55)",color:"#fff",padding:"3px 9px",borderRadius:4,fontSize:".62rem",letterSpacing:.5,fontWeight:500,pointerEvents:"none"}}>🔍 Click to enlarge</div>
+              </div>
               :<div style={{display:"flex",gap:4,maxHeight:340,overflow:"hidden"}}>
                 <img src={p.images[0]} style={{flex:2,height:340,objectFit:"cover",cursor:"pointer"}} onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=p.images[0];im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v)}}/>
                 <div style={{flex:1,display:"flex",flexDirection:"column",gap:4}}>
@@ -1832,9 +1930,12 @@ export default function App(){
               {/* Engagement bar */}
               <div style={{display:"flex",alignItems:"center",gap:12,paddingTop:12,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
                 <LikeBtn liked={(p.likedBy||[]).includes(au?.uid)} count={p.likes||0} onToggle={()=>toggleLike("forum",p.id,p,setForumPosts)}/>
-                <span style={{fontSize:".78rem",color:T.mute,display:"flex",alignItems:"center",gap:4}}>💬 {p.replies||0} replies</span>
+                <span style={{fontSize:".78rem",color:T.mute,display:"flex",alignItems:"center",gap:4}}>💬 {p.comments?.length||0} {p.comments?.length===1?"reply":"replies"}</span>
                 <ShareBar title={p.title} url={`${window.location.origin}/?forum=${p.id}`} description={p.body?.slice(0,120)} itemId={p.id} itemType="forum" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>
               </div>
+
+              {/* Comment thread */}
+              <CommentThread collection="forum" itemId={p.id} item={p} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} onUpdate={(id,comments)=>setForumPosts(prev=>prev.map(x=>x.id===id?{...x,comments,replies:comments.length}:x))}/>
             </div>
           </div>)})}
           </div>
@@ -1842,15 +1943,71 @@ export default function App(){
       })()}
 
       {/* RANK */}
-      {pg==="rank"&&<div style={{...T.card,maxWidth:640}}><h3 style={{fontSize:"1.15rem",fontWeight:700,marginBottom:14}}>🏆 Leaderboard</h3>
-        {leaderboard.length===0&&<p style={{color:T.mute}}>No scores yet.</p>}
-        {leaderboard.map((u,i)=>{const uAcc=u.totalAnswered?Math.round(u.totalCorrect/u.totalAnswered*100):0;const isMe=u.id===au?.uid;
-          return<div key={u.id} style={{display:"flex",alignItems:"center",gap:12,padding:12,borderRadius:12,marginBottom:6,background:isMe?T.tealBg:"#fff",border:`1px solid ${isMe?T.teal:T.border}`}}>
-            <div style={{width:28,textAlign:"center",fontWeight:700,color:i<3?["#FFD700","#888","#CD7F32"][i]:T.txt}}>{i<3?["🥇","🥈","🥉"][i]:i+1}</div>
-            {u.photo?<img src={u.photo} style={{width:36,height:36,borderRadius:"50%"}}/>:<div style={T.av(36,isMe?T.teal:T.tealBg,isMe?"#fff":T.teal)}>{u.initials||"?"}</div>}
-            <div style={{flex:1}}><div style={{fontWeight:600,fontSize:".88rem"}}>{u.name}{isMe?" (You)":""}</div><div style={{fontSize:".7rem",color:T.mute}}>{u.clinic||u.email}</div></div>
-            <div style={{textAlign:"right"}}><div style={{fontWeight:700,color:T.teal}}>{uAcc}%</div><div style={{fontSize:".65rem",color:T.mute}}>🔥{u.streak||0}d · {u.totalAnswered}Q</div></div>
-          </div>})}
+      {pg==="rank"&&<div style={{maxWidth:680}}>
+        {/* Header */}
+        <div style={{...T.card,padding:20,background:"linear-gradient(135deg,#fff,"+T.goldBg+"55)",borderLeft:"3px solid "+T.gold,marginBottom:14}}>
+          <h3 style={{fontSize:"1.3rem",fontWeight:700,margin:0}}>🏆 SKINARIO Leaderboard</h3>
+          <p style={{color:T.txt2,fontSize:".84rem",marginTop:6,lineHeight:1.55}}>Points are earned by answering daily clinical quizzes. Compete with peers across India based on knowledge and consistency.</p>
+          <div style={{display:"flex",gap:14,marginTop:12,flexWrap:"wrap",fontSize:".74rem"}}>
+            <div><span style={{color:T.gold,fontWeight:700}}>1pt</span> <span style={{color:T.mute}}>Easy</span></div>
+            <div><span style={{color:T.gold,fontWeight:700}}>2pt</span> <span style={{color:T.mute}}>Moderate</span></div>
+            <div><span style={{color:T.gold,fontWeight:700}}>3pt</span> <span style={{color:T.mute}}>Hard</span></div>
+            <div><span style={{color:T.gold,fontWeight:700}}>+5pt</span> <span style={{color:T.mute}}>Every 7-day streak</span></div>
+          </div>
+        </div>
+
+        {/* Top 20 Leaderboard */}
+        <div style={{...T.card,padding:18,marginBottom:14}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <h4 style={{fontSize:".95rem",fontWeight:700,margin:0}}>🏆 Top {Math.min(leaderboard.length,20)}</h4>
+            <span style={{fontSize:".7rem",color:T.mute}}>Min {MIN_Q_FOR_RANK} questions to qualify</span>
+          </div>
+
+          {leaderboard.length===0&&<div style={{textAlign:"center",padding:30,color:T.mute,fontSize:".88rem"}}>
+            <div style={{fontSize:"2rem",marginBottom:6}}>🌱</div>
+            No qualified rankings yet. Doctors need to answer {MIN_Q_FOR_RANK} questions to appear here.
+          </div>}
+
+          {leaderboard.map((u,i)=>{const uAcc=u.totalAnswered?Math.round(u.totalCorrect/u.totalAnswered*100):0;const isMe=u.id===au?.uid;
+            return<div key={u.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 12px",borderRadius:10,marginBottom:6,background:isMe?T.tealBg:"#fff",border:`1px solid ${isMe?T.teal:T.border}`}}>
+              <div style={{width:32,textAlign:"center",fontWeight:700,fontSize:i<3?"1.3rem":".95rem",color:i<3?["#d4a017","#888","#a0703a"][i]:T.txt2}}>{i<3?["🥇","🥈","🥉"][i]:`#${i+1}`}</div>
+              {u.photo?<img src={u.photo} style={{width:38,height:38,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(38,isMe?T.teal:T.tealBg,isMe?"#fff":T.teal)}>{u.initials||"?"}</div>}
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:600,fontSize:".9rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.name}{isMe?" (You)":""}</div>
+                <div style={{fontSize:".7rem",color:T.mute,display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <span>{uAcc}% accuracy</span>
+                  <span>·</span>
+                  <span>{u.totalAnswered||0}Q</span>
+                  {(u.streak||0)>0&&<><span>·</span><span style={{color:T.gold}}>🔥{u.streak}d</span></>}
+                </div>
+              </div>
+              <div style={{textAlign:"right",minWidth:60}}>
+                <div style={{fontWeight:700,color:T.teal,fontSize:"1.05rem",lineHeight:1}}>{u.points||0}</div>
+                <div style={{fontSize:".62rem",color:T.mute,letterSpacing:1,textTransform:"uppercase"}}>points</div>
+              </div>
+            </div>})}
+        </div>
+
+        {/* Rising Stars (newcomers below the threshold) */}
+        {risingStars.length>0&&<div style={{...T.card,padding:18}}>
+          <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:6}}>🌟 Rising Stars</h4>
+          <p style={{fontSize:".78rem",color:T.txt2,marginBottom:12,lineHeight:1.55}}>Doctors building their score. Once they hit {MIN_Q_FOR_RANK} questions, they'll appear in the main leaderboard.</p>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {risingStars.map(u=>{const isMe=u.id===au?.uid;const remaining=MIN_Q_FOR_RANK-(u.totalAnswered||0);return<div key={u.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,background:isMe?T.tealBg:"transparent",border:`1px solid ${isMe?T.teal:T.border}`}}>
+              {u.photo?<img src={u.photo} style={{width:30,height:30,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(30,T.tealBg,T.teal)}>{u.initials||"?"}</div>}
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:".84rem",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.name}{isMe?" (You)":""}</div>
+                <div style={{fontSize:".7rem",color:T.mute}}>{u.totalCorrect||0}/{u.totalAnswered} correct · {remaining} more to qualify</div>
+              </div>
+              <div style={{fontSize:".75rem",color:T.gold,fontWeight:600}}>{u.points||0}pt</div>
+            </div>})}
+          </div>
+        </div>}
+
+        {/* Where am I if I'm a rising star? Helpful nudge */}
+        {prof&&(prof.totalAnswered||0)<MIN_Q_FOR_RANK&&<div style={{...T.card,padding:14,marginTop:14,background:T.goldBg,borderLeft:"3px solid "+T.gold}}>
+          <div style={{fontSize:".82rem",color:T.txt}}>💡 You've answered <b>{prof.totalAnswered||0}</b> of {MIN_Q_FOR_RANK} questions needed to enter the main leaderboard. <span style={{color:T.teal,cursor:"pointer",fontWeight:600}} onClick={()=>go("quiz")}>Take today's quiz →</span></div>
+        </div>}
       </div>}
 
       {/* PROFILE */}
@@ -1895,7 +2052,17 @@ export default function App(){
         <div style={{display:"flex",gap:5,marginBottom:16,flexWrap:"wrap"}}>
           {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["announce","📣 Announce"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null)}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
         </div>
-        {aTab==="stats"&&<div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length],["Events",events.length],["Ads",ads.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>}
+        {aTab==="stats"&&<><div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length],["Events",events.length],["Ads",ads.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>
+          {/* Admin tools */}
+          <div style={{...T.card,marginTop:14}}>
+            <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:10}}>🛠️ Admin Tools</h4>
+            <div style={{padding:"12px 14px",background:T.goldBg,borderLeft:"3px solid "+T.gold,borderRadius:"0 8px 8px 0",marginBottom:10}}>
+              <div style={{fontSize:".88rem",fontWeight:600,marginBottom:4}}>♻️ Recompute leaderboard points</div>
+              <p style={{fontSize:".78rem",color:T.txt2,lineHeight:1.55,marginBottom:10}}>Reads every user's quiz answer history and recalculates their points using the difficulty-weighted system (1pt Easy, 2pt Moderate, 3pt Hard). Run this ONCE after launching the new scoring system to fairly assign points to existing users. Streak bonuses are not retroactive.</p>
+              <button onClick={recomputeAllPoints} style={{...T.btn,padding:"9px 18px",fontSize:".85rem"}}>♻️ Recompute all points now</button>
+            </div>
+          </div>
+        </>}
         {aTab==="quiz"&&<div style={T.card}>{edForm?.type==="quizzes"?<AdminForm type="Quiz sponsor" edForm={edForm} setEdForm={setEdForm} fields={[["sponsored","Mark as sponsored quiz","check"],["sponsor","Sponsor name (e.g. 'Sun Pharma')"],["sponsorLogo","Sponsor logo","image"],["sponsorUrl","Sponsor URL (optional — makes name clickable)"]]} onSave={()=>saveContent("quizzes")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{quizzes.length} questions</span><button onClick={genQuiz} style={T.btn}>🤖 Generate today</button></div>
           {quizzes.map(q=><div key={q.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border,gap:10}}><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,fontSize:".88rem"}}>{q.cat} — {q.diff} {q.sponsored&&<span style={{...T.tag(T.goldBg,T.goldD),marginLeft:6}}>📢 {q.sponsor||"Sponsored"}</span>}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(q.date)} · {Object.keys(q.answers||{}).length} answers · ❤️ {q.likes||0}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>{setSelD(q.date);go("quiz")}} style={{...T.btnO,...T.btnSm}}>View</button><button onClick={()=>setEdForm({type:"quizzes",data:{...q},editing:true})} style={{...T.btnO,...T.btnSm}}>📢 Sponsor</button><button onClick={()=>deleteContent("quizzes",q.id,q.cat)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
