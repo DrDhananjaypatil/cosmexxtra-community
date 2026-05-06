@@ -98,7 +98,7 @@ export default async function handler(req, res) {
     const prompt = buildPrompt(category, difficulty);
 
     // ═══ CALL GEMINI ═══
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
     const geminiResp = await fetch(geminiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
