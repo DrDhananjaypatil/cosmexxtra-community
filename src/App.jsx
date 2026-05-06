@@ -484,23 +484,16 @@ function relTime(ts){
 }
 
 async function genQuizAI(date){
-  const tp=TOPICS[Math.floor(Math.random()*TOPICS.length)];const df=Math.random()>.5?"Advanced":"Moderate";
-  try{const r=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:`Generate a clinical aesthetic and cosmetology medicine quiz question as JSON.
-Topic: ${tp}
-Difficulty: ${df}
-Rules:
-- Create a realistic case scenario with patient age, gender, skin type, history
-- Provide exactly 3 answer options, only 1 correct
-- Keep all text short - scenario under 200 chars, each option under 100 chars, explanation under 300 chars
-- Use straight quotes only, no special characters, no newlines within strings
-- correctIndex is 0, 1, or 2
-Return ONLY this JSON, nothing else:
-{"category":"${tp}","difficulty":"${df}","scenario":"case here","question":"question here","options":["A","B","C"],"correctIndex":0,"explanation":"explanation here"}`})});
-    const data=await r.json();if(data.error)throw new Error(JSON.stringify(data));
-    let txt=data.text||"";txt=txt.replace(/```json\s*/g,"").replace(/```/g,"").trim();txt=txt.replace(/[\x00-\x1F]/g," ");
-    const jsonMatch=txt.match(/\{[\s\S]*\}/);if(!jsonMatch)throw new Error("No JSON");
-    const q=JSON.parse(jsonMatch[0]);if(!q.question||!q.options||q.options.length<3)throw new Error("Invalid");
-    return{date,cat:q.category||tp,diff:q.difficulty||df,scen:q.scenario||"",question:q.question,opts:q.options.slice(0,3),ci:typeof q.correctIndex==="number"?q.correctIndex:0,expl:q.explanation||"",answers:{},comments:[]}
+  try{
+    const r=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"}});
+    const data=await r.json();
+    if(!data.ok||!data.quiz){
+      console.error("Quiz gen error:",data.error||"Unknown error",data);
+      return null;
+    }
+    const q=data.quiz;
+    if(!q.question||!q.opts||q.opts.length<3){console.error("Invalid quiz shape:",q);return null}
+    return{date,cat:q.cat,diff:q.diff,scen:q.scen||"",question:q.question,opts:q.opts.slice(0,3),ci:typeof q.ci==="number"?q.ci:0,expl:q.expl||"",answers:{},comments:[]}
   }catch(e){console.error("Quiz gen error:",e);return null}}
 
 export default function App(){
@@ -537,6 +530,11 @@ export default function App(){
   const[broadcastList,setBroadcastList]=useState([]);
   const[announceBusy,setAnnounceBusy]=useState(false);
   const[articleLimit,setArticleLimit]=useState(6);
+  const[videoFilter,setVideoFilter]=useState("all");
+  const[videoSearch,setVideoSearch]=useState("");
+  const[editingProfile,setEditingProfile]=useState(false);
+  const[editPf,setEditPf]=useState({});
+  const[editErr,setEditErr]=useState("");
   const[events,setEvents]=useState([]);
   const[selAd,setSelAd]=useState(null);
   const[selE,setSelE]=useState(null);
@@ -1222,7 +1220,36 @@ export default function App(){
             <div style={{fontSize:".95rem",fontWeight:600,color:T.txt,marginBottom:3}}>Complete your profile</div>
             <div style={{fontSize:".82rem",color:T.txt2,lineHeight:1.55}}>SKINARIO has been upgraded with new account types and country support. Add your details so other doctors can find you and you appear in the directory.</div>
           </div>
-          <button onClick={()=>go("me")} style={{...T.btn,padding:"10px 18px",fontSize:".85rem",background:"linear-gradient(135deg,"+T.gold+","+T.goldD+")"}}>Complete now →</button>
+          <button onClick={()=>{
+            // Pre-fill edit form with current profile
+            setEditPf({
+              name:prof?.name||"",
+              mobile:prof?.mobile||"",
+              accountType:prof?.accountType||"",
+              country:prof?.country||"India",
+              degree:prof?.degree||"",
+              council:prof?.council||"",
+              internationalCouncil:prof?.internationalCouncil||"",
+              regNumber:prof?.regNumber||"",
+              clinic:prof?.clinic||"",
+              address:prof?.address||"",
+              city:prof?.city||"",
+              region:prof?.region||"",
+              visibility:prof?.visibility||"public",
+              companyName:prof?.companyName||"",
+              brandCategory:prof?.brandCategory||"",
+              contactPerson:prof?.contactPerson||"",
+              website:prof?.website||"",
+              instituteName:prof?.instituteName||"",
+              instituteType:prof?.instituteType||"",
+              directorName:prof?.directorName||"",
+              bio:prof?.bio||""
+            });
+            setEditingProfile(true);
+            setEditErr("");
+            go("me");
+            window.scrollTo(0,0);
+          }} style={{...T.btn,padding:"10px 18px",fontSize:".85rem",background:"linear-gradient(135deg,"+T.gold+","+T.goldD+")"}}>Complete now →</button>
         </div>}
 
         <div style={{...T.card,borderLeft:"3px solid "+T.gold,padding:24}}><div style={{display:"flex",alignItems:"center",gap:16,marginBottom:14}}>{uPhoto?<img src={uPhoto} style={{width:52,height:52,borderRadius:"50%",border:"2px solid "+T.teal}}/>:<div style={T.av(52,T.tealBg,T.teal)}>{uIni}</div>}<div><h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0}}>Welcome, {uName.split(" ")[0]} 👋</h2><p style={{color:T.txt2,fontSize:".9rem",marginTop:3}}>Daily quizzes, clinical cases & community.</p></div></div>
@@ -1615,31 +1642,78 @@ export default function App(){
       </div>}
 
       {/* VIDEOS */}
-      {pg==="videos"&&!selV&&<div><h3 style={{fontSize:"1.15rem",fontWeight:700,marginBottom:14}}>🎥 Video gallery</h3>
-        {videos.length===0&&<p style={{color:T.mute}}>No videos yet.</p>}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
-          {videos.map(v=>{const thumb=getVideoThumbnail(v.embedUrl);return(<div key={v.id} onClick={()=>setSelV(v)} style={{...T.card,cursor:"pointer",marginBottom:0,padding:0,overflow:"hidden"}}>
-            {/* Thumbnail area — real YouTube thumbnail OR gradient fallback */}
-            <div style={{height:160,position:"relative",background:thumb?"#000":"linear-gradient(135deg,#e1f5ee,#d0ede5)",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
-              {thumb?<img src={thumb} alt={v.title||v.t} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={(e)=>{e.target.style.display="none"}}/>:<span style={{fontSize:"2.5rem"}}>{v.icon||"🎥"}</span>}
-              {/* Play button overlay */}
-              {thumb&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.15)",transition:"background 0.2s"}}>
-                <div style={{width:54,height:54,borderRadius:"50%",background:"rgba(0,0,0,0.78)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px rgba(0,0,0,0.35)"}}>
-                  <div style={{width:0,height:0,borderLeft:"16px solid #fff",borderTop:"10px solid transparent",borderBottom:"10px solid transparent",marginLeft:4}}/>
-                </div>
-              </div>}
-              {/* Premium lock badge */}
-              {!v.free&&!isPd&&<div style={{position:"absolute",top:8,right:8,...T.tag(T.goldBg,T.goldD),fontWeight:600}}>🔒 Premium</div>}
-              {/* Duration badge */}
-              {v.dur&&<div style={{position:"absolute",bottom:8,right:8,fontSize:".7rem",background:"rgba(0,0,0,0.78)",padding:"3px 8px",borderRadius:4,color:"#fff",fontWeight:500}}>{v.dur}</div>}
+      {pg==="videos"&&!selV&&(()=>{
+        const q=videoSearch.trim().toLowerCase();
+        const filtered=videos.filter(v=>{
+          if(videoFilter!=="all"&&v.cat!==videoFilter)return false;
+          if(q){
+            const t=(v.title||v.t||"").toLowerCase();
+            const d=(v.desc||"").toLowerCase();
+            const c=(v.cat||"").toLowerCase();
+            if(!t.includes(q)&&!d.includes(q)&&!c.includes(q))return false;
+          }
+          return true;
+        });
+        // Build category counts dynamically — only show categories that actually have videos
+        const catCounts={};
+        videos.forEach(v=>{const c=v.cat||"General";catCounts[c]=(catCounts[c]||0)+1});
+        const sortedCats=Object.entries(catCounts).sort((a,b)=>b[1]-a[1]);
+
+        return(<div>
+          {/* Hero header with stats */}
+          <div style={{...T.card,padding:22,background:"linear-gradient(135deg,#fff,"+T.tealBg+"55)",borderLeft:"3px solid "+T.teal,marginBottom:14}}>
+            <h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0,display:"flex",alignItems:"center",gap:8}}>🎥 Video Library</h2>
+            <p style={{color:T.txt2,fontSize:".88rem",marginTop:6,maxWidth:560,lineHeight:1.55}}>Curated educational videos on aesthetic procedures, techniques, and case studies.</p>
+            <div style={{display:"flex",gap:14,marginTop:10,fontSize:".75rem",color:T.mute}}>
+              <span><b style={{color:T.teal,fontSize:".9rem"}}>{videos.length}</b> videos</span>
+              <span><b style={{color:T.teal,fontSize:".9rem"}}>{sortedCats.length}</b> categories</span>
+              <span><b style={{color:T.teal,fontSize:".9rem"}}>{videos.filter(v=>v.free).length}</b> free</span>
             </div>
-            <div style={{padding:14}}>
-              <span style={T.tag(T.tealBg,T.teal)}>{v.cat||"General"}</span>
-              <h4 style={{fontSize:".95rem",fontWeight:600,marginTop:8,lineHeight:1.35}}>{v.title||v.t}</h4>
-              <div style={{display:"flex",gap:12,marginTop:8,fontSize:".72rem",color:T.mute}}><span>❤️ {v.likes||0}</span><span>💬 {v.comments?.length||0}</span></div>
-            </div>
-          </div>)})}
-        </div></div>}
+          </div>
+
+          {/* Search bar */}
+          <div style={{position:"relative",marginBottom:12}}>
+            <input value={videoSearch} onChange={e=>setVideoSearch(e.target.value)} placeholder="🔍 Search videos by title, description, or category..." style={{...T.inp,padding:"11px 16px 11px 16px",fontSize:".88rem"}}/>
+            {videoSearch&&<button onClick={()=>setVideoSearch("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",fontSize:"1rem",color:T.mute,cursor:"pointer",padding:4}}>✕</button>}
+          </div>
+
+          {/* Category filter chips */}
+          {sortedCats.length>0&&<div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:6,marginBottom:14,flexWrap:"wrap"}}>
+            <button onClick={()=>setVideoFilter("all")} style={{padding:"7px 14px",borderRadius:20,border:`1.5px solid ${videoFilter==="all"?T.teal:T.border}`,background:videoFilter==="all"?T.tealBg:"#fff",color:videoFilter==="all"?T.teal:T.mute,cursor:"pointer",fontSize:".78rem",fontWeight:videoFilter==="all"?600:400,fontFamily:"inherit",whiteSpace:"nowrap",flexShrink:0}}>🎬 All <span style={{opacity:.6}}>{videos.length}</span></button>
+            {sortedCats.map(([cat,count])=><button key={cat} onClick={()=>setVideoFilter(cat)} style={{padding:"7px 14px",borderRadius:20,border:`1.5px solid ${videoFilter===cat?T.teal:T.border}`,background:videoFilter===cat?T.tealBg:"#fff",color:videoFilter===cat?T.teal:T.mute,cursor:"pointer",fontSize:".78rem",fontWeight:videoFilter===cat?600:400,fontFamily:"inherit",whiteSpace:"nowrap",flexShrink:0}}>{cat} <span style={{opacity:.6}}>{count}</span></button>)}
+          </div>}
+
+          {/* Empty states */}
+          {videos.length===0&&<div style={{...T.card,textAlign:"center",padding:40}}><div style={{fontSize:"2.4rem",marginBottom:8}}>🎥</div><p style={{color:T.mute}}>No videos yet.</p></div>}
+          {videos.length>0&&filtered.length===0&&<div style={{...T.card,textAlign:"center",padding:40}}>
+            <div style={{fontSize:"2.4rem",marginBottom:8}}>🔍</div>
+            <p style={{color:T.mute,fontSize:".9rem"}}>No videos match your search{videoFilter!=="all"?` in "${videoFilter}"`:""}.</p>
+            <button onClick={()=>{setVideoSearch("");setVideoFilter("all")}} style={{...T.btnO,...T.btnSm,marginTop:10}}>Clear filters</button>
+          </div>}
+
+          {/* Grid */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
+            {filtered.map(v=>{const thumb=getVideoThumbnail(v.embedUrl);return(<div key={v.id} onClick={()=>setSelV(v)} style={{...T.card,cursor:"pointer",marginBottom:0,padding:0,overflow:"hidden"}}>
+              <div style={{height:160,position:"relative",background:thumb?"#000":"linear-gradient(135deg,#e1f5ee,#d0ede5)",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+                {thumb?<img src={thumb} alt={v.title||v.t} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={(e)=>{e.target.style.display="none"}}/>:<span style={{fontSize:"2.5rem"}}>{v.icon||"🎥"}</span>}
+                {thumb&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.15)",transition:"background 0.2s"}}>
+                  <div style={{width:54,height:54,borderRadius:"50%",background:"rgba(0,0,0,0.78)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px rgba(0,0,0,0.35)"}}>
+                    <div style={{width:0,height:0,borderLeft:"16px solid #fff",borderTop:"10px solid transparent",borderBottom:"10px solid transparent",marginLeft:4}}/>
+                  </div>
+                </div>}
+                {!v.free&&!isPd&&<div style={{position:"absolute",top:8,right:8,...T.tag(T.goldBg,T.goldD),fontWeight:600}}>🔒 Premium</div>}
+                {v.dur&&<div style={{position:"absolute",bottom:8,right:8,fontSize:".7rem",background:"rgba(0,0,0,0.78)",padding:"3px 8px",borderRadius:4,color:"#fff",fontWeight:500}}>{v.dur}</div>}
+              </div>
+              <div style={{padding:14}}>
+                <span style={T.tag(T.tealBg,T.teal)}>{v.cat||"General"}</span>
+                <h4 style={{fontSize:".95rem",fontWeight:600,marginTop:8,lineHeight:1.35}}>{v.title||v.t}</h4>
+                {v.desc&&<p style={{fontSize:".75rem",color:T.txt2,marginTop:6,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{v.desc}</p>}
+                <div style={{display:"flex",gap:12,marginTop:8,fontSize:".72rem",color:T.mute}}><span>❤️ {v.likes||0}</span><span>💬 {v.comments?.length||0}</span></div>
+              </div>
+            </div>)})}
+          </div>
+        </div>);
+      })()}
       {pg==="videos"&&selV&&<div><button onClick={()=>setSelV(null)} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back</button>
         <div style={{...T.card,maxWidth:720}}>{(()=>{
           const videoSrc=selV.videoFile||selV.embedUrl;
@@ -2268,10 +2342,218 @@ export default function App(){
 
       {/* PROFILE */}
       {pg==="me"&&<div style={{maxWidth:640}}>
-        <div style={{...T.card,textAlign:"center",padding:28}}>
-          {uPhoto?<img src={uPhoto} style={{width:76,height:76,borderRadius:"50%",border:"3px solid "+T.teal,display:"block",margin:"0 auto 12px"}}/>:<div style={{...T.av(76,T.tealBg,T.teal),border:"3px solid "+T.teal,margin:"0 auto 12px",fontSize:"1.6rem"}}>{uIni}</div>}
-          <div style={{fontSize:"1.4rem",fontWeight:700}}>{uName}</div><div style={{color:T.txt2,fontSize:".88rem",marginTop:3}}>{prof?.degree}</div><div style={{color:T.mute,fontSize:".8rem",marginTop:2}}>{au?.email}</div>
-        </div>
+
+        {/* ═══ EDITABLE PROFILE SECTION ═══ */}
+        {editingProfile?<div style={{...T.card,borderLeft:"3px solid "+T.gold,padding:22}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+            <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>✏️ Edit your profile</h3>
+            <button onClick={()=>{setEditingProfile(false);setEditErr("")}} style={{background:"none",border:"none",fontSize:"1rem",color:T.mute,cursor:"pointer"}}>✕</button>
+          </div>
+
+          <p style={{fontSize:".82rem",color:T.txt2,marginBottom:18,lineHeight:1.55}}>Update your details so other doctors can find you and you appear in the directory.</p>
+
+          {/* Account type — only editable if not yet set */}
+          {!prof?.accountType&&<>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Account type <span style={{color:T.err}}>*</span></label>
+            <select value={editPf.accountType} onChange={e=>setEditPf(p=>({...p,accountType:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+              <option value="">— Select —</option>
+              {ACCOUNT_TYPES.map(t=><option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
+            </select>
+          </>}
+
+          {/* Common fields */}
+          <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Full name <span style={{color:T.err}}>*</span></label>
+          <input value={editPf.name} onChange={e=>setEditPf(p=>({...p,name:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
+
+          <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Mobile <span style={{color:T.err}}>*</span></label>
+          <input value={editPf.mobile} onChange={e=>setEditPf(p=>({...p,mobile:e.target.value.replace(/[^0-9+\- ]/g,"")}))} placeholder="+91 98765 43210" style={{...T.inp,marginBottom:12}}/>
+
+          {/* Doctor fields */}
+          {editPf.accountType==="doctor"&&<>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Country</label>
+            <select value={editPf.country} onChange={e=>setEditPf(p=>({...p,country:e.target.value,council:"",internationalCouncil:""}))} style={{...T.inp,marginBottom:12}}>
+              {COUNTRIES.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Degree <span style={{color:T.err}}>*</span></label>
+            <select value={editPf.degree} onChange={e=>setEditPf(p=>({...p,degree:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+              <option value="">— Select —</option>{DEGREES.map(d=><option key={d} value={d}>{d}</option>)}
+            </select>
+
+            {editPf.country==="India"?<>
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Medical council <span style={{color:T.err}}>*</span></label>
+              <select value={editPf.council} onChange={e=>setEditPf(p=>({...p,council:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+                <option value="">— Select —</option>{COUNCILS.map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+            </>:<>
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Medical council / board <span style={{color:T.err}}>*</span></label>
+              <input value={editPf.internationalCouncil} onChange={e=>setEditPf(p=>({...p,internationalCouncil:e.target.value}))} placeholder="e.g. GMC, DHA, Singapore Medical Council" style={{...T.inp,marginBottom:12}}/>
+
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+                <div><label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>City <span style={{color:T.err}}>*</span></label>
+                <input value={editPf.city} onChange={e=>setEditPf(p=>({...p,city:e.target.value}))} style={T.inp}/></div>
+                <div><label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>State / region</label>
+                <input value={editPf.region} onChange={e=>setEditPf(p=>({...p,region:e.target.value}))} style={T.inp}/></div>
+              </div>
+            </>}
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Registration / license number <span style={{color:T.err}}>*</span></label>
+            <input value={editPf.regNumber} onChange={e=>setEditPf(p=>({...p,regNumber:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Clinic / practice <span style={{color:T.err}}>*</span></label>
+            <input value={editPf.clinic} onChange={e=>setEditPf(p=>({...p,clinic:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
+
+            {editPf.country==="India"&&<>
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>City, state (optional)</label>
+              <input value={editPf.address} onChange={e=>setEditPf(p=>({...p,address:e.target.value}))} placeholder="e.g. Pune, Maharashtra" style={{...T.inp,marginBottom:12}}/>
+            </>}
+          </>}
+
+          {/* Pharma fields */}
+          {editPf.accountType==="pharma"&&<>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Country</label>
+            <select value={editPf.country} onChange={e=>setEditPf(p=>({...p,country:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+              {COUNTRIES.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Company / brand name <span style={{color:T.err}}>*</span></label>
+            <input value={editPf.companyName} onChange={e=>setEditPf(p=>({...p,companyName:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Brand category <span style={{color:T.err}}>*</span></label>
+            <select value={editPf.brandCategory} onChange={e=>setEditPf(p=>({...p,brandCategory:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+              <option value="">— Select —</option>{BRAND_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Contact person <span style={{color:T.err}}>*</span></label>
+            <input value={editPf.contactPerson} onChange={e=>setEditPf(p=>({...p,contactPerson:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Website (optional)</label>
+            <input value={editPf.website} onChange={e=>setEditPf(p=>({...p,website:e.target.value}))} placeholder="https://" style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Address (optional)</label>
+            <input value={editPf.address} onChange={e=>setEditPf(p=>({...p,address:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
+          </>}
+
+          {/* Institute fields */}
+          {editPf.accountType==="institute"&&<>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Country</label>
+            <select value={editPf.country} onChange={e=>setEditPf(p=>({...p,country:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+              {COUNTRIES.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Institute name <span style={{color:T.err}}>*</span></label>
+            <input value={editPf.instituteName} onChange={e=>setEditPf(p=>({...p,instituteName:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Institute type <span style={{color:T.err}}>*</span></label>
+            <select value={editPf.instituteType} onChange={e=>setEditPf(p=>({...p,instituteType:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+              <option value="">— Select —</option>{INSTITUTE_TYPES.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Director / principal <span style={{color:T.err}}>*</span></label>
+            <input value={editPf.directorName} onChange={e=>setEditPf(p=>({...p,directorName:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Website (optional)</label>
+            <input value={editPf.website} onChange={e=>setEditPf(p=>({...p,website:e.target.value}))} placeholder="https://" style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Address (optional)</label>
+            <input value={editPf.address} onChange={e=>setEditPf(p=>({...p,address:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
+          </>}
+
+          {/* Bio (optional, for everyone) */}
+          <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Bio (optional)</label>
+          <textarea value={editPf.bio} onChange={e=>setEditPf(p=>({...p,bio:e.target.value}))} placeholder="A short bio shown on your profile" rows={3} style={{...T.txa,marginBottom:14}}/>
+
+          {/* Visibility */}
+          <div style={{padding:"12px 14px",background:T.bg,borderRadius:10,marginBottom:14}}>
+            <div style={{fontSize:".7rem",color:T.teal,fontWeight:600,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>Profile visibility</div>
+            <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+              {[["public","🌐 Public"],["private","🔒 Private"]].map(([id,l])=>
+                <label key={id} style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",padding:"5px 10px",borderRadius:6,border:`1.5px solid ${editPf.visibility===id?T.teal:"transparent"}`,background:editPf.visibility===id?"#fff":"transparent"}}>
+                  <input type="radio" checked={editPf.visibility===id} onChange={()=>setEditPf(p=>({...p,visibility:id}))}/>
+                  <span style={{fontSize:".84rem"}}>{l}</span>
+                </label>)}
+            </div>
+          </div>
+
+          {editErr&&<div style={{color:T.err,fontSize:".84rem",padding:"8px 12px",background:T.errBg,borderRadius:8,marginBottom:12}}>⚠️ {editErr}</div>}
+
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={async()=>{
+              setEditErr("");
+              const e=editPf;
+              if(!e.accountType){setEditErr("Account type required");return}
+              if(!e.name?.trim()){setEditErr("Name required");return}
+              if(!e.mobile?.trim()){setEditErr("Mobile required");return}
+              if(e.accountType==="doctor"){
+                if(!e.degree){setEditErr("Degree required");return}
+                if(e.country==="India"&&!e.council){setEditErr("Medical council required");return}
+                if(e.country!=="India"&&!e.internationalCouncil?.trim()){setEditErr("Council/board required");return}
+                if(e.country!=="India"&&!e.city?.trim()){setEditErr("City required");return}
+                if(!e.regNumber?.trim()){setEditErr("Registration number required");return}
+                if(!e.clinic?.trim()){setEditErr("Clinic required");return}
+              }
+              if(e.accountType==="pharma"){
+                if(!e.companyName?.trim()){setEditErr("Company name required");return}
+                if(!e.brandCategory){setEditErr("Brand category required");return}
+                if(!e.contactPerson?.trim()){setEditErr("Contact person required");return}
+              }
+              if(e.accountType==="institute"){
+                if(!e.instituteName?.trim()){setEditErr("Institute name required");return}
+                if(!e.instituteType){setEditErr("Institute type required");return}
+                if(!e.directorName?.trim()){setEditErr("Director name required");return}
+              }
+              const initials=(e.name||"D").replace(/^Dr\.?\s*/i,"").split(" ").map(w=>w[0]||"").join("").toUpperCase().slice(0,2)||"D";
+              const updated={
+                name:e.name.trim(),
+                mobile:e.mobile.trim(),
+                accountType:e.accountType,
+                country:e.country,
+                isInternational:e.country!=="India",
+                visibility:e.visibility||"public",
+                bio:e.bio?.trim()||"",
+                initials,
+                ...(e.accountType==="doctor"?{
+                  degree:e.degree,
+                  regNumber:e.regNumber.trim(),
+                  clinic:e.clinic.trim(),
+                  address:e.address?.trim()||"",
+                  ...(e.country==="India"?{council:e.council,internationalCouncil:"",city:"",region:""}:{internationalCouncil:e.internationalCouncil.trim(),city:e.city.trim(),region:e.region?.trim()||"",council:""})
+                }:{}),
+                ...(e.accountType==="pharma"?{companyName:e.companyName.trim(),brandCategory:e.brandCategory,contactPerson:e.contactPerson.trim(),website:e.website?.trim()||"",address:e.address?.trim()||""}:{}),
+                ...(e.accountType==="institute"?{instituteName:e.instituteName.trim(),instituteType:e.instituteType,directorName:e.directorName.trim(),address:e.address?.trim()||"",website:e.website?.trim()||""}:{})
+              };
+              await fbSet("users",au.uid,updated);
+              const newProf={...prof,...updated};
+              setProf(newProf);
+              localStorage.setItem("sk_p_"+au.uid,JSON.stringify(newProf));
+              setEditingProfile(false);
+              loadData();
+              sh("✅ Profile updated!");
+            }} style={T.btn}>💾 Save changes</button>
+            <button onClick={()=>{setEditingProfile(false);setEditErr("")}} style={T.btnO}>Cancel</button>
+          </div>
+        </div>:<>
+          {/* Read-only profile card with Edit button */}
+          <div style={{...T.card,textAlign:"center",padding:28,position:"relative"}}>
+            <button onClick={()=>{
+              setEditPf({
+                name:prof?.name||"",mobile:prof?.mobile||"",accountType:prof?.accountType||"",country:prof?.country||"India",
+                degree:prof?.degree||"",council:prof?.council||"",internationalCouncil:prof?.internationalCouncil||"",
+                regNumber:prof?.regNumber||"",clinic:prof?.clinic||"",address:prof?.address||"",city:prof?.city||"",region:prof?.region||"",
+                visibility:prof?.visibility||"public",companyName:prof?.companyName||"",brandCategory:prof?.brandCategory||"",
+                contactPerson:prof?.contactPerson||"",website:prof?.website||"",instituteName:prof?.instituteName||"",
+                instituteType:prof?.instituteType||"",directorName:prof?.directorName||"",bio:prof?.bio||""
+              });
+              setEditingProfile(true);
+              setEditErr("");
+            }} style={{...T.btnO,...T.btnSm,position:"absolute",top:14,right:14}}>✏️ Edit</button>
+            {uPhoto?<img src={uPhoto} style={{width:76,height:76,borderRadius:"50%",border:"3px solid "+T.teal,display:"block",margin:"0 auto 12px"}}/>:<div style={{...T.av(76,T.tealBg,T.teal),border:"3px solid "+T.teal,margin:"0 auto 12px",fontSize:"1.6rem"}}>{uIni}</div>}
+            <div style={{fontSize:"1.4rem",fontWeight:700}}>{uName}</div>
+            <div style={{color:T.txt2,fontSize:".88rem",marginTop:3}}>{prof?.degree||prof?.companyName||prof?.instituteName||"—"}</div>
+            <div style={{color:T.mute,fontSize:".8rem",marginTop:2}}>{au?.email}</div>
+            {prof?.accountType&&<div style={{marginTop:8}}><span style={T.tag(T.tealBg,T.teal)}>{ACCOUNT_TYPES.find(t=>t.id===prof.accountType)?.icon} {ACCOUNT_TYPES.find(t=>t.id===prof.accountType)?.label}</span></div>}
+          </div>
+        </>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,margin:"12px 0"}}>
           {[["Quizzes",totA],["Correct",corr],["Accuracy",acc+"%"],["Streak",prof?.streak||0]].map(([l,v])=><div key={l} style={{...T.card,textAlign:"center",padding:"12px 4px",marginBottom:0}}><div style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".58rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}
         </div>
