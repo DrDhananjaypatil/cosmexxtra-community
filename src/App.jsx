@@ -507,14 +507,23 @@ export default function App(){
   const[au,setAu]=useState(null);const[prof,setProf]=useState(null);const[scr,setScr]=useState("loading");const[pg,setPg]=useState("home");
   const[welcomeSeen,setWelcomeSeen]=useState(()=>localStorage.getItem("sk_welcome")==="1");
   const[quizzes,setQuizzes]=useState([]);const[articles,setArticles]=useState([]);const[resources,setResources]=useState([]);const[videos,setVideos]=useState([]);const[forumPosts,setForumPosts]=useState([]);const[cases,setCases]=useState([]);const[allUsers,setAllUsers]=useState([]);
-  const[selD,setSelD]=useState(ds(getIST()));const[selA,setSelA]=useState(null);const[selV,setSelV]=useState(null);const[toast,setToast]=useState(null);const[cmt,setCmt]=useState("");const[ld,setLd]=useState(false);const[aTab,setATab]=useState("stats");
+  const[selD,setSelD]=useState(ds(getIST()));const[selA,setSelA]=useState(null);const[selV,setSelV]=useState(null);const[selU,setSelU]=useState(null);const[toast,setToast]=useState(null);const[cmt,setCmt]=useState("");const[ld,setLd]=useState(false);const[aTab,setATab]=useState("stats");
   const[authMode,setAuthMode]=useState("signin");const[authEmail,setAuthEmail]=useState("");const[authPass,setAuthPass]=useState("");const[authName,setAuthName]=useState("");const[authBusy,setAuthBusy]=useState(false);const[authErr,setAuthErr]=useState("");
   const[pf,setPf]=useState({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});const[edForm,setEdForm]=useState(null);const[setupStep,setSetupStep]=useState(0);const[setupErr,setSetupErr]=useState("");
   // Forum/Cases new post state
   const[newForum,setNewForum]=useState(false);const[fpT,setFpT]=useState("");const[fpB,setFpB]=useState("");const[fpC,setFpC]=useState(TOPICS[0]);const[fpImgs,setFpImgs]=useState([]);const[fpUp,setFpUp]=useState(false);
   const[newCase,setNewCase]=useState(false);const[ccT,setCcT]=useState("");const[ccB,setCcB]=useState("");const[ccC,setCcC]=useState(TOPICS[0]);const[ccImgs,setCcImgs]=useState([]);const[ccUp,setCcUp]=useState(false);const[ccDiag,setCcDiag]=useState("");const[ccHistory,setCcHistory]=useState("");const[ccTreatment,setCcTreatment]=useState("");const[ccOutcome,setCcOutcome]=useState("");
 
-  const sh=m=>setToast(m);const go=p=>{setPg(p);setSelA(null);setSelV(null);setSelAd(null);setSelE(null);setEdForm(null)};
+  const sh=m=>setToast(m);const go=p=>{setPg(p);setSelA(null);setSelV(null);setSelAd(null);setSelE(null);setSelU(null);setEdForm(null)};
+  // ═══ VIEW PROFILE — open any user's profile page ═══
+  const viewProfile=(uid)=>{
+    if(!uid)return;
+    const u=allUsers.find(x=>x.id===uid);
+    if(!u)return;
+    setSelU(u);
+    setPg("profile");
+    window.scrollTo(0,0);
+  };
   useEffect(()=>{if(toast){const t=setTimeout(()=>setToast(null),3000);return()=>clearTimeout(t)}},[toast]);
 
   const[ads,setAds]=useState([]);
@@ -613,6 +622,8 @@ export default function App(){
 
   const isAdm=prof&&ADMINS.includes(au?.email);const isPd=prof?.paid;const today=ds(getIST());const hr=getIST().getHours();
   const uName=prof?.name||au?.displayName||"Doctor";const uIni=(uName.replace(/^Dr\.?\s*/i,"").split(" ").map(w=>w[0]).join("").toUpperCase()||"D").slice(0,2);const uPhoto=au?.photoURL;
+  // ═══ PHARMA = sponsor only, can't post clinical content ═══
+  const isPharma=prof?.accountType==="pharma";
   const myAns=quizzes.reduce((a,q)=>{if(q.answers?.[au?.uid]!==undefined)a.push({correct:q.answers[au.uid]===q.ci});return a},[]);
   const totA=myAns.length;const corr=myAns.filter(a=>a.correct).length;const acc=totA?Math.round(corr/totA*100):0;
 
@@ -1204,6 +1215,16 @@ export default function App(){
       {/* HOME */}
       {pg==="home"&&!selA&&<div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 360px",gap:20,alignItems:"start"}} className="home-grid">
         <div style={{minWidth:0}}>{/* MAIN COLUMN */}
+        {/* Complete-your-profile banner — shown if user is on legacy schema (no accountType) */}
+        {prof&&!prof.accountType&&<div style={{...T.card,borderLeft:"3px solid "+T.gold,background:T.goldBg,padding:18,marginBottom:14,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+          <div style={{fontSize:"1.6rem"}}>🎯</div>
+          <div style={{flex:1,minWidth:200}}>
+            <div style={{fontSize:".95rem",fontWeight:600,color:T.txt,marginBottom:3}}>Complete your profile</div>
+            <div style={{fontSize:".82rem",color:T.txt2,lineHeight:1.55}}>SKINARIO has been upgraded with new account types and country support. Add your details so other doctors can find you and you appear in the directory.</div>
+          </div>
+          <button onClick={()=>go("me")} style={{...T.btn,padding:"10px 18px",fontSize:".85rem",background:"linear-gradient(135deg,"+T.gold+","+T.goldD+")"}}>Complete now →</button>
+        </div>}
+
         <div style={{...T.card,borderLeft:"3px solid "+T.gold,padding:24}}><div style={{display:"flex",alignItems:"center",gap:16,marginBottom:14}}>{uPhoto?<img src={uPhoto} style={{width:52,height:52,borderRadius:"50%",border:"2px solid "+T.teal}}/>:<div style={T.av(52,T.tealBg,T.teal)}>{uIni}</div>}<div><h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0}}>Welcome, {uName.split(" ")[0]} 👋</h2><p style={{color:T.txt2,fontSize:".9rem",marginTop:3}}>Daily quizzes, clinical cases & community.</p></div></div>
           <div style={{display:"flex",gap:10,flexWrap:"wrap"}}><button onClick={()=>go("quiz")} style={T.btn}>🧠 Today's quiz</button><button onClick={()=>go("events")} style={T.btnO}>📅 Events</button><button onClick={()=>go("cases")} style={T.btnO}>🔬 Clinical cases</button><button onClick={()=>go("forum")} style={T.btnO}>💬 Forum</button></div>
         </div>
@@ -1796,7 +1817,8 @@ export default function App(){
                 <span><b style={{color:T.teal,fontSize:".9rem"}}>{cases.reduce((s,c)=>s+(c.comments?.length||0),0)}</b> discussions</span>
               </div>
             </div>
-            <button onClick={()=>setNewCase(true)} style={{...T.btn,padding:"13px 26px",fontSize:".95rem",background:"linear-gradient(135deg,"+T.gold+","+T.goldD+")"}}>📋 Post a new case</button>
+            {isPharma?<div style={{padding:"10px 14px",background:T.goldBg,border:"1px solid "+T.gold+"55",borderRadius:8,fontSize:".82rem",color:T.goldD,maxWidth:280}}>📢 Pharma accounts can sponsor cases & content. Contact us at <a href="mailto:partnerships@skinario.com" style={{color:T.goldD,fontWeight:600}}>partnerships@skinario.com</a>.</div>
+            :<button onClick={()=>setNewCase(true)} style={{...T.btn,padding:"13px 26px",fontSize:".95rem",background:"linear-gradient(135deg,"+T.gold+","+T.goldD+")"}}>📋 Post a new case</button>}
           </div>
         </div>
 
@@ -1872,9 +1894,9 @@ export default function App(){
           <div style={{padding:18}}>
             {/* Author + meta */}
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-              {cs.photo?<img src={cs.photo} style={{width:36,height:36,borderRadius:"50%"}}/>:<div style={T.av(36,T.tealBg,T.teal)}>{cs.ini||"?"}</div>}
+              {cs.photo?<img src={cs.photo} onClick={()=>viewProfile(cs.uid)} style={{width:36,height:36,borderRadius:"50%",cursor:"pointer"}}/>:<div onClick={()=>viewProfile(cs.uid)} style={{...T.av(36,T.tealBg,T.teal),cursor:"pointer"}}>{cs.ini||"?"}</div>}
               <div style={{flex:1}}>
-                <b style={{fontSize:".88rem"}}>{cs.author}</b>
+                <b onClick={()=>viewProfile(cs.uid)} style={{fontSize:".88rem",cursor:"pointer"}}>{cs.author}</b>
                 <div style={{fontSize:".7rem",color:T.mute}}>{fD(cs.date)}</div>
               </div>
               <span style={T.tag(T.tealBg,T.teal)}>{cs.cat}</span>
@@ -1945,7 +1967,8 @@ export default function App(){
                   <div><span style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{totalLikes}</span> <span style={{fontSize:".72rem",color:T.mute,textTransform:"uppercase",letterSpacing:1}}>likes</span></div>
                 </div>
               </div>
-              <button onClick={()=>setNewForum(!newForum)} style={{...T.btn,padding:"12px 26px",fontSize:".92rem"}}>{newForum?"Cancel":"✏️ Start a discussion"}</button>
+              {isPharma?<div style={{padding:"10px 14px",background:T.goldBg,border:"1px solid "+T.gold+"55",borderRadius:8,fontSize:".82rem",color:T.goldD,maxWidth:280}}>📢 Pharma accounts can sponsor discussions. Reach out to <a href="mailto:partnerships@skinario.com" style={{color:T.goldD,fontWeight:600}}>partnerships@skinario.com</a>.</div>
+              :<button onClick={()=>setNewForum(!newForum)} style={{...T.btn,padding:"12px 26px",fontSize:".92rem"}}>{newForum?"Cancel":"✏️ Start a discussion"}</button>}
             </div>
           </div>
 
@@ -1993,9 +2016,9 @@ export default function App(){
             <div style={{padding:22}}>
               {/* Author + meta */}
               <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-                {p.photo?<img src={p.photo} style={{width:42,height:42,borderRadius:"50%",border:"2px solid "+T.tealBg}}/>:<div style={{...T.av(42,T.tealBg,T.teal),border:"2px solid "+T.tealBg}}>{p.ini||"?"}</div>}
+                {p.photo?<img src={p.photo} onClick={()=>viewProfile(p.uid)} style={{width:42,height:42,borderRadius:"50%",border:"2px solid "+T.tealBg,cursor:"pointer"}}/>:<div onClick={()=>viewProfile(p.uid)} style={{...T.av(42,T.tealBg,T.teal),border:"2px solid "+T.tealBg,cursor:"pointer"}}>{p.ini||"?"}</div>}
                 <div style={{flex:1}}>
-                  <b style={{fontSize:".92rem",color:T.txt}}>{p.author}</b>
+                  <b onClick={()=>viewProfile(p.uid)} style={{fontSize:".92rem",color:T.txt,cursor:"pointer"}}>{p.author}</b>
                   <div style={{fontSize:".72rem",color:T.mute,display:"flex",alignItems:"center",gap:6}}>
                     <span>{fD(p.date)}</span>
                     <span>·</span>
@@ -2053,7 +2076,7 @@ export default function App(){
           </div>}
 
           {leaderboard.map((u,i)=>{const uAcc=u.totalAnswered?Math.round(u.totalCorrect/u.totalAnswered*100):0;const isMe=u.id===au?.uid;
-            return<div key={u.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 12px",borderRadius:10,marginBottom:6,background:isMe?T.tealBg:"#fff",border:`1px solid ${isMe?T.teal:T.border}`}}>
+            return<div key={u.id} onClick={()=>viewProfile(u.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 12px",borderRadius:10,marginBottom:6,background:isMe?T.tealBg:"#fff",border:`1px solid ${isMe?T.teal:T.border}`,cursor:"pointer"}}>
               <div style={{width:32,textAlign:"center",fontWeight:700,fontSize:i<3?"1.3rem":".95rem",color:i<3?["#d4a017","#888","#a0703a"][i]:T.txt2}}>{i<3?["🥇","🥈","🥉"][i]:`#${i+1}`}</div>
               {u.photo?<img src={u.photo} style={{width:38,height:38,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(38,isMe?T.teal:T.tealBg,isMe?"#fff":T.teal)}>{u.initials||"?"}</div>}
               <div style={{flex:1,minWidth:0}}>
@@ -2077,7 +2100,7 @@ export default function App(){
           <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:6}}>🌟 Rising Stars</h4>
           <p style={{fontSize:".78rem",color:T.txt2,marginBottom:12,lineHeight:1.55}}>Doctors building their score. Once they hit {MIN_Q_FOR_RANK} questions, they'll appear in the main leaderboard.</p>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {risingStars.map(u=>{const isMe=u.id===au?.uid;const remaining=MIN_Q_FOR_RANK-(u.totalAnswered||0);return<div key={u.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,background:isMe?T.tealBg:"transparent",border:`1px solid ${isMe?T.teal:T.border}`}}>
+            {risingStars.map(u=>{const isMe=u.id===au?.uid;const remaining=MIN_Q_FOR_RANK-(u.totalAnswered||0);return<div key={u.id} onClick={()=>viewProfile(u.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,background:isMe?T.tealBg:"transparent",border:`1px solid ${isMe?T.teal:T.border}`,cursor:"pointer"}}>
               {u.photo?<img src={u.photo} style={{width:30,height:30,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(30,T.tealBg,T.teal)}>{u.initials||"?"}</div>}
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:".84rem",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.name}{isMe?" (You)":""}</div>
@@ -2093,6 +2116,155 @@ export default function App(){
           <div style={{fontSize:".82rem",color:T.txt}}>💡 You've answered <b>{prof.totalAnswered||0}</b> of {MIN_Q_FOR_RANK} questions needed to enter the main leaderboard. <span style={{color:T.teal,cursor:"pointer",fontWeight:600}} onClick={()=>go("quiz")}>Take today's quiz →</span></div>
         </div>}
       </div>}
+
+      {/* ═══ PUBLIC PROFILE PAGE — view any user's profile ═══ */}
+      {pg==="profile"&&selU&&(()=>{
+        const u=selU;
+        const isMe=u.id===au?.uid;
+        const isAdmin=ADMINS.includes(au?.email);
+        const acc=ACCOUNT_TYPES.find(t=>t.id===u.accountType);
+        const isPrivate=u.visibility==="private";
+        // If profile is private and viewer isn't owner or admin, show locked state
+        const canSee=isMe||isAdmin||!isPrivate;
+        const acc2=u.totalAnswered?Math.round(u.totalCorrect/u.totalAnswered*100):0;
+
+        return(<div style={{maxWidth:780}}>
+          <button onClick={()=>setSelU(null)} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back</button>
+
+          {/* HERO HEADER */}
+          <div style={{...T.card,padding:0,overflow:"hidden",marginBottom:14}}>
+            <div style={{height:90,background:"linear-gradient(135deg,"+T.tealBg+","+T.goldBg+")"}}/>
+            <div style={{padding:"0 24px 22px",marginTop:-44,position:"relative"}}>
+              <div style={{display:"flex",alignItems:"flex-end",gap:18,flexWrap:"wrap"}}>
+                {u.photo?<img src={u.photo} style={{width:96,height:96,borderRadius:"50%",border:"4px solid #fff",objectFit:"cover",boxShadow:"0 2px 12px rgba(0,0,0,0.08)"}}/>:<div style={{...T.av(96,T.tealBg,T.teal),border:"4px solid #fff",fontSize:"2rem",boxShadow:"0 2px 12px rgba(0,0,0,0.08)"}}>{u.initials||"?"}</div>}
+                <div style={{flex:1,minWidth:200,paddingBottom:6}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+                    <h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0}}>{u.name}</h2>
+                    {u.verified&&<span title="Verified by SKINARIO admin" style={{fontSize:"1.1rem",color:"#1d9bf0"}}>✓</span>}
+                    {u.regFlagged&&isAdmin&&<span style={T.tag(T.errBg,T.err)} title={u.regFlagReason}>🚩 Flagged</span>}
+                    {acc&&<span style={T.tag(T.tealBg,T.teal)}>{acc.icon} {acc.label}</span>}
+                  </div>
+                  {u.degree&&<div style={{fontSize:".88rem",color:T.txt2,fontStyle:"italic"}}>{u.degree}</div>}
+                  {u.companyName&&<div style={{fontSize:".88rem",color:T.txt2,fontStyle:"italic"}}>{u.brandCategory}</div>}
+                  {u.instituteName&&<div style={{fontSize:".88rem",color:T.txt2,fontStyle:"italic"}}>{u.instituteType}</div>}
+                  <div style={{fontSize:".75rem",color:T.mute,marginTop:6}}>Joined {fD(u.joined)}</div>
+                </div>
+                {isMe&&<button onClick={()=>{go("me")}} style={{...T.btnO,padding:"8px 16px",fontSize:".82rem"}}>✏️ Edit profile</button>}
+              </div>
+            </div>
+          </div>
+
+          {/* PRIVATE LOCKED STATE — when non-admin views a private profile */}
+          {!canSee&&<div style={{...T.card,textAlign:"center",padding:36}}>
+            <div style={{fontSize:"2.4rem",marginBottom:8}}>🔒</div>
+            <h3 style={{fontSize:"1rem",fontWeight:600,marginBottom:6}}>This profile is private</h3>
+            <p style={{color:T.txt2,fontSize:".88rem",lineHeight:1.55,maxWidth:380,margin:"0 auto"}}>{u.name?.split(" ")[0]||"This user"} has chosen to keep their profile private. Only basic info is visible.</p>
+          </div>}
+
+          {/* PUBLIC PROFILE CONTENT */}
+          {canSee&&<>
+            {/* Doctor-specific details */}
+            {u.accountType==="doctor"&&<div style={{...T.card,marginBottom:14}}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:14}}>🩺 Practice Details</h4>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:14}}>
+                {u.clinic&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Clinic</div><div style={{fontSize:".88rem",color:T.txt}}>{u.clinic}</div></div>}
+                {u.country&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Country</div><div style={{fontSize:".88rem",color:T.txt}}>{u.country}</div></div>}
+                {(u.address||u.city)&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Location</div><div style={{fontSize:".88rem",color:T.txt}}>{u.address||(u.city+(u.region?", "+u.region:""))}</div></div>}
+                {(isMe||isAdmin)&&u.regNumber&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Registration</div><div style={{fontSize:".88rem",color:T.txt}}>{u.council||u.internationalCouncil} · <span style={{fontFamily:"monospace"}}>{u.regNumber}</span></div></div>}
+              </div>
+              {/* Bio if filled */}
+              {u.bio&&<div style={{marginTop:14,paddingTop:14,borderTop:"1px solid "+T.border}}>
+                <div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:5}}>About</div>
+                <div style={{fontSize:".9rem",color:T.txt2,lineHeight:1.7,whiteSpace:"pre-wrap"}}>{u.bio}</div>
+              </div>}
+            </div>}
+
+            {/* Pharma-specific details */}
+            {u.accountType==="pharma"&&<div style={{...T.card,marginBottom:14}}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:14}}>🏢 Company Details</h4>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:14}}>
+                {u.companyName&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Company</div><div style={{fontSize:".88rem",color:T.txt}}>{u.companyName}</div></div>}
+                {u.brandCategory&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Category</div><div style={{fontSize:".88rem",color:T.txt}}>{u.brandCategory}</div></div>}
+                {u.contactPerson&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Contact</div><div style={{fontSize:".88rem",color:T.txt}}>{u.contactPerson}</div></div>}
+                {u.country&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Country</div><div style={{fontSize:".88rem",color:T.txt}}>{u.country}</div></div>}
+                {u.website&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Website</div><a href={u.website} target="_blank" rel="noopener noreferrer" style={{fontSize:".88rem",color:T.teal,textDecoration:"none"}}>{u.website.replace(/^https?:\/\//,"")} →</a></div>}
+              </div>
+            </div>}
+
+            {/* Institute-specific details */}
+            {u.accountType==="institute"&&<div style={{...T.card,marginBottom:14}}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:14}}>🏛️ Institute Details</h4>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:14}}>
+                {u.instituteName&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Institute</div><div style={{fontSize:".88rem",color:T.txt}}>{u.instituteName}</div></div>}
+                {u.instituteType&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Type</div><div style={{fontSize:".88rem",color:T.txt}}>{u.instituteType}</div></div>}
+                {u.directorName&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Director</div><div style={{fontSize:".88rem",color:T.txt}}>{u.directorName}</div></div>}
+                {u.country&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Country</div><div style={{fontSize:".88rem",color:T.txt}}>{u.country}</div></div>}
+                {u.website&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Website</div><a href={u.website} target="_blank" rel="noopener noreferrer" style={{fontSize:".88rem",color:T.teal,textDecoration:"none"}}>{u.website.replace(/^https?:\/\//,"")} →</a></div>}
+              </div>
+            </div>}
+
+            {/* Contact info — only visible to self or admin (private fields) */}
+            {(isMe||isAdmin)&&<div style={{...T.card,marginBottom:14,background:T.bg,borderLeft:"3px solid "+T.gold}}>
+              <h4 style={{fontSize:".88rem",fontWeight:700,marginBottom:10}}>🔒 Contact Info <span style={{fontSize:".7rem",color:T.mute,fontWeight:400,marginLeft:6}}>(private — visible only to {isMe?"you":"admin"})</span></h4>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:10,fontSize:".85rem"}}>
+                {u.email&&<div><span style={{color:T.mute}}>Email:</span> <span style={{color:T.txt}}>{u.email}</span></div>}
+                {u.mobile&&<div><span style={{color:T.mute}}>Mobile:</span> <span style={{color:T.txt}}>{u.mobile}</span></div>}
+              </div>
+            </div>}
+
+            {/* Stats — for doctors only */}
+            {u.accountType==="doctor"&&<div style={{...T.card,marginBottom:14}}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:14}}>📊 Activity</h4>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
+                <div style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}>
+                  <div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{u.points||0}</div>
+                  <div style={{fontSize:".62rem",color:T.mute,textTransform:"uppercase",letterSpacing:1}}>Points</div>
+                </div>
+                <div style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}>
+                  <div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{u.totalAnswered||0}</div>
+                  <div style={{fontSize:".62rem",color:T.mute,textTransform:"uppercase",letterSpacing:1}}>Quizzes</div>
+                </div>
+                <div style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}>
+                  <div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{acc2}%</div>
+                  <div style={{fontSize:".62rem",color:T.mute,textTransform:"uppercase",letterSpacing:1}}>Accuracy</div>
+                </div>
+                <div style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}>
+                  <div style={{fontSize:"1.4rem",fontWeight:700,color:T.gold}}>🔥{u.streak||0}</div>
+                  <div style={{fontSize:".62rem",color:T.mute,textTransform:"uppercase",letterSpacing:1}}>Streak</div>
+                </div>
+              </div>
+            </div>}
+
+            {/* Admin verification controls */}
+            {isAdmin&&!isMe&&<div style={{...T.card,marginBottom:14,background:"#fff8e1",borderLeft:"3px solid "+T.gold}}>
+              <h4 style={{fontSize:".88rem",fontWeight:700,marginBottom:8}}>⚙️ Admin Tools</h4>
+              {u.regFlagged&&<div style={{padding:"10px 12px",background:T.errBg,borderRadius:8,marginBottom:10,fontSize:".82rem",color:T.err}}>🚩 <b>Flagged:</b> {u.regFlagReason}</div>}
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {!u.verified?<button onClick={async()=>{
+                  if(!confirm(`Mark ${u.name} as verified? They'll get a blue check.`))return;
+                  await fbSet("users",u.id,{verified:true,regFlagged:false,regFlagReason:""});
+                  setSelU(p=>({...p,verified:true,regFlagged:false,regFlagReason:""}));
+                  loadData();
+                  sh("✓ Verified!");
+                }} style={{...T.btn,padding:"8px 16px",fontSize:".82rem"}}>✓ Mark verified</button>
+                :<button onClick={async()=>{
+                  if(!confirm(`Remove verification from ${u.name}?`))return;
+                  await fbSet("users",u.id,{verified:false});
+                  setSelU(p=>({...p,verified:false}));
+                  loadData();
+                }} style={{...T.btnO,padding:"8px 16px",fontSize:".82rem"}}>Remove ✓</button>}
+                {u.regFlagged&&<button onClick={async()=>{
+                  if(!confirm(`Clear the duplicate flag on ${u.name}?`))return;
+                  await fbSet("users",u.id,{regFlagged:false,regFlagReason:""});
+                  setSelU(p=>({...p,regFlagged:false,regFlagReason:""}));
+                  loadData();
+                  sh("Flag cleared");
+                }} style={{...T.btnO,padding:"8px 16px",fontSize:".82rem"}}>Clear flag</button>}
+              </div>
+            </div>}
+          </>}
+        </div>);
+      })()}
 
       {/* PROFILE */}
       {pg==="me"&&<div style={{maxWidth:640}}>
@@ -2307,12 +2479,29 @@ export default function App(){
           </div>
         </div>}
 
-        {aTab==="users"&&<div style={T.card}><p style={{color:T.mute,fontSize:".82rem",marginBottom:10}}>{allUsers.length} users</p>
-          {allUsers.map(u=>{const a2=u.totalAnswered?Math.round(u.totalCorrect/u.totalAnswered*100):0;return<div key={u.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid "+T.border}}>
-            {u.photo?<img src={u.photo} style={{width:30,height:30,borderRadius:"50%"}}/>:<div style={T.av(30,T.tealBg,T.teal)}>{u.initials||"?"}</div>}
-            <div style={{flex:1}}><div style={{fontSize:".85rem",fontWeight:500}}>{u.name} {ADMINS.includes(u.email)?<span style={T.tag(T.tealBg,T.teal)}>Admin</span>:""}</div><div style={{fontSize:".7rem",color:T.mute}}>{u.email}</div></div>
-            <div style={{textAlign:"right",fontSize:".75rem"}}><div style={{color:T.teal,fontWeight:600}}>{a2}% · {u.totalAnswered||0}Q</div><div style={{color:T.mute}}>{u.paid?"⭐ Premium":"Free"}</div></div>
-          </div>})}</div>}
+        {aTab==="users"&&<div style={T.card}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <p style={{color:T.mute,fontSize:".82rem",margin:0}}>{allUsers.length} users · click to view profile</p>
+            <p style={{color:T.mute,fontSize:".75rem",margin:0}}>🚩 {allUsers.filter(u=>u.regFlagged).length} flagged · ✓ {allUsers.filter(u=>u.verified).length} verified</p>
+          </div>
+          {allUsers.map(u=>{const a2=u.totalAnswered?Math.round(u.totalCorrect/u.totalAnswered*100):0;const acc=ACCOUNT_TYPES.find(t=>t.id===u.accountType);return<div key={u.id} onClick={()=>viewProfile(u.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 8px",borderBottom:"1px solid "+T.border,cursor:"pointer",borderRadius:6,...(u.regFlagged?{background:T.errBg+"55"}:{})}}>
+            {u.photo?<img src={u.photo} style={{width:34,height:34,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(34,T.tealBg,T.teal)}>{u.initials||"?"}</div>}
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:".88rem",fontWeight:500,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                {u.name||"Unnamed"}
+                {u.verified&&<span title="Verified" style={{color:"#1d9bf0"}}>✓</span>}
+                {ADMINS.includes(u.email)&&<span style={T.tag(T.tealBg,T.teal)}>Admin</span>}
+                {u.regFlagged&&<span style={T.tag(T.errBg,T.err)}>🚩</span>}
+                {acc&&<span style={T.tag(T.bg,T.mute)}>{acc.icon} {acc.label}</span>}
+              </div>
+              <div style={{fontSize:".7rem",color:T.mute}}>{u.email} · {u.country||"—"}</div>
+            </div>
+            <div style={{textAlign:"right",fontSize:".72rem"}}>
+              {u.accountType==="doctor"&&<div style={{color:T.teal,fontWeight:600}}>{u.points||0} pts · {a2}%</div>}
+              <div style={{color:T.mute}}>{u.paid?"⭐ Premium":"Free"}</div>
+            </div>
+          </div>})}
+        </div>}
       </div>}
 
       <div style={{textAlign:"center",padding:"22px 0",borderTop:"1px solid "+T.border,marginTop:20}}>
