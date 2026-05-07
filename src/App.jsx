@@ -8,6 +8,19 @@ const firebaseConfig={apiKey:"AIzaSyAzW8kouNGmK11tLIDftwlg5QEtffecYEM",authDomai
 const fbApp=initializeApp(firebaseConfig);const auth=getAuth(fbApp);const db=getFirestore(fbApp);const gProv=new GoogleAuthProvider();
 const storage=getStorage(fbApp);
 const ADMINS=["drjpatil@gmail.com","absoluteinstituteedu@gmail.com"];
+
+// ═══ TIER SYSTEM — sticky badges based on lifetime points ═══
+const TIERS=[
+  {id:"beginner",label:"Beginner",min:0,max:49,color:"#888",bg:"#f0f0f0"},
+  {id:"contributor",label:"Contributor",min:50,max:199,color:"#0d6b6e",bg:"#e1f5ee"},
+  {id:"pro",label:"Pro",min:200,max:499,color:"#785f1e",bg:"#fdf6e3"},
+  {id:"expert",label:"Expert",min:500,max:999,color:"#7a3e9a",bg:"#f3e8ff"},
+  {id:"master",label:"Master",min:1000,max:Infinity,color:"#b91c1c",bg:"#fef2f2"}
+];
+function getTier(points){
+  const p=points||0;
+  return TIERS.find(t=>p>=t.min&&p<=t.max)||TIERS[0];
+}
 const TOPICS=["Botox & Neurotoxins","Dermal Fillers","Threads","PDRN & Polynucleotides","Peptides & Skin Boosters","Chemical Peels","Laser & Energy Devices","Hair Restoration","Body Contouring","Anti-Aging & Regenerative","Skincare Science","Pigmentation & Melasma","Acne & Scars","Practice Management"];
 
 // ═══ ACCOUNT TYPES ═══
@@ -535,6 +548,8 @@ export default function App(){
   const[editingProfile,setEditingProfile]=useState(false);
   const[editPf,setEditPf]=useState({});
   const[editErr,setEditErr]=useState("");
+  const[showPoints,setShowPoints]=useState(false);
+  const[showTiers,setShowTiers]=useState(false);
   const[events,setEvents]=useState([]);
   const[selAd,setSelAd]=useState(null);
   const[selE,setSelE]=useState(null);
@@ -716,6 +731,22 @@ export default function App(){
   };
 
   // ═══ LIKE TOGGLE (works for any collection) ═══
+  // ═══ VIEW COUNT TRACKING ═══
+  // Increments view count when user opens a content item. Per-session deduplication
+  // (using sessionStorage) so refreshes don't inflate counts. Owner views don't count.
+  const bumpView=async(colName,id,item,stateUpdater)=>{
+    if(!id||!item)return;
+    if(item.uid&&item.uid===au?.uid)return; // Don't count owner views
+    const sessionKey=`sk_v_${colName}_${id}`;
+    if(sessionStorage.getItem(sessionKey))return; // Already counted this session
+    sessionStorage.setItem(sessionKey,"1");
+    const newCount=(item.views||0)+1;
+    try{
+      await fbSet(colName,id,{views:newCount});
+      if(stateUpdater)stateUpdater(prev=>prev.map(x=>x.id===id?{...x,views:newCount}:x));
+    }catch(e){/* silent fail — don't disrupt UX for a view count */}
+  };
+
   const toggleLike=async(colName,id,item,stateUpdater)=>{
     const likedBy=item.likedBy||[];const hasLiked=likedBy.includes(au.uid);
     const newLikedBy=hasLiked?likedBy.filter(u=>u!==au.uid):[...likedBy,au.uid];
@@ -1252,17 +1283,34 @@ export default function App(){
           }} style={{...T.btn,padding:"10px 18px",fontSize:".85rem",background:"linear-gradient(135deg,"+T.gold+","+T.goldD+")"}}>Complete now →</button>
         </div>}
 
-        <div style={{...T.card,borderLeft:"3px solid "+T.gold,padding:24}}><div style={{display:"flex",alignItems:"center",gap:16,marginBottom:14}}>{uPhoto?<img src={uPhoto} style={{width:52,height:52,borderRadius:"50%",border:"2px solid "+T.teal}}/>:<div style={T.av(52,T.tealBg,T.teal)}>{uIni}</div>}<div><h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0}}>Welcome, {uName.split(" ")[0]} 👋</h2><p style={{color:T.txt2,fontSize:".9rem",marginTop:3}}>Daily quizzes, clinical cases & community.</p></div></div>
+        <div style={{...T.card,borderLeft:"3px solid "+T.gold,padding:24}}>
+          <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:14,flexWrap:"wrap"}}>
+            {uPhoto?<img src={uPhoto} style={{width:52,height:52,borderRadius:"50%",border:"2px solid "+T.teal}}/>:<div style={T.av(52,T.tealBg,T.teal)}>{uIni}</div>}
+            <div style={{flex:1,minWidth:200}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                <h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0}}>Welcome, {uName.split(" ")[0]} 👋</h2>
+                {prof?.accountType==="doctor"&&(()=>{const t=getTier(prof?.points||0);if(t.id==="beginner")return null;return<span style={{padding:"3px 9px",borderRadius:12,fontSize:".7rem",fontWeight:700,letterSpacing:.5,background:t.bg,color:t.color,whiteSpace:"nowrap"}}>{t.label}</span>;})()}
+              </div>
+              <p style={{color:T.txt2,fontSize:".9rem",marginTop:3}}>Daily quizzes, clinical cases & community.</p>
+            </div>
+          </div>
           <div style={{display:"flex",gap:10,flexWrap:"wrap"}}><button onClick={()=>go("quiz")} style={T.btn}>🧠 Today's quiz</button><button onClick={()=>go("events")} style={T.btnO}>📅 Events</button><button onClick={()=>go("cases")} style={T.btnO}>🔬 Clinical cases</button><button onClick={()=>go("forum")} style={T.btnO}>💬 Forum</button></div>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,margin:"16px 0"}}>
-          {[["🧠",totA,"Quizzes"],["✅",acc+"%","Accuracy"],["🔬",cases.length,"Cases"],["📚",resources.length,"PDFs"],["🎥",videos.length,"Videos"]].map(([i,v,l])=>
-            <div key={l} style={{...T.card,textAlign:"center",padding:"12px 4px",marginBottom:0}}><div style={{fontSize:"1rem"}}>{i}</div><div style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".55rem",color:T.mute,textTransform:"uppercase",marginTop:2}}>{l}</div></div>)}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:8,margin:"16px 0"}}>
+          {[
+            ["🧠",totA,"Quizzes",()=>go("quiz")],
+            ["✅",acc+"%","Accuracy",()=>go("rank")],
+            ["⭐",prof?.points||0,"Points",()=>go("rank")],
+            ["🔬",cases.length,"Cases",()=>go("cases")],
+            ["💬",forumPosts.length,"Forum",()=>go("forum")],
+            ["🎥",videos.length,"Videos",()=>go("videos")]
+          ].map(([i,v,l,onClick])=>
+            <div key={l} onClick={onClick} style={{...T.card,textAlign:"center",padding:"12px 4px",marginBottom:0,cursor:"pointer",transition:"transform .1s, box-shadow .1s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.05)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}><div style={{fontSize:"1rem"}}>{i}</div><div style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".55rem",color:T.mute,textTransform:"uppercase",marginTop:2}}>{l}</div></div>)}
         </div>
         <h3 style={{fontSize:"1.05rem",fontWeight:700,marginBottom:12}}>Latest articles</h3>
         {articles.length===0&&<p style={{color:T.mute}}>No articles yet. Admins can create them from Admin panel.</p>}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-          {articles.slice(0,articleLimit).map(a=><div key={a.id} onClick={()=>setSelA(a)} style={{...T.card,cursor:"pointer",marginBottom:0,overflow:"hidden",padding:0,position:"relative"}}>
+          {articles.slice(0,articleLimit).map(a=><div key={a.id} onClick={()=>{setSelA(a);bumpView("articles",a.id,a,setArticles)}} style={{...T.card,cursor:"pointer",marginBottom:0,overflow:"hidden",padding:0,position:"relative"}}>
             {a.cover&&<img src={a.cover} style={{width:"100%",height:140,objectFit:"cover"}}/>}
             {a.sponsored&&<div style={{position:"absolute",top:8,right:8,background:"rgba(168,128,48,0.95)",color:"#fff",padding:"3px 9px",borderRadius:4,fontSize:".58rem",letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,zIndex:2}}>Sponsored</div>}
             <div style={{padding:18}}>
@@ -1276,7 +1324,7 @@ export default function App(){
                   <div style={{fontSize:".74rem",fontWeight:600,color:T.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.sponsored&&a.sponsor?<>by {a.sponsor}</>:a.author||"Admin"}</div>
                   <div style={{fontSize:".66rem",color:T.mute}}>{fD(a.date)}</div>
                 </div>
-                <div style={{display:"flex",gap:8,fontSize:".7rem",color:T.mute,flexShrink:0}}><span>❤️ {a.likes||0}</span><span>💬 {a.comments?.length||0}</span></div>
+                <div style={{display:"flex",gap:8,fontSize:".7rem",color:T.mute,flexShrink:0}}><span>❤️ {a.likes||0}</span><span>💬 {a.comments?.length||0}</span>{(a.views||0)>0&&<span>👁️ {a.views}</span>}</div>
               </div>
             </div>
           </div>)}
@@ -1693,7 +1741,7 @@ export default function App(){
 
           {/* Grid */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
-            {filtered.map(v=>{const thumb=getVideoThumbnail(v.embedUrl);return(<div key={v.id} onClick={()=>setSelV(v)} style={{...T.card,cursor:"pointer",marginBottom:0,padding:0,overflow:"hidden"}}>
+            {filtered.map(v=>{const thumb=getVideoThumbnail(v.embedUrl);return(<div key={v.id} onClick={()=>{setSelV(v);bumpView("videos",v.id,v,setVideos)}} style={{...T.card,cursor:"pointer",marginBottom:0,padding:0,overflow:"hidden"}}>
               <div style={{height:160,position:"relative",background:thumb?"#000":"linear-gradient(135deg,#e1f5ee,#d0ede5)",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
                 {thumb?<img src={thumb} alt={v.title||v.t} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={(e)=>{e.target.style.display="none"}}/>:<span style={{fontSize:"2.5rem"}}>{v.icon||"🎥"}</span>}
                 {thumb&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.15)",transition:"background 0.2s"}}>
@@ -1708,7 +1756,7 @@ export default function App(){
                 <span style={T.tag(T.tealBg,T.teal)}>{v.cat||"General"}</span>
                 <h4 style={{fontSize:".95rem",fontWeight:600,marginTop:8,lineHeight:1.35}}>{v.title||v.t}</h4>
                 {v.desc&&<p style={{fontSize:".75rem",color:T.txt2,marginTop:6,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{v.desc}</p>}
-                <div style={{display:"flex",gap:12,marginTop:8,fontSize:".72rem",color:T.mute}}><span>❤️ {v.likes||0}</span><span>💬 {v.comments?.length||0}</span></div>
+                <div style={{display:"flex",gap:12,marginTop:8,fontSize:".72rem",color:T.mute}}><span>❤️ {v.likes||0}</span><span>💬 {v.comments?.length||0}</span>{(v.views||0)>0&&<span>👁️ {v.views}</span>}</div>
               </div>
             </div>)})}
           </div>
@@ -1782,7 +1830,7 @@ export default function App(){
           {list.length===0&&<div style={{...T.card,textAlign:"center",padding:40}}><div style={{fontSize:"2rem",marginBottom:8}}>📅</div><p style={{color:T.mute}}>{evTab==="upcoming"?"No upcoming events. Check back soon!":"No past events yet."}</p></div>}
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:14}}>
             {list.map(e=>{const dt=new Date(e.date+"T12:00:00");const day=dt.getDate();const mo=dt.toLocaleDateString("en-IN",{month:"short"}).toUpperCase();const isPast=e.date<todayStr;const attending=(e.attendees||[]).find(a=>a.uid===au?.uid);const multiDay=e.endDate&&e.endDate!==e.date;const endDt=multiDay?new Date(e.endDate+"T12:00:00"):null;const endDay=multiDay?endDt.getDate():null;const endMo=multiDay?endDt.toLocaleDateString("en-IN",{month:"short"}).toUpperCase():null;const sameMonth=multiDay&&dt.getMonth()===endDt.getMonth();
-              return<div key={e.id} onClick={()=>setSelE(e)} style={{...T.card,cursor:"pointer",marginBottom:0,padding:0,overflow:"hidden",opacity:isPast?.85:1}}>
+              return<div key={e.id} onClick={()=>{setSelE(e);bumpView("events",e.id,e,setEvents)}} style={{...T.card,cursor:"pointer",marginBottom:0,padding:0,overflow:"hidden",opacity:isPast?.85:1}}>
                 {e.banner?<img src={e.banner} style={{width:"100%",height:140,objectFit:"cover"}}/>:<div style={{height:140,background:"linear-gradient(135deg,"+T.tealBg+","+T.goldBg+")",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"3rem"}}>📅</div>}
                 <div style={{padding:16}}>
                   <div style={{display:"flex",gap:10,alignItems:"flex-start",marginBottom:8}}>
@@ -1808,6 +1856,7 @@ export default function App(){
                     {e.time&&<div>🕐 {e.time}</div>}
                     {e.location&&<div>📍 {e.location}</div>}
                     {e.attendees?.length>0&&<div style={{marginTop:6,color:T.teal,fontWeight:500}}>👥 {e.attendees.length} attending{attending?" · You're going":""}</div>}
+                    {(e.views||0)>0&&<div style={{marginTop:4,color:T.mute,fontSize:".7rem"}}>👁️ {e.views} views</div>}
                   </div>
                   {e.sponsor&&<div style={{display:"flex",alignItems:"center",gap:8,marginTop:10,paddingTop:10,borderTop:"1px dashed "+T.border}}>
                     {e.sponsorLogo&&<img src={e.sponsorLogo} style={{height:24,maxWidth:60,objectFit:"contain"}}/>}
@@ -2004,8 +2053,9 @@ export default function App(){
 
             {/* Engagement bar */}
             <div style={{display:"flex",alignItems:"center",gap:12,paddingTop:12,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
-              <LikeBtn liked={(cs.likedBy||[]).includes(au?.uid)} count={cs.likes||0} onToggle={()=>toggleLike("cases",cs.id,cs,setCases)}/>
+              <LikeBtn liked={(cs.likedBy||[]).includes(au?.uid)} count={cs.likes||0} onToggle={()=>{toggleLike("cases",cs.id,cs,setCases);bumpView("cases",cs.id,cs,setCases)}}/>
               <span style={{fontSize:".75rem",color:T.mute}}>💬 {cs.comments?.length||0} comments</span>
+              {(cs.views||0)>0&&<span style={{fontSize:".75rem",color:T.mute}}>👁️ {cs.views} views</span>}
               <ShareBar title={cs.title} url={`${window.location.origin}/?case=${cs.id}`} description={(cs.history||cs.body||"").slice(0,120)} itemId={cs.id} itemType="cases" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>
             </div>
 
@@ -2110,8 +2160,9 @@ export default function App(){
 
               {/* Engagement bar */}
               <div style={{display:"flex",alignItems:"center",gap:12,paddingTop:12,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
-                <LikeBtn liked={(p.likedBy||[]).includes(au?.uid)} count={p.likes||0} onToggle={()=>toggleLike("forum",p.id,p,setForumPosts)}/>
+                <LikeBtn liked={(p.likedBy||[]).includes(au?.uid)} count={p.likes||0} onToggle={()=>{toggleLike("forum",p.id,p,setForumPosts);bumpView("forum",p.id,p,setForumPosts)}}/>
                 <span style={{fontSize:".78rem",color:T.mute,display:"flex",alignItems:"center",gap:4}}>💬 {p.comments?.length||0} {p.comments?.length===1?"reply":"replies"}</span>
+                {(p.views||0)>0&&<span style={{fontSize:".78rem",color:T.mute,display:"flex",alignItems:"center",gap:4}}>👁️ {p.views}</span>}
                 <ShareBar title={p.title} url={`${window.location.origin}/?forum=${p.id}`} description={p.body?.slice(0,120)} itemId={p.id} itemType="forum" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>
               </div>
 
@@ -2125,16 +2176,73 @@ export default function App(){
 
       {/* RANK */}
       {pg==="rank"&&<div style={{maxWidth:680}}>
-        {/* Header */}
-        <div style={{...T.card,padding:20,background:"linear-gradient(135deg,#fff,"+T.goldBg+"55)",borderLeft:"3px solid "+T.gold,marginBottom:14}}>
-          <h3 style={{fontSize:"1.3rem",fontWeight:700,margin:0}}>🏆 SKINARIO Leaderboard</h3>
-          <p style={{color:T.txt2,fontSize:".84rem",marginTop:6,lineHeight:1.55}}>Points are earned by answering daily clinical quizzes. Compete with peers across India based on knowledge and consistency.</p>
-          <div style={{display:"flex",gap:14,marginTop:12,flexWrap:"wrap",fontSize:".74rem"}}>
-            <div><span style={{color:T.gold,fontWeight:700}}>1pt</span> <span style={{color:T.mute}}>Easy</span></div>
-            <div><span style={{color:T.gold,fontWeight:700}}>2pt</span> <span style={{color:T.mute}}>Moderate</span></div>
-            <div><span style={{color:T.gold,fontWeight:700}}>3pt</span> <span style={{color:T.mute}}>Hard</span></div>
-            <div><span style={{color:T.gold,fontWeight:700}}>+5pt</span> <span style={{color:T.mute}}>Every 7-day streak</span></div>
+        {/* ═══ HEADER (compact) ═══ */}
+        <div style={{...T.card,padding:18,background:"linear-gradient(135deg,#fff,"+T.goldBg+"55)",borderLeft:"3px solid "+T.gold,marginBottom:10}}>
+          <h3 style={{fontSize:"1.2rem",fontWeight:700,margin:0}}>🏆 SKINARIO Leaderboard</h3>
+          <p style={{color:T.txt2,fontSize:".82rem",marginTop:5,lineHeight:1.5}}>Compete with peers across India based on knowledge and consistency.</p>
+        </div>
+
+        {/* ═══ COLLAPSIBLE: How points work ═══ */}
+        <div style={{...T.card,marginBottom:8,padding:0,overflow:"hidden"}}>
+          <div onClick={()=>setShowPoints(!showPoints)} style={{padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",gap:10}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0,flex:1}}>
+              <span style={{fontSize:".95rem",fontWeight:600,whiteSpace:"nowrap"}}>💯 How points work</span>
+              {!showPoints&&<span style={{fontSize:".72rem",color:T.mute,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>1pt easy · 2pt mod · 3pt hard · +5 streak</span>}
+            </div>
+            <span style={{fontSize:".85rem",color:T.mute,transition:"transform .2s",transform:showPoints?"rotate(180deg)":"rotate(0deg)",display:"inline-block"}}>▾</span>
           </div>
+          {showPoints&&<div style={{padding:"4px 16px 16px",borderTop:"1px solid "+T.border}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginTop:14}}>
+              <div style={{padding:"10px 12px",background:T.bg,borderRadius:8}}>
+                <div style={{fontSize:"1.1rem",fontWeight:700,color:T.gold,marginBottom:2}}>1 pt</div>
+                <div style={{fontSize:".74rem",color:T.txt2}}>Easy question</div>
+              </div>
+              <div style={{padding:"10px 12px",background:T.bg,borderRadius:8}}>
+                <div style={{fontSize:"1.1rem",fontWeight:700,color:T.gold,marginBottom:2}}>2 pts</div>
+                <div style={{fontSize:".74rem",color:T.txt2}}>Moderate question</div>
+              </div>
+              <div style={{padding:"10px 12px",background:T.bg,borderRadius:8}}>
+                <div style={{fontSize:"1.1rem",fontWeight:700,color:T.gold,marginBottom:2}}>3 pts</div>
+                <div style={{fontSize:".74rem",color:T.txt2}}>Hard question</div>
+              </div>
+              <div style={{padding:"10px 12px",background:T.goldBg,borderRadius:8,border:"1px solid "+T.gold+"55"}}>
+                <div style={{fontSize:"1.1rem",fontWeight:700,color:T.goldD,marginBottom:2}}>+5 pts</div>
+                <div style={{fontSize:".74rem",color:T.txt2}}>Every 7-day streak</div>
+              </div>
+            </div>
+            <p style={{fontSize:".75rem",color:T.txt2,lineHeight:1.55,marginTop:12,marginBottom:0}}>Points come from answering daily quizzes correctly. Harder questions are worth more. Maintain a daily streak for bonus points every week.</p>
+          </div>}
+        </div>
+
+        {/* ═══ COLLAPSIBLE: Tier system ═══ */}
+        <div style={{...T.card,marginBottom:14,padding:0,overflow:"hidden"}}>
+          <div onClick={()=>setShowTiers(!showTiers)} style={{padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",gap:10}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0,flex:1}}>
+              <span style={{fontSize:".95rem",fontWeight:600,whiteSpace:"nowrap"}}>🎖️ Tier system</span>
+              {!showTiers&&prof?.accountType==="doctor"&&(()=>{
+                const myPts=prof?.points||0;
+                const myTier=getTier(myPts);
+                const nextTier=TIERS.find(t=>t.min>myPts);
+                if(!nextTier)return<span style={{fontSize:".72rem",color:T.gold,fontWeight:600,whiteSpace:"nowrap"}}>🏅 Top tier reached</span>;
+                const remaining=nextTier.min-myPts;
+                return<span style={{fontSize:".72rem",color:T.mute,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><span style={{color:myTier.color,fontWeight:600}}>{myTier.label}</span> · {remaining} pts to <span style={{color:nextTier.color,fontWeight:600}}>{nextTier.label}</span></span>;
+              })()}
+            </div>
+            <span style={{fontSize:".85rem",color:T.mute,transition:"transform .2s",transform:showTiers?"rotate(180deg)":"rotate(0deg)",display:"inline-block"}}>▾</span>
+          </div>
+          {showTiers&&<div style={{padding:"4px 16px 16px",borderTop:"1px solid "+T.border}}>
+            <p style={{fontSize:".75rem",color:T.txt2,lineHeight:1.55,marginTop:12,marginBottom:12}}>Tiers are earned through accumulated points. Once you reach a tier, you keep it forever — no demotion. Higher tiers display as a badge next to your name.</p>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {TIERS.map(t=>{
+                const isMyTier=prof?.accountType==="doctor"&&getTier(prof?.points||0).id===t.id;
+                return<div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",borderRadius:8,background:isMyTier?t.bg:"transparent",border:`1px solid ${isMyTier?t.color:T.border}`}}>
+                  <span style={{padding:"2px 8px",borderRadius:10,fontSize:".66rem",fontWeight:700,letterSpacing:.5,background:t.bg,color:t.color,minWidth:80,textAlign:"center"}}>{t.label}</span>
+                  <span style={{fontSize:".78rem",color:T.txt}}>{t.min}{t.max===Infinity?"+":` – ${t.max}`} points</span>
+                  {isMyTier&&<span style={{marginLeft:"auto",fontSize:".7rem",color:t.color,fontWeight:600}}>← You</span>}
+                </div>
+              })}
+            </div>
+          </div>}
         </div>
 
         {/* Top 20 Leaderboard */}
@@ -2154,7 +2262,7 @@ export default function App(){
               <div style={{width:32,textAlign:"center",fontWeight:700,fontSize:i<3?"1.3rem":".95rem",color:i<3?["#d4a017","#888","#a0703a"][i]:T.txt2}}>{i<3?["🥇","🥈","🥉"][i]:`#${i+1}`}</div>
               {u.photo?<img src={u.photo} style={{width:38,height:38,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(38,isMe?T.teal:T.tealBg,isMe?"#fff":T.teal)}>{u.initials||"?"}</div>}
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontWeight:600,fontSize:".9rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.name}{isMe?" (You)":""}</div>
+                <div style={{fontWeight:600,fontSize:".9rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6}}>{u.name}{isMe?" (You)":""}{(()=>{const t=getTier(u.points||0);if(t.id==="beginner")return null;return<span style={{padding:"1px 6px",borderRadius:8,fontSize:".58rem",fontWeight:700,letterSpacing:.5,background:t.bg,color:t.color}}>{t.label}</span>;})()}</div>
                 <div style={{fontSize:".7rem",color:T.mute,display:"flex",gap:6,flexWrap:"wrap"}}>
                   <span>{uAcc}% accuracy</span>
                   <span>·</span>
@@ -2214,6 +2322,7 @@ export default function App(){
                 <div style={{flex:1,minWidth:200,paddingBottom:6}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
                     <h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0}}>{u.name}</h2>
+                    {u.accountType==="doctor"&&(()=>{const t=getTier(u.points||0);if(t.id==="beginner")return null;return<span style={{padding:"3px 9px",borderRadius:12,fontSize:".7rem",fontWeight:700,letterSpacing:.5,background:t.bg,color:t.color}}>{t.label}</span>;})()}
                     {u.verified&&<span title="Verified by SKINARIO admin" style={{fontSize:"1.1rem",color:"#1d9bf0"}}>✓</span>}
                     {u.regFlagged&&isAdmin&&<span style={T.tag(T.errBg,T.err)} title={u.regFlagReason}>🚩 Flagged</span>}
                     {acc&&<span style={T.tag(T.tealBg,T.teal)}>{acc.icon} {acc.label}</span>}
