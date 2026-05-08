@@ -509,6 +509,44 @@ async function genQuizAI(date){
     return{date,cat:q.cat,diff:q.diff,scen:q.scen||"",question:q.question,opts:q.opts.slice(0,3),ci:typeof q.ci==="number"?q.ci:0,expl:q.expl||"",answers:{},comments:[]}
   }catch(e){console.error("Quiz gen error:",e);return null}}
 
+// ═══ VIEW TRACKER ═══
+// Wraps a content card and fires onView() once when the card has been
+// 50%+ visible for 800ms — that's a real "read", not a scroll-past.
+// Per-session deduplication via sessionStorage so refreshes don't inflate counts.
+function ViewTracker({ trackingKey, onView, children, style }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!ref.current || !trackingKey) return;
+    const sessionKey = `sk_vt_${trackingKey}`;
+    if (sessionStorage.getItem(sessionKey)) return;
+    let timer = null;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+            timer = setTimeout(() => {
+              if (sessionStorage.getItem(sessionKey)) return;
+              sessionStorage.setItem(sessionKey, "1");
+              onView && onView();
+              obs.disconnect();
+            }, 800);
+          } else if (timer) {
+            clearTimeout(timer);
+            timer = null;
+          }
+        });
+      },
+      { threshold: [0, 0.5, 1] }
+    );
+    obs.observe(ref.current);
+    return () => {
+      obs.disconnect();
+      if (timer) clearTimeout(timer);
+    };
+  }, [trackingKey, onView]);
+  return <div ref={ref} style={style}>{children}</div>;
+}
+
 export default function App(){
   const[au,setAu]=useState(null);const[prof,setProf]=useState(null);const[scr,setScr]=useState("loading");const[pg,setPg]=useState("home");
   const[welcomeSeen,setWelcomeSeen]=useState(()=>localStorage.getItem("sk_welcome")==="1");
@@ -533,10 +571,18 @@ export default function App(){
   useEffect(()=>{if(toast){const t=setTimeout(()=>setToast(null),3000);return()=>clearTimeout(t)}},[toast]);
 
   const[ads,setAds]=useState([]);
+  const[newsPosts,setNewsPosts]=useState([]); // admin-curated news
+  const[research,setResearch]=useState([]); // PubMed papers, fetched on demand
+  const[researchLoading,setResearchLoading]=useState(false);
   const[notifs,setNotifs]=useState([]);
   const[notifsOpen,setNotifsOpen]=useState(false);
   const[mentionMatches,setMentionMatches]=useState([]);
   const[announceTitle,setAnnounceTitle]=useState("");
+  const[newsTitle,setNewsTitle]=useState("");
+  const[newsBody,setNewsBody]=useState("");
+  const[newsUrl,setNewsUrl]=useState("");
+  const[newsCat,setNewsCat]=useState("");
+  const[newsImage,setNewsImage]=useState("");
   const[announceText,setAnnounceText]=useState("");
   const[announceLinkType,setAnnounceLinkType]=useState("");
   const[announceLinkId,setAnnounceLinkId]=useState("");
@@ -553,9 +599,32 @@ export default function App(){
   const[events,setEvents]=useState([]);
   const[selAd,setSelAd]=useState(null);
   const[selE,setSelE]=useState(null);
-  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev]=await Promise.all([fbGetAll("quizzes","date","desc"),fbGetAll("articles","date","desc"),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc"),fbGetAll("cases","createdAt","desc"),fbGetAll("users","joined","desc"),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev)},[]);
+  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n]=await Promise.all([fbGetAll("quizzes","date","desc"),fbGetAll("articles","date","desc"),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc"),fbGetAll("cases","createdAt","desc"),fbGetAll("users","joined","desc"),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n)},[]);
 
   useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){setProf(p);setScr("main");loadData()}else{setPf({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:au?.displayName||"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});setSetupStep(0);setSetupErr("");setScr("setup")}}else{setAu(null);setProf(null);setScr("login")}});return()=>unsub()},[loadData]);
+
+  // ═══ Fetch PubMed research papers (cached in sessionStorage for 6 hours) ═══
+  useEffect(()=>{
+    if(scr!=="main")return;
+    const cached=sessionStorage.getItem("sk_research");
+    if(cached){
+      try{
+        const{items,ts}=JSON.parse(cached);
+        if(Date.now()-ts<6*60*60*1000){setResearch(items);return}
+      }catch{}
+    }
+    setResearchLoading(true);
+    fetch("/api/research")
+      .then(r=>r.json())
+      .then(data=>{
+        if(data.ok&&Array.isArray(data.items)){
+          setResearch(data.items);
+          sessionStorage.setItem("sk_research",JSON.stringify({items:data.items,ts:Date.now()}));
+        }
+      })
+      .catch(e=>console.error("Research fetch error:",e))
+      .finally(()=>setResearchLoading(false));
+  },[scr]);
 
   // ═══ NOTIFICATIONS LOADER — fetches current user's notifications + broadcast announcements ═══
   useEffect(()=>{
@@ -937,6 +1006,17 @@ export default function App(){
 
   const W="1400px";const dates=Array.from({length:14},(_,i)=>{let d=new Date(getIST());d.setDate(d.getDate()-(13-i));return ds(d)});
   const qObj=quizzes.find(q=>q.date===selD);const uA=qObj?.answers?.[au?.uid];const isT=selD===today;const rev=!isT||hr>=21;const dd=Math.floor((new Date(today)-new Date(selD))/864e5);const canA=uA===undefined&&(isT||(dd<=3&&dd>0));
+  // ═══ Quiz view tracking — once per quiz per session ═══
+  useEffect(()=>{
+    if(!qObj||!au)return;
+    if(qObj.uid===au.uid)return; // don't count owner
+    const k=`sk_qv_${qObj.id}`;
+    if(sessionStorage.getItem(k))return;
+    sessionStorage.setItem(k,"1");
+    const newCount=(qObj.views||0)+1;
+    fbSet("quizzes",qObj.id,{views:newCount}).catch(()=>{});
+    setQuizzes(prev=>prev.map(x=>x.id===qObj.id?{...x,views:newCount}:x));
+  },[qObj?.id,au?.uid]);
 
   if(scr==="loading")return(<div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui"}}><div style={{textAlign:"center"}}><Logo size={60}/><p style={{color:T.mute,marginTop:12}}>Loading...</p></div></div>);
 
@@ -1308,6 +1388,40 @@ export default function App(){
           ].map(([i,v,l,onClick])=>
             <div key={l} onClick={onClick} style={{...T.card,textAlign:"center",padding:"12px 4px",marginBottom:0,cursor:"pointer",transition:"transform .1s, box-shadow .1s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.05)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}><div style={{fontSize:"1rem"}}>{i}</div><div style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".55rem",color:T.mute,textTransform:"uppercase",marginTop:2}}>{l}</div></div>)}
         </div>
+
+        {/* ═══ LATEST RESEARCH & NEWS ═══ */}
+        {(()=>{
+          // Combine: admin news first, then PubMed papers. Cap total at 6.
+          const adminItems=newsPosts.slice(0,3).map(n=>({type:"admin",id:n.id,icon:"📰",topic:n.cat||"News",title:n.title,body:n.body||"",url:n.url||"",pubdate:fD(n.date),source:"SKINARIO Editorial",views:n.views||0}));
+          const researchItems=research.slice(0,Math.max(3,6-adminItems.length)).map(r=>({type:"research",icon:r.icon||"🧬",topic:r.topic,title:r.title,body:"",url:r.url,pubdate:r.pubdate,source:r.journal,authors:r.authors,pmid:r.pmid}));
+          const all=[...adminItems,...researchItems].slice(0,6);
+          if(all.length===0&&!researchLoading)return null;
+          return(<div style={{...T.card,padding:18,marginBottom:16}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
+              <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0,display:"flex",alignItems:"center",gap:8}}>📚 Latest research & news</h3>
+              <span style={{fontSize:".7rem",color:T.mute}}>Across SKINARIO's 14 topics</span>
+            </div>
+            {researchLoading&&all.length===0&&<div style={{textAlign:"center",padding:30,color:T.mute,fontSize:".88rem"}}>
+              <div style={{fontSize:"1.4rem",marginBottom:6}}>📡</div>Fetching latest research from PubMed...
+            </div>}
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {all.map((item,i)=><a key={i} href={item.url||"#"} target="_blank" rel="noopener noreferrer" onClick={e=>{if(!item.url){e.preventDefault();return}if(item.type==="admin"&&item.id){const newCount=(item.views||0)+1;fbSet("news",item.id,{views:newCount});setNewsPosts(prev=>prev.map(x=>x.id===item.id?{...x,views:newCount}:x))}}} style={{display:"flex",gap:12,padding:"10px 12px",borderRadius:10,border:"1px solid "+T.border,textDecoration:"none",color:"inherit",cursor:item.url?"pointer":"default",background:"#fff",transition:"all .15s"}} onMouseEnter={e=>{if(item.url){e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.background=T.tealBg+"33"}}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background="#fff"}}>
+                <div style={{fontSize:"1.4rem",lineHeight:1,flexShrink:0,paddingTop:2}}>{item.icon}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4,flexWrap:"wrap"}}>
+                    <span style={T.tag(T.tealBg,T.teal)}>{item.topic}</span>
+                    {item.type==="admin"?<span style={T.tag(T.goldBg,T.goldD)}>📰 Editorial</span>:<span style={T.tag(T.bg,T.mute)}>🔬 Research</span>}
+                  </div>
+                  <div style={{fontSize:".88rem",fontWeight:600,color:T.txt,lineHeight:1.4,marginBottom:4}}>{item.title}</div>
+                  {item.body&&<div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5,marginBottom:4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{item.body}</div>}
+                  <div style={{fontSize:".7rem",color:T.mute,fontStyle:item.source?"italic":"normal"}}>{item.source}{item.authors?` · ${item.authors}`:""}{item.pubdate?` · ${item.pubdate}`:""}{item.type==="admin"&&item.views>0?` · 👁️ ${item.views}`:""}{item.url&&" · Read →"}</div>
+                </div>
+              </a>)}
+            </div>
+            {research.length>0&&<p style={{fontSize:".68rem",color:T.mute,marginTop:12,textAlign:"center",fontStyle:"italic"}}>Research papers fetched from PubMed (NIH/NLM). Click to read on PubMed.</p>}
+          </div>);
+        })()}
+
         <h3 style={{fontSize:"1.05rem",fontWeight:700,marginBottom:12}}>Latest articles</h3>
         {articles.length===0&&<p style={{color:T.mute}}>No articles yet. Admins can create them from Admin panel.</p>}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
@@ -1637,7 +1751,7 @@ export default function App(){
             </div>}
             <div style={{padding:20}}>
             <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}><span style={{fontSize:".8rem",color:T.mute}}>📅 {fD(qObj.date)}</span>{isT&&hr<21&&<span style={T.tag(T.okBg,T.ok)}>● LIVE</span>}{rev&&!isT&&<span style={T.tag(T.errBg,T.err)}>Closed</span>}<span style={{fontSize:".72rem",color:T.mute,marginLeft:"auto"}}>{Object.keys(qObj.answers||{}).length} answered</span></div>
-            <div style={{display:"flex",gap:6,marginBottom:12}}><span style={T.tag(T.tealBg,T.teal)}>{qObj.cat}</span><span style={T.tag(T.warnBg,T.warn)}>{qObj.diff}</span></div>
+            <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}><span style={T.tag(T.tealBg,T.teal)}>{qObj.cat}</span><span style={T.tag(T.warnBg,T.warn)}>{qObj.diff}</span>{(qObj.views||0)>0&&<span style={{fontSize:".72rem",color:T.mute}}>👁️ {qObj.views} {qObj.views===1?"view":"views"}</span>}{Object.keys(qObj.answers||{}).length>0&&<span style={{fontSize:".72rem",color:T.mute}}>✏️ {Object.keys(qObj.answers).length} answered</span>}</div>
             {qObj.scen&&<div style={{background:T.bg,borderLeft:"3px solid "+T.gold,padding:"12px 16px",marginBottom:16,borderRadius:"0 10px 10px 0",fontSize:".9rem",color:T.txt2,lineHeight:1.65}}>{qObj.scen}</div>}
             <div style={{fontSize:"1.1rem",fontWeight:600,lineHeight:1.6,marginBottom:16}}>{qObj.question}</div>
             {qObj.opts.map((o,i)=>{const l="ABC"[i];const sr=uA!==undefined||(rev&&!canA);const co=sr&&i===qObj.ci;const wr=sr&&i===uA&&uA!==qObj.ci;
@@ -1999,7 +2113,7 @@ export default function App(){
         </div>}
 
         {cases.length===0&&!newCase&&<div style={{...T.card,textAlign:"center",padding:48}}><div style={{fontSize:"2.4rem",marginBottom:8}}>🔬</div><p style={{color:T.mute,fontSize:".95rem"}}>No cases yet. Be the first to share a clinical case!</p></div>}
-        {cases.map(cs=><div key={cs.id} style={{...T.card,padding:0,overflow:"hidden"}}>
+        {cases.map(cs=><ViewTracker key={cs.id} trackingKey={`cases_${cs.id}`} onView={()=>{if(cs.uid===au?.uid)return;const newCount=(cs.views||0)+1;fbSet("cases",cs.id,{views:newCount});setCases(prev=>prev.map(x=>x.id===cs.id?{...x,views:newCount}:x))}}><div style={{...T.card,padding:0,overflow:"hidden"}}>
           {/* IMAGES AT TOP — full image (no cropping) for clinical accuracy */}
           {cs.images?.length>0&&<div style={{padding:14,paddingBottom:0}}>
             {cs.images.length===1?
@@ -2054,7 +2168,7 @@ export default function App(){
 
             {/* Engagement bar */}
             <div style={{display:"flex",alignItems:"center",gap:12,paddingTop:12,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
-              <LikeBtn liked={(cs.likedBy||[]).includes(au?.uid)} count={cs.likes||0} onToggle={()=>{toggleLike("cases",cs.id,cs,setCases);bumpView("cases",cs.id,cs,setCases)}}/>
+              <LikeBtn liked={(cs.likedBy||[]).includes(au?.uid)} count={cs.likes||0} onToggle={()=>toggleLike("cases",cs.id,cs,setCases)}/>
               <span style={{fontSize:".75rem",color:T.mute}}>💬 {cs.comments?.length||0} comments</span>
               {(cs.views||0)>0&&<span style={{fontSize:".75rem",color:T.mute}}>👁️ {cs.views} views</span>}
               <ShareBar title={cs.title} url={`${window.location.origin}/?case=${cs.id}`} description={(cs.history||cs.body||"").slice(0,120)} itemId={cs.id} itemType="cases" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>
@@ -2069,7 +2183,7 @@ export default function App(){
             </div>}
             <CaseCmtInput caseId={cs.id} caseObj={cs} addCaseComment={addCaseComment} allUsers={allUsers}/>
           </div>
-        </div>)}
+        </div></ViewTracker>)}
       </div>}
 
       {/* FORUM */}
@@ -2120,7 +2234,7 @@ export default function App(){
           {filtered.length===0&&!newForum&&<div style={{...T.card,textAlign:"center",padding:50}}><div style={{fontSize:"2.4rem",marginBottom:8}}>💬</div><p style={{color:T.mute,fontSize:".95rem"}}>{forumFilter==="all"?"No discussions yet. Be the first to start one!":`No posts in "${forumFilter}" category yet.`}</p></div>}
 
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
-          {filtered.map(p=>{const hasImg=p.images?.length>0;const isHot=(p.likes||0)>=3;return(<div key={p.id} style={{...T.card,padding:0,overflow:"hidden",marginBottom:0}}>
+          {filtered.map(p=>{const hasImg=p.images?.length>0;const isHot=(p.likes||0)>=3;return(<ViewTracker key={p.id} trackingKey={`forum_${p.id}`} onView={()=>{if(p.uid===au?.uid)return;const newCount=(p.views||0)+1;fbSet("forum",p.id,{views:newCount});setForumPosts(prev=>prev.map(x=>x.id===p.id?{...x,views:newCount}:x))}}><div style={{...T.card,padding:0,overflow:"hidden",marginBottom:0}}>
             {/* Hero image — single posters/photos display full image, never cropped */}
             {hasImg&&(p.images.length===1?
               <div style={{width:"100%",background:"#f4f1ea",cursor:"zoom-in",position:"relative",display:"flex",justifyContent:"center",alignItems:"center"}} onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=p.images[0];im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v)}}>
@@ -2161,7 +2275,7 @@ export default function App(){
 
               {/* Engagement bar */}
               <div style={{display:"flex",alignItems:"center",gap:12,paddingTop:12,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
-                <LikeBtn liked={(p.likedBy||[]).includes(au?.uid)} count={p.likes||0} onToggle={()=>{toggleLike("forum",p.id,p,setForumPosts);bumpView("forum",p.id,p,setForumPosts)}}/>
+                <LikeBtn liked={(p.likedBy||[]).includes(au?.uid)} count={p.likes||0} onToggle={()=>toggleLike("forum",p.id,p,setForumPosts)}/>
                 <span style={{fontSize:".78rem",color:T.mute,display:"flex",alignItems:"center",gap:4}}>💬 {p.comments?.length||0} {p.comments?.length===1?"reply":"replies"}</span>
                 {(p.views||0)>0&&<span style={{fontSize:".78rem",color:T.mute,display:"flex",alignItems:"center",gap:4}}>👁️ {p.views}</span>}
                 <ShareBar title={p.title} url={`${window.location.origin}/?forum=${p.id}`} description={p.body?.slice(0,120)} itemId={p.id} itemType="forum" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>
@@ -2170,7 +2284,7 @@ export default function App(){
               {/* Comment thread */}
               <CommentThread collection="forum" itemId={p.id} item={p} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} onUpdate={(id,comments)=>setForumPosts(prev=>prev.map(x=>x.id===id?{...x,comments,replies:comments.length}:x))}/>
             </div>
-          </div>)})}
+          </div></ViewTracker>)})}
           </div>
         </div>);
       })()}
@@ -2698,10 +2812,37 @@ export default function App(){
       {pg==="admin"&&isAdm&&<div>
         <h3 style={{fontSize:"1.15rem",fontWeight:700,marginBottom:12}}>⚙️ Admin dashboard</h3>
         <div style={{display:"flex",gap:5,marginBottom:16,flexWrap:"wrap"}}>
-          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["announce","📣 Announce"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null)}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
+          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["announce","📣 Announce"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null)}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
         </div>
         {aTab==="stats"&&<><div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length],["Events",events.length],["Ads",ads.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>
-          {/* Admin tools */}
+          {/* ═══ ANALYTICS — top viewed content ═══ */}
+          <div style={{...T.card,marginTop:14}}>
+            <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:10}}>📈 Top viewed content</h4>
+            <p style={{fontSize:".78rem",color:T.txt2,marginBottom:14,lineHeight:1.55}}>What's getting the most eyeballs across SKINARIO. Helps you understand what doctors actually read.</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:12}}>
+              {[
+                ["📰 Articles",articles,"title"],
+                ["🎥 Videos",videos,"title"],
+                ["🔬 Cases",cases,"title"],
+                ["💬 Forum",forumPosts,"title"],
+                ["📰 News",newsPosts,"title"],
+                ["🧠 Quizzes",quizzes,"cat"]
+              ].map(([label,arr,titleKey])=>{
+                const top3=[...arr].sort((a,b)=>(b.views||0)-(a.views||0)).slice(0,3).filter(x=>(x.views||0)>0);
+                return<div key={label} style={{padding:12,background:T.bg,borderRadius:10}}>
+                  <div style={{fontSize:".82rem",fontWeight:600,marginBottom:8,color:T.txt}}>{label}</div>
+                  {top3.length===0?<div style={{fontSize:".74rem",color:T.mute,fontStyle:"italic"}}>No views yet</div>:
+                  top3.map((item,i)=><div key={i} style={{display:"flex",alignItems:"flex-start",gap:8,padding:"5px 0",borderBottom:i<top3.length-1?"1px solid "+T.border:"none"}}>
+                    <span style={{fontSize:".7rem",color:T.gold,fontWeight:700,flexShrink:0}}>#{i+1}</span>
+                    <div style={{flex:1,fontSize:".74rem",color:T.txt2,lineHeight:1.4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item[titleKey]||item.question||"Untitled"}</div>
+                    <span style={{fontSize:".7rem",color:T.teal,fontWeight:600,flexShrink:0}}>👁️ {item.views}</span>
+                  </div>)}
+                </div>;
+              })}
+            </div>
+          </div>
+
+          {/* ═══ ADMIN TOOLS ═══ */}
           <div style={{...T.card,marginTop:14}}>
             <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:10}}>🛠️ Admin Tools</h4>
             <div style={{padding:"12px 14px",background:T.goldBg,borderLeft:"3px solid "+T.gold,borderRadius:"0 8px 8px 0",marginBottom:10}}>
@@ -2783,6 +2924,58 @@ export default function App(){
           </div>)}</>}</div>}
 
         {/* ═══ ANNOUNCEMENTS ADMIN — broadcast notifications to all users ═══ */}
+        {aTab==="news"&&<div style={T.card}>
+          <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>📰 News & Industry Updates</h4>
+          <p style={{fontSize:".82rem",color:T.txt2,marginBottom:18,lineHeight:1.55}}>Post news, regulatory updates, conference announcements, or industry insights. Items here appear in the "Latest research & news" section on the home page, mixed with auto-fetched PubMed papers.</p>
+
+          <div style={{padding:"14px 18px",background:T.tealBg,borderLeft:"3px solid "+T.teal,borderRadius:"0 8px 8px 0",marginBottom:20}}>
+            <div style={{fontSize:".7rem",color:T.teal,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:8}}>📝 Compose news item</div>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Headline <span style={{color:T.err}}>*</span></label>
+            <input value={newsTitle} onChange={e=>setNewsTitle(e.target.value)} placeholder="e.g. FDA approves new biostimulator filler for facial volume" style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Topic</label>
+            <select value={newsCat} onChange={e=>setNewsCat(e.target.value)} style={{...T.inp,marginBottom:12}}>
+              <option value="">— Select topic —</option>
+              {TOPICS.map(t=><option key={t} value={t}>{t}</option>)}
+            </select>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Brief summary</label>
+            <textarea value={newsBody} onChange={e=>setNewsBody(e.target.value)} placeholder="Optional — 1-2 sentences. If blank, only headline shows." rows={3} style={{...T.txa,marginBottom:12,fontSize:".9rem",lineHeight:1.6}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>External link (where users go when they click)</label>
+            <input value={newsUrl} onChange={e=>setNewsUrl(e.target.value)} placeholder="https://..." style={{...T.inp,marginBottom:12}}/>
+
+            <button onClick={async()=>{
+              if(!newsTitle.trim()){sh("Headline required");return}
+              await fbAdd("news",{
+                title:newsTitle.trim(),
+                body:newsBody.trim(),
+                url:newsUrl.trim(),
+                cat:newsCat||"",
+                source:"admin",
+                createdAt:Date.now(),
+                date:ds(getIST()),
+                author:uName,
+              });
+              setNewsTitle("");setNewsBody("");setNewsUrl("");setNewsCat("");setNewsImage("");
+              loadData();
+              sh("📰 News posted!");
+            }} style={{...T.btn,padding:"10px 20px"}}>📰 Publish news item</button>
+          </div>
+
+          <h5 style={{fontSize:".88rem",fontWeight:700,marginBottom:10}}>Recent news posts ({newsPosts.length})</h5>
+          {newsPosts.length===0&&<p style={{color:T.mute,fontSize:".84rem"}}>No news posted yet.</p>}
+          {newsPosts.map(n=><div key={n.id} style={{display:"flex",gap:12,padding:"10px 0",borderBottom:"1px solid "+T.border,alignItems:"flex-start"}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:".88rem",fontWeight:600,marginBottom:3}}>{n.title}</div>
+              {n.cat&&<span style={T.tag(T.tealBg,T.teal)}>{n.cat}</span>}
+              <div style={{fontSize:".7rem",color:T.mute,marginTop:4}}>{fD(n.date)} · by {n.author||"admin"}{(n.views||0)>0?` · 👁️ ${n.views} clicks`:""}</div>
+            </div>
+            <button onClick={async()=>{if(confirm("Delete this news item?")){await fbDel("news",n.id);loadData();sh("Deleted")}}} style={{...T.btnDanger,...T.btnSm}}>Delete</button>
+          </div>)}
+        </div>}
+
         {aTab==="announce"&&<div style={T.card}>
           <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>📣 Send Announcement to All Users</h4>
           <p style={{fontSize:".82rem",color:T.txt2,marginBottom:18,lineHeight:1.55}}>Broadcasts a notification to every registered user on SKINARIO. They'll see it in their 🔔 bell with a gold accent. Use sparingly — too many announcements train users to ignore them.</p>
