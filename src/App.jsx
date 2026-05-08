@@ -1395,7 +1395,9 @@ export default function App(){
           const adminItems=newsPosts.slice(0,3).map(n=>({type:"admin",id:n.id,icon:"📰",topic:n.cat||"News",title:n.title,body:n.body||"",url:n.url||"",pubdate:fD(n.date),source:"SKINARIO Editorial",views:n.views||0}));
           const researchItems=research.slice(0,Math.max(3,6-adminItems.length)).map(r=>({type:"research",icon:r.icon||"🧬",topic:r.topic,title:r.title,body:"",url:r.url,pubdate:r.pubdate,source:r.journal,authors:r.authors,pmid:r.pmid}));
           const all=[...adminItems,...researchItems].slice(0,6);
-          if(all.length===0&&!researchLoading)return null;
+          const isAdmin=ADMINS.includes(au?.email);
+          // Don't hide for admins — show empty state so they know to post news
+          if(all.length===0&&!researchLoading&&!isAdmin)return null;
           return(<div style={{...T.card,padding:18,marginBottom:16}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
               <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0,display:"flex",alignItems:"center",gap:8}}>📚 Latest research & news</h3>
@@ -1403,6 +1405,11 @@ export default function App(){
             </div>
             {researchLoading&&all.length===0&&<div style={{textAlign:"center",padding:30,color:T.mute,fontSize:".88rem"}}>
               <div style={{fontSize:"1.4rem",marginBottom:6}}>📡</div>Fetching latest research from PubMed...
+            </div>}
+            {!researchLoading&&all.length===0&&isAdmin&&<div style={{textAlign:"center",padding:24,background:T.bg,borderRadius:10,color:T.txt2,fontSize:".84rem",lineHeight:1.55}}>
+              <div style={{fontSize:"1.6rem",marginBottom:6}}>📰</div>
+              <div style={{fontWeight:600,color:T.txt,marginBottom:4}}>News feed is empty</div>
+              <div style={{fontSize:".78rem"}}>PubMed research couldn't be loaded — make sure <code style={{background:"#fff",padding:"1px 6px",borderRadius:4,fontSize:".75rem"}}>/api/research.js</code> is deployed. Or post your first news item from <b>Admin → 📰 News</b>.</div>
             </div>}
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               {all.map((item,i)=><a key={i} href={item.url||"#"} target="_blank" rel="noopener noreferrer" onClick={e=>{if(!item.url){e.preventDefault();return}if(item.type==="admin"&&item.id){const newCount=(item.views||0)+1;fbSet("news",item.id,{views:newCount});setNewsPosts(prev=>prev.map(x=>x.id===item.id?{...x,views:newCount}:x))}}} style={{display:"flex",gap:12,padding:"10px 12px",borderRadius:10,border:"1px solid "+T.border,textDecoration:"none",color:"inherit",cursor:item.url?"pointer":"default",background:"#fff",transition:"all .15s"}} onMouseEnter={e=>{if(item.url){e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.background=T.tealBg+"33"}}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background="#fff"}}>
