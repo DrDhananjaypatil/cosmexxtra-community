@@ -21,6 +21,28 @@ function getTier(points){
   const p=points||0;
   return TIERS.find(t=>p>=t.min&&p<=t.max)||TIERS[0];
 }
+
+// ═══ ACTION-BASED POINTS SPEC (per locked spec) ═══
+// Each action has: points awarded, daily cap (0 = no cap), human label
+const ACTION_POINTS={
+  forum_comment:    {points:1, cap:5, label:"Forum comment",   minChars:20},
+  case_post:        {points:3, cap:6, label:"Case post"},
+  share_unique:     {points:1, cap:5, label:"Sharing content"},
+  // Below are placeholders for future sessions — DO NOT remove
+  qa_answer:        {points:1, cap:5, label:"Q&A answer"},
+  qa_marked_best:   {points:1, cap:0, label:"Q&A marked best"},
+  case_reply:       {points:1, cap:5, label:"Case reply marked helpful"},
+  forum_upvoted:    {points:1, cap:0, label:"Comment upvoted"},
+  article_publish:  {points:5, cap:0, label:"Article published"},
+  profile_complete: {points:5, cap:0, label:"Profile completion (one-time)"},
+  invite_success:   {points:5, cap:0, label:"Successful invite"},
+};
+
+// Returns today's IST date as YYYY-MM-DD — used as the key for daily-cap tracking
+function todayIST_YMD(){
+  const ist=new Date(Date.now()+5.5*60*60*1000);
+  return ist.toISOString().split("T")[0];
+}
 const TOPICS=["Botox & Neurotoxins","Dermal Fillers","Threads","PDRN & Polynucleotides","Peptides & Skin Boosters","Chemical Peels","Laser & Energy Devices","Hair Restoration","Body Contouring","Anti-Aging & Regenerative","Skincare Science","Pigmentation & Melasma","Acne & Scars","Practice Management"];
 
 // ═══ ACCOUNT TYPES ═══
@@ -149,7 +171,7 @@ const XIcon=()=><svg width="13" height="13" viewBox="0 0 24 24" fill="currentCol
 const LiIcon=()=><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.063 2.063 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>;
 
 // ═══ SHARE BAR (WhatsApp, X, LinkedIn, Copy link, Save) ═══
-const ShareBar=({title,url,description,itemId,itemType,currentUser,prof,onSaveToggle})=>{
+const ShareBar=({title,url,description,itemId,itemType,currentUser,prof,onSaveToggle,onShare})=>{
   const[copied,setCopied]=useState(false);
   const shareText=`🔬 ${title} — read this on SKINARIO, the Professional Aesthetic & Cosmetology Community.`;
   const fullUrl=url||window.location.href;
@@ -157,20 +179,23 @@ const ShareBar=({title,url,description,itemId,itemType,currentUser,prof,onSaveTo
   const waUrl=`https://wa.me/?text=${enc(shareText+" 👉 "+fullUrl)}`;
   const twUrl=`https://twitter.com/intent/tweet?text=${enc(shareText)}&url=${enc(fullUrl)}`;
   const liUrl=`https://www.linkedin.com/sharing/share-offsite/?url=${enc(fullUrl)}`;
+  // Fire share-points callback once per share (parent enforces uniqueness/caps)
+  const fireShare=(via)=>{if(onShare)onShare(via,itemType,itemId)};
   const copyLink=async()=>{
     try{
       await navigator.clipboard.writeText(fullUrl);
       setCopied(true);
       setTimeout(()=>setCopied(false),2000);
+      fireShare("copy");
     }catch{alert("Could not copy. URL: "+fullUrl)}
   };
   const saved=itemId&&itemType&&prof?.saved?.[itemType]?.includes(itemId);
   const btn={display:"inline-flex",alignItems:"center",gap:5,padding:"6px 11px",borderRadius:18,border:"1px solid "+T.border,background:"#fff",color:T.txt2,cursor:"pointer",fontSize:".75rem",fontFamily:"inherit",textDecoration:"none",fontWeight:500,lineHeight:1};
   return(<div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
     <span style={{fontSize:".72rem",color:T.mute,marginRight:2}}>Share:</span>
-    <a href={waUrl} target="_blank" rel="noopener noreferrer" style={{...btn,color:"#25D366",borderColor:"#25D36644"}} onClick={e=>e.stopPropagation()} title="Share on WhatsApp"><WaIcon/> WhatsApp</a>
-    <a href={twUrl} target="_blank" rel="noopener noreferrer" style={{...btn,color:"#000",borderColor:"#00000033"}} onClick={e=>e.stopPropagation()} title="Share on X"><XIcon/> Post</a>
-    <a href={liUrl} target="_blank" rel="noopener noreferrer" style={{...btn,color:"#0A66C2",borderColor:"#0A66C244"}} onClick={e=>e.stopPropagation()} title="Share on LinkedIn"><LiIcon/> LinkedIn</a>
+    <a href={waUrl} target="_blank" rel="noopener noreferrer" style={{...btn,color:"#25D366",borderColor:"#25D36644"}} onClick={e=>{e.stopPropagation();fireShare("whatsapp")}} title="Share on WhatsApp"><WaIcon/> WhatsApp</a>
+    <a href={twUrl} target="_blank" rel="noopener noreferrer" style={{...btn,color:"#000",borderColor:"#00000033"}} onClick={e=>{e.stopPropagation();fireShare("x")}} title="Share on X"><XIcon/> Post</a>
+    <a href={liUrl} target="_blank" rel="noopener noreferrer" style={{...btn,color:"#0A66C2",borderColor:"#0A66C244"}} onClick={e=>{e.stopPropagation();fireShare("linkedin")}} title="Share on LinkedIn"><LiIcon/> LinkedIn</a>
     <button onClick={e=>{e.stopPropagation();copyLink()}} style={{...btn,color:copied?T.ok:T.txt2,borderColor:copied?T.ok:T.border}}>{copied?"✓ Copied!":"🔗 Copy"}</button>
     {itemId&&itemType&&onSaveToggle&&<button onClick={e=>{e.stopPropagation();onSaveToggle(itemType,itemId)}} style={{...btn,color:saved?T.gold:T.txt2,borderColor:saved?T.gold:T.border,fontWeight:saved?600:500}} title={saved?"Saved — click to unsave":"Save to your profile"}>{saved?"🔖 Saved":"🔖 Save"}</button>}
   </div>);
@@ -241,11 +266,12 @@ const MentionInput=({value,onChange,onSubmit,placeholder,allUsers,style})=>{
   </div>);
 };
 
-const CommentThread=({collection,itemId,item,currentUser,uName,uIni,uPhoto,allUsers,onUpdate})=>{
+const CommentThread=({collection,itemId,item,currentUser,uName,uIni,uPhoto,allUsers,onUpdate,onAfterPost})=>{
   const[txt,setTxt]=useState("");
   const comments=item.comments||[];
   const submit=async()=>{
     if(!txt.trim()||!currentUser)return;
+    const trimmedTxt=txt;
     const c={n:uName,ini:uIni,txt,tm:getIST().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",hour12:true}),uid:currentUser.uid,likedBy:[],likes:0};
     const updated=[...comments,c];
     await fbSet(collection,itemId,{comments:updated});
@@ -264,6 +290,7 @@ const CommentThread=({collection,itemId,item,currentUser,uName,uIni,uPhoto,allUs
       }
     });
     setTxt("");
+    if(onAfterPost)onAfterPost(trimmedTxt,collection,itemId);
   };
   const toggleCmtLike=async(idx)=>{
     if(!currentUser)return;
@@ -574,6 +601,8 @@ export default function App(){
   const[newsPosts,setNewsPosts]=useState([]); // admin-curated news
   const[research,setResearch]=useState([]); // PubMed papers, fetched on demand
   const[researchLoading,setResearchLoading]=useState(false);
+  const[rewards,setRewards]=useState([]);
+  const[redemptions,setRedemptions]=useState([]);
   const[notifs,setNotifs]=useState([]);
   const[notifsOpen,setNotifsOpen]=useState(false);
   const[mentionMatches,setMentionMatches]=useState([]);
@@ -583,6 +612,16 @@ export default function App(){
   const[newsUrl,setNewsUrl]=useState("");
   const[newsCat,setNewsCat]=useState("");
   const[newsImage,setNewsImage]=useState("");
+  // Rewards admin state
+  const[rwTitle,setRwTitle]=useState("");
+  const[rwDesc,setRwDesc]=useState("");
+  const[rwImage,setRwImage]=useState("");
+  const[rwPartner,setRwPartner]=useState("");
+  const[rwCost,setRwCost]=useState("");
+  const[rwStock,setRwStock]=useState("");
+  const[rwInstructions,setRwInstructions]=useState("");
+  const[rwCategory,setRwCategory]=useState("");
+  const[rwExpiry,setRwExpiry]=useState("");
   const[announceText,setAnnounceText]=useState("");
   const[announceLinkType,setAnnounceLinkType]=useState("");
   const[announceLinkId,setAnnounceLinkId]=useState("");
@@ -599,7 +638,7 @@ export default function App(){
   const[events,setEvents]=useState([]);
   const[selAd,setSelAd]=useState(null);
   const[selE,setSelE]=useState(null);
-  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n]=await Promise.all([fbGetAll("quizzes","date","desc"),fbGetAll("articles","date","desc"),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc"),fbGetAll("cases","createdAt","desc"),fbGetAll("users","joined","desc"),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n)},[]);
+  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd]=await Promise.all([fbGetAll("quizzes","date","desc"),fbGetAll("articles","date","desc"),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc"),fbGetAll("cases","createdAt","desc"),fbGetAll("users","joined","desc"),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd)},[]);
 
   useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){setProf(p);setScr("main");loadData()}else{setPf({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:au?.displayName||"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});setSetupStep(0);setSetupErr("");setScr("setup")}}else{setAu(null);setProf(null);setScr("login")}});return()=>unsub()},[loadData]);
 
@@ -867,6 +906,129 @@ export default function App(){
   // ═══ QUIZ ═══
   // ═══ RECOMPUTE POINTS for all users from quiz history ═══
   // Admin-only, run once after deploying new scoring system to fairly assign points to existing users.
+  // ═══ AWARD POINTS — central helper with daily-cap enforcement ═══
+  // Returns {awarded: number, capped: boolean}.
+  // Schema: pointsActivity/{userId}_{date}_{actionType}
+  // Document: { uid, date, action, count, pointsEarned, updatedAt }
+  // Uses a unique key system so it's safe to call this many times — only the
+  // first N calls per day (where N = action's cap) actually award points.
+  // Optional uniqueKey: for actions where "uniqueness" matters (e.g. share_unique
+  // per item) — prevents double-counting the same share.
+  const awardPoints=async(actionType,uniqueKey)=>{
+    if(!au||!prof)return{awarded:0,capped:false};
+    const spec=ACTION_POINTS[actionType];
+    if(!spec){console.warn("Unknown action type:",actionType);return{awarded:0,capped:false}}
+    const date=todayIST_YMD();
+    const docId=`${au.uid}_${date}_${actionType}`;
+    try{
+      const existing=await fbGet("pointsActivity",docId);
+      const currentCount=existing?.count||0;
+      const currentUnique=existing?.uniqueKeys||[];
+      // Uniqueness check (e.g. only one share-credit per item)
+      if(uniqueKey&&currentUnique.includes(uniqueKey)){
+        return{awarded:0,capped:false,duplicate:true};
+      }
+      // Cap check
+      if(spec.cap>0&&currentCount>=spec.cap){
+        sh(`✋ You've hit today's points cap for "${spec.label}". Keep contributing — your points reset at midnight.`);
+        return{awarded:0,capped:true};
+      }
+      // Award points
+      const points=spec.points;
+      const newCount=currentCount+1;
+      const newUnique=uniqueKey?[...currentUnique,uniqueKey]:currentUnique;
+      await fbSet("pointsActivity",docId,{
+        uid:au.uid,
+        date,
+        action:actionType,
+        count:newCount,
+        pointsEarned:(existing?.pointsEarned||0)+points,
+        uniqueKeys:newUnique,
+        updatedAt:Date.now(),
+      });
+      // Add to user's running total
+      const newTotal=(prof.points||0)+points;
+      await fbSet("users",au.uid,{points:newTotal});
+      setProf(p=>({...p,points:newTotal}));
+      // Show cap-warning toast on last allowed point
+      if(spec.cap>0&&newCount===spec.cap){
+        sh(`+${points} pt for "${spec.label}" — that's the last one for today! 🎯`);
+      }else{
+        sh(`+${points} pt: ${spec.label}`);
+      }
+      return{awarded:points,capped:false};
+    }catch(err){
+      console.error("awardPoints error:",err);
+      return{awarded:0,capped:false,error:err.message};
+    }
+  };
+
+  // Wrapper for share actions — awards points with uniqueKey to prevent
+  // double-counting the same item across WhatsApp/X/LinkedIn/Copy.
+  const handleShare=(via,itemType,itemId)=>{
+    if(!itemId||!itemType||!au)return;
+    const uniqueKey=`${itemType}_${itemId}`;
+    awardPoints("share_unique",uniqueKey);
+  };
+
+  // ═══ REWARDS REDEMPTION ═══
+  // Generates a unique-ish 8-char alphanumeric voucher code
+  const genVoucherCode=()=>{
+    const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // skip 0/O/1/I for readability
+    let c="SK-";
+    for(let i=0;i<8;i++)c+=chars[Math.floor(Math.random()*chars.length)];
+    return c;
+  };
+
+  // Spendable points = lifetime earned - lifetime redeemed
+  const spendablePoints=Math.max(0,(prof?.points||0)-(prof?.redeemedPoints||0));
+
+  // Core redemption function — atomic check + deduct + create receipt
+  const redeemReward=async(reward)=>{
+    if(!au||!prof){sh("Please log in first");return}
+    if(!reward||!reward.active){sh("This reward is not available");return}
+    if((reward.stock||0)<=0){sh("Sorry — out of stock");return}
+    const cost=reward.pointCost||0;
+    if(cost<=0){sh("Invalid reward — contact admin");return}
+    if(spendablePoints<cost){sh(`You need ${cost-spendablePoints} more points to redeem this`);return}
+    if(!confirm(`Redeem "${reward.title}" for ${cost} points?\n\nYou'll get a voucher code to use with ${reward.partner||"the partner"}.\n\nThis action can't be undone.`))return;
+
+    // Re-fetch the latest reward to avoid race conditions on stock
+    const fresh=await fbGet("rewards",reward.id);
+    if(!fresh||!fresh.active||(fresh.stock||0)<=0){sh("This reward was just claimed by someone else");loadData();return}
+
+    const code=genVoucherCode();
+    try{
+      // 1. Decrement stock
+      await fbSet("rewards",reward.id,{stock:(fresh.stock||0)-1,timesRedeemed:(fresh.timesRedeemed||0)+1});
+      // 2. Create redemption record
+      const redemptionId=await fbAdd("redemptions",{
+        uid:au.uid,
+        userName:uName,
+        userEmail:au.email,
+        rewardId:reward.id,
+        rewardTitle:reward.title,
+        partner:reward.partner||"",
+        pointCost:cost,
+        code,
+        status:"pending", // pending → fulfilled → completed
+        instructions:reward.instructions||"",
+        redeemedAt:Date.now(),
+        date:ds(getIST()),
+      });
+      // 3. Update user's redeemed total
+      const newRedeemed=(prof.redeemedPoints||0)+cost;
+      await fbSet("users",au.uid,{redeemedPoints:newRedeemed});
+      setProf(p=>({...p,redeemedPoints:newRedeemed}));
+      sh(`✅ Redeemed! Your code: ${code}`);
+      loadData();
+      return{code,redemptionId};
+    }catch(err){
+      console.error("Redemption error:",err);
+      sh("Redemption failed — please try again");
+    }
+  };
+
   const recomputeAllPoints=async()=>{
     if(!confirm("This will recompute ALL users' points from their quiz answer history. It rewards 1pt (Easy), 2pt (Moderate), 3pt (Hard) per correct answer. Streak bonuses are NOT retroactive (no way to know historical streak order). Continue?"))return;
     sh("⏳ Recomputing... please wait");
@@ -963,7 +1125,7 @@ export default function App(){
   const postForum=async()=>{if(!fpT.trim())return;await fbAdd("forum",{author:uName,ini:uIni,uid:au.uid,photo:uPhoto||"",title:fpT,cat:fpC,body:fpB,images:fpImgs,likedBy:[],likes:0,replies:0,date:ds(getIST())});setFpT("");setFpB("");setFpImgs([]);setNewForum(false);sh("Posted!");loadData()};
 
   // ═══ CLINICAL CASE POST ═══
-  const postCase=async()=>{if(!ccT.trim()){sh("Title required");return}if(!ccImgs.length){sh("Add at least 1 image");return}await fbAdd("cases",{author:uName,ini:uIni,uid:au.uid,photo:uPhoto||"",title:ccT,cat:ccC,body:ccB,history:ccHistory,treatment:ccTreatment,outcome:ccOutcome,diagnosis:ccDiag,images:ccImgs,likedBy:[],likes:0,comments:[],date:ds(getIST())});setCcT("");setCcB("");setCcImgs([]);setCcDiag("");setCcHistory("");setCcTreatment("");setCcOutcome("");setNewCase(false);sh("Case posted!");loadData()};
+  const postCase=async()=>{if(!ccT.trim()){sh("Title required");return}if(!ccImgs.length){sh("Add at least 1 image");return}await fbAdd("cases",{author:uName,ini:uIni,uid:au.uid,photo:uPhoto||"",title:ccT,cat:ccC,body:ccB,history:ccHistory,treatment:ccTreatment,outcome:ccOutcome,diagnosis:ccDiag,images:ccImgs,likedBy:[],likes:0,comments:[],date:ds(getIST())});setCcT("");setCcB("");setCcImgs([]);setCcDiag("");setCcHistory("");setCcTreatment("");setCcOutcome("");setNewCase(false);sh("Case posted!");loadData();await awardPoints("case_post")};
 
   // ═══ CASE COMMENT ═══
   const addCaseComment=async(caseId,caseObj,txt)=>{
@@ -1381,7 +1543,7 @@ export default function App(){
           {[
             ["🧠",totA,"Quizzes",()=>go("quiz")],
             ["✅",acc+"%","Accuracy",()=>go("rank")],
-            ["⭐",prof?.points||0,"Points",()=>go("rank")],
+            ["⭐",prof?.points||0,"Points",()=>go("rewards")],
             ["🔬",cases.length,"Cases",()=>go("cases")],
             ["💬",forumPosts.length,"Forum",()=>go("forum")],
             ["🎥",videos.length,"Videos",()=>go("videos")]
@@ -1682,7 +1844,7 @@ export default function App(){
             {/* Engagement */}
             <div style={{display:"flex",alignItems:"center",gap:12,marginTop:28,paddingTop:18,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
               <LikeBtn liked={(selA.likedBy||[]).includes(au?.uid)} count={selA.likes||0} onToggle={()=>{toggleLike("articles",selA.id,selA,setArticles);setSelA(p=>{const lb=p.likedBy||[];const has=lb.includes(au.uid);const nlb=has?lb.filter(u=>u!==au.uid):[...lb,au.uid];return{...p,likedBy:nlb,likes:nlb.length}})}}/>
-              <ShareBar title={selA.title} url={`${window.location.origin}/?article=${selA.id}`} description={selA.body?.slice(0,120)} itemId={selA.id} itemType="articles" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>
+              <ShareBar title={selA.title} url={`${window.location.origin}/?article=${selA.id}`} description={selA.body?.slice(0,120)} itemId={selA.id} itemType="articles" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
             </div>
 
             {/* Author bio block at end (if authorBio present) */}
@@ -1830,7 +1992,7 @@ export default function App(){
             {((uA!==undefined&&rev)||(!canA&&rev&&dd>0))&&qObj.expl&&<div style={{background:T.goldBg,border:"1px solid #f0e6c8",borderRadius:12,padding:16,marginTop:12}}><div style={{color:T.goldD,fontWeight:700,marginBottom:8}}>💡 Explanation</div><div style={{fontSize:".88rem",color:T.txt2,lineHeight:1.75}} dangerouslySetInnerHTML={{__html:qObj.expl}}/></div>}
             <div style={{display:"flex",alignItems:"center",gap:12,marginTop:14,paddingTop:12,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
               <LikeBtn liked={(qObj.likedBy||[]).includes(au?.uid)} count={qObj.likes||0} onToggle={()=>toggleLike("quizzes",qObj.id,qObj,setQuizzes)}/>
-              <ShareBar title={`SKINARIO Daily Quiz: ${qObj.cat} (${qObj.diff})`} url={`${window.location.origin}/?quiz=${qObj.id}`} description={qObj.question?.slice(0,120)} itemId={qObj.id} itemType="quizzes" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>
+              <ShareBar title={`SKINARIO Daily Quiz: ${qObj.cat} (${qObj.diff})`} url={`${window.location.origin}/?quiz=${qObj.id}`} description={qObj.question?.slice(0,120)} itemId={qObj.id} itemType="quizzes" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
             </div>
             </div>
           </div>
@@ -1867,7 +2029,7 @@ export default function App(){
             <div style={{display:"flex",alignItems:"center",gap:10,marginTop:12,paddingTop:12,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
               <LikeBtn liked={(r.likedBy||[]).includes(au?.uid)} count={r.likes||0} onToggle={()=>toggleLike("resources",r.id,r,setResources)}/>
               <span style={{fontSize:".75rem",color:T.mute}}>💬 {r.comments?.length||0}</span>
-              {r.url&&<ShareBar title={r.title||r.t} url={r.url} description={`Resource from SKINARIO: ${r.title||r.t}`} itemId={r.id} itemType="resources" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>}
+              {r.url&&<ShareBar title={r.title||r.t} url={r.url} description={`Resource from SKINARIO: ${r.title||r.t}`} itemId={r.id} itemType="resources" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>}
             </div>
             <CommentThread collection="resources" itemId={r.id} item={r} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} onUpdate={(id,comments)=>setResources(p=>p.map(x=>x.id===id?{...x,comments}:x))}/>
           </div>)}
@@ -1961,7 +2123,7 @@ export default function App(){
           <h3 style={{fontWeight:700,fontSize:"1.2rem"}}>{selV.title||selV.t}</h3><p style={{color:T.mute,fontSize:".82rem",marginTop:4}}>{selV.dur}</p><p style={{color:T.txt2,marginTop:12,lineHeight:1.8}}>{selV.desc}</p>
           <div style={{display:"flex",alignItems:"center",gap:12,marginTop:16,paddingTop:14,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
             <LikeBtn liked={(selV.likedBy||[]).includes(au?.uid)} count={selV.likes||0} onToggle={()=>{toggleLike("videos",selV.id,selV,setVideos);setSelV(p=>{const lb=p.likedBy||[];const has=lb.includes(au.uid);const nlb=has?lb.filter(u=>u!==au.uid):[...lb,au.uid];return{...p,likedBy:nlb,likes:nlb.length}})}}/>
-            <ShareBar title={selV.title||selV.t} url={`${window.location.origin}/?video=${selV.id}`} description={selV.desc?.slice(0,120)} itemId={selV.id} itemType="videos" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>
+            <ShareBar title={selV.title||selV.t} url={`${window.location.origin}/?video=${selV.id}`} description={selV.desc?.slice(0,120)} itemId={selV.id} itemType="videos" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
           </div>
           <CommentThread collection="videos" itemId={selV.id} item={selV} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} onUpdate={(id,comments)=>{setVideos(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelV(p=>({...p,comments}))}}/>
         </div>
@@ -1991,7 +2153,7 @@ export default function App(){
             {selAd.contact&&<div style={{marginTop:18,padding:14,background:T.bg,borderRadius:10,fontSize:".85rem",color:T.txt2}}><b style={{color:T.txt}}>Contact:</b> {selAd.contact}</div>}
             <div style={{display:"flex",alignItems:"center",gap:12,marginTop:18,paddingTop:14,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
               <LikeBtn liked={(selAd.likedBy||[]).includes(au?.uid)} count={selAd.likes||0} onToggle={()=>{toggleLike("ads",selAd.id,selAd,setAds);setSelAd(p=>{const lb=p.likedBy||[];const has=lb.includes(au.uid);const nlb=has?lb.filter(u=>u!==au.uid):[...lb,au.uid];return{...p,likedBy:nlb,likes:nlb.length}})}}/>
-              <ShareBar title={selAd.title} url={`${window.location.origin}/?ad=${selAd.id}`} description={selAd.desc?.slice(0,120)} itemId={selAd.id} itemType="ads" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>
+              <ShareBar title={selAd.title} url={`${window.location.origin}/?ad=${selAd.id}`} description={selAd.desc?.slice(0,120)} itemId={selAd.id} itemType="ads" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
             </div>
           </div>
         </div>
@@ -2104,7 +2266,7 @@ export default function App(){
               {/* Like + share */}
               <div style={{display:"flex",alignItems:"center",gap:12,marginTop:18,paddingTop:14,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
                 <LikeBtn liked={(selE.likedBy||[]).includes(au?.uid)} count={selE.likes||0} onToggle={()=>{toggleLike("events",selE.id,selE,setEvents);setSelE(p=>{const lb=p.likedBy||[];const has=lb.includes(au.uid);const nlb=has?lb.filter(u=>u!==au.uid):[...lb,au.uid];return{...p,likedBy:nlb,likes:nlb.length}})}}/>
-                <ShareBar title={selE.title} url={`${window.location.origin}/?event=${selE.id}`} description={selE.body?.slice(0,120)} itemId={selE.id} itemType="events" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>
+                <ShareBar title={selE.title} url={`${window.location.origin}/?event=${selE.id}`} description={selE.body?.slice(0,120)} itemId={selE.id} itemType="events" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
               </div>
               <CommentThread collection="events" itemId={selE.id} item={selE} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} onUpdate={(id,comments)=>{setEvents(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelE(p=>({...p,comments}))}}/>
             </div>
@@ -2241,7 +2403,7 @@ export default function App(){
               <LikeBtn liked={(cs.likedBy||[]).includes(au?.uid)} count={cs.likes||0} onToggle={()=>toggleLike("cases",cs.id,cs,setCases)}/>
               <span style={{fontSize:".75rem",color:T.mute}}>💬 {cs.comments?.length||0} comments</span>
               {(cs.views||0)>0&&<span style={{fontSize:".75rem",color:T.mute}}>👁️ {cs.views} views</span>}
-              <ShareBar title={cs.title} url={`${window.location.origin}/?case=${cs.id}`} description={(cs.history||cs.body||"").slice(0,120)} itemId={cs.id} itemType="cases" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>
+              <ShareBar title={cs.title} url={`${window.location.origin}/?case=${cs.id}`} description={(cs.history||cs.body||"").slice(0,120)} itemId={cs.id} itemType="cases" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
             </div>
 
             {/* Comments */}
@@ -2348,11 +2510,11 @@ export default function App(){
                 <LikeBtn liked={(p.likedBy||[]).includes(au?.uid)} count={p.likes||0} onToggle={()=>toggleLike("forum",p.id,p,setForumPosts)}/>
                 <span style={{fontSize:".78rem",color:T.mute,display:"flex",alignItems:"center",gap:4}}>💬 {p.comments?.length||0} {p.comments?.length===1?"reply":"replies"}</span>
                 {(p.views||0)>0&&<span style={{fontSize:".78rem",color:T.mute,display:"flex",alignItems:"center",gap:4}}>👁️ {p.views}</span>}
-                <ShareBar title={p.title} url={`${window.location.origin}/?forum=${p.id}`} description={p.body?.slice(0,120)} itemId={p.id} itemType="forum" currentUser={au} prof={prof} onSaveToggle={toggleSave}/>
+                <ShareBar title={p.title} url={`${window.location.origin}/?forum=${p.id}`} description={p.body?.slice(0,120)} itemId={p.id} itemType="forum" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
               </div>
 
               {/* Comment thread */}
-              <CommentThread collection="forum" itemId={p.id} item={p} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} onUpdate={(id,comments)=>setForumPosts(prev=>prev.map(x=>x.id===id?{...x,comments,replies:comments.length}:x))}/>
+              <CommentThread collection="forum" itemId={p.id} item={p} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} onUpdate={(id,comments)=>setForumPosts(prev=>prev.map(x=>x.id===id?{...x,comments,replies:comments.length}:x))} onAfterPost={(text)=>{if(text.trim().length>=20)awardPoints("forum_comment")}}/>
             </div>
           </div></ViewTracker>)})}
           </div>
@@ -2635,6 +2797,85 @@ export default function App(){
       })()}
 
       {/* PROFILE */}
+      {/* ═══ REWARDS PAGE — browse catalog + see your redemptions ═══ */}
+      {pg==="rewards"&&<div style={{maxWidth:780}}>
+        <div style={{...T.card,padding:22,background:"linear-gradient(135deg,#fff,"+T.goldBg+"55)",borderLeft:"3px solid "+T.gold,marginBottom:16}}>
+          <h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0,display:"flex",alignItems:"center",gap:8}}>🎁 Rewards</h2>
+          <p style={{color:T.txt2,fontSize:".88rem",marginTop:6,lineHeight:1.55,marginBottom:14}}>Redeem your SKINARIO points for vouchers from our partners — courses, products, events, and more. Each voucher is redeemable directly with the partner.</p>
+          {prof?.accountType==="doctor"&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10}}>
+            <div style={{padding:14,background:"#fff",borderRadius:10,border:"1px solid "+T.border}}>
+              <div style={{fontSize:".66rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Spendable</div>
+              <div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{spendablePoints} pts</div>
+            </div>
+            <div style={{padding:14,background:"#fff",borderRadius:10,border:"1px solid "+T.border}}>
+              <div style={{fontSize:".66rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Earned (lifetime)</div>
+              <div style={{fontSize:"1.4rem",fontWeight:700,color:T.txt}}>{prof?.points||0} pts</div>
+            </div>
+            <div style={{padding:14,background:"#fff",borderRadius:10,border:"1px solid "+T.border}}>
+              <div style={{fontSize:".66rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Redeemed</div>
+              <div style={{fontSize:"1.4rem",fontWeight:700,color:T.gold}}>{prof?.redeemedPoints||0} pts</div>
+            </div>
+          </div>}
+          <p style={{fontSize:".7rem",color:T.mute,marginTop:10,lineHeight:1.55}}>💡 Your tier stays based on earned points — redeeming never demotes you.</p>
+        </div>
+
+        {/* Available rewards */}
+        <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:10}}>Available rewards</h4>
+        {rewards.filter(r=>r.active&&(r.stock||0)>0).length===0?
+          <div style={{...T.card,textAlign:"center",padding:40,color:T.mute,fontSize:".88rem",marginBottom:16}}>
+            <div style={{fontSize:"2.4rem",marginBottom:8}}>🎁</div>
+            No rewards available right now. Check back soon — new rewards are added regularly.
+          </div>
+        :
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:12,marginBottom:24}}>
+            {rewards.filter(r=>r.active&&(r.stock||0)>0).map(r=>{
+              const canAfford=spendablePoints>=(r.pointCost||0);
+              return(<div key={r.id} style={{...T.card,padding:0,overflow:"hidden",marginBottom:0,position:"relative"}}>
+                {r.image?
+                  <div style={{height:130,overflow:"hidden",background:"#f4f1ea"}}><img src={r.image} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/></div>
+                  :<div style={{height:90,background:T.goldBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2.6rem"}}>🎁</div>
+                }
+                <div style={{padding:14}}>
+                  <div style={{display:"flex",gap:5,marginBottom:6,flexWrap:"wrap"}}>
+                    {r.category&&<span style={T.tag(T.tealBg,T.teal)}>{r.category}</span>}
+                    <span style={T.tag(T.goldBg,T.goldD)}>{r.partner}</span>
+                  </div>
+                  <div style={{fontSize:".95rem",fontWeight:600,color:T.txt,lineHeight:1.35,marginBottom:6}}>{r.title}</div>
+                  {r.desc&&<div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5,marginBottom:8,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{r.desc}</div>}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginTop:10,paddingTop:10,borderTop:"1px solid "+T.border}}>
+                    <div>
+                      <div style={{fontSize:"1.05rem",fontWeight:700,color:T.gold,lineHeight:1}}>⭐ {r.pointCost} pts</div>
+                      <div style={{fontSize:".65rem",color:T.mute,marginTop:3}}>{r.stock||0} left{r.expiry?` · Expires ${fD(r.expiry)}`:""}</div>
+                    </div>
+                    <button onClick={()=>redeemReward(r)} disabled={!canAfford||prof?.accountType!=="doctor"} style={{...(canAfford&&prof?.accountType==="doctor"?T.btn:T.btnO),padding:"8px 14px",fontSize:".82rem",opacity:canAfford&&prof?.accountType==="doctor"?1:.55,cursor:canAfford&&prof?.accountType==="doctor"?"pointer":"not-allowed"}}>{prof?.accountType!=="doctor"?"Doctors only":canAfford?"Redeem":`Need ${r.pointCost-spendablePoints} more`}</button>
+                  </div>
+                </div>
+              </div>);
+            })}
+          </div>
+        }
+
+        {/* My redemption history */}
+        {(()=>{
+          const myRedemptions=redemptions.filter(r=>r.uid===au?.uid);
+          if(myRedemptions.length===0)return null;
+          return(<div style={{...T.card,padding:18}}>
+            <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:14}}>📜 My redemptions ({myRedemptions.length})</h4>
+            {myRedemptions.map(rd=><div key={rd.id} style={{padding:"12px 14px",borderRadius:10,border:"1px solid "+T.border,marginBottom:8,background:rd.status==="fulfilled"?T.okBg+"44":"#fff"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
+                <div style={{flex:1,minWidth:200}}>
+                  <div style={{fontSize:".88rem",fontWeight:600,marginBottom:3}}>{rd.rewardTitle}</div>
+                  <div style={{fontSize:".72rem",color:T.mute,marginBottom:6}}>{rd.partner} · {fD(rd.date)} · {rd.pointCost} pts</div>
+                  <div style={{fontSize:".82rem",fontFamily:"monospace",fontWeight:700,color:T.gold,padding:"6px 12px",background:"#fff",borderRadius:6,display:"inline-block",border:"1.5px dashed "+T.gold,marginBottom:8,letterSpacing:1}}>{rd.code}</div>
+                  {rd.instructions&&<div style={{fontSize:".75rem",color:T.txt2,lineHeight:1.55,padding:"8px 10px",background:T.bg,borderRadius:6,marginTop:4}}>📋 <b>How to redeem:</b> {rd.instructions}</div>}
+                </div>
+                <span style={{fontSize:".7rem",fontWeight:700,padding:"3px 9px",borderRadius:10,background:rd.status==="fulfilled"?T.okBg:rd.status==="pending"?T.warnBg:T.bg,color:rd.status==="fulfilled"?T.ok:rd.status==="pending"?T.warn:T.mute,textTransform:"uppercase",letterSpacing:.5,flexShrink:0}}>{rd.status||"pending"}</span>
+              </div>
+            </div>)}
+          </div>);
+        })()}
+      </div>}
+
       {pg==="me"&&<div style={{maxWidth:640}}>
 
         {/* ═══ EDITABLE PROFILE SECTION ═══ */}
@@ -2882,7 +3123,7 @@ export default function App(){
       {pg==="admin"&&isAdm&&<div>
         <h3 style={{fontSize:"1.15rem",fontWeight:700,marginBottom:12}}>⚙️ Admin dashboard</h3>
         <div style={{display:"flex",gap:5,marginBottom:16,flexWrap:"wrap"}}>
-          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["announce","📣 Announce"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null)}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
+          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["announce","📣 Announce"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null)}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
         </div>
         {aTab==="stats"&&<><div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length],["Events",events.length],["Ads",ads.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>
           {/* ═══ ANALYTICS — top viewed content ═══ */}
@@ -3067,6 +3308,129 @@ export default function App(){
             </div>
             <button onClick={async()=>{if(confirm("Delete this news item?")){await fbDel("news",n.id);loadData();sh("Deleted")}}} style={{...T.btnDanger,...T.btnSm}}>Delete</button>
           </div>)}
+        </div>}
+
+        {aTab==="rewards"&&<div>
+          {/* ═══ COMPOSE NEW REWARD ═══ */}
+          <div style={{...T.card,marginBottom:14}}>
+            <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>🎁 Rewards Catalog</h4>
+            <p style={{fontSize:".82rem",color:T.txt2,marginBottom:18,lineHeight:1.55}}>Add rewards from partners (Pharma, Institutes, Event organizers). Doctors redeem points for vouchers. Partners deduct the value at their checkout. <b>You don't pay anything</b> — partners eat the discount.</p>
+
+            <div style={{padding:"14px 18px",background:T.tealBg,borderLeft:"3px solid "+T.teal,borderRadius:"0 8px 8px 0",marginBottom:14}}>
+              <div style={{fontSize:".7rem",color:T.teal,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:10}}>📝 Add new reward</div>
+
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Reward title <span style={{color:T.err}}>*</span></label>
+              <input value={rwTitle} onChange={e=>setRwTitle(e.target.value)} placeholder="e.g. ₹500 off Botox Masterclass" style={{...T.inp,marginBottom:10}}/>
+
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Partner / Brand <span style={{color:T.err}}>*</span></label>
+              <input value={rwPartner} onChange={e=>setRwPartner(e.target.value)} placeholder="e.g. Absolute Institute" style={{...T.inp,marginBottom:10}}/>
+
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div>
+                  <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Point cost <span style={{color:T.err}}>*</span></label>
+                  <input type="number" value={rwCost} onChange={e=>setRwCost(e.target.value)} placeholder="200" style={T.inp}/>
+                </div>
+                <div>
+                  <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Stock (count)</label>
+                  <input type="number" value={rwStock} onChange={e=>setRwStock(e.target.value)} placeholder="10" style={T.inp}/>
+                </div>
+              </div>
+
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Category (optional)</label>
+              <input value={rwCategory} onChange={e=>setRwCategory(e.target.value)} placeholder="e.g. Course, Product, Event, Service" style={{...T.inp,marginBottom:10}}/>
+
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Description</label>
+              <textarea value={rwDesc} onChange={e=>setRwDesc(e.target.value)} placeholder="What this reward includes — 1-2 sentences." rows={2} style={{...T.txa,marginBottom:10}}/>
+
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Redemption instructions for the doctor</label>
+              <textarea value={rwInstructions} onChange={e=>setRwInstructions(e.target.value)} placeholder="e.g. Email this code to partner@absolute.com OR show at registration desk OR enter at checkout" rows={2} style={{...T.txa,marginBottom:10}}/>
+
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Expires on (optional)</label>
+              <input type="date" value={rwExpiry} onChange={e=>setRwExpiry(e.target.value)} style={{...T.inp,marginBottom:10}}/>
+
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Cover image (optional)</label>
+              <div style={{marginBottom:12}}>
+                {rwImage?<div style={{position:"relative",width:"100%",maxWidth:240,height:120,borderRadius:8,overflow:"hidden",border:"1px solid "+T.border,marginBottom:8}}>
+                  <img src={rwImage} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  <button onClick={()=>setRwImage("")} style={{position:"absolute",top:6,right:6,width:24,height:24,borderRadius:"50%",background:"rgba(0,0,0,.6)",color:"#fff",border:"none",fontSize:".7rem",cursor:"pointer"}}>✕</button>
+                </div>:null}
+                <input type="file" accept="image/*" onChange={async e=>{
+                  const f=e.target.files?.[0];if(!f)return;
+                  try{const path=`rewards/${Date.now()}_${f.name}`;const sRef=ref(storage,path);await uploadBytes(sRef,f);const url=await getDownloadURL(sRef);setRwImage(url);sh("Image uploaded");}
+                  catch(err){sh("Upload failed");console.error(err)}
+                  if(e.target)e.target.value="";
+                }} style={{fontSize:".8rem"}}/>
+              </div>
+
+              <button onClick={async()=>{
+                if(!rwTitle.trim()){sh("Title required");return}
+                if(!rwPartner.trim()){sh("Partner name required");return}
+                const cost=parseInt(rwCost);
+                if(!cost||cost<=0){sh("Point cost must be a positive number");return}
+                const stock=parseInt(rwStock)||0;
+                await fbAdd("rewards",{
+                  title:rwTitle.trim(),
+                  partner:rwPartner.trim(),
+                  desc:rwDesc.trim(),
+                  pointCost:cost,
+                  stock,
+                  category:rwCategory.trim(),
+                  instructions:rwInstructions.trim(),
+                  image:rwImage||"",
+                  expiry:rwExpiry||"",
+                  active:true,
+                  timesRedeemed:0,
+                  createdAt:Date.now(),
+                  date:ds(getIST()),
+                });
+                setRwTitle("");setRwDesc("");setRwPartner("");setRwCost("");setRwStock("");setRwCategory("");setRwInstructions("");setRwImage("");setRwExpiry("");
+                loadData();
+                sh("🎁 Reward added!");
+              }} style={{...T.btn,padding:"10px 20px"}}>🎁 Add to catalog</button>
+            </div>
+
+            {/* Existing rewards list */}
+            <h5 style={{fontSize:".88rem",fontWeight:700,marginBottom:10}}>Active rewards ({rewards.filter(r=>r.active).length}) · All ({rewards.length})</h5>
+            {rewards.length===0&&<p style={{color:T.mute,fontSize:".84rem"}}>No rewards yet. Add your first one above.</p>}
+            {rewards.map(r=><div key={r.id} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:"1px solid "+T.border,alignItems:"flex-start",opacity:r.active?1:.5}}>
+              {r.image?<img src={r.image} style={{width:64,height:64,borderRadius:8,objectFit:"cover",flexShrink:0,border:"1px solid "+T.border}}/>:<div style={{width:64,height:64,borderRadius:8,background:T.goldBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.6rem",flexShrink:0}}>🎁</div>}
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:".9rem",fontWeight:600,marginBottom:3}}>{r.title}{!r.active&&<span style={{color:T.mute,marginLeft:6,fontSize:".75rem",fontWeight:400}}>(inactive)</span>}</div>
+                <div style={{fontSize:".75rem",color:T.txt2,marginBottom:4}}>{r.partner}{r.category?` · ${r.category}`:""}</div>
+                <div style={{display:"flex",gap:10,fontSize:".72rem",color:T.mute,flexWrap:"wrap"}}>
+                  <span style={{color:T.gold,fontWeight:600}}>⭐ {r.pointCost} pts</span>
+                  <span>📦 {r.stock||0} in stock</span>
+                  {(r.timesRedeemed||0)>0&&<span>🔥 {r.timesRedeemed} redeemed</span>}
+                  {r.expiry&&<span>📅 Expires {fD(r.expiry)}</span>}
+                </div>
+              </div>
+              <div style={{display:"flex",gap:6,flexShrink:0}}>
+                <button onClick={async()=>{await fbSet("rewards",r.id,{active:!r.active});loadData();sh(r.active?"Disabled":"Activated")}} style={{...T.btnO,...T.btnSm}}>{r.active?"Disable":"Enable"}</button>
+                <button onClick={async()=>{if(confirm(`Delete "${r.title}"? This won't refund anyone who already redeemed it.`)){await fbDel("rewards",r.id);loadData();sh("Deleted")}}} style={{...T.btnDanger,...T.btnSm}}>Delete</button>
+              </div>
+            </div>)}
+          </div>
+
+          {/* ═══ REDEMPTION QUEUE ═══ */}
+          <div style={T.card}>
+            <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>📋 Redemption Queue</h4>
+            <p style={{fontSize:".78rem",color:T.txt2,marginBottom:14,lineHeight:1.55}}>Doctor redemptions. Mark as <b>fulfilled</b> once the partner has confirmed the voucher was honored. Doctors keep their points reservation regardless of fulfillment status.</p>
+            {redemptions.length===0&&<p style={{color:T.mute,fontSize:".84rem"}}>No redemptions yet.</p>}
+            {redemptions.map(rd=><div key={rd.id} style={{padding:"12px 14px",borderRadius:10,border:"1px solid "+T.border,marginBottom:8,background:rd.status==="fulfilled"?T.okBg:rd.status==="pending"?T.warnBg+"33":T.bg}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
+                <div style={{flex:1,minWidth:200}}>
+                  <div style={{fontSize:".88rem",fontWeight:600,marginBottom:3}}>{rd.rewardTitle}</div>
+                  <div style={{fontSize:".75rem",color:T.txt2,marginBottom:3}}>👤 {rd.userName} · {rd.userEmail}</div>
+                  <div style={{fontSize:".72rem",color:T.mute}}>{rd.partner} · {fD(rd.date)} · {rd.pointCost} pts</div>
+                  <div style={{fontSize:".78rem",fontFamily:"monospace",fontWeight:700,color:T.gold,marginTop:6,padding:"4px 10px",background:"#fff",borderRadius:6,display:"inline-block",border:"1px dashed "+T.gold}}>{rd.code}</div>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:5,flexShrink:0}}>
+                  <span style={{fontSize:".7rem",fontWeight:700,padding:"3px 9px",borderRadius:10,background:rd.status==="fulfilled"?T.okBg:rd.status==="pending"?T.warnBg:T.bg,color:rd.status==="fulfilled"?T.ok:rd.status==="pending"?T.warn:T.mute,textTransform:"uppercase",letterSpacing:.5}}>{rd.status||"pending"}</span>
+                  {rd.status!=="fulfilled"&&<button onClick={async()=>{await fbSet("redemptions",rd.id,{status:"fulfilled",fulfilledAt:Date.now()});loadData();sh("Marked fulfilled")}} style={{...T.btn,...T.btnSm}}>✓ Mark fulfilled</button>}
+                </div>
+              </div>
+            </div>)}
+          </div>
         </div>}
 
         {aTab==="announce"&&<div style={T.card}>
