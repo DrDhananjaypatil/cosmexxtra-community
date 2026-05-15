@@ -1188,7 +1188,21 @@ export default function App(){
   };
 
   const MIN_Q_FOR_RANK=5;
+  // ═══ LEADERBOARD EXCLUSIONS ═══
+  // Admins and (future) moderators earn points normally but don't appear on
+  // the public leaderboard or Rising Stars. This keeps the ranking fair and
+  // credible for actual community members.
+  // To add moderators later: extend this function to check a `role` field
+  // (e.g. u.role==="moderator") or a `hideFromLeaderboard` flag on the user doc.
+  const isExcludedFromLeaderboard=(u)=>{
+    if(!u||!u.email)return false;
+    if(ADMINS.includes(u.email))return true;
+    if(u.role==="moderator")return true; // future support — harmless until you set role on a user
+    if(u.hideFromLeaderboard===true)return true; // future support for ad-hoc exclusions
+    return false;
+  };
   const leaderboard=allUsers
+    .filter(u=>!isExcludedFromLeaderboard(u))
     .filter(u=>(u.totalAnswered||0)>=MIN_Q_FOR_RANK)
     .sort((a,b)=>{
       // Primary: points
@@ -1203,6 +1217,7 @@ export default function App(){
     })
     .slice(0,20);
   const risingStars=allUsers
+    .filter(u=>!isExcludedFromLeaderboard(u))
     .filter(u=>(u.totalAnswered||0)>0&&(u.totalAnswered||0)<MIN_Q_FOR_RANK)
     .sort((a,b)=>(b.totalAnswered||0)-(a.totalAnswered||0));
 
@@ -2638,6 +2653,11 @@ export default function App(){
             <h4 style={{fontSize:".95rem",fontWeight:700,margin:0}}>🏆 Top {Math.min(leaderboard.length,20)}</h4>
             <span style={{fontSize:".7rem",color:T.mute}}>Min {MIN_Q_FOR_RANK} questions to qualify</span>
           </div>
+
+          {/* Admin-only notice — visible only to admins so they understand they're filtered out */}
+          {ADMINS.includes(au?.email)&&<div style={{padding:"8px 12px",background:T.bg,borderLeft:"3px solid "+T.mute,borderRadius:"0 6px 6px 0",marginBottom:12,fontSize:".74rem",color:T.txt2,lineHeight:1.55}}>
+            🛡️ <b>Admins are hidden from the public leaderboard</b> for fairness. You still earn points normally — just not displayed here.
+          </div>}
 
           {leaderboard.length===0&&<div style={{textAlign:"center",padding:30,color:T.mute,fontSize:".88rem"}}>
             <div style={{fontSize:"2rem",marginBottom:6}}>🌱</div>
