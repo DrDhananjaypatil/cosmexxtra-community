@@ -601,6 +601,11 @@ export default function App(){
   const[newsPosts,setNewsPosts]=useState([]); // admin-curated news
   const[research,setResearch]=useState([]); // PubMed papers, fetched on demand
   const[researchLoading,setResearchLoading]=useState(false);
+  const[fdaAlerts,setFdaAlerts]=useState([]);
+  const[trials,setTrials]=useState([]);
+  const[industryNews,setIndustryNews]=useState([]);
+  const[industryNewsConfigured,setIndustryNewsConfigured]=useState(true);
+  const[newsFeedsLoading,setNewsFeedsLoading]=useState(false);
   const[rewards,setRewards]=useState([]);
   const[redemptions,setRedemptions]=useState([]);
   const[notifs,setNotifs]=useState([]);
@@ -638,7 +643,7 @@ export default function App(){
   const[events,setEvents]=useState([]);
   const[selAd,setSelAd]=useState(null);
   const[selE,setSelE]=useState(null);
-  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd]=await Promise.all([fbGetAll("quizzes","date","desc"),fbGetAll("articles","date","desc"),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc"),fbGetAll("cases","createdAt","desc"),fbGetAll("users","joined","desc"),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd)},[]);
+  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd)},[]);
 
   useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){setProf(p);setScr("main");loadData()}else{setPf({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:au?.displayName||"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});setSetupStep(0);setSetupErr("");setScr("setup")}}else{setAu(null);setProf(null);setScr("login")}});return()=>unsub()},[loadData]);
 
@@ -663,6 +668,41 @@ export default function App(){
       })
       .catch(e=>console.error("Research fetch error:",e))
       .finally(()=>setResearchLoading(false));
+  },[scr]);
+
+  // ═══ Fetch FDA alerts + Clinical trials + Industry news (cached 6 hours) ═══
+  useEffect(()=>{
+    if(scr!=="main")return;
+    const cached=sessionStorage.getItem("sk_newsfeeds");
+    if(cached){
+      try{
+        const{fda,trials:t,industry,industryConfigured,ts}=JSON.parse(cached);
+        if(Date.now()-ts<6*60*60*1000){
+          setFdaAlerts(fda||[]);
+          setTrials(t||[]);
+          setIndustryNews(industry||[]);
+          if(typeof industryConfigured==="boolean")setIndustryNewsConfigured(industryConfigured);
+          return;
+        }
+      }catch{}
+    }
+    setNewsFeedsLoading(true);
+    Promise.all([
+      fetch("/api/fda-alerts").then(r=>r.json()).catch(e=>({ok:false,error:e.message,items:[]})),
+      fetch("/api/clinical-trials").then(r=>r.json()).catch(e=>({ok:false,error:e.message,items:[]})),
+      fetch("/api/industry-news").then(r=>r.json()).catch(e=>({ok:false,error:e.message,items:[]})),
+    ]).then(([fdaRes,trialsRes,industryRes])=>{
+      const fda=fdaRes?.items||[];
+      const t=trialsRes?.items||[];
+      const industry=industryRes?.items||[];
+      const industryConfigured=industryRes?.configured!==false;
+      setFdaAlerts(fda);
+      setTrials(t);
+      setIndustryNews(industry);
+      setIndustryNewsConfigured(industryConfigured);
+      sessionStorage.setItem("sk_newsfeeds",JSON.stringify({fda,trials:t,industry,industryConfigured,ts:Date.now()}));
+    }).catch(e=>console.error("News feeds fetch error:",e))
+    .finally(()=>setNewsFeedsLoading(false));
   },[scr]);
 
   // ═══ NOTIFICATIONS LOADER — fetches current user's notifications + broadcast announcements ═══
