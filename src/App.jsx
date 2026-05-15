@@ -9,6 +9,33 @@ const fbApp=initializeApp(firebaseConfig);const auth=getAuth(fbApp);const db=get
 const storage=getStorage(fbApp);
 const ADMINS=["drjpatil@gmail.com","absoluteinstituteedu@gmail.com"];
 
+// ═══ ROLE-BASED ACCESS CONTROL ═══
+// Roles are stored on the user document under `role` field.
+// Default if missing: regular user (no elevated permissions).
+const ROLES={
+  CONTENT_CONTRIBUTOR:"contentContributor",
+  FORUM_MODERATOR:"forumModerator",
+  ADMIN:"admin", // assigned via ADMINS email list or via user.role
+};
+// Display labels + badge colors for each role
+const ROLE_DISPLAY={
+  contentContributor:{label:"Content Contributor",bg:"#e8f5e9",fg:"#1b5e20",icon:"✍️"},
+  forumModerator:{label:"Forum Moderator",bg:"#fff3e0",fg:"#bf360c",icon:"🛡️"},
+  admin:{label:"Admin",bg:"#fce4ec",fg:"#880e4f",icon:"⚡"},
+};
+// Permission checks — use these everywhere instead of hardcoded role checks.
+// User can be either the profile object or an email string for admin check.
+function isAdminUser(userOrEmail){
+  if(!userOrEmail)return false;
+  if(typeof userOrEmail==="string")return ADMINS.includes(userOrEmail);
+  if(userOrEmail.email&&ADMINS.includes(userOrEmail.email))return true;
+  if(userOrEmail.role===ROLES.ADMIN)return true;
+  return false;
+}
+function isContentContributor(u){return u?.role===ROLES.CONTENT_CONTRIBUTOR||isAdminUser(u)}
+function isForumModerator(u){return u?.role===ROLES.FORUM_MODERATOR||isAdminUser(u)}
+function hasAnyModRole(u){return u?.role&&Object.values(ROLES).includes(u.role)||isAdminUser(u)}
+
 // ═══ TIER SYSTEM — sticky badges based on lifetime points ═══
 const TIERS=[
   {id:"beginner",label:"Beginner",min:0,max:49,color:"#888",bg:"#f0f0f0"},
@@ -540,6 +567,159 @@ async function genQuizAI(date){
 // Wraps a content card and fires onView() once when the card has been
 // 50%+ visible for 800ms — that's a real "read", not a scroll-past.
 // Per-session deduplication via sessionStorage so refreshes don't inflate counts.
+// ═══ ROLE APPLICATION CARD (user-facing on Me page) ═══
+function RoleApplicationCard({ T, prof, myPending, myLatest, ROLES, ROLE_DISPLAY, submitRoleApplication, getTier, TIERS }) {
+  const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState("");
+  const [reason, setReason] = useState("");
+  const [experience, setExperience] = useState("");
+
+  // Already applied & pending — show status, no form
+  if (myPending) {
+    const rd = ROLE_DISPLAY[myPending.requestedRole] || { label: myPending.requestedRole, icon: "📋" };
+    return (
+      <div style={{...T.card, padding: 18, marginBottom: 14, borderLeft: "3px solid " + T.gold}}>
+        <h4 style={{fontSize: ".95rem", fontWeight: 700, margin: 0, marginBottom: 8}}>📨 Application under review</h4>
+        <p style={{fontSize: ".82rem", color: T.txt2, lineHeight: 1.55, marginBottom: 0}}>
+          Your application for <b>{rd.icon} {rd.label}</b> is pending admin review. We'll notify you soon.
+        </p>
+      </div>
+    );
+  }
+
+  // Recently rejected — show note, but allow reapplying
+  const recentlyRejected = myLatest && myLatest.status === "rejected" && (Date.now() - (myLatest.reviewedAt||0)) < 30*86400000;
+
+  if (!open) {
+    return (
+      <div style={{...T.card, padding: 18, marginBottom: 14, borderLeft: "3px solid " + T.teal, background: "linear-gradient(135deg, #fff, " + T.tealBg + "33)"}}>
+        <h4 style={{fontSize: ".95rem", fontWeight: 700, margin: 0, marginBottom: 6, display: "flex", alignItems: "center", gap: 8}}>🛡️ Help shape SKINARIO</h4>
+        <p style={{fontSize: ".82rem", color: T.txt2, lineHeight: 1.55, marginBottom: 12}}>
+          Apply to be a <b>Content Contributor</b> (publish articles, share videos) or <b>Forum Moderator</b> (help keep discussions healthy). Roles are unpaid recognition for top contributors.
+        </p>
+        {recentlyRejected && (
+          <div style={{padding: "8px 12px", background: T.bg, borderRadius: 6, fontSize: ".74rem", color: T.txt2, marginBottom: 10}}>
+            Your previous application was declined. You can reapply with more details.
+          </div>
+        )}
+        <button onClick={() => setOpen(true)} style={{...T.btnO, padding: "8px 16px", fontSize: ".82rem"}}>Apply for a role →</button>
+      </div>
+    );
+  }
+
+  const isForumMod = picked === ROLES.FORUM_MODERATOR;
+  const isDoctor = prof?.accountType === "doctor";
+  const blockedForumMod = isForumMod && !isDoctor;
+
+  return (
+    <div style={{...T.card, padding: 18, marginBottom: 14, borderLeft: "3px solid " + T.teal}}>
+      <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14}}>
+        <h4 style={{fontSize: ".95rem", fontWeight: 700, margin: 0}}>🛡️ Apply for a role</h4>
+        <button onClick={() => {setOpen(false); setPicked(""); setReason(""); setExperience("")}} style={{background: "none", border: "none", fontSize: "1rem", color: T.mute, cursor: "pointer"}}>✕</button>
+      </div>
+
+      <label style={{display: "block", fontSize: ".7rem", color: T.teal, marginBottom: 4, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1}}>Which role? <span style={{color: T.err}}>*</span></label>
+      <div style={{display: "flex", flexDirection: "column", gap: 6, marginBottom: 12}}>
+        <label style={{padding: "10px 12px", border: `1px solid ${picked===ROLES.CONTENT_CONTRIBUTOR?T.teal:T.border}`, borderRadius: 8, cursor: "pointer", background: picked===ROLES.CONTENT_CONTRIBUTOR?T.tealBg:"#fff"}}>
+          <div style={{display: "flex", alignItems: "center", gap: 8}}>
+            <input type="radio" name="role" value={ROLES.CONTENT_CONTRIBUTOR} checked={picked===ROLES.CONTENT_CONTRIBUTOR} onChange={e=>setPicked(e.target.value)}/>
+            <span style={{fontWeight: 600, fontSize: ".88rem"}}>✍️ Content Contributor</span>
+          </div>
+          <div style={{fontSize: ".74rem", color: T.txt2, marginTop: 4, paddingLeft: 22, lineHeight: 1.55}}>Submit articles, videos, news items. All submissions are admin-reviewed before publishing. Open to all account types.</div>
+        </label>
+        <label style={{padding: "10px 12px", border: `1px solid ${picked===ROLES.FORUM_MODERATOR?T.teal:T.border}`, borderRadius: 8, cursor: isDoctor ? "pointer" : "not-allowed", opacity: isDoctor ? 1 : 0.5, background: picked===ROLES.FORUM_MODERATOR?T.tealBg:"#fff"}}>
+          <div style={{display: "flex", alignItems: "center", gap: 8}}>
+            <input type="radio" name="role" value={ROLES.FORUM_MODERATOR} checked={picked===ROLES.FORUM_MODERATOR} onChange={e=>setPicked(e.target.value)} disabled={!isDoctor}/>
+            <span style={{fontWeight: 600, fontSize: ".88rem"}}>🛡️ Forum Moderator</span>
+            {!isDoctor && <span style={{fontSize: ".68rem", color: T.mute, marginLeft: 4}}>(doctors only)</span>}
+          </div>
+          <div style={{fontSize: ".74rem", color: T.txt2, marginTop: 4, paddingLeft: 22, lineHeight: 1.55}}>Flag or soft-delete inappropriate forum posts and cases. Doctors only — to prevent commercial conflicts.</div>
+        </label>
+      </div>
+
+      {blockedForumMod && (
+        <div style={{padding: "8px 10px", background: "#fce4ec", borderLeft: "3px solid #c2185b", borderRadius: "0 6px 6px 0", fontSize: ".74rem", color: "#880e4f", marginBottom: 12}}>
+          Forum Moderator role is restricted to doctor accounts.
+        </div>
+      )}
+
+      <label style={{display: "block", fontSize: ".7rem", color: T.teal, marginBottom: 4, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1}}>Why are you applying? <span style={{color: T.err}}>*</span></label>
+      <textarea value={reason} onChange={e=>setReason(e.target.value)} placeholder="What motivates you to contribute? What value will you bring?" rows={3} style={{...T.txa, marginBottom: 12, fontSize: ".88rem"}}/>
+
+      <label style={{display: "block", fontSize: ".7rem", color: T.teal, marginBottom: 4, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1}}>Relevant experience (optional)</label>
+      <textarea value={experience} onChange={e=>setExperience(e.target.value)} placeholder="Areas of expertise, publications, conferences, training, etc." rows={2} style={{...T.txa, marginBottom: 14, fontSize: ".88rem"}}/>
+
+      <button disabled={!picked || blockedForumMod || !reason.trim()} onClick={async() => {
+        const result = await submitRoleApplication(picked, reason, experience);
+        if (result.ok) {
+          setOpen(false); setPicked(""); setReason(""); setExperience("");
+        }
+      }} style={{...((!picked || blockedForumMod || !reason.trim()) ? T.btnO : T.btn), padding: "10px 20px", fontSize: ".85rem", opacity: (!picked || blockedForumMod || !reason.trim()) ? 0.5 : 1, cursor: (!picked || blockedForumMod || !reason.trim()) ? "not-allowed" : "pointer"}}>📨 Submit application</button>
+    </div>
+  );
+}
+
+// ═══ MANUAL ROLE ASSIGNMENT (admin-only widget) ═══
+function ManualRoleAssign({ allUsers, assignRole, T, ROLES, ROLE_DISPLAY }) {
+  const [search, setSearch] = useState("");
+  const [pickedUser, setPickedUser] = useState(null);
+  const [pickedRole, setPickedRole] = useState("");
+  const [reason, setReason] = useState("");
+  const matches = search.trim().length >= 2
+    ? allUsers.filter(u => {
+        const q = search.toLowerCase();
+        return (u.name||"").toLowerCase().includes(q) || (u.email||"").toLowerCase().includes(q);
+      }).slice(0, 8)
+    : [];
+  return (
+    <div>
+      {!pickedUser ? (
+        <>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search user by name or email..." style={{...T.inp,marginBottom:8}}/>
+          {matches.length > 0 && <div style={{border:"1px solid "+T.border,borderRadius:8,overflow:"hidden"}}>
+            {matches.map(u => <div key={u.id} onClick={()=>{setPickedUser(u);setSearch("")}} style={{padding:"8px 12px",borderBottom:"1px solid "+T.border,cursor:"pointer",fontSize:".82rem",display:"flex",alignItems:"center",gap:10}}>
+              {u.photo ? <img src={u.photo} style={{width:28,height:28,borderRadius:"50%",objectFit:"cover"}}/> : <div style={T.av(28,T.tealBg,T.teal)}>{u.initials||"?"}</div>}
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:600}}>{u.name}</div>
+                <div style={{fontSize:".68rem",color:T.mute}}>{u.email} · {u.accountType||"?"}{u.role?` · current: ${ROLE_DISPLAY[u.role]?.label||u.role}`:""}</div>
+              </div>
+            </div>)}
+          </div>}
+        </>
+      ) : (
+        <div style={{padding:12,background:T.bg,borderRadius:8,marginBottom:8}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:10}}>
+            <div>
+              <div style={{fontWeight:600,fontSize:".88rem"}}>{pickedUser.name}</div>
+              <div style={{fontSize:".7rem",color:T.mute}}>{pickedUser.email} · {pickedUser.accountType||"?"}{pickedUser.role?` · current: ${ROLE_DISPLAY[pickedUser.role]?.label||pickedUser.role}`:""}</div>
+            </div>
+            <button onClick={()=>{setPickedUser(null);setPickedRole("");setReason("")}} style={{...T.btnO,padding:"4px 10px",fontSize:".75rem"}}>Cancel</button>
+          </div>
+          <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Assign role</label>
+          <select value={pickedRole} onChange={e=>setPickedRole(e.target.value)} style={{...T.inp,marginBottom:8}}>
+            <option value="">— pick a role —</option>
+            <option value={ROLES.CONTENT_CONTRIBUTOR}>✍️ Content Contributor</option>
+            <option value={ROLES.FORUM_MODERATOR}>🛡️ Forum Moderator (doctors only)</option>
+          </select>
+          {pickedRole === ROLES.FORUM_MODERATOR && pickedUser.accountType !== "doctor" && (
+            <div style={{padding:"8px 10px",background:"#fce4ec",borderLeft:"3px solid #c2185b",borderRadius:"0 6px 6px 0",fontSize:".74rem",color:"#880e4f",marginBottom:8}}>
+              ⚠️ Forum Moderator is intended for doctors only. This user is a <b>{pickedUser.accountType}</b> — conflict of interest risk.
+            </div>
+          )}
+          <input value={reason} onChange={e=>setReason(e.target.value)} placeholder="Reason for assignment (logged in audit trail)" style={{...T.inp,marginBottom:8}}/>
+          <button disabled={!pickedRole} onClick={async()=>{
+            if(!pickedRole)return;
+            if(confirm(`Assign ${ROLE_DISPLAY[pickedRole]?.label||pickedRole} role to ${pickedUser.name}?`)){
+              await assignRole(pickedUser.id, pickedUser.name, pickedRole, reason);
+              setPickedUser(null); setPickedRole(""); setReason("");
+            }
+          }} style={{...(pickedRole?T.btn:T.btnO),padding:"8px 16px",fontSize:".82rem",opacity:pickedRole?1:.5,cursor:pickedRole?"pointer":"not-allowed"}}>Assign role</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ViewTracker({ trackingKey, onView, children, style }) {
   const ref = useRef(null);
   useEffect(() => {
@@ -608,6 +788,8 @@ export default function App(){
   const[newsFeedsLoading,setNewsFeedsLoading]=useState(false);
   const[rewards,setRewards]=useState([]);
   const[redemptions,setRedemptions]=useState([]);
+  const[roleApplications,setRoleApplications]=useState([]);
+  const[moderationLog,setModerationLog]=useState([]);
   const[notifs,setNotifs]=useState([]);
   const[notifsOpen,setNotifsOpen]=useState(false);
   const[mentionMatches,setMentionMatches]=useState([]);
@@ -643,7 +825,7 @@ export default function App(){
   const[events,setEvents]=useState([]);
   const[selAd,setSelAd]=useState(null);
   const[selE,setSelE]=useState(null);
-  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd)},[]);
+  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml)},[]);
 
   useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){setProf(p);setScr("main");loadData()}else{setPf({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:au?.displayName||"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});setSetupStep(0);setSetupErr("");setScr("setup")}}else{setAu(null);setProf(null);setScr("login")}});return()=>unsub()},[loadData]);
 
@@ -1024,6 +1206,103 @@ export default function App(){
   const spendablePoints=Math.max(0,(prof?.points||0)-(prof?.redeemedPoints||0));
 
   // Core redemption function — atomic check + deduct + create receipt
+  // ═══ MODERATION AUDIT LOG ═══
+  // Every privileged action (role change, content moderation) writes here.
+  // This is non-negotiable: without it, you can't investigate problems or reverse mistakes.
+  const logModerationAction=async(action,details={})=>{
+    if(!au)return;
+    try{
+      await fbAdd("moderationLog",{
+        actorUid:au.uid,
+        actorName:uName,
+        actorEmail:au.email||"",
+        actorRole:isAdminUser(au.email)?"admin":(prof?.role||"user"),
+        action,
+        ...details,
+        createdAt:Date.now(),
+        date:ds(getIST()),
+      });
+    }catch(err){console.error("audit log error:",err)}
+  };
+
+  // ═══ ROLE MANAGEMENT (admin only) ═══
+  const assignRole=async(targetUserId,targetUserName,newRole,reason="")=>{
+    if(!isAdminUser(au?.email)){sh("Only admins can change roles");return}
+    if(!targetUserId)return;
+    try{
+      const target=await fbGet("users",targetUserId);
+      const oldRole=target?.role||null;
+      await fbSet("users",targetUserId,{role:newRole||null});
+      await logModerationAction("role_assign",{
+        targetUid:targetUserId,
+        targetName:targetUserName,
+        oldRole,
+        newRole:newRole||null,
+        reason,
+      });
+      sh(newRole?`✅ ${targetUserName} promoted to ${ROLE_DISPLAY[newRole]?.label||newRole}`:`✅ ${targetUserName}'s role removed`);
+      loadData();
+    }catch(err){console.error("assignRole error:",err);sh("Role change failed")}
+  };
+
+  // ═══ ROLE APPLICATION SUBMISSION (any signed-in user) ═══
+  const submitRoleApplication=async(requestedRole,reason,experience)=>{
+    if(!au||!prof)return{ok:false};
+    if(!requestedRole||!reason.trim()){sh("Please fill in all required fields");return{ok:false}}
+    // Prevent duplicate pending applications
+    const existing=roleApplications.find(a=>a.uid===au.uid&&a.status==="pending");
+    if(existing){sh("You already have a pending application — please wait for review");return{ok:false}}
+    try{
+      await fbAdd("roleApplications",{
+        uid:au.uid,
+        userName:uName,
+        userEmail:au.email,
+        accountType:prof.accountType||"unknown",
+        requestedRole,
+        reason:reason.trim(),
+        experience:experience.trim(),
+        currentTier:getTier(prof.points||0).label,
+        currentPoints:prof.points||0,
+        status:"pending", // pending | approved | rejected
+        createdAt:Date.now(),
+        date:ds(getIST()),
+      });
+      sh("📨 Application submitted! You'll hear from us soon.");
+      loadData();
+      return{ok:true};
+    }catch(err){console.error("submitRoleApplication error:",err);sh("Submission failed");return{ok:false}}
+  };
+
+  // ═══ APPLICATION REVIEW (admin only) ═══
+  const reviewApplication=async(appId,decision,note="")=>{
+    if(!isAdminUser(au?.email)){sh("Admin only");return}
+    const app=roleApplications.find(a=>a.id===appId);
+    if(!app)return;
+    try{
+      await fbSet("roleApplications",appId,{
+        status:decision, // "approved" | "rejected"
+        reviewedAt:Date.now(),
+        reviewerUid:au.uid,
+        reviewerName:uName,
+        reviewNote:note,
+      });
+      // If approved, assign the role
+      if(decision==="approved"){
+        await assignRole(app.uid,app.userName,app.requestedRole,`Approved application #${appId}`);
+      }
+      await logModerationAction("application_review",{
+        applicationId:appId,
+        applicantUid:app.uid,
+        applicantName:app.userName,
+        requestedRole:app.requestedRole,
+        decision,
+        note,
+      });
+      sh(`Application ${decision}`);
+      loadData();
+    }catch(err){console.error("reviewApplication error:",err);sh("Review failed")}
+  };
+
   const redeemReward=async(reward)=>{
     if(!au||!prof){sh("Please log in first");return}
     if(!reward||!reward.active){sh("This reward is not available");return}
@@ -2730,6 +3009,7 @@ export default function App(){
                   <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
                     <h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0}}>{u.name}</h2>
                     {u.accountType==="doctor"&&(()=>{const t=getTier(u.points||0);if(t.id==="beginner")return null;return<span style={{padding:"3px 9px",borderRadius:12,fontSize:".7rem",fontWeight:700,letterSpacing:.5,background:t.bg,color:t.color}}>{t.label}</span>;})()}
+                    {u.role&&ROLE_DISPLAY[u.role]&&<span style={{padding:"3px 9px",borderRadius:12,fontSize:".7rem",fontWeight:700,letterSpacing:.5,background:ROLE_DISPLAY[u.role].bg,color:ROLE_DISPLAY[u.role].fg}}>{ROLE_DISPLAY[u.role].icon} {ROLE_DISPLAY[u.role].label}</span>}
                     {u.verified&&<span title="Verified by SKINARIO admin" style={{fontSize:"1.1rem",color:"#1d9bf0"}}>✓</span>}
                     {u.regFlagged&&isAdmin&&<span style={T.tag(T.errBg,T.err)} title={u.regFlagReason}>🚩 Flagged</span>}
                     {acc&&<span style={T.tag(T.tealBg,T.teal)}>{acc.icon} {acc.label}</span>}
@@ -2937,6 +3217,34 @@ export default function App(){
       </div>}
 
       {pg==="me"&&<div style={{maxWidth:640}}>
+
+        {/* ═══ ROLE APPLICATION CARD (visible only if no role yet & no pending app) ═══ */}
+        {!editingProfile&&!prof?.role&&!isAdminUser(au?.email)&&(()=>{
+          const myPending=roleApplications.find(a=>a.uid===au?.uid&&a.status==="pending");
+          const myLatest=roleApplications.filter(a=>a.uid===au?.uid).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0];
+          return(<RoleApplicationCard
+            T={T}
+            prof={prof}
+            myPending={myPending}
+            myLatest={myLatest}
+            ROLES={ROLES}
+            ROLE_DISPLAY={ROLE_DISPLAY}
+            submitRoleApplication={submitRoleApplication}
+            getTier={getTier}
+            TIERS={TIERS}
+          />);
+        })()}
+
+        {/* If user already has a role, show their badge prominently */}
+        {!editingProfile&&prof?.role&&ROLE_DISPLAY[prof.role]&&<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+(ROLE_DISPLAY[prof.role].fg||T.gold)}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+            <span style={{fontSize:"1.6rem"}}>{ROLE_DISPLAY[prof.role].icon}</span>
+            <div>
+              <div style={{fontSize:".7rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600}}>Your role</div>
+              <div style={{fontSize:"1.1rem",fontWeight:700,color:ROLE_DISPLAY[prof.role].fg}}>{ROLE_DISPLAY[prof.role].label}</div>
+            </div>
+          </div>
+        </div>}
 
         {/* ═══ EDITABLE PROFILE SECTION ═══ */}
         {editingProfile?<div style={{...T.card,borderLeft:"3px solid "+T.gold,padding:22}}>
@@ -3183,7 +3491,7 @@ export default function App(){
       {pg==="admin"&&isAdm&&<div>
         <h3 style={{fontSize:"1.15rem",fontWeight:700,marginBottom:12}}>⚙️ Admin dashboard</h3>
         <div style={{display:"flex",gap:5,marginBottom:16,flexWrap:"wrap"}}>
-          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["announce","📣 Announce"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null)}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
+          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["roles","🛡️ Roles"],["announce","📣 Announce"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null)}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
         </div>
         {aTab==="stats"&&<><div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length],["Events",events.length],["Ads",ads.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>
           {/* ═══ ANALYTICS — top viewed content ═══ */}
@@ -3489,6 +3797,125 @@ export default function App(){
                   {rd.status!=="fulfilled"&&<button onClick={async()=>{await fbSet("redemptions",rd.id,{status:"fulfilled",fulfilledAt:Date.now()});loadData();sh("Marked fulfilled")}} style={{...T.btn,...T.btnSm}}>✓ Mark fulfilled</button>}
                 </div>
               </div>
+            </div>)}
+          </div>
+        </div>}
+
+        {aTab==="roles"&&<div>
+          <div style={{...T.card,marginBottom:14}}>
+            <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>🛡️ Roles & Moderators</h4>
+            <p style={{fontSize:".82rem",color:T.txt2,marginBottom:14,lineHeight:1.55}}>
+              Manage who can publish content (Content Contributors) and moderate community discussion (Forum Moderators).
+              Every role change and moderator action is logged in the audit trail below.
+            </p>
+            <div style={{padding:"12px 14px",background:T.tealBg,borderLeft:"3px solid "+T.teal,borderRadius:"0 8px 8px 0",fontSize:".78rem",color:T.txt2,lineHeight:1.6}}>
+              <b>Role guide:</b><br/>
+              ✍️ <b>Content Contributor</b> — Can submit articles, videos, news (admin reviews before publishing). Open to all account types. Attribution is shown to readers.<br/>
+              🛡️ <b>Forum Moderator</b> — Can flag/soft-delete forum posts &amp; cases. <b>Doctors only</b> — to prevent commercial conflicts.<br/>
+              ⚡ <b>Admin</b> — Full access. Set via email allowlist in code.
+            </div>
+          </div>
+
+          {/* PENDING APPLICATIONS QUEUE */}
+          {(()=>{
+            const pending=roleApplications.filter(a=>a.status==="pending");
+            if(pending.length===0)return null;
+            return(<div style={{...T.card,marginBottom:14,borderLeft:"3px solid "+T.gold}}>
+              <h5 style={{fontSize:".95rem",fontWeight:700,marginBottom:12,display:"flex",alignItems:"center",gap:8}}>📨 Pending Applications ({pending.length})</h5>
+              {pending.map(app=>{
+                const rd=ROLE_DISPLAY[app.requestedRole]||{label:app.requestedRole,bg:T.bg,fg:T.txt};
+                const isForumModRole=app.requestedRole===ROLES.FORUM_MODERATOR;
+                const isDoctor=app.accountType==="doctor";
+                const conflictWarning=isForumModRole&&!isDoctor;
+                return<div key={app.id} style={{padding:14,border:"1px solid "+T.border,borderRadius:10,marginBottom:10,background:"#fff"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap",marginBottom:8}}>
+                    <div style={{flex:1,minWidth:220}}>
+                      <div style={{fontWeight:600,fontSize:".95rem",marginBottom:3}}>{app.userName}</div>
+                      <div style={{fontSize:".72rem",color:T.mute,marginBottom:6}}>{app.userEmail} · {app.accountType} · {app.currentPoints} pts · {app.currentTier}</div>
+                      <span style={{display:"inline-block",padding:"3px 9px",borderRadius:10,fontSize:".7rem",fontWeight:700,background:rd.bg,color:rd.fg,marginBottom:8}}>{rd.icon} Wants: {rd.label}</span>
+                    </div>
+                    <div style={{fontSize:".7rem",color:T.mute,flexShrink:0}}>{fD(app.date)}</div>
+                  </div>
+                  {conflictWarning&&<div style={{padding:"8px 10px",background:"#fce4ec",borderLeft:"3px solid #c2185b",borderRadius:"0 6px 6px 0",fontSize:".74rem",color:"#880e4f",marginBottom:10}}>
+                    ⚠️ <b>Conflict warning:</b> Forum Moderator role is intended for doctors only. This applicant is a <b>{app.accountType}</b> — approving may create conflict of interest issues.
+                  </div>}
+                  {app.reason&&<div style={{fontSize:".82rem",color:T.txt,lineHeight:1.55,marginBottom:6}}><b>Why:</b> {app.reason}</div>}
+                  {app.experience&&<div style={{fontSize:".82rem",color:T.txt,lineHeight:1.55,marginBottom:10}}><b>Experience:</b> {app.experience}</div>}
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    <button onClick={async()=>{
+                      const note=prompt("Optional note (visible only to admins):","");
+                      if(note===null)return;
+                      await reviewApplication(app.id,"approved",note||"");
+                    }} style={{...T.btn,padding:"8px 16px",fontSize:".82rem"}}>✓ Approve & promote</button>
+                    <button onClick={async()=>{
+                      const note=prompt("Reason for rejection (kept private):","");
+                      if(note===null)return;
+                      await reviewApplication(app.id,"rejected",note||"");
+                    }} style={{...T.btnDanger,padding:"8px 16px",fontSize:".82rem"}}>✗ Reject</button>
+                    <button onClick={()=>viewProfile(app.uid)} style={{...T.btnO,padding:"8px 16px",fontSize:".82rem"}}>View profile →</button>
+                  </div>
+                </div>;
+              })}
+            </div>);
+          })()}
+
+          {/* CURRENT MODERATORS */}
+          <div style={{...T.card,marginBottom:14}}>
+            <h5 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>Current moderators & contributors</h5>
+            {(()=>{
+              const mods=allUsers.filter(u=>u.role&&Object.values(ROLES).includes(u.role));
+              if(mods.length===0)return<p style={{color:T.mute,fontSize:".84rem"}}>No moderators yet. Approve applications above to start building your team.</p>;
+              return mods.map(u=>{
+                const rd=ROLE_DISPLAY[u.role]||{label:u.role,bg:T.bg,fg:T.txt};
+                return<div key={u.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid "+T.border}}>
+                  {u.photo?<img src={u.photo} style={{width:38,height:38,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(38,T.tealBg,T.teal)}>{u.initials||"?"}</div>}
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                      <span style={{fontWeight:600,fontSize:".88rem"}}>{u.name}</span>
+                      <span style={{padding:"2px 8px",borderRadius:10,fontSize:".66rem",fontWeight:700,background:rd.bg,color:rd.fg}}>{rd.icon} {rd.label}</span>
+                    </div>
+                    <div style={{fontSize:".7rem",color:T.mute}}>{u.email} · {u.accountType||"unknown"}</div>
+                  </div>
+                  <button onClick={async()=>{
+                    if(confirm(`Remove ${u.name}'s ${rd.label} role?\n\nThey'll keep all their earned points and content.`)){
+                      const reason=prompt("Reason (logged in audit trail):","")||"";
+                      await assignRole(u.id,u.name,null,reason);
+                    }
+                  }} style={{...T.btnDanger,...T.btnSm}}>Remove role</button>
+                </div>;
+              });
+            })()}
+          </div>
+
+          {/* MANUAL ROLE ASSIGNMENT */}
+          <div style={{...T.card,marginBottom:14}}>
+            <h5 style={{fontSize:".95rem",fontWeight:700,marginBottom:6}}>Manual role assignment</h5>
+            <p style={{fontSize:".78rem",color:T.txt2,marginBottom:12,lineHeight:1.55}}>Assign a role to any user without an application. Use sparingly — applications are the cleaner path.</p>
+            <ManualRoleAssign allUsers={allUsers} assignRole={assignRole} T={T} ROLES={ROLES} ROLE_DISPLAY={ROLE_DISPLAY}/>
+          </div>
+
+          {/* AUDIT LOG */}
+          <div style={T.card}>
+            <h5 style={{fontSize:".95rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>📜 Audit log</h5>
+            <p style={{fontSize:".78rem",color:T.txt2,marginBottom:12,lineHeight:1.55}}>Every role change and moderator action is recorded here. Recent {moderationLog.length} entries.</p>
+            {moderationLog.length===0&&<p style={{color:T.mute,fontSize:".84rem"}}>No actions logged yet.</p>}
+            {moderationLog.slice(0,30).map(log=><div key={log.id} style={{padding:"8px 12px",borderBottom:"1px solid "+T.border,fontSize:".78rem",display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
+              <div style={{flex:1,minWidth:200}}>
+                <div style={{color:T.txt}}>
+                  <b>{log.actorName}</b> ({log.actorRole}) → <span style={{color:T.teal,fontWeight:600}}>{log.action}</span>
+                  {log.targetName&&<> on <b>{log.targetName}</b></>}
+                  {log.applicantName&&<> for <b>{log.applicantName}</b></>}
+                </div>
+                <div style={{color:T.mute,fontSize:".7rem",marginTop:3}}>
+                  {log.oldRole&&log.newRole&&`${ROLE_DISPLAY[log.oldRole]?.label||log.oldRole} → ${ROLE_DISPLAY[log.newRole]?.label||log.newRole}`}
+                  {log.oldRole&&!log.newRole&&`${ROLE_DISPLAY[log.oldRole]?.label||log.oldRole} → removed`}
+                  {!log.oldRole&&log.newRole&&`Assigned: ${ROLE_DISPLAY[log.newRole]?.label||log.newRole}`}
+                  {log.decision&&` · Decision: ${log.decision}`}
+                  {log.reason&&` · "${log.reason}"`}
+                  {log.note&&` · "${log.note}"`}
+                </div>
+              </div>
+              <div style={{fontSize:".68rem",color:T.mute,flexShrink:0}}>{fD(log.date)}</div>
             </div>)}
           </div>
         </div>}
