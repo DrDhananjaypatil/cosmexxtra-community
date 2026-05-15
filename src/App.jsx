@@ -1885,108 +1885,188 @@ export default function App(){
             <div key={l} onClick={onClick} style={{...T.card,textAlign:"center",padding:"12px 4px",marginBottom:0,cursor:"pointer",transition:"transform .1s, box-shadow .1s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.05)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}><div style={{fontSize:"1rem"}}>{i}</div><div style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".55rem",color:T.mute,textTransform:"uppercase",marginTop:2}}>{l}</div></div>)}
         </div>
 
-        {/* ═══ LATEST RESEARCH & NEWS ═══ */}
+        {/* ═══ INDUSTRY NEWS, FDA ALERTS, RESEARCH, TRIALS — 4 SECTIONS ═══ */}
         {(()=>{
-          // Take up to 3 admin posts and up to 4 research papers
-          const adminItems=newsPosts.slice(0,3);
-          const researchItems=research.slice(0,4);
           const isAdmin=ADMINS.includes(au?.email);
-          const hasContent=adminItems.length>0||researchItems.length>0;
-          // Don't hide for admins — show empty state so they know to post news
-          if(!hasContent&&!researchLoading&&!isAdmin)return null;
 
-          // Topic → color mapping for research items' circle background
+          // Topic → color mapping (used for research circles)
           const topicColor=(t)=>{
             const map={"Botox & Neurotoxins":["#fce8e6","#c5392a"],"Dermal Fillers":["#e3f2fd","#1565c0"],"Threads":["#f3e5f5","#6a1b9a"],"PDRN & Polynucleotides":["#e1f5ee","#0d6b6e"],"Peptides & Skin Boosters":["#fff3e0","#bf360c"],"Chemical Peels":["#fce4ec","#880e4f"],"Laser & Energy Devices":["#fff8e1","#bf6a00"],"Hair Restoration":["#efebe9","#4e342e"],"Body Contouring":["#e8eaf6","#283593"],"Anti-Aging & Regenerative":["#e8f5e9","#1b5e20"],"Skincare Science":["#f1f8e9","#33691e"],"Pigmentation & Melasma":["#fce4ec","#ad1457"],"Acne & Scars":["#ede7f6","#311b92"],"Practice Management":["#eceff1","#37474f"]};
             return map[t]||[T.tealBg,T.teal];
           };
+          const placeholderFor=(cat)=>{const[bg,fg]=topicColor(cat);return{bg,fg}};
 
-          // Smart placeholder for admin posts without an uploaded image
-          const placeholderFor=(cat)=>{
-            const[bg,fg]=topicColor(cat);
-            return{bg,fg};
-          };
+          // Whether to show each section
+          const hasIndustry=industryNews.length>0;
+          const hasFda=fdaAlerts.length>0;
+          const hasResearch=research.length>0||newsPosts.length>0;
+          const hasTrials=trials.length>0;
+          const anyContent=hasIndustry||hasFda||hasResearch||hasTrials;
+          if(!anyContent&&!researchLoading&&!newsFeedsLoading&&!isAdmin)return null;
 
-          return(<div style={{...T.card,padding:18,marginBottom:16}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
-              <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0,display:"flex",alignItems:"center",gap:8}}>📚 Latest research &amp; news</h3>
-              <span style={{fontSize:".7rem",color:T.mute}}>Across SKINARIO's 14 topics</span>
-            </div>
+          return(<>
 
-            {researchLoading&&!hasContent&&<div style={{textAlign:"center",padding:30,color:T.mute,fontSize:".88rem"}}>
-              <div style={{fontSize:"1.4rem",marginBottom:6}}>📡</div>Fetching latest research from PubMed...
-            </div>}
-            {!researchLoading&&!hasContent&&isAdmin&&<div style={{textAlign:"center",padding:24,background:T.bg,borderRadius:10,color:T.txt2,fontSize:".84rem",lineHeight:1.55}}>
-              <div style={{fontSize:"1.6rem",marginBottom:6}}>📰</div>
-              <div style={{fontWeight:600,color:T.txt,marginBottom:4}}>News feed is empty</div>
-              <div style={{fontSize:".78rem"}}>PubMed research couldn't be loaded yet. Or post your first news item from <b>Admin → 📰 News</b>.</div>
-            </div>}
-
-            {/* ═══ EDITORIAL: full article-style cards ═══ */}
-            {adminItems.length>0&&<div style={{display:"grid",gridTemplateColumns:adminItems.length===1?"1fr":"repeat(auto-fit,minmax(260px,1fr))",gap:12,marginBottom:researchItems.length>0?16:0}}>
-              {adminItems.map(n=>{const ph=placeholderFor(n.cat||"News");return(
-                <a key={n.id} href={n.url||"#"} target={n.url?"_blank":"_self"} rel="noopener noreferrer"
-                  onClick={e=>{
-                    if(!n.url){e.preventDefault();return}
-                    const newCount=(n.views||0)+1;
-                    fbSet("news",n.id,{views:newCount});
-                    setNewsPosts(prev=>prev.map(x=>x.id===n.id?{...x,views:newCount}:x));
-                  }}
-                  style={{display:"block",textDecoration:"none",color:"inherit",borderRadius:12,overflow:"hidden",border:"1px solid "+T.border,background:"#fff",transition:"all .15s",cursor:n.url?"pointer":"default"}}
-                  onMouseEnter={e=>{if(n.url){e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.08)"}}}
+            {/* ═════════ INDUSTRY NEWS ═════════ */}
+            {(hasIndustry||(isAdmin&&!industryNewsConfigured))&&<div style={{...T.card,padding:18,marginBottom:14}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
+                <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>📰 Industry News</h3>
+                <span style={{fontSize:".7rem",color:T.mute}}>From aesthetic medicine news sources</span>
+              </div>
+              {!industryNewsConfigured&&isAdmin&&<div style={{padding:"10px 12px",background:T.warnBg,borderLeft:"3px solid "+T.warn,borderRadius:"0 6px 6px 0",fontSize:".75rem",color:T.txt2,lineHeight:1.55,marginBottom:12}}>
+                ⚙️ <b>Industry news inactive.</b> Sign up free at <a href="https://newsdata.io" target="_blank" rel="noopener noreferrer" style={{color:T.teal}}>newsdata.io</a>, then add <code style={{background:"#fff",padding:"1px 6px",borderRadius:4,fontSize:".7rem"}}>NEWSDATA_API_KEY</code> to Vercel environment variables.
+              </div>}
+              {hasIndustry&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:10}}>
+                {industryNews.slice(0,6).map((n,i)=><a key={i} href={n.url||"#"} target="_blank" rel="noopener noreferrer"
+                  style={{display:"block",textDecoration:"none",color:"inherit",borderRadius:10,overflow:"hidden",border:"1px solid "+T.border,background:"#fff",transition:"all .15s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 4px 12px rgba(0,0,0,0.06)"}}
                   onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}
                 >
-                  {/* Cover image OR smart placeholder */}
                   {n.image?
-                    <div style={{height:130,background:"#f4f1ea",overflow:"hidden"}}>
-                      <img src={n.image} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
-                    </div>
-                  :
-                    <div style={{height:110,background:ph.bg,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:4,position:"relative"}}>
-                      <div style={{fontSize:"2.2rem",lineHeight:1,opacity:.9}}>📰</div>
-                      <div style={{fontSize:".62rem",color:ph.fg,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase"}}>{n.cat||"SKINARIO News"}</div>
-                    </div>
+                    <div style={{height:110,overflow:"hidden",background:"#f4f1ea"}}><img src={n.image} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}} onError={e=>{e.currentTarget.style.display="none"}}/></div>
+                    :<div style={{height:80,background:T.tealBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.8rem"}}>📰</div>
                   }
-                  <div style={{padding:"12px 14px"}}>
-                    <div style={{display:"flex",gap:5,marginBottom:6,flexWrap:"wrap"}}>
-                      {n.cat&&<span style={T.tag(T.tealBg,T.teal)}>{n.cat}</span>}
-                      <span style={T.tag(T.goldBg,T.goldD)}>📰 Editorial</span>
-                    </div>
-                    <div style={{fontSize:".95rem",fontWeight:600,color:T.txt,lineHeight:1.4,marginBottom:n.body?5:0}}>{n.title}</div>
-                    {n.body&&<div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5,marginBottom:6,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{n.body}</div>}
-                    <div style={{fontSize:".68rem",color:T.mute,marginTop:6,paddingTop:6,borderTop:"1px solid "+T.border}}>SKINARIO Editorial · {fD(n.date)}{(n.views||0)>0?` · 👁️ ${n.views}`:""}{n.url&&" · Read →"}</div>
+                  <div style={{padding:12}}>
+                    <div style={{fontSize:".88rem",fontWeight:600,color:T.txt,lineHeight:1.35,marginBottom:6,display:"-webkit-box",WebkitLineClamp:3,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{n.title}</div>
+                    <div style={{fontSize:".68rem",color:T.mute,fontStyle:"italic"}}>{n.source||"News source"}{n.pubdate?` · ${n.pubdate}`:""}</div>
                   </div>
-                </a>
-              )})}
+                </a>)}
+              </div>}
             </div>}
 
-            {/* ═══ RESEARCH: upgraded styled rows ═══ */}
-            {researchItems.length>0&&<>
-              {adminItems.length>0&&<div style={{fontSize:".7rem",color:T.mute,fontWeight:600,letterSpacing:1.2,textTransform:"uppercase",marginBottom:10,paddingTop:6,borderTop:"1px dashed "+T.border}}>🔬 Latest peer-reviewed research</div>}
+            {/* ═════════ FDA ALERTS ═════════ */}
+            {hasFda&&<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid #c2185b"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
+                <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0,color:"#880e4f"}}>🚨 FDA Alerts</h3>
+                <span style={{fontSize:".7rem",color:T.mute}}>Drug & device recalls relevant to aesthetic medicine</span>
+              </div>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {researchItems.map(r=>{const[cBg,cFg]=topicColor(r.topic);return(
-                  <a key={r.pmid} href={r.url} target="_blank" rel="noopener noreferrer"
-                    style={{display:"flex",gap:14,padding:"12px 14px",borderRadius:10,border:"1px solid "+T.border,textDecoration:"none",color:"inherit",background:"#fff",transition:"all .15s"}}
-                    onMouseEnter={e=>{e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.background=T.tealBg+"22"}}
-                    onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background="#fff"}}
+                {fdaAlerts.slice(0,6).map((a,i)=><a key={i} href={a.url||"#"} target="_blank" rel="noopener noreferrer"
+                  style={{display:"flex",gap:12,padding:"12px 14px",borderRadius:10,border:"1px solid #f8bbd0",background:"#fff",textDecoration:"none",color:"inherit",transition:"all .15s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.background="#fce4ec"}}
+                  onMouseLeave={e=>{e.currentTarget.style.background="#fff"}}
+                >
+                  <div style={{width:44,height:44,borderRadius:8,background:"#fce4ec",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.4rem",flexShrink:0}}>{a.icon||"⚠️"}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",gap:5,marginBottom:5,flexWrap:"wrap"}}>
+                      {a.severity&&<span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:700,background:"#fce4ec",color:"#880e4f"}}>Class {a.severity.replace(/[^IVX]/g,"")||a.severity}</span>}
+                      <span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:600,background:T.bg,color:T.mute}}>{a.type==="device_recall"?"Device":"Drug"}</span>
+                    </div>
+                    <div style={{fontSize:".86rem",fontWeight:600,color:T.txt,lineHeight:1.4,marginBottom:4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{a.title}</div>
+                    {a.reason&&<div style={{fontSize:".74rem",color:T.txt2,lineHeight:1.5,marginBottom:4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{a.reason}</div>}
+                    <div style={{fontSize:".68rem",color:T.mute,fontStyle:"italic"}}>{a.firm||"FDA"}{a.pubdate?` · ${a.pubdate}`:""} · View on FDA.gov →</div>
+                  </div>
+                </a>)}
+              </div>
+            </div>}
+
+            {/* ═════════ LATEST RESEARCH + EDITORIAL ═════════ */}
+            {(hasResearch||researchLoading)&&<div style={{...T.card,padding:18,marginBottom:14}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
+                <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>🔬 Latest Research</h3>
+                <span style={{fontSize:".7rem",color:T.mute}}>Peer-reviewed papers from PubMed</span>
+              </div>
+              {researchLoading&&!hasResearch&&<div style={{textAlign:"center",padding:30,color:T.mute,fontSize:".88rem"}}>
+                <div style={{fontSize:"1.4rem",marginBottom:6}}>📡</div>Fetching latest research...
+              </div>}
+
+              {/* Editorial admin posts — full article cards */}
+              {newsPosts.length>0&&<div style={{display:"grid",gridTemplateColumns:newsPosts.slice(0,3).length===1?"1fr":"repeat(auto-fit,minmax(260px,1fr))",gap:12,marginBottom:research.length>0?14:0}}>
+                {newsPosts.slice(0,3).map(n=>{const ph=placeholderFor(n.cat||"News");return(
+                  <a key={n.id} href={n.url||"#"} target={n.url?"_blank":"_self"} rel="noopener noreferrer"
+                    onClick={e=>{
+                      if(!n.url){e.preventDefault();return}
+                      const newCount=(n.views||0)+1;
+                      fbSet("news",n.id,{views:newCount});
+                      setNewsPosts(prev=>prev.map(x=>x.id===n.id?{...x,views:newCount}:x));
+                    }}
+                    style={{display:"block",textDecoration:"none",color:"inherit",borderRadius:12,overflow:"hidden",border:"1px solid "+T.border,background:"#fff",transition:"all .15s",cursor:n.url?"pointer":"default"}}
+                    onMouseEnter={e=>{if(n.url){e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.08)"}}}
+                    onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}
                   >
-                    {/* Topic-colored circle "cover" */}
-                    <div style={{width:56,height:56,borderRadius:"50%",background:cBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.6rem",flexShrink:0}}>{r.icon||"🔬"}</div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5,flexWrap:"wrap"}}>
-                        <span style={{padding:"2px 8px",borderRadius:10,fontSize:".66rem",fontWeight:600,background:cBg,color:cFg}}>{r.topic}</span>
-                        <span style={T.tag(T.bg,T.mute)}>🔬 Research</span>
+                    {n.image?
+                      <div style={{height:130,background:"#f4f1ea",overflow:"hidden"}}><img src={n.image} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/></div>
+                    :
+                      <div style={{height:110,background:ph.bg,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:4}}>
+                        <div style={{fontSize:"2.2rem",lineHeight:1,opacity:.9}}>📰</div>
+                        <div style={{fontSize:".62rem",color:ph.fg,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase"}}>{n.cat||"SKINARIO News"}</div>
                       </div>
-                      <div style={{fontSize:".88rem",fontWeight:600,color:T.txt,lineHeight:1.4,marginBottom:4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{r.title}</div>
-                      <div style={{fontSize:".7rem",color:T.mute,fontStyle:"italic"}}>{r.journal}{r.authors?` · ${r.authors}`:""}{r.pubdate?` · ${r.pubdate}`:""} · Read on PubMed →</div>
+                    }
+                    <div style={{padding:"12px 14px"}}>
+                      <div style={{display:"flex",gap:5,marginBottom:6,flexWrap:"wrap"}}>
+                        {n.cat&&<span style={T.tag(T.tealBg,T.teal)}>{n.cat}</span>}
+                        <span style={T.tag(T.goldBg,T.goldD)}>📰 Editorial</span>
+                      </div>
+                      <div style={{fontSize:".95rem",fontWeight:600,color:T.txt,lineHeight:1.4,marginBottom:n.body?5:0}}>{n.title}</div>
+                      {n.body&&<div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5,marginBottom:6,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{n.body}</div>}
+                      <div style={{fontSize:".68rem",color:T.mute,marginTop:6,paddingTop:6,borderTop:"1px solid "+T.border}}>SKINARIO Editorial · {fD(n.date)}{(n.views||0)>0?` · 👁️ ${n.views}`:""}{n.url&&" · Read →"}</div>
                     </div>
                   </a>
                 )})}
+              </div>}
+
+              {/* Research papers — upgraded rows */}
+              {research.length>0&&<>
+                {newsPosts.length>0&&<div style={{fontSize:".7rem",color:T.mute,fontWeight:600,letterSpacing:1.2,textTransform:"uppercase",marginBottom:10,paddingTop:6,borderTop:"1px dashed "+T.border}}>🔬 Latest peer-reviewed research</div>}
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {research.slice(0,4).map(r=>{const[cBg,cFg]=topicColor(r.topic);return(
+                    <a key={r.pmid} href={r.url} target="_blank" rel="noopener noreferrer"
+                      style={{display:"flex",gap:14,padding:"12px 14px",borderRadius:10,border:"1px solid "+T.border,textDecoration:"none",color:"inherit",background:"#fff",transition:"all .15s"}}
+                      onMouseEnter={e=>{e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.background=T.tealBg+"22"}}
+                      onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background="#fff"}}
+                    >
+                      <div style={{width:56,height:56,borderRadius:"50%",background:cBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.6rem",flexShrink:0}}>{r.icon||"🔬"}</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5,flexWrap:"wrap"}}>
+                          <span style={{padding:"2px 8px",borderRadius:10,fontSize:".66rem",fontWeight:600,background:cBg,color:cFg}}>{r.topic}</span>
+                          <span style={T.tag(T.bg,T.mute)}>🔬 PubMed</span>
+                        </div>
+                        <div style={{fontSize:".88rem",fontWeight:600,color:T.txt,lineHeight:1.4,marginBottom:4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{r.title}</div>
+                        <div style={{fontSize:".7rem",color:T.mute,fontStyle:"italic"}}>{r.journal}{r.authors?` · ${r.authors}`:""}{r.pubdate?` · ${r.pubdate}`:""} · Read on PubMed →</div>
+                      </div>
+                    </a>
+                  )})}
+                </div>
+              </>}
+            </div>}
+
+            {/* ═════════ CLINICAL TRIALS ═════════ */}
+            {hasTrials&&<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.teal}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
+                <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>🧪 Active Clinical Trials</h3>
+                <span style={{fontSize:".7rem",color:T.mute}}>Recruiting now on ClinicalTrials.gov</span>
               </div>
-              <p style={{fontSize:".66rem",color:T.mute,marginTop:10,textAlign:"center",fontStyle:"italic"}}>Research papers fetched from PubMed (NIH/NLM). Click to read on PubMed.</p>
-            </>}
-          </div>);
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {trials.slice(0,6).map((t,i)=><a key={t.nctId||i} href={t.url} target="_blank" rel="noopener noreferrer"
+                  style={{display:"flex",gap:12,padding:"12px 14px",borderRadius:10,border:"1px solid "+T.border,textDecoration:"none",color:"inherit",background:"#fff",transition:"all .15s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.background=T.tealBg+"22"}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background="#fff"}}
+                >
+                  <div style={{width:48,height:48,borderRadius:8,background:T.tealBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.4rem",flexShrink:0}}>{t.icon||"🧪"}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",gap:5,marginBottom:5,flexWrap:"wrap"}}>
+                      {t.status&&<span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:700,background:t.status==="RECRUITING"?"#e8f5e9":T.bg,color:t.status==="RECRUITING"?"#1b5e20":T.mute}}>{t.status.replace(/_/g," ")}</span>}
+                      {t.phase&&<span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:600,background:T.bg,color:T.mute}}>{t.phase}</span>}
+                      {t.condition&&<span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:600,background:T.tealBg,color:T.teal}}>{t.condition}</span>}
+                    </div>
+                    <div style={{fontSize:".86rem",fontWeight:600,color:T.txt,lineHeight:1.4,marginBottom:4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{t.title}</div>
+                    <div style={{fontSize:".68rem",color:T.mute,fontStyle:"italic"}}>{t.sponsor||"ClinicalTrials.gov"}{t.country?` · ${t.country}`:""}{t.startDate?` · Started ${t.startDate}`:""} · {t.nctId} →</div>
+                  </div>
+                </a>)}
+              </div>
+            </div>}
+
+            {/* Admin-only empty hint when ALL sources are empty */}
+            {!anyContent&&!researchLoading&&!newsFeedsLoading&&isAdmin&&<div style={{...T.card,textAlign:"center",padding:30,color:T.txt2,fontSize:".84rem",lineHeight:1.55,marginBottom:14}}>
+              <div style={{fontSize:"2rem",marginBottom:8}}>📰</div>
+              <div style={{fontWeight:600,color:T.txt,marginBottom:6}}>All news feeds are empty</div>
+              <div style={{fontSize:".78rem"}}>
+                Check that <code style={{background:T.bg,padding:"1px 6px",borderRadius:4,fontSize:".74rem"}}>/api/research</code>, <code style={{background:T.bg,padding:"1px 6px",borderRadius:4,fontSize:".74rem"}}>/api/fda-alerts</code>, <code style={{background:T.bg,padding:"1px 6px",borderRadius:4,fontSize:".74rem"}}>/api/clinical-trials</code>, and <code style={{background:T.bg,padding:"1px 6px",borderRadius:4,fontSize:".74rem"}}>/api/industry-news</code> are all deployed. Try opening each URL directly to test.
+              </div>
+            </div>}
+
+          </>);
         })()}
+
 
         <h3 style={{fontSize:"1.05rem",fontWeight:700,marginBottom:12}}>Latest articles</h3>
         {articles.length===0&&<p style={{color:T.mute}}>No articles yet. Admins can create them from Admin panel.</p>}
