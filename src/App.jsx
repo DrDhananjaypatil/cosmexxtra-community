@@ -36,6 +36,134 @@ function isContentContributor(u){return u?.role===ROLES.CONTENT_CONTRIBUTOR||isA
 function isForumModerator(u){return u?.role===ROLES.FORUM_MODERATOR||isAdminUser(u)}
 function hasAnyModRole(u){return u?.role&&Object.values(ROLES).includes(u.role)||isAdminUser(u)}
 
+// ═══ CONTENT SUBMISSION TYPES — unified config for all 5 types ═══
+// Each type defines: who can submit, target collection on approval, fields, image dims, label.
+// This is the single source of truth. Forms + review UI + approval handler all read from here.
+const SUBMISSION_TYPES={
+  event:{
+    label:"Event",
+    icon:"📅",
+    color:"#0d6b6e",
+    targetCollection:"events",
+    openToAll:true, // anyone signed in can submit
+    description:"Conferences, workshops, webinars — relevant to aesthetic medicine.",
+    imageHint:"Recommended banner size: 600×260 px (landscape)",
+    imageKey:"banner", // saves uploaded image to this field name
+    imageRecommendedW:600,
+    imageRecommendedH:260,
+    fields:[
+      {key:"title",label:"Event title",required:true,placeholder:"e.g. Advanced Botox Masterclass 2026"},
+      {key:"cat",label:"Category",required:true,type:"select",options:["Conference","Workshop","Masterclass","Webinar","Product Launch","Course Deadline","Other"]},
+      {key:"date",label:"Start date",required:true,type:"date"},
+      {key:"endDate",label:"End date (leave blank for single-day event)",required:false,type:"date"},
+      {key:"time",label:"Time",required:false,placeholder:"e.g. 10:00 AM - 4:00 PM IST"},
+      {key:"location",label:"Location",required:true,placeholder:"e.g. Hotel Sahara Star, Mumbai — or 'Online'"},
+      {key:"organizer",label:"Organizer / Host",required:false,placeholder:"e.g. Absolute Institute"},
+      {key:"body",label:"Description",required:true,type:"textarea",rows:4,placeholder:"What is this event about? Who should attend? What will they learn?"},
+      {key:"speakers",label:"Speakers (comma-separated)",required:false,type:"textarea",rows:2,placeholder:"Dr. ABC, Dr. XYZ"},
+      {key:"sponsor",label:"Sponsored by (leave blank if not sponsored)",required:false,placeholder:"e.g. Sun Pharma"},
+      {key:"regType",label:"Registration type",required:false,type:"select",options:["internal","external"]},
+      {key:"regUrl",label:"External registration URL (if regType is external)",required:false,placeholder:"https://..."},
+      {key:"regCta",label:"CTA button text",required:false,placeholder:"e.g. Buy ticket, Register on Eventbrite"},
+    ],
+  },
+  article:{
+    label:"Article",
+    icon:"📰",
+    color:"#0d6b6e",
+    targetCollection:"articles",
+    openToAll:false, // Content Contributors only
+    description:"Write or share an educational article on aesthetic medicine topics.",
+    imageHint:"Recommended cover size: 1200×630 px (article hero)",
+    imageKey:"cover",
+    imageRecommendedW:1200,
+    imageRecommendedH:630,
+    fields:[
+      {key:"title",label:"Title",required:true,placeholder:"e.g. Long-term outcomes of PDRN therapy"},
+      {key:"subtitle",label:"Subtitle / Tagline (optional, shown below title in italic)",required:false,placeholder:"A 5-year follow-up study"},
+      {key:"cat",label:"Category",required:true,type:"select",options:["Botox","Fillers","Threads","PDRN","Lasers","Hair","Body","Skincare","Pigmentation","Acne","General"]},
+      {key:"author",label:"Author name",required:true,placeholder:"e.g. Dr. Dhananjay Patil, MD"},
+      {key:"authorAffiliation",label:"Author affiliation",required:false,placeholder:"e.g. Absolute Institute of Aesthetic Medicine, Pune"},
+      {key:"date",label:"Publication date",required:false,type:"date"},
+      {key:"abstract",label:"Abstract / Summary (optional — boxed italic intro)",required:false,type:"textarea",rows:3,placeholder:"2-3 sentence summary of the article"},
+      {key:"body",label:"Article body",required:true,type:"textarea",rows:10,placeholder:"Full article text. Use double line breaks between paragraphs."},
+      {key:"refs",label:"References (optional)",required:false,type:"textarea",rows:3,placeholder:"List references — one per line"},
+      {key:"authorBio",label:"Author bio (optional — shown at end of article)",required:false,type:"textarea",rows:2,placeholder:"Short bio about you"},
+    ],
+  },
+  video:{
+    label:"Video",
+    icon:"🎥",
+    color:"#c8a84e",
+    targetCollection:"videos",
+    openToAll:false,
+    description:"Share an educational YouTube video.",
+    imageHint:"Thumbnail is fetched automatically from YouTube",
+    imageKey:"",
+    imageRecommendedW:0,
+    imageRecommendedH:0,
+    fields:[
+      {key:"title",label:"Video title",required:true,placeholder:"e.g. Step-by-step PDO thread placement"},
+      {key:"cat",label:"Category",required:true,type:"select",options:["Botox","Fillers","Threads","PDRN","Lasers","Hair","Body","Skincare","Pigmentation","Acne","General"]},
+      {key:"embedUrl",label:"YouTube URL",required:true,placeholder:"https://www.youtube.com/watch?v=... (any YouTube URL format)"},
+      {key:"dur",label:"Duration (optional)",required:false,placeholder:"e.g. 12:34"},
+      {key:"desc",label:"Description",required:false,type:"textarea",rows:3,placeholder:"What does this video cover? Why is it valuable?"},
+    ],
+  },
+  ad:{
+    label:"Advertisement",
+    icon:"📢",
+    color:"#bf6a00",
+    targetCollection:"ads",
+    openToAll:false, // Content Contributors only — to prevent spam
+    description:"Promote courses, services, or institute offerings. Will display as 'Sponsored' to users.",
+    imageHint:"Recommended banner size: 600×340 px (landscape ad)",
+    imageKey:"image",
+    imageRecommendedW:600,
+    imageRecommendedH:340,
+    fields:[
+      {key:"title",label:"Title",required:true,placeholder:"e.g. Master Botox in 3 days — Absolute Institute"},
+      {key:"adType",label:"Ad type",required:true,type:"select",options:["external","internal"]},
+      {key:"desc",label:"Short description (shown in sidebar card)",required:true,type:"textarea",rows:2,placeholder:"One sentence hook"},
+      {key:"url",label:"Click-through URL",required:true,placeholder:"https://..."},
+      {key:"tag",label:"Category tag",required:false,placeholder:"e.g. Course, Pharma, Institute"},
+      {key:"body",label:"Full description (only for internal-page ads)",required:false,type:"textarea",rows:4,placeholder:"Detailed content for the internal landing page"},
+      {key:"cta",label:"CTA button text (optional)",required:false,placeholder:"e.g. Visit website, Register now"},
+      {key:"contact",label:"Contact info (optional, for internal-page ads)",required:false,placeholder:"e.g. info@absolute.com / +91 9876543210"},
+      {key:"expiry",label:"Expiry date (leave blank for no expiry)",required:false,type:"date"},
+    ],
+  },
+  news:{
+    label:"News Item",
+    icon:"📰",
+    color:"#c5392a",
+    targetCollection:"news",
+    openToAll:false, // Content Contributors only
+    description:"Share aesthetic medicine industry news — product launches, regulatory updates, conference recaps.",
+    imageHint:"Recommended thumbnail: 600×400 px (3:2 ratio)",
+    imageKey:"image",
+    imageRecommendedW:600,
+    imageRecommendedH:400,
+    fields:[
+      {key:"title",label:"News headline",required:true,placeholder:"e.g. FDA approves new biostimulator filler"},
+      {key:"cat",label:"Topic",required:true,type:"select",options:["Botox","Fillers","Threads","PDRN","Lasers","Hair","Body","Skincare","Pigmentation","Acne","Industry","Regulatory","General"]},
+      {key:"body",label:"Brief summary",required:false,type:"textarea",rows:3,placeholder:"1-2 sentence summary"},
+      {key:"url",label:"Source link",required:true,placeholder:"https://... — where users can read the full article"},
+    ],
+  },
+};
+
+// Helper: who is allowed to submit a given content type?
+function canSubmitType(typeKey, user, profile) {
+  if (!user) return false;
+  if (isAdminUser(user.email || user)) return true; // admins always can
+  const cfg = SUBMISSION_TYPES[typeKey];
+  if (!cfg) return false;
+  if (cfg.openToAll) return true;
+  // Restricted: Content Contributor or higher
+  return profile?.role === ROLES.CONTENT_CONTRIBUTOR || profile?.role === ROLES.FORUM_MODERATOR;
+}
+
 // ═══ TIER SYSTEM — sticky badges based on lifetime points ═══
 const TIERS=[
   {id:"beginner",label:"Beginner",min:0,max:49,color:"#888",bg:"#f0f0f0"},
@@ -660,6 +788,138 @@ function RoleApplicationCard({ T, prof, myPending, myLatest, ROLES, ROLE_DISPLAY
 }
 
 // ═══ MANUAL ROLE ASSIGNMENT (admin-only widget) ═══
+// ═══ UNIFIED SUBMISSION FORM (handles all 5 content types) ═══
+function SubmissionForm({ typeKey, cfg, T, storage, ref, uploadBytes, getDownloadURL, submitContent, onSuccess, sh }) {
+  const [formData, setFormData] = useState({});
+  const [coverImage, setCoverImage] = useState("");
+  const [imageDims, setImageDims] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const setField = (key, val) => setFormData(prev => ({...prev, [key]: val}));
+
+  const handleImageUpload = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setUploading(true);
+    try {
+      // Read dimensions for preview/guidance
+      const dims = await new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve({w: img.naturalWidth, h: img.naturalHeight});
+        img.onerror = () => resolve(null);
+        img.src = URL.createObjectURL(f);
+      });
+      setImageDims(dims);
+
+      const path = `submissions/${typeKey}/${Date.now()}_${f.name}`;
+      const sRef = ref(storage, path);
+      await uploadBytes(sRef, f);
+      const url = await getDownloadURL(sRef);
+      setCoverImage(url);
+      sh("Image uploaded");
+    } catch (err) {
+      console.error(err);
+      sh("Upload failed");
+    }
+    if (e.target) e.target.value = "";
+    setUploading(false);
+  };
+
+  const dimsMatch = imageDims && cfg.imageRecommendedW > 0 &&
+    Math.abs(imageDims.w - cfg.imageRecommendedW) < 50 &&
+    Math.abs(imageDims.h - cfg.imageRecommendedH) < 30;
+  const dimsRatioMatch = imageDims && cfg.imageRecommendedW > 0 &&
+    Math.abs((imageDims.w / imageDims.h) - (cfg.imageRecommendedW / cfg.imageRecommendedH)) < 0.1;
+
+  const handleSubmit = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    const result = await submitContent(typeKey, formData, coverImage);
+    if (result.ok) {
+      setFormData({}); setCoverImage(""); setImageDims(null);
+      if (onSuccess) onSuccess();
+    } else if (result.error) {
+      sh(result.error);
+    }
+    setSubmitting(false);
+  };
+
+  return (
+    <div>
+      <div style={{padding: "12px 14px", background: T.tealBg, borderLeft: "3px solid " + T.teal, borderRadius: "0 8px 8px 0", marginBottom: 16, fontSize: ".82rem", color: T.txt2, lineHeight: 1.55}}>
+        <div style={{fontWeight: 600, color: T.teal, marginBottom: 4}}>{cfg.icon} Submitting: {cfg.label}</div>
+        {cfg.description}
+      </div>
+
+      {cfg.fields.map(field => {
+        const val = formData[field.key] || "";
+        return (
+          <div key={field.key} style={{marginBottom: 14}}>
+            <label style={{display: "block", fontSize: ".7rem", color: T.teal, marginBottom: 4, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1}}>
+              {field.label} {field.required && <span style={{color: T.err}}>*</span>}
+            </label>
+            {field.type === "textarea" ? (
+              <textarea value={val} onChange={e => setField(field.key, e.target.value)} placeholder={field.placeholder || ""} rows={field.rows || 3} style={{...T.txa, fontSize: ".88rem", lineHeight: 1.55}}/>
+            ) : field.type === "select" ? (
+              <select value={val} onChange={e => setField(field.key, e.target.value)} style={T.inp}>
+                <option value="">— select —</option>
+                {(field.options || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            ) : field.type === "date" ? (
+              <input type="date" value={val} onChange={e => setField(field.key, e.target.value)} style={T.inp}/>
+            ) : (
+              <input type="text" value={val} onChange={e => setField(field.key, e.target.value)} placeholder={field.placeholder || ""} style={T.inp}/>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Image upload — only if type expects one */}
+      {cfg.imageRecommendedW > 0 && (
+        <div style={{marginBottom: 16}}>
+          <label style={{display: "block", fontSize: ".7rem", color: T.teal, marginBottom: 4, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1}}>
+            Cover image / Poster
+          </label>
+          <div style={{padding: "8px 12px", background: T.bg, borderRadius: 6, fontSize: ".78rem", color: T.txt2, marginBottom: 10, lineHeight: 1.55}}>
+            <b>📐 {cfg.imageHint}</b><br/>
+            <span style={{fontSize: ".72rem", color: T.mute}}>Tip: You can generate a poster of this exact size using ChatGPT, DALL-E, or Canva.</span>
+          </div>
+
+          {coverImage ? (
+            <div style={{marginBottom: 8}}>
+              <div style={{position: "relative", width: "100%", maxWidth: 360, borderRadius: 8, overflow: "hidden", border: "1px solid " + T.border}}>
+                <img src={coverImage} style={{width: "100%", display: "block"}}/>
+                <button onClick={() => {setCoverImage(""); setImageDims(null)}} style={{position: "absolute", top: 8, right: 8, width: 28, height: 28, borderRadius: "50%", background: "rgba(0,0,0,.6)", color: "#fff", border: "none", fontSize: ".8rem", cursor: "pointer"}}>✕</button>
+              </div>
+              {imageDims && (
+                <div style={{marginTop: 6, fontSize: ".75rem", color: dimsMatch ? T.ok : dimsRatioMatch ? T.gold : T.warn}}>
+                  Uploaded: {imageDims.w}×{imageDims.h} px
+                  {dimsMatch && " — perfect match ✓"}
+                  {!dimsMatch && dimsRatioMatch && " — correct aspect ratio, larger size (ok)"}
+                  {!dimsMatch && !dimsRatioMatch && ` — recommended is ${cfg.imageRecommendedW}×${cfg.imageRecommendedH}. It may not display optimally.`}
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          <input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploading} style={{fontSize: ".8rem"}}/>
+          {uploading && <span style={{marginLeft: 8, fontSize: ".75rem", color: T.mute}}>Uploading...</span>}
+        </div>
+      )}
+
+      <div style={{display: "flex", gap: 10, marginTop: 18, paddingTop: 14, borderTop: "1px solid " + T.border}}>
+        <button onClick={handleSubmit} disabled={submitting || uploading} style={{...T.btn, padding: "10px 22px", opacity: submitting ? 0.6 : 1}}>
+          {submitting ? "Submitting..." : `📨 Submit ${cfg.label}`}
+        </button>
+      </div>
+
+      <p style={{marginTop: 10, fontSize: ".72rem", color: T.mute, fontStyle: "italic", lineHeight: 1.5}}>
+        💡 Your submission goes to admin for review. You'll get a notification once it's approved or if changes are needed.
+      </p>
+    </div>
+  );
+}
+
 function ManualRoleAssign({ allUsers, assignRole, T, ROLES, ROLE_DISPLAY }) {
   const [search, setSearch] = useState("");
   const [pickedUser, setPickedUser] = useState(null);
@@ -790,6 +1050,8 @@ export default function App(){
   const[redemptions,setRedemptions]=useState([]);
   const[roleApplications,setRoleApplications]=useState([]);
   const[moderationLog,setModerationLog]=useState([]);
+  const[submissions,setSubmissions]=useState([]);
+  const[submitType,setSubmitType]=useState("");
   const[notifs,setNotifs]=useState([]);
   const[notifsOpen,setNotifsOpen]=useState(false);
   const[mentionMatches,setMentionMatches]=useState([]);
@@ -825,7 +1087,7 @@ export default function App(){
   const[events,setEvents]=useState([]);
   const[selAd,setSelAd]=useState(null);
   const[selE,setSelE]=useState(null);
-  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml)},[]);
+  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub)},[]);
 
   useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){setProf(p);setScr("main");loadData()}else{setPf({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:au?.displayName||"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});setSetupStep(0);setSetupErr("");setScr("setup")}}else{setAu(null);setProf(null);setScr("login")}});return()=>unsub()},[loadData]);
 
@@ -1301,6 +1563,164 @@ export default function App(){
       sh(`Application ${decision}`);
       loadData();
     }catch(err){console.error("reviewApplication error:",err);sh("Review failed")}
+  };
+
+  // ═══ CONTENT SUBMISSION SYSTEM ═══
+  // User submits content → goes into 'submissions' collection with status:"pending"
+  // Admin/Moderator reviews → on approve, data is copied to target collection (events/articles/etc.)
+  // Pattern handles all 5 types uniformly via SUBMISSION_TYPES config.
+
+  const submitContent=async(typeKey,formData,coverImage)=>{
+    if(!au||!prof)return{ok:false,error:"Not signed in"};
+    if(!canSubmitType(typeKey,au,prof))return{ok:false,error:"You don't have permission to submit this type"};
+    const cfg=SUBMISSION_TYPES[typeKey];
+    if(!cfg)return{ok:false,error:"Unknown content type"};
+    // Validate required fields
+    for(const f of cfg.fields){
+      if(f.required&&!(formData[f.key]||"").toString().trim()){
+        return{ok:false,error:`"${f.label}" is required`};
+      }
+    }
+    // Cross-field validation: event end date must be ≥ start date
+    if(typeKey==="event"&&formData.endDate&&formData.date&&formData.endDate<formData.date){
+      return{ok:false,error:"End date must be on or after start date"};
+    }
+    try{
+      await fbAdd("submissions",{
+        type:typeKey,
+        submitterUid:au.uid,
+        submitterName:uName,
+        submitterEmail:au.email,
+        submitterAccountType:prof.accountType||"unknown",
+        submitterRole:prof.role||null,
+        data:formData,
+        coverImage:coverImage||"",
+        status:"pending", // pending | approved | rejected
+        createdAt:Date.now(),
+        date:ds(getIST()),
+      });
+      sh(`📨 ${cfg.label} submitted! You'll hear from admin once reviewed.`);
+      loadData();
+      return{ok:true};
+    }catch(err){
+      console.error("submitContent error:",err);
+      sh("Submission failed — please try again");
+      return{ok:false,error:err.message};
+    }
+  };
+
+  const approveSubmission=async(submissionId,edits=null)=>{
+    if(!isAdminUser(au?.email)){sh("Admin only");return}
+    const sub=submissions.find(s=>s.id===submissionId);
+    if(!sub){sh("Submission not found");return}
+    const cfg=SUBMISSION_TYPES[sub.type];
+    if(!cfg){sh("Unknown content type");return}
+    try{
+      // Build the final data — merge submission with any admin edits
+      const finalData=edits?{...sub.data,...edits}:sub.data;
+      // Build the doc to insert into the target collection
+      const targetDoc={
+        ...finalData,
+        // Submitter metadata (always tracked)
+        authorUid:sub.submitterUid,
+        authorAccountType:sub.submitterAccountType,
+        submitterName:sub.submitterName,
+        // Engagement fields
+        likedBy:[],
+        likes:0,
+        comments:[],
+        views:0,
+        date:finalData.date||ds(getIST()),
+        createdAt:Date.now(),
+        submittedVia:"user-submission",
+        sourceSubmissionId:submissionId,
+      };
+      // Place uploaded image into the correct field name for this content type
+      if(sub.coverImage&&cfg.imageKey){
+        targetDoc[cfg.imageKey]=sub.coverImage;
+      }
+      // For articles, the form has its own `author` field — keep it; otherwise use submitter name
+      if(sub.type!=="article"||!finalData.author){
+        targetDoc.author=sub.submitterName;
+      }
+      // Special handling for ads (no comments/likes structure)
+      if(sub.type==="ad"){
+        delete targetDoc.likedBy;delete targetDoc.likes;delete targetDoc.comments;
+        targetDoc.active=true; // approved ads go live immediately
+      }
+      // Special handling for events — regType defaults to internal if not set
+      if(sub.type==="event"&&!targetDoc.regType){
+        targetDoc.regType="internal";
+      }
+      // Insert into target collection
+      const newId=await fbAdd(cfg.targetCollection,targetDoc);
+      // Update submission status
+      await fbSet("submissions",submissionId,{
+        status:"approved",
+        reviewedAt:Date.now(),
+        reviewerUid:au.uid,
+        reviewerName:uName,
+        publishedId:newId,
+      });
+      // Log + notify
+      await logModerationAction("submission_approved",{
+        submissionId,
+        type:sub.type,
+        submitterUid:sub.submitterUid,
+        submitterName:sub.submitterName,
+        publishedId:newId,
+      });
+      createNotif({
+        toUid:sub.submitterUid,
+        fromUid:au.uid,
+        fromName:uName,
+        fromIni:uIni,
+        fromPhoto:uPhoto,
+        type:"announcement",
+        text:`approved your ${cfg.label} submission "${(finalData.title||"").slice(0,40)}"`,
+      });
+      sh(`✅ Approved & published as ${cfg.label}`);
+      loadData();
+    }catch(err){
+      console.error("approveSubmission error:",err);
+      sh("Approval failed");
+    }
+  };
+
+  const rejectSubmission=async(submissionId,reason)=>{
+    if(!isAdminUser(au?.email)){sh("Admin only");return}
+    const sub=submissions.find(s=>s.id===submissionId);
+    if(!sub)return;
+    try{
+      await fbSet("submissions",submissionId,{
+        status:"rejected",
+        reviewedAt:Date.now(),
+        reviewerUid:au.uid,
+        reviewerName:uName,
+        rejectionReason:reason||"",
+      });
+      await logModerationAction("submission_rejected",{
+        submissionId,
+        type:sub.type,
+        submitterUid:sub.submitterUid,
+        submitterName:sub.submitterName,
+        reason,
+      });
+      createNotif({
+        toUid:sub.submitterUid,
+        fromUid:au.uid,
+        fromName:uName,
+        fromIni:uIni,
+        fromPhoto:uPhoto,
+        type:"announcement",
+        text:`reviewed your submission — see status on your Me page`,
+      });
+      sh("Submission rejected");
+      loadData();
+    }catch(err){
+      console.error("rejectSubmission error:",err);
+      sh("Rejection failed");
+    }
   };
 
   const redeemReward=async(reward)=>{
@@ -2583,7 +3003,10 @@ export default function App(){
         return(<div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
             <div><h3 style={{fontSize:"1.3rem",fontWeight:700,margin:0}}>📅 Events</h3><p style={{color:T.mute,fontSize:".85rem",marginTop:3}}>Conferences, workshops, webinars & masterclasses</p></div>
-            {isAdm&&<button onClick={()=>{setATab("events");go("admin")}} style={T.btnO}>⚙️ Manage events</button>}
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <button onClick={()=>{setSubmitType("event");go("submit")}} style={{...T.btn,padding:"7px 14px",fontSize:".82rem"}}>📨 Submit event</button>
+              {isAdm&&<button onClick={()=>{setATab("events");go("admin")}} style={T.btnO}>⚙️ Manage</button>}
+            </div>
           </div>
           <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
             {[["upcoming","Upcoming",upcoming.length],["past","Past events",past.length]].map(([id,l,n])=><button key={id} onClick={()=>setATab("ev_"+id)} style={{padding:"7px 14px",borderRadius:10,border:`1.5px solid ${evTab===id?T.teal:T.border}`,background:evTab===id?T.tealBg:"#fff",color:evTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".82rem",fontWeight:evTab===id?600:400,fontFamily:"inherit"}}>{l} ({n})</button>)}
@@ -3218,6 +3641,85 @@ export default function App(){
 
       {/* PROFILE */}
       {/* ═══ REWARDS PAGE — browse catalog + see your redemptions ═══ */}
+      {/* ═══ SUBMIT CONTENT PAGE ═══ */}
+      {pg==="submit"&&<div style={{maxWidth:760}}>
+        <div style={{...T.card,padding:22,background:"linear-gradient(135deg,#fff,"+T.tealBg+"55)",borderLeft:"3px solid "+T.teal,marginBottom:16}}>
+          <h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0,display:"flex",alignItems:"center",gap:8}}>📨 Submit Content</h2>
+          <p style={{color:T.txt2,fontSize:".88rem",marginTop:6,lineHeight:1.55,marginBottom:0}}>
+            Share events, articles, videos, ads, or news with the SKINARIO community.
+            Submissions are reviewed by admins before going live.
+          </p>
+        </div>
+
+        {/* Type picker — show what each user is allowed to submit */}
+        {!submitType&&<div style={T.card}>
+          <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>What do you want to submit?</h4>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:10}}>
+            {Object.entries(SUBMISSION_TYPES).map(([key,cfg])=>{
+              const allowed=canSubmitType(key,au,prof);
+              return(<div key={key} onClick={()=>{if(allowed)setSubmitType(key)}} style={{padding:14,borderRadius:10,border:`1.5px solid ${allowed?T.border:T.border}`,background:allowed?"#fff":T.bg,cursor:allowed?"pointer":"not-allowed",opacity:allowed?1:0.5,transition:"all .15s"}} onMouseEnter={e=>{if(allowed){e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 4px 12px rgba(0,0,0,0.06)"}}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                  <span style={{fontSize:"1.4rem"}}>{cfg.icon}</span>
+                  <span style={{fontWeight:600,fontSize:".95rem",color:T.txt}}>{cfg.label}</span>
+                </div>
+                <div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5,marginBottom:8}}>{cfg.description}</div>
+                {!allowed&&<div style={{fontSize:".7rem",color:T.warn,fontWeight:600,padding:"4px 8px",background:T.warnBg,borderRadius:6,display:"inline-block"}}>🔒 Content Contributor role required</div>}
+                {allowed&&cfg.openToAll&&<div style={{fontSize:".68rem",color:T.ok,fontWeight:600}}>✓ Open to all members</div>}
+                {allowed&&!cfg.openToAll&&<div style={{fontSize:".68rem",color:T.teal,fontWeight:600}}>✓ You have access</div>}
+              </div>);
+            })}
+          </div>
+          {!prof?.role&&!isAdminUser(au?.email)&&<div style={{marginTop:14,padding:"10px 12px",background:T.bg,borderRadius:8,fontSize:".78rem",color:T.txt2,lineHeight:1.55}}>
+            💡 To submit ads, news, articles, or videos, apply for the <b>Content Contributor</b> role from your <span onClick={()=>go("me")} style={{color:T.teal,fontWeight:600,cursor:"pointer",textDecoration:"underline"}}>Me page</span>. Events are open to everyone.
+          </div>}
+        </div>}
+
+        {/* Form for selected type */}
+        {submitType&&SUBMISSION_TYPES[submitType]&&<div style={T.card}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,paddingBottom:14,borderBottom:"1px solid "+T.border}}>
+            <h4 style={{fontSize:"1rem",fontWeight:700,margin:0}}>{SUBMISSION_TYPES[submitType].icon} New {SUBMISSION_TYPES[submitType].label}</h4>
+            <button onClick={()=>setSubmitType("")} style={{...T.btnO,padding:"6px 14px",fontSize:".82rem"}}>← Back</button>
+          </div>
+          <SubmissionForm
+            typeKey={submitType}
+            cfg={SUBMISSION_TYPES[submitType]}
+            T={T}
+            storage={storage}
+            ref={ref}
+            uploadBytes={uploadBytes}
+            getDownloadURL={getDownloadURL}
+            submitContent={submitContent}
+            sh={sh}
+            onSuccess={()=>setSubmitType("")}
+          />
+        </div>}
+
+        {/* My Submissions */}
+        {(()=>{
+          const mine=submissions.filter(s=>s.submitterUid===au?.uid);
+          if(mine.length===0)return null;
+          return(<div style={{...T.card,marginTop:16}}>
+            <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12,display:"flex",alignItems:"center",gap:8}}>📋 My submissions ({mine.length})</h4>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {mine.map(s=>{const cfg=SUBMISSION_TYPES[s.type]||{label:s.type,icon:"📄"};const statusColor={pending:T.warn,approved:T.ok,rejected:T.err}[s.status]||T.mute;const statusBg={pending:T.warnBg,approved:T.okBg,rejected:T.errBg}[s.status]||T.bg;return(
+                <div key={s.id} style={{padding:"10px 12px",border:"1px solid "+T.border,borderRadius:8,background:"#fff"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
+                    <div style={{flex:1,minWidth:200}}>
+                      <div style={{fontSize:".88rem",fontWeight:600,marginBottom:3}}>{cfg.icon} {s.data?.title||"Untitled"}</div>
+                      <div style={{fontSize:".7rem",color:T.mute}}>{cfg.label} · {fD(s.date)}</div>
+                      {s.status==="rejected"&&s.rejectionReason&&<div style={{fontSize:".78rem",color:T.txt2,marginTop:6,padding:"6px 10px",background:T.errBg,borderRadius:6,borderLeft:"3px solid "+T.err}}>
+                        <b>Rejected:</b> {s.rejectionReason}
+                      </div>}
+                    </div>
+                    <span style={{padding:"3px 9px",borderRadius:10,fontSize:".66rem",fontWeight:700,letterSpacing:.5,textTransform:"uppercase",background:statusBg,color:statusColor,flexShrink:0}}>{s.status||"pending"}</span>
+                  </div>
+                </div>
+              );})}
+            </div>
+          </div>);
+        })()}
+      </div>}
+
       {pg==="rewards"&&<div style={{maxWidth:780}}>
         <div style={{...T.card,padding:22,background:"linear-gradient(135deg,#fff,"+T.goldBg+"55)",borderLeft:"3px solid "+T.gold,marginBottom:16}}>
           <h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0,display:"flex",alignItems:"center",gap:8}}>🎁 Rewards</h2>
@@ -3297,6 +3799,18 @@ export default function App(){
       </div>}
 
       {pg==="me"&&<div style={{maxWidth:640}}>
+
+        {/* ═══ SUBMIT CONTENT BUTTON ═══ */}
+        {!editingProfile&&<div style={{...T.card,padding:16,marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",borderLeft:"3px solid "+T.gold,background:"linear-gradient(135deg,#fff,"+T.goldBg+"55)"}}>
+          <div style={{flex:1,minWidth:200}}>
+            <div style={{fontSize:".95rem",fontWeight:700,marginBottom:3}}>📨 Submit content to SKINARIO</div>
+            <div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.55}}>
+              Events, articles, videos, news, and ads — your contributions help grow the community.
+              {!prof?.role&&!isAdminUser(au?.email)&&<> Events are open to all; rest needs Content Contributor role.</>}
+            </div>
+          </div>
+          <button onClick={()=>{setSubmitType("");go("submit")}} style={{...T.btn,padding:"10px 20px",fontSize:".85rem",whiteSpace:"nowrap"}}>📨 Submit</button>
+        </div>}
 
         {/* ═══ ROLE APPLICATION CARD (visible only if no role yet & no pending app) ═══ */}
         {!editingProfile&&!prof?.role&&!isAdminUser(au?.email)&&(()=>{
@@ -3571,7 +4085,7 @@ export default function App(){
       {pg==="admin"&&isAdm&&<div>
         <h3 style={{fontSize:"1.15rem",fontWeight:700,marginBottom:12}}>⚙️ Admin dashboard</h3>
         <div style={{display:"flex",gap:5,marginBottom:16,flexWrap:"wrap"}}>
-          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["roles","🛡️ Roles"],["announce","📣 Announce"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null)}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
+          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null)}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
         </div>
         {aTab==="stats"&&<><div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length],["Events",events.length],["Ads",ads.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>
           {/* ═══ ANALYTICS — top viewed content ═══ */}
@@ -3998,6 +4512,90 @@ export default function App(){
               <div style={{fontSize:".68rem",color:T.mute,flexShrink:0}}>{fD(log.date)}</div>
             </div>)}
           </div>
+        </div>}
+
+        {aTab==="submissions"&&<div>
+          <div style={{...T.card,marginBottom:14}}>
+            <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>📥 Submission Review Queue</h4>
+            <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.55,marginBottom:0}}>
+              User-submitted content waiting for review. Approving publishes it to the appropriate section.
+              Rejecting notifies the submitter with your reason.
+            </p>
+          </div>
+
+          {/* Filter by status */}
+          {(()=>{
+            const pending=submissions.filter(s=>s.status==="pending");
+            const reviewed=submissions.filter(s=>s.status!=="pending");
+
+            return(<>
+              {/* PENDING */}
+              <div style={{...T.card,marginBottom:14,borderLeft:"3px solid "+T.gold}}>
+                <h5 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>⏳ Pending review ({pending.length})</h5>
+                {pending.length===0&&<p style={{color:T.mute,fontSize:".84rem"}}>Nothing waiting. Submissions from users will appear here.</p>}
+                {pending.map(sub=>{
+                  const cfg=SUBMISSION_TYPES[sub.type]||{label:sub.type,icon:"📄",color:T.teal};
+                  return(<div key={sub.id} style={{padding:14,border:"1px solid "+T.border,borderRadius:10,marginBottom:10,background:"#fff"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap",marginBottom:12}}>
+                      <div style={{flex:1,minWidth:240}}>
+                        <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap",alignItems:"center"}}>
+                          <span style={{padding:"3px 10px",borderRadius:10,fontSize:".7rem",fontWeight:700,background:T.tealBg,color:cfg.color}}>{cfg.icon} {cfg.label}</span>
+                          <span style={{fontSize:".7rem",color:T.mute}}>by <b style={{color:T.txt2}}>{sub.submitterName}</b> ({sub.submitterAccountType})</span>
+                        </div>
+                        <div style={{fontSize:"1rem",fontWeight:600,color:T.txt,lineHeight:1.4,marginBottom:6}}>{sub.data?.title||"Untitled"}</div>
+                        {sub.coverImage&&<img src={sub.coverImage} style={{maxWidth:300,maxHeight:160,borderRadius:8,border:"1px solid "+T.border,marginBottom:8,display:"block"}}/>}
+                        <div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.6}}>
+                          {Object.entries(sub.data||{}).filter(([k,v])=>k!=="title"&&v).map(([k,v])=>{
+                            const fieldDef=cfg.fields?.find(f=>f.key===k);
+                            const label=fieldDef?.label||k;
+                            return<div key={k} style={{marginBottom:4}}><b style={{color:T.txt}}>{label}:</b> {typeof v==="string"?v.slice(0,300)+(v.length>300?"...":""):String(v)}</div>;
+                          })}
+                        </div>
+                        <div style={{fontSize:".7rem",color:T.mute,marginTop:8,paddingTop:8,borderTop:"1px dashed "+T.border}}>
+                          Submitted {fD(sub.date)} · {sub.submitterEmail}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap",paddingTop:10,borderTop:"1px solid "+T.border}}>
+                      <button onClick={async()=>{
+                        if(confirm(`Approve & publish this ${cfg.label}?`)){
+                          await approveSubmission(sub.id);
+                        }
+                      }} style={{...T.btn,padding:"8px 16px",fontSize:".82rem"}}>✓ Approve & publish</button>
+                      <button onClick={async()=>{
+                        const reason=prompt("Why are you rejecting? (visible to submitter):","");
+                        if(reason===null)return;
+                        await rejectSubmission(sub.id,reason);
+                      }} style={{...T.btnDanger,padding:"8px 16px",fontSize:".82rem"}}>✗ Reject</button>
+                      <button onClick={()=>viewProfile(sub.submitterUid)} style={{...T.btnO,padding:"8px 16px",fontSize:".82rem"}}>View submitter →</button>
+                    </div>
+                  </div>);
+                })}
+              </div>
+
+              {/* REVIEWED (recent history) */}
+              {reviewed.length>0&&<div style={T.card}>
+                <h5 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>📜 Recent reviews ({reviewed.length})</h5>
+                {reviewed.slice(0,15).map(sub=>{
+                  const cfg=SUBMISSION_TYPES[sub.type]||{label:sub.type,icon:"📄"};
+                  const statusColor={approved:T.ok,rejected:T.err}[sub.status]||T.mute;
+                  const statusBg={approved:T.okBg,rejected:T.errBg}[sub.status]||T.bg;
+                  return(<div key={sub.id} style={{padding:"8px 12px",borderBottom:"1px solid "+T.border,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
+                    <div style={{flex:1,minWidth:200}}>
+                      <div style={{fontSize:".84rem",color:T.txt}}>
+                        {cfg.icon} <b>{sub.data?.title||"Untitled"}</b>
+                      </div>
+                      <div style={{fontSize:".7rem",color:T.mute,marginTop:2}}>
+                        {cfg.label} · {sub.submitterName} · reviewed by {sub.reviewerName||"admin"}
+                        {sub.rejectionReason&&<> · "{sub.rejectionReason}"</>}
+                      </div>
+                    </div>
+                    <span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:700,letterSpacing:.5,textTransform:"uppercase",background:statusBg,color:statusColor,flexShrink:0}}>{sub.status}</span>
+                  </div>);
+                })}
+              </div>}
+            </>);
+          })()}
         </div>}
 
         {aTab==="announce"&&<div style={T.card}>
