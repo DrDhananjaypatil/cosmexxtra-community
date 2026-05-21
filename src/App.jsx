@@ -980,6 +980,75 @@ function ManualRoleAssign({ allUsers, assignRole, T, ROLES, ROLE_DISPLAY }) {
   );
 }
 
+// ═══ FADE IN ON SCROLL — used by landing page ═══
+function FadeIn({ children, delay = 0, style = {} }) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    if (!ref.current) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setTimeout(() => setVisible(true), delay);
+            obs.disconnect();
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+    obs.observe(ref.current);
+    return () => obs.disconnect();
+  }, [delay]);
+  return (
+    <div
+      ref={ref}
+      style={{
+        ...style,
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0)" : "translateY(20px)",
+        transition: "opacity 0.8s ease-out, transform 0.8s ease-out",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ═══ COUNT UP ANIMATION — used for community size stat ═══
+function CountUp({ to, duration = 2000, suffix = "", style = {} }) {
+  const ref = useRef(null);
+  const [value, setValue] = useState(0);
+  const [started, setStarted] = useState(false);
+  useEffect(() => {
+    if (!ref.current || started) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !started) {
+            setStarted(true);
+            const start = Date.now();
+            const tick = () => {
+              const elapsed = Date.now() - start;
+              const progress = Math.min(elapsed / duration, 1);
+              // Ease out cubic
+              const eased = 1 - Math.pow(1 - progress, 3);
+              setValue(Math.floor(eased * to));
+              if (progress < 1) requestAnimationFrame(tick);
+            };
+            tick();
+            obs.disconnect();
+          }
+        });
+      },
+      { threshold: 0.3 }
+    );
+    obs.observe(ref.current);
+    return () => obs.disconnect();
+  }, [to, duration, started]);
+  return <span ref={ref} style={style}>{value}{suffix}</span>;
+}
+
 function ViewTracker({ trackingKey, onView, children, style }) {
   const ref = useRef(null);
   useEffect(() => {
@@ -1016,6 +1085,8 @@ function ViewTracker({ trackingKey, onView, children, style }) {
 
 export default function App(){
   const[au,setAu]=useState(null);const[prof,setProf]=useState(null);const[scr,setScr]=useState("loading");const[pg,setPg]=useState("home");
+  const[publicQuiz,setPublicQuiz]=useState(null);
+  const[publicQuizLoading,setPublicQuizLoading]=useState(false);
   const[welcomeSeen,setWelcomeSeen]=useState(()=>localStorage.getItem("sk_welcome")==="1");
   const[quizzes,setQuizzes]=useState([]);const[articles,setArticles]=useState([]);const[resources,setResources]=useState([]);const[videos,setVideos]=useState([]);const[forumPosts,setForumPosts]=useState([]);const[cases,setCases]=useState([]);const[allUsers,setAllUsers]=useState([]);
   const[selD,setSelD]=useState(ds(getIST()));const[selA,setSelA]=useState(null);const[selV,setSelV]=useState(null);const[selU,setSelU]=useState(null);const[toast,setToast]=useState(null);const[cmt,setCmt]=useState("");const[ld,setLd]=useState(false);const[aTab,setATab]=useState("stats");
@@ -1089,7 +1160,29 @@ export default function App(){
   const[selE,setSelE]=useState(null);
   const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub)},[]);
 
-  useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){setProf(p);setScr("main");loadData()}else{setPf({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:au?.displayName||"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});setSetupStep(0);setSetupErr("");setScr("setup")}}else{setAu(null);setProf(null);setScr("login")}});return()=>unsub()},[loadData]);
+  useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){setProf(p);setScr("main");loadData()}else{setPf({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:au?.displayName||"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});setSetupStep(0);setSetupErr("");setScr("setup")}}else{setAu(null);setProf(null);setScr("landing")}});return()=>unsub()},[loadData]);
+
+  // ═══ Fetch latest quiz for landing page preview (unauthenticated users) ═══
+  useEffect(()=>{
+    if(scr!=="landing")return;
+    setPublicQuizLoading(true);
+    // Use direct Firestore client SDK call — quizzes are now publicly readable per rules
+    (async()=>{
+      try{
+        const{getDocs:gd,query:qy,orderBy:ob,limit:lm,collection:col}=await import("firebase/firestore");
+        const q=qy(col(db,"quizzes"),ob("date","desc"),lm(1));
+        const snap=await gd(q);
+        if(!snap.empty){
+          const d=snap.docs[0];
+          setPublicQuiz({id:d.id,...d.data()});
+        }
+      }catch(err){
+        console.error("Public quiz fetch error:",err);
+      }finally{
+        setPublicQuizLoading(false);
+      }
+    })();
+  },[scr]);
 
   // ═══ Fetch PubMed research papers (cached in sessionStorage for 6 hours) ═══
   useEffect(()=>{
@@ -1936,8 +2029,8 @@ export default function App(){
 
   if(scr==="loading")return(<div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui"}}><div style={{textAlign:"center"}}><Logo size={60}/><p style={{color:T.mute,marginTop:12}}>Loading...</p></div></div>);
 
-  // ═══ WELCOME SCREEN (shown once before login — fits screen, click anywhere to enter) ═══
-  if(scr==="login"&&!welcomeSeen)return(
+  // ═══ WELCOME SCREEN (shown once before landing — fits screen, click anywhere to enter) ═══
+  if((scr==="login"||scr==="landing")&&!welcomeSeen)return(
     <div onClick={()=>{localStorage.setItem("sk_welcome","1");setWelcomeSeen(true)}} style={{height:"100vh",width:"100vw",background:"#f5ede2",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontFamily:"system-ui",overflow:"hidden",position:"relative"}} title="Click to enter">
       <picture style={{display:"flex",alignItems:"center",justifyContent:"center",width:"100%",height:"100%"}}>
         <source media="(max-width: 768px)" srcSet="/welcome-mobile.png"/>
@@ -1946,6 +2039,304 @@ export default function App(){
       <div style={{position:"absolute",bottom:24,right:24,background:"rgba(74,31,61,0.92)",color:"#fff",padding:"10px 22px",borderRadius:999,fontSize:".85rem",fontWeight:600,zIndex:5,pointerEvents:"none",boxShadow:"0 4px 14px rgba(0,0,0,0.2)"}}>👆 Click anywhere to enter</div>
     </div>
   );
+
+  // ═══ PUBLIC LANDING PAGE (SKINARIO Brand: cream / burgundy / gold) ═══
+  // Hero pattern: text-left + doctor-image-right (matches brand poster style).
+  // Place a 1600x1000 PNG named "landing-hero.png" in public/ (with the doctor + phone mockup).
+  // If not present, image gracefully fails and section still works on text-only side.
+  if(scr==="landing")return(
+    <div style={{minHeight:"100vh",fontFamily:"system-ui",color:"#3a2333",background:"#faf3e7"}}>
+
+      {/* ═══ TOP NAV ═══ */}
+      <div style={{position:"sticky",top:0,zIndex:50,background:"rgba(250,243,231,0.92)",backdropFilter:"blur(10px)",borderBottom:"1px solid rgba(200,168,78,0.2)"}}>
+        <div style={{maxWidth:1240,margin:"0 auto",padding:"14px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <Logo size={42}/>
+            <div>
+              <div style={{fontSize:"1.1rem",fontWeight:300,letterSpacing:4,fontFamily:"Georgia,serif",color:"#4a1f3d"}}>SKINARIO</div>
+              <div style={{fontSize:".55rem",color:"#c8a84e",letterSpacing:3,textTransform:"uppercase",fontWeight:700,marginTop:2}}>Professional Aesthetic Community</div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:12,alignItems:"center"}}>
+            <button onClick={()=>setScr("login")} style={{background:"transparent",border:"1px solid rgba(74,31,61,0.3)",color:"#4a1f3d",fontSize:".82rem",cursor:"pointer",padding:"9px 20px",fontWeight:600,fontFamily:"inherit",borderRadius:999,letterSpacing:.5}}>Sign in</button>
+            <button onClick={()=>{setAuthMode("signup");setScr("login")}} style={{background:"#4a1f3d",border:"1px solid #4a1f3d",color:"#f5ede2",fontSize:".82rem",cursor:"pointer",padding:"9px 22px",fontWeight:700,fontFamily:"inherit",borderRadius:999,letterSpacing:.5,boxShadow:"0 2px 10px rgba(74,31,61,0.15)"}}>Join free</button>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══ HERO — text left, doctor image right (matches brand poster) ═══ */}
+      <section style={{position:"relative",overflow:"hidden",background:"linear-gradient(135deg,#faf3e7 0%,#f5ede2 50%,#faecda 100%)"}}>
+        {/* Decorative gold arc behind doctor image */}
+        <svg viewBox="0 0 600 600" style={{position:"absolute",right:"-10%",top:"5%",width:"55%",maxWidth:700,opacity:0.18,pointerEvents:"none"}}>
+          <path d="M 300 30 Q 530 30 530 300 Q 530 570 300 570" fill="none" stroke="#c8a84e" strokeWidth="2"/>
+          <path d="M 300 80 Q 480 80 480 300 Q 480 520 300 520" fill="none" stroke="#c8a84e" strokeWidth="1.5"/>
+        </svg>
+
+        {/* Subtle botanical / molecular pattern on left */}
+        <svg viewBox="0 0 200 200" style={{position:"absolute",left:"-5%",top:"15%",width:"15%",opacity:0.15,pointerEvents:"none"}}>
+          <circle cx="50" cy="50" r="3" fill="#c8a84e"/>
+          <circle cx="100" cy="100" r="3" fill="#c8a84e"/>
+          <circle cx="150" cy="150" r="3" fill="#c8a84e"/>
+          <circle cx="100" cy="40" r="3" fill="#c8a84e"/>
+          <circle cx="40" cy="120" r="3" fill="#c8a84e"/>
+          <line x1="50" y1="50" x2="100" y2="100" stroke="#c8a84e" strokeWidth="1"/>
+          <line x1="100" y1="100" x2="150" y2="150" stroke="#c8a84e" strokeWidth="1"/>
+          <line x1="100" y1="40" x2="100" y2="100" stroke="#c8a84e" strokeWidth="1"/>
+          <line x1="40" y1="120" x2="100" y2="100" stroke="#c8a84e" strokeWidth="1"/>
+        </svg>
+
+        <div style={{maxWidth:1240,margin:"0 auto",padding:"40px 28px 60px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:40,alignItems:"center",position:"relative",zIndex:2}} className="hero-grid">
+
+          {/* LEFT — Text content */}
+          <div style={{paddingTop:30,paddingBottom:30}}>
+            <FadeIn>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:24}}>
+                <div style={{height:1,width:36,background:"#c8a84e"}}/>
+                <span style={{fontSize:".7rem",color:"#c8a84e",letterSpacing:3,textTransform:"uppercase",fontWeight:700}}>For verified doctors</span>
+              </div>
+            </FadeIn>
+
+            <FadeIn delay={100}>
+              <h1 style={{fontSize:"clamp(2.4rem, 5vw, 4rem)",fontWeight:300,fontFamily:"Georgia,serif",margin:0,marginBottom:12,lineHeight:1.05}}>
+                <span style={{color:"#4a1f3d"}}>Welcome to</span><br/>
+                <span style={{color:"#4a1f3d",letterSpacing:4,fontWeight:400}}>SKINARIO</span>
+              </h1>
+            </FadeIn>
+
+            <FadeIn delay={200}>
+              <div style={{height:1,width:80,background:"#c8a84e",margin:"22px 0 22px"}}/>
+            </FadeIn>
+
+            <FadeIn delay={250}>
+              <p style={{fontSize:"clamp(1rem, 1.6vw, 1.2rem)",color:"#5a3a4d",lineHeight:1.65,marginBottom:18,fontWeight:400}}>
+                Your professional space to <b style={{color:"#4a1f3d"}}>learn, grow, and connect</b> with aesthetic experts across India.
+              </p>
+            </FadeIn>
+
+            <FadeIn delay={350}>
+              <p style={{fontSize:".95rem",color:"#7a5a6d",lineHeight:1.7,marginBottom:24}}>
+                Daily clinical quizzes, peer case discussions, expert articles, video masterclasses & a vibrant community of aesthetic medicine professionals.
+              </p>
+            </FadeIn>
+
+            <FadeIn delay={450}>
+              <div style={{display:"flex",alignItems:"center",gap:18,marginBottom:32,flexWrap:"wrap"}}>
+                {["Learn","Evolve","Connect","Lead"].map((w,i)=>(
+                  <div key={w} style={{display:"flex",alignItems:"center",gap:18}}>
+                    <span style={{fontSize:".78rem",color:"#c8a84e",letterSpacing:3,textTransform:"uppercase",fontWeight:700}}>{w}</span>
+                    {i<3&&<span style={{width:5,height:5,borderRadius:"50%",background:"#c8a84e"}}/>}
+                  </div>
+                ))}
+              </div>
+            </FadeIn>
+
+            <FadeIn delay={550}>
+              <div style={{display:"flex",gap:14,flexWrap:"wrap",alignItems:"center"}}>
+                <button onClick={()=>{setAuthMode("signup");setScr("login")}} style={{background:"#4a1f3d",color:"#f5ede2",border:"none",padding:"15px 34px",fontSize:".95rem",fontWeight:700,letterSpacing:1.5,cursor:"pointer",fontFamily:"inherit",borderRadius:999,transition:"all .25s",display:"flex",alignItems:"center",gap:10,boxShadow:"0 4px 20px rgba(74,31,61,0.2)"}} onMouseEnter={e=>{e.currentTarget.style.background="#5a2347";e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 28px rgba(74,31,61,0.3)"}} onMouseLeave={e=>{e.currentTarget.style.background="#4a1f3d";e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 4px 20px rgba(74,31,61,0.2)"}}>GET STARTED <span style={{fontSize:"1.1rem"}}>→</span></button>
+                <div style={{fontSize:".78rem",color:"#7a5a6d",lineHeight:1.5}}>Elevate your practice.<br/>Empower your patients.</div>
+              </div>
+            </FadeIn>
+          </div>
+
+          {/* RIGHT — Hero image (doctor + phone mockup) */}
+          <FadeIn delay={300}>
+            <div style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"center",minHeight:520}}>
+              <img src="/landing-hero.png" alt="SKINARIO doctor community" style={{maxWidth:"100%",height:"auto",maxHeight:600,objectFit:"contain",filter:"drop-shadow(0 20px 40px rgba(74,31,61,0.15))"}} onError={e=>{e.currentTarget.style.display="none"}}/>
+              {/* Trust badge */}
+              <div style={{position:"absolute",bottom:30,right:0,background:"#4a1f3d",color:"#f5ede2",padding:"14px 20px",borderRadius:"50%",width:120,height:120,display:"flex",alignItems:"center",justifyContent:"center",textAlign:"center",boxShadow:"0 8px 24px rgba(74,31,61,0.25)",border:"2px solid #c8a84e"}}>
+                <div>
+                  <div style={{fontSize:"1.2rem",marginBottom:4}}>✓</div>
+                  <div style={{fontSize:".68rem",fontWeight:700,letterSpacing:1,lineHeight:1.3}}>Trusted.<br/>Curated.<br/>For Doctors.</div>
+                </div>
+              </div>
+            </div>
+          </FadeIn>
+        </div>
+
+        {/* Features row — 5 icon cards at bottom of hero (matches Image 3) */}
+        <div style={{maxWidth:1240,margin:"0 auto",padding:"0 28px 40px",position:"relative",zIndex:2}}>
+          <FadeIn delay={650}>
+            <div style={{background:"rgba(255,255,255,0.7)",backdropFilter:"blur(8px)",borderRadius:16,padding:"24px 20px",border:"1px solid rgba(200,168,78,0.25)",boxShadow:"0 4px 24px rgba(74,31,61,0.06)"}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:16}}>
+                {[
+                  {icon:"🧠",title:"Daily Quizzes",desc:"Sharpen your clinical knowledge daily"},
+                  {icon:"📰",title:"Expert Articles",desc:"Evidence-based insights from industry experts"},
+                  {icon:"📚",title:"Resources",desc:"Curated content for your practice"},
+                  {icon:"🎥",title:"Video Masterclasses",desc:"Learn from world-class aesthetic experts"},
+                  {icon:"💬",title:"Vibrant Community",desc:"Connect, discuss & grow with peers"},
+                ].map((f,i)=>(
+                  <div key={i} style={{textAlign:"center",padding:"6px 4px"}}>
+                    <div style={{fontSize:"1.8rem",marginBottom:8,filter:"sepia(0.3)"}}>{f.icon}</div>
+                    <div style={{fontSize:".68rem",fontWeight:700,color:"#4a1f3d",letterSpacing:1.5,textTransform:"uppercase",marginBottom:6}}>{f.title}</div>
+                    <div style={{fontSize:".74rem",color:"#7a5a6d",lineHeight:1.5}}>{f.desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </FadeIn>
+        </div>
+      </section>
+
+      {/* ═══ STATS BAR ═══ */}
+      <section style={{background:"#4a1f3d",padding:"50px 28px",position:"relative",overflow:"hidden"}}>
+        <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,#c8a84e,transparent)"}}/>
+        <div style={{position:"absolute",bottom:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,#c8a84e,transparent)"}}/>
+        <div style={{maxWidth:1100,margin:"0 auto",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:30,textAlign:"center",position:"relative"}}>
+          <FadeIn>
+            <div>
+              <div style={{fontSize:"2.6rem",fontFamily:"Georgia,serif",color:"#c8a84e",fontWeight:300,marginBottom:6}}><CountUp to={100} suffix="+"/></div>
+              <div style={{fontSize:".7rem",color:"rgba(245,237,226,0.75)",letterSpacing:2,textTransform:"uppercase",fontWeight:600}}>Verified Doctors</div>
+            </div>
+          </FadeIn>
+          <FadeIn delay={150}>
+            <div>
+              <div style={{fontSize:"2.6rem",fontFamily:"Georgia,serif",color:"#c8a84e",fontWeight:300,marginBottom:6}}><CountUp to={14}/></div>
+              <div style={{fontSize:".7rem",color:"rgba(245,237,226,0.75)",letterSpacing:2,textTransform:"uppercase",fontWeight:600}}>Clinical Topics</div>
+            </div>
+          </FadeIn>
+          <FadeIn delay={300}>
+            <div>
+              <div style={{fontSize:"2.6rem",fontFamily:"Georgia,serif",color:"#c8a84e",fontWeight:300,marginBottom:6}}><CountUp to={365}/></div>
+              <div style={{fontSize:".7rem",color:"rgba(245,237,226,0.75)",letterSpacing:2,textTransform:"uppercase",fontWeight:600}}>Days of Daily Quizzes</div>
+            </div>
+          </FadeIn>
+          <FadeIn delay={450}>
+            <div>
+              <div style={{fontSize:"2.6rem",fontFamily:"Georgia,serif",color:"#c8a84e",fontWeight:300,marginBottom:6}}>∞</div>
+              <div style={{fontSize:".7rem",color:"rgba(245,237,226,0.75)",letterSpacing:2,textTransform:"uppercase",fontWeight:600}}>Peer Knowledge</div>
+            </div>
+          </FadeIn>
+        </div>
+      </section>
+
+      {/* ═══ THE SKINARIO DIFFERENCE — editorial 3 columns ═══ */}
+      <section style={{background:"#faf3e7",padding:"90px 28px"}}>
+        <div style={{maxWidth:1100,margin:"0 auto"}}>
+          <FadeIn>
+            <div style={{textAlign:"center",marginBottom:60}}>
+              <div style={{display:"inline-flex",alignItems:"center",gap:10,marginBottom:16}}>
+                <div style={{height:1,width:30,background:"#c8a84e"}}/>
+                <span style={{fontSize:".7rem",color:"#c8a84e",letterSpacing:3,textTransform:"uppercase",fontWeight:700}}>Why SKINARIO</span>
+                <div style={{height:1,width:30,background:"#c8a84e"}}/>
+              </div>
+              <h2 style={{fontSize:"clamp(1.8rem, 3.5vw, 2.6rem)",fontFamily:"Georgia,serif",fontWeight:300,margin:0,color:"#4a1f3d",lineHeight:1.3}}>Built by doctors. For the doctors<br/>shaping aesthetics.</h2>
+            </div>
+          </FadeIn>
+
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:40}}>
+            {[
+              {num:"01",title:"Sharpen Your Clinical Edge",desc:"Daily AI-curated quizzes across Botox, fillers, threads, lasers, PDRN and more. Earn points, climb tiers, build a streak.",icon:"🧠"},
+              {num:"02",title:"Real Cases, Real Peers",desc:"Share challenging aesthetic cases with verified doctors. Get clinical input from peers across India. Anonymous, peer-reviewed, evidence-based.",icon:"💬"},
+              {num:"03",title:"Stay Ahead of the Field",desc:"PubMed research, FDA alerts, clinical trials, industry news — curated for aesthetic medicine. One feed, all sources.",icon:"🔬"},
+            ].map((item,i)=>(
+              <FadeIn key={i} delay={i*150}>
+                <div style={{background:"#fff",padding:"32px 28px",borderRadius:14,border:"1px solid rgba(200,168,78,0.25)",height:"100%",position:"relative",transition:"all .3s",boxShadow:"0 2px 16px rgba(74,31,61,0.04)"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-4px)";e.currentTarget.style.boxShadow="0 12px 30px rgba(74,31,61,0.1)";e.currentTarget.style.borderColor="rgba(200,168,78,0.5)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 2px 16px rgba(74,31,61,0.04)";e.currentTarget.style.borderColor="rgba(200,168,78,0.25)"}}>
+                  <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:16}}>
+                    <div style={{fontSize:"3rem",fontFamily:"Georgia,serif",color:"#c8a84e",fontWeight:300,lineHeight:1}}>{item.num}</div>
+                    <div style={{fontSize:"1.8rem",filter:"sepia(0.4)"}}>{item.icon}</div>
+                  </div>
+                  <h3 style={{fontSize:"1.25rem",fontFamily:"Georgia,serif",fontWeight:500,margin:0,marginBottom:12,color:"#4a1f3d"}}>{item.title}</h3>
+                  <p style={{fontSize:".88rem",color:"#7a5a6d",lineHeight:1.7,margin:0}}>{item.desc}</p>
+                </div>
+              </FadeIn>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ QUIZ PREVIEW — burgundy card on cream ═══ */}
+      <section style={{background:"linear-gradient(180deg,#faf3e7,#f5ede2)",padding:"90px 28px"}}>
+        <div style={{maxWidth:760,margin:"0 auto"}}>
+          <FadeIn>
+            <div style={{textAlign:"center",marginBottom:40}}>
+              <div style={{fontSize:".7rem",color:"#c8a84e",letterSpacing:3,textTransform:"uppercase",fontWeight:700,marginBottom:12}}>Today's Clinical Quiz</div>
+              <h2 style={{fontSize:"clamp(1.6rem, 3vw, 2.2rem)",fontFamily:"Georgia,serif",fontWeight:300,margin:0,color:"#4a1f3d"}}>A real question from our community</h2>
+              <div style={{height:1,width:60,background:"#c8a84e",margin:"20px auto 0"}}/>
+            </div>
+          </FadeIn>
+
+          {publicQuizLoading&&<div style={{textAlign:"center",padding:60,color:"#888"}}>Loading today's quiz...</div>}
+
+          {publicQuiz&&<FadeIn>
+            <div style={{background:"#4a1f3d",borderRadius:14,padding:"36px 32px",position:"relative",overflow:"hidden",boxShadow:"0 12px 40px rgba(74,31,61,0.18)"}}>
+              <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:"linear-gradient(90deg,#c8a84e,#d4b558,#c8a84e)"}}/>
+              <div style={{display:"flex",gap:10,marginBottom:22,flexWrap:"wrap"}}>
+                {publicQuiz.cat&&<span style={{padding:"4px 12px",border:"1px solid rgba(200,168,78,0.5)",borderRadius:999,fontSize:".7rem",color:"#c8a84e",letterSpacing:1.5,textTransform:"uppercase",fontWeight:600}}>{publicQuiz.cat}</span>}
+                {publicQuiz.diff&&<span style={{padding:"4px 12px",border:"1px solid rgba(245,237,226,0.25)",borderRadius:999,fontSize:".7rem",color:"rgba(245,237,226,0.7)",letterSpacing:1.5,textTransform:"uppercase",fontWeight:600}}>{publicQuiz.diff}</span>}
+              </div>
+              <h3 style={{fontSize:"clamp(1.1rem, 2vw, 1.35rem)",fontFamily:"Georgia,serif",fontWeight:400,color:"#f5ede2",lineHeight:1.55,marginBottom:24,margin:0}}>{publicQuiz.question||publicQuiz.q}</h3>
+              <div style={{display:"flex",flexDirection:"column",gap:9,marginTop:24,marginBottom:28}}>
+                {(publicQuiz.options||publicQuiz.opts||[]).map((opt,i)=>(
+                  <div key={i} onClick={()=>{setAuthMode("signup");setScr("login")}} style={{padding:"14px 18px",borderRadius:8,border:"1px solid rgba(245,237,226,0.15)",background:"rgba(245,237,226,0.04)",cursor:"pointer",fontSize:".9rem",color:"rgba(245,237,226,0.9)",transition:"all .2s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor="#c8a84e";e.currentTarget.style.background="rgba(200,168,78,0.12)";e.currentTarget.style.transform="translateX(4px)"}} onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(245,237,226,0.15)";e.currentTarget.style.background="rgba(245,237,226,0.04)";e.currentTarget.style.transform="translateX(0)"}}>
+                    <span style={{color:"#c8a84e",fontWeight:700,marginRight:14,fontFamily:"Georgia,serif"}}>{String.fromCharCode(65+i)}</span>{opt}
+                  </div>
+                ))}
+              </div>
+              <div style={{textAlign:"center",paddingTop:22,borderTop:"1px solid rgba(245,237,226,0.1)"}}>
+                <div style={{fontSize:".78rem",color:"#c8a84e",letterSpacing:2,textTransform:"uppercase",fontWeight:700,marginBottom:14}}>✦ Members only ✦</div>
+                <div style={{fontSize:".88rem",color:"rgba(245,237,226,0.75)",marginBottom:18,lineHeight:1.6}}>Sign up to reveal the correct answer, see the clinical explanation, and start earning points.</div>
+                <button onClick={()=>{setAuthMode("signup");setScr("login")}} style={{background:"#c8a84e",color:"#4a1f3d",border:"none",padding:"13px 30px",fontSize:".88rem",fontWeight:700,letterSpacing:1,cursor:"pointer",fontFamily:"inherit",borderRadius:999,transition:"all .2s"}} onMouseEnter={e=>{e.currentTarget.style.background="#d4b558";e.currentTarget.style.transform="translateY(-1px)"}} onMouseLeave={e=>{e.currentTarget.style.background="#c8a84e";e.currentTarget.style.transform=""}}>REVEAL ANSWER →</button>
+              </div>
+            </div>
+          </FadeIn>}
+
+          {!publicQuiz&&!publicQuizLoading&&<div style={{background:"#fff",borderRadius:14,padding:60,textAlign:"center",color:"#7a5a6d",border:"1px solid rgba(200,168,78,0.25)"}}>
+            <div style={{fontSize:"2rem",marginBottom:14,color:"#c8a84e"}}>✦</div>
+            A new clinical quiz is published every day. Sign up to start your streak.
+          </div>}
+        </div>
+      </section>
+
+      {/* ═══ TESTIMONIAL — large quote on cream ═══ */}
+      <section style={{background:"#faf3e7",padding:"80px 28px",borderTop:"1px solid rgba(200,168,78,0.2)",borderBottom:"1px solid rgba(200,168,78,0.2)"}}>
+        <div style={{maxWidth:780,margin:"0 auto",textAlign:"center"}}>
+          <FadeIn>
+            <div style={{fontSize:"4.5rem",fontFamily:"Georgia,serif",color:"#c8a84e",lineHeight:1,marginBottom:0,opacity:0.7}}>&ldquo;</div>
+            <blockquote style={{fontSize:"clamp(1.15rem, 2.2vw, 1.55rem)",fontFamily:"Georgia,serif",fontWeight:300,fontStyle:"italic",color:"#4a1f3d",lineHeight:1.6,margin:"0 0 26px"}}>
+              SKINARIO has become my five-minute morning ritual. The case discussions are gold —
+              real peers, real complications, real solutions. It's how I stay sharp between conferences.
+            </blockquote>
+            <div style={{height:1,width:80,background:"#c8a84e",margin:"0 auto 16px"}}/>
+            <div style={{fontSize:".78rem",color:"#c8a84e",letterSpacing:3,textTransform:"uppercase",fontWeight:700}}>Aesthetic Practitioner · Pune</div>
+          </FadeIn>
+        </div>
+      </section>
+
+      {/* ═══ FINAL CTA ═══ */}
+      <section style={{background:"linear-gradient(135deg,#4a1f3d,#5a2347)",padding:"90px 28px",textAlign:"center",position:"relative",overflow:"hidden"}}>
+        <svg viewBox="0 0 600 200" style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:"80%",opacity:0.1,pointerEvents:"none"}}>
+          <path d="M 0 100 Q 150 0 300 100 T 600 100" fill="none" stroke="#c8a84e" strokeWidth="1.5"/>
+          <path d="M 0 120 Q 150 20 300 120 T 600 120" fill="none" stroke="#c8a84e" strokeWidth="1"/>
+        </svg>
+        <div style={{maxWidth:680,margin:"0 auto",position:"relative",zIndex:2}}>
+          <FadeIn>
+            <div style={{fontSize:".7rem",color:"#c8a84e",letterSpacing:4,textTransform:"uppercase",fontWeight:700,marginBottom:18}}>Join the community</div>
+            <h2 style={{fontSize:"clamp(2rem, 4.5vw, 3rem)",fontFamily:"Georgia,serif",fontWeight:300,letterSpacing:1,color:"#f5ede2",lineHeight:1.2,margin:0,marginBottom:20}}>Your peers are<br/>already inside.</h2>
+            <p style={{fontSize:"1rem",color:"rgba(245,237,226,0.8)",lineHeight:1.8,marginBottom:34,maxWidth:480,margin:"0 auto 34px"}}>
+              Free for verified medical practitioners. Sign up with Google in 30 seconds.
+            </p>
+            <button onClick={()=>{setAuthMode("signup");setScr("login")}} style={{background:"#c8a84e",color:"#4a1f3d",border:"none",padding:"16px 42px",fontSize:"1rem",fontWeight:700,letterSpacing:1.5,cursor:"pointer",fontFamily:"inherit",borderRadius:999,transition:"all .2s",boxShadow:"0 8px 24px rgba(200,168,78,0.25)"}} onMouseEnter={e=>{e.currentTarget.style.background="#d4b558";e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 12px 30px rgba(200,168,78,0.4)"}} onMouseLeave={e=>{e.currentTarget.style.background="#c8a84e";e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 8px 24px rgba(200,168,78,0.25)"}}>BECOME A MEMBER →</button>
+            <p style={{marginTop:22,fontSize:".82rem",color:"rgba(245,237,226,0.6)"}}>Already inside? <span onClick={()=>setScr("login")} style={{color:"#c8a84e",cursor:"pointer",textDecoration:"underline",fontWeight:600}}>Sign in</span></p>
+          </FadeIn>
+        </div>
+      </section>
+
+      {/* ═══ FOOTER ═══ */}
+      <footer style={{background:"#3a172f",padding:"36px 28px",textAlign:"center"}}>
+        <div style={{maxWidth:1100,margin:"0 auto"}}>
+          <div style={{fontSize:".82rem",color:"#c8a84e",letterSpacing:4,fontFamily:"Georgia,serif",fontWeight:300}}>SKINARIO</div>
+          <div style={{fontSize:".66rem",color:"rgba(245,237,226,0.55)",letterSpacing:2,textTransform:"uppercase",marginTop:6,fontWeight:600}}>By Absolute Institute · India</div>
+          <div style={{height:1,width:60,background:"rgba(200,168,78,0.3)",margin:"22px auto"}}/>
+          <p style={{fontSize:".7rem",color:"rgba(245,237,226,0.45)",lineHeight:1.7,margin:0,maxWidth:500,marginInline:"auto"}}>A professional community for licensed medical practitioners only.</p>
+        </div>
+      </footer>
+
+      {/* Mobile responsive grid override + animation styles */}
+      <style>{`@media (max-width: 760px){.hero-grid{grid-template-columns: 1fr !important; gap: 20px !important;}}`}</style>
+    </div>
+  );
+
+
 
   if(scr==="login")return(
     <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#f8f7f4,#fdf6e3 40%,#e1f5ee 70%,#f8f7f4)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"system-ui"}}>
@@ -1969,7 +2360,8 @@ export default function App(){
           {authMode==="forgot"&&<span onClick={()=>{setAuthMode("signin");setAuthErr("")}} style={{color:T.teal,cursor:"pointer",fontWeight:600}}>← Back to sign in</span>}
         </div>
       </div>
-      <p style={{marginTop:20,fontSize:".6rem",color:T.light,letterSpacing:2,textTransform:"uppercase"}}>{BRAND.sub}</p>
+      <p onClick={()=>setScr("landing")} style={{marginTop:16,fontSize:".78rem",color:T.teal,cursor:"pointer",fontWeight:500,textDecoration:"underline"}}>← Back to landing</p>
+      <p style={{marginTop:14,fontSize:".6rem",color:T.light,letterSpacing:2,textTransform:"uppercase"}}>{BRAND.sub}</p>
     </div>);
 
   if(scr==="setup")return(
@@ -2326,6 +2718,33 @@ export default function App(){
 
           return(<>
 
+            {/* ═════════ CLINICAL TRIALS ═════════ */}
+            {hasTrials&&<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.teal}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
+                <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>🧪 Active Clinical Trials</h3>
+                <span style={{fontSize:".7rem",color:T.mute}}>Recruiting now on ClinicalTrials.gov</span>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {trials.slice(0,6).map((t,i)=><a key={t.nctId||i} href={t.url} target="_blank" rel="noopener noreferrer"
+                  style={{display:"flex",gap:12,padding:"12px 14px",borderRadius:10,border:"1px solid "+T.border,textDecoration:"none",color:"inherit",background:"#fff",transition:"all .15s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.background=T.tealBg+"22"}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background="#fff"}}
+                >
+                  <div style={{width:48,height:48,borderRadius:8,background:T.tealBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.4rem",flexShrink:0}}>{t.icon||"🧪"}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",gap:5,marginBottom:5,flexWrap:"wrap"}}>
+                      {t.status&&<span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:700,background:t.status==="RECRUITING"?"#e8f5e9":T.bg,color:t.status==="RECRUITING"?"#1b5e20":T.mute}}>{t.status.replace(/_/g," ")}</span>}
+                      {t.phase&&<span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:600,background:T.bg,color:T.mute}}>{t.phase}</span>}
+                      {t.condition&&<span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:600,background:T.tealBg,color:T.teal}}>{t.condition}</span>}
+                    </div>
+                    <div style={{fontSize:".86rem",fontWeight:600,color:T.txt,lineHeight:1.4,marginBottom:4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{t.title}</div>
+                    <div style={{fontSize:".68rem",color:T.mute,fontStyle:"italic"}}>{t.sponsor||"ClinicalTrials.gov"}{t.country?` · ${t.country}`:""}{t.startDate?` · Started ${t.startDate}`:""} · {t.nctId} →</div>
+                  </div>
+                </a>)}
+              </div>
+            </div>}
+
+            {/* Admin-only empty hint when ALL sources are empty */}
             {/* ═════════ INDUSTRY NEWS ═════════ */}
             {(hasIndustry||(isAdmin&&!industryNewsConfigured))&&<div style={{...T.card,padding:18,marginBottom:14}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
@@ -2351,32 +2770,6 @@ export default function App(){
                   </div>
                 </a>)}
               </div>}
-            </div>}
-
-            {/* ═════════ FDA ALERTS ═════════ */}
-            {hasFda&&<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid #c2185b"}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
-                <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0,color:"#880e4f"}}>🚨 FDA Alerts</h3>
-                <span style={{fontSize:".7rem",color:T.mute}}>Drug & device recalls relevant to aesthetic medicine</span>
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {fdaAlerts.slice(0,6).map((a,i)=><a key={i} href={a.url||"#"} target="_blank" rel="noopener noreferrer"
-                  style={{display:"flex",gap:12,padding:"12px 14px",borderRadius:10,border:"1px solid #f8bbd0",background:"#fff",textDecoration:"none",color:"inherit",transition:"all .15s"}}
-                  onMouseEnter={e=>{e.currentTarget.style.background="#fce4ec"}}
-                  onMouseLeave={e=>{e.currentTarget.style.background="#fff"}}
-                >
-                  <div style={{width:44,height:44,borderRadius:8,background:"#fce4ec",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.4rem",flexShrink:0}}>{a.icon||"⚠️"}</div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{display:"flex",gap:5,marginBottom:5,flexWrap:"wrap"}}>
-                      {a.severity&&<span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:700,background:"#fce4ec",color:"#880e4f"}}>Class {a.severity.replace(/[^IVX]/g,"")||a.severity}</span>}
-                      <span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:600,background:T.bg,color:T.mute}}>{a.type==="device_recall"?"Device":"Drug"}</span>
-                    </div>
-                    <div style={{fontSize:".86rem",fontWeight:600,color:T.txt,lineHeight:1.4,marginBottom:4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{a.title}</div>
-                    {a.reason&&<div style={{fontSize:".74rem",color:T.txt2,lineHeight:1.5,marginBottom:4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{a.reason}</div>}
-                    <div style={{fontSize:".68rem",color:T.mute,fontStyle:"italic"}}>{a.firm||"FDA"}{a.pubdate?` · ${a.pubdate}`:""} · View on FDA.gov →</div>
-                  </div>
-                </a>)}
-              </div>
             </div>}
 
             {/* ═════════ LATEST RESEARCH + EDITORIAL ═════════ */}
@@ -2449,33 +2842,32 @@ export default function App(){
               </>}
             </div>}
 
-            {/* ═════════ CLINICAL TRIALS ═════════ */}
-            {hasTrials&&<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.teal}}>
+            {/* ═════════ FDA ALERTS ═════════ */}
+            {hasFda&&<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid #c2185b"}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
-                <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>🧪 Active Clinical Trials</h3>
-                <span style={{fontSize:".7rem",color:T.mute}}>Recruiting now on ClinicalTrials.gov</span>
+                <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0,color:"#880e4f"}}>🚨 FDA Alerts</h3>
+                <span style={{fontSize:".7rem",color:T.mute}}>Drug & device recalls relevant to aesthetic medicine</span>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {trials.slice(0,6).map((t,i)=><a key={t.nctId||i} href={t.url} target="_blank" rel="noopener noreferrer"
-                  style={{display:"flex",gap:12,padding:"12px 14px",borderRadius:10,border:"1px solid "+T.border,textDecoration:"none",color:"inherit",background:"#fff",transition:"all .15s"}}
-                  onMouseEnter={e=>{e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.background=T.tealBg+"22"}}
-                  onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background="#fff"}}
+                {fdaAlerts.slice(0,6).map((a,i)=><a key={i} href={a.url||"#"} target="_blank" rel="noopener noreferrer"
+                  style={{display:"flex",gap:12,padding:"12px 14px",borderRadius:10,border:"1px solid #f8bbd0",background:"#fff",textDecoration:"none",color:"inherit",transition:"all .15s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.background="#fce4ec"}}
+                  onMouseLeave={e=>{e.currentTarget.style.background="#fff"}}
                 >
-                  <div style={{width:48,height:48,borderRadius:8,background:T.tealBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.4rem",flexShrink:0}}>{t.icon||"🧪"}</div>
+                  <div style={{width:44,height:44,borderRadius:8,background:"#fce4ec",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.4rem",flexShrink:0}}>{a.icon||"⚠️"}</div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:"flex",gap:5,marginBottom:5,flexWrap:"wrap"}}>
-                      {t.status&&<span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:700,background:t.status==="RECRUITING"?"#e8f5e9":T.bg,color:t.status==="RECRUITING"?"#1b5e20":T.mute}}>{t.status.replace(/_/g," ")}</span>}
-                      {t.phase&&<span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:600,background:T.bg,color:T.mute}}>{t.phase}</span>}
-                      {t.condition&&<span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:600,background:T.tealBg,color:T.teal}}>{t.condition}</span>}
+                      {a.severity&&<span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:700,background:"#fce4ec",color:"#880e4f"}}>Class {a.severity.replace(/[^IVX]/g,"")||a.severity}</span>}
+                      <span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:600,background:T.bg,color:T.mute}}>{a.type==="device_recall"?"Device":"Drug"}</span>
                     </div>
-                    <div style={{fontSize:".86rem",fontWeight:600,color:T.txt,lineHeight:1.4,marginBottom:4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{t.title}</div>
-                    <div style={{fontSize:".68rem",color:T.mute,fontStyle:"italic"}}>{t.sponsor||"ClinicalTrials.gov"}{t.country?` · ${t.country}`:""}{t.startDate?` · Started ${t.startDate}`:""} · {t.nctId} →</div>
+                    <div style={{fontSize:".86rem",fontWeight:600,color:T.txt,lineHeight:1.4,marginBottom:4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{a.title}</div>
+                    {a.reason&&<div style={{fontSize:".74rem",color:T.txt2,lineHeight:1.5,marginBottom:4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{a.reason}</div>}
+                    <div style={{fontSize:".68rem",color:T.mute,fontStyle:"italic"}}>{a.firm||"FDA"}{a.pubdate?` · ${a.pubdate}`:""} · View on FDA.gov →</div>
                   </div>
                 </a>)}
               </div>
             </div>}
 
-            {/* Admin-only empty hint when ALL sources are empty */}
             {!anyContent&&!researchLoading&&!newsFeedsLoading&&isAdmin&&<div style={{...T.card,textAlign:"center",padding:30,color:T.txt2,fontSize:".84rem",lineHeight:1.55,marginBottom:14}}>
               <div style={{fontSize:"2rem",marginBottom:8}}>📰</div>
               <div style={{fontWeight:600,color:T.txt,marginBottom:6}}>All news feeds are empty</div>
@@ -4516,11 +4908,22 @@ export default function App(){
 
         {aTab==="submissions"&&<div>
           <div style={{...T.card,marginBottom:14}}>
-            <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>📥 Submission Review Queue</h4>
-            <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.55,marginBottom:0}}>
-              User-submitted content waiting for review. Approving publishes it to the appropriate section.
-              Rejecting notifies the submitter with your reason.
-            </p>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:14,flexWrap:"wrap"}}>
+              <div style={{flex:1,minWidth:240}}>
+                <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>📥 Submission Review Queue</h4>
+                <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.55,marginBottom:0}}>
+                  User-submitted content waiting for review. Approving publishes it to the appropriate section.
+                  Rejecting notifies the submitter with your reason.
+                </p>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
+                <button onClick={loadData} style={{...T.btnO,padding:"6px 14px",fontSize:".78rem"}}>↻ Reload</button>
+                <span style={{fontSize:".68rem",color:T.mute}}>Total fetched: {submissions.length}</span>
+              </div>
+            </div>
+            {submissions.length===0&&<div style={{marginTop:14,padding:"10px 14px",background:T.warnBg,borderLeft:"3px solid "+T.warn,borderRadius:"0 6px 6px 0",fontSize:".78rem",color:T.txt2,lineHeight:1.55}}>
+              ⚠️ <b>No submissions visible.</b> If users have submitted content but you don't see anything here, possible causes: (1) Firestore rules may not include the <code style={{background:"#fff",padding:"1px 5px",borderRadius:3,fontSize:".74rem"}}>submissions</code> collection — publish the latest rules. (2) Open browser DevTools console (F12) and look for <code style={{background:"#fff",padding:"1px 5px",borderRadius:3,fontSize:".74rem"}}>permission-denied</code> errors. (3) Click ↻ Reload above.
+            </div>}
           </div>
 
           {/* Filter by status */}
