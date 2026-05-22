@@ -421,7 +421,7 @@ const MentionInput=({value,onChange,onSubmit,placeholder,allUsers,style})=>{
   </div>);
 };
 
-const CommentThread=({collection,itemId,item,currentUser,uName,uIni,uPhoto,allUsers,onUpdate,onAfterPost})=>{
+const CommentThread=({collection,itemId,item,currentUser,uName,uIni,uPhoto,allUsers,onUpdate,onAfterPost,sendEmail})=>{
   const[txt,setTxt]=useState("");
   const comments=item.comments||[];
   const submit=async()=>{
@@ -435,6 +435,19 @@ const CommentThread=({collection,itemId,item,currentUser,uName,uIni,uPhoto,allUs
     if(item.uid&&item.uid!==currentUser.uid){
       const linkTypeMap={articles:"article",cases:"case",videos:"video",forum:"forum",events:"event"};
       createNotif({toUid:item.uid,fromUid:currentUser.uid,fromName:uName,fromIni:uIni,fromPhoto:uPhoto,type:"comment",text:`commented on your ${linkTypeMap[collection]||"post"}`,linkType:linkTypeMap[collection],linkId:itemId,linkLabel:item.title||"your post"});
+      // Email reply notification — fire and forget, respects recipient prefs
+      if(sendEmail&&allUsers){
+        const author=allUsers.find(u=>u.id===item.uid);
+        if(author?.email){
+          sendEmail("reply",author.email,{
+            name:author.name,
+            replierName:uName,
+            contentType:linkTypeMap[collection]||"post",
+            contentTitle:item.title||"your post",
+            snippet:txt,
+          },author.emailPreferences);
+        }
+      }
     }
     // Notify any @mentioned users
     const mentioned=parseMentions(txt,allUsers||[]);
@@ -1090,6 +1103,7 @@ export default function App(){
   const[welcomeSeen,setWelcomeSeen]=useState(()=>localStorage.getItem("sk_welcome")==="1");
   const[quizzes,setQuizzes]=useState([]);const[articles,setArticles]=useState([]);const[resources,setResources]=useState([]);const[videos,setVideos]=useState([]);const[forumPosts,setForumPosts]=useState([]);const[cases,setCases]=useState([]);const[allUsers,setAllUsers]=useState([]);
   const[selD,setSelD]=useState(ds(getIST()));const[selA,setSelA]=useState(null);const[selV,setSelV]=useState(null);const[selU,setSelU]=useState(null);const[toast,setToast]=useState(null);const[cmt,setCmt]=useState("");const[ld,setLd]=useState(false);const[aTab,setATab]=useState("stats");
+  const[profileReturnPg,setProfileReturnPg]=useState("home"); // where to go when "Back" clicked on profile page
   const[authMode,setAuthMode]=useState("signin");const[authEmail,setAuthEmail]=useState("");const[authPass,setAuthPass]=useState("");const[authName,setAuthName]=useState("");const[authBusy,setAuthBusy]=useState(false);const[authErr,setAuthErr]=useState("");
   const[pf,setPf]=useState({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});const[edForm,setEdForm]=useState(null);const[setupStep,setSetupStep]=useState(0);const[setupErr,setSetupErr]=useState("");
   // Forum/Cases new post state
@@ -1104,6 +1118,7 @@ export default function App(){
     const u=allUsers.find(x=>x.id===uid);
     if(!u)return;
     setSelU(u);
+    setProfileReturnPg(pg); // remember where we came from
     setPg("profile");
     window.scrollTo(0,0);
   };
@@ -1413,6 +1428,8 @@ export default function App(){
     }else{
       sh("Welcome to SKINARIO!");
     }
+    // Fire welcome email (non-blocking) — sandbox domain until custom domain set up
+    sendEmail("welcome",au.email,{name:p.name,accountType:p.accountType});
     loadData();
   };
 
@@ -1565,6 +1582,27 @@ export default function App(){
   // ═══ MODERATION AUDIT LOG ═══
   // Every privileged action (role change, content moderation) writes here.
   // This is non-negotiable: without it, you can't investigate problems or reverse mistakes.
+  // ═══ EMAIL NOTIFICATIONS ═══
+  // Fire-and-forget — emails should never block the UI or fail loudly.
+  // Respects the recipient's emailPreferences (if set).
+  const sendEmail=async(type,to,data,recipientPrefs=null)=>{
+    if(!to||!to.includes("@"))return; // silently skip invalid addresses
+    // Check recipient preferences — if they opted out of this type, don't send
+    const prefKey={welcome:"welcome",submission_approved:"submissions",submission_rejected:"submissions",reply:"replies"}[type];
+    if(recipientPrefs&&prefKey&&recipientPrefs[prefKey]===false)return;
+    try{
+      const r=await fetch("/api/send-email",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({type,to,data}),
+      });
+      const j=await r.json();
+      if(!j.ok&&j.error){console.warn("Email send failed:",type,j.error)}
+    }catch(err){
+      console.warn("Email request error:",err.message);
+    }
+  };
+
   const logModerationAction=async(action,details={})=>{
     if(!au)return;
     try{
@@ -1773,6 +1811,15 @@ export default function App(){
         type:"announcement",
         text:`approved your ${cfg.label} submission "${(finalData.title||"").slice(0,40)}"`,
       });
+      // Email notification — find submitter's email and prefs
+      const submitter=allUsers.find(u=>u.id===sub.submitterUid);
+      if(submitter?.email||sub.submitterEmail){
+        sendEmail("submission_approved",submitter?.email||sub.submitterEmail,{
+          name:sub.submitterName,
+          contentType:sub.type,
+          title:finalData.title||"",
+        },submitter?.emailPreferences);
+      }
       sh(`✅ Approved & published as ${cfg.label}`);
       loadData();
     }catch(err){
@@ -1809,6 +1856,16 @@ export default function App(){
         type:"announcement",
         text:`reviewed your submission — see status on your Me page`,
       });
+      // Email notification with rejection reason
+      const submitter=allUsers.find(u=>u.id===sub.submitterUid);
+      if(submitter?.email||sub.submitterEmail){
+        sendEmail("submission_rejected",submitter?.email||sub.submitterEmail,{
+          name:sub.submitterName,
+          contentType:sub.type,
+          title:sub.data?.title||"",
+          reason:reason||"",
+        },submitter?.emailPreferences);
+      }
       sh("Submission rejected");
       loadData();
     }catch(err){
@@ -3150,7 +3207,7 @@ export default function App(){
               </div>
             </div>}
 
-            <CommentThread collection="articles" itemId={selA.id} item={selA} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} onUpdate={(id,comments)=>{setArticles(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelA(p=>({...p,comments}))}}/>
+            <CommentThread collection="articles" itemId={selA.id} item={selA} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} sendEmail={sendEmail} onUpdate={(id,comments)=>{setArticles(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelA(p=>({...p,comments}))}}/>
           </div>
         </article>
           </div>{/* END MAIN ARTICLE COLUMN */}
@@ -3324,7 +3381,7 @@ export default function App(){
               <span style={{fontSize:".75rem",color:T.mute}}>💬 {r.comments?.length||0}</span>
               {r.url&&<ShareBar title={r.title||r.t} url={r.url} description={`Resource from SKINARIO: ${r.title||r.t}`} itemId={r.id} itemType="resources" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>}
             </div>
-            <CommentThread collection="resources" itemId={r.id} item={r} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} onUpdate={(id,comments)=>setResources(p=>p.map(x=>x.id===id?{...x,comments}:x))}/>
+            <CommentThread collection="resources" itemId={r.id} item={r} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} sendEmail={sendEmail} onUpdate={(id,comments)=>setResources(p=>p.map(x=>x.id===id?{...x,comments}:x))}/>
           </div>)}
         </div>
       </div>}
@@ -3418,7 +3475,7 @@ export default function App(){
             <LikeBtn liked={(selV.likedBy||[]).includes(au?.uid)} count={selV.likes||0} onToggle={()=>{toggleLike("videos",selV.id,selV,setVideos);setSelV(p=>{const lb=p.likedBy||[];const has=lb.includes(au.uid);const nlb=has?lb.filter(u=>u!==au.uid):[...lb,au.uid];return{...p,likedBy:nlb,likes:nlb.length}})}}/>
             <ShareBar title={selV.title||selV.t} url={`${window.location.origin}/?video=${selV.id}`} description={selV.desc?.slice(0,120)} itemId={selV.id} itemType="videos" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
           </div>
-          <CommentThread collection="videos" itemId={selV.id} item={selV} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} onUpdate={(id,comments)=>{setVideos(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelV(p=>({...p,comments}))}}/>
+          <CommentThread collection="videos" itemId={selV.id} item={selV} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} sendEmail={sendEmail} onUpdate={(id,comments)=>{setVideos(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelV(p=>({...p,comments}))}}/>
         </div>
       </div>}
 
@@ -3564,7 +3621,7 @@ export default function App(){
                 <LikeBtn liked={(selE.likedBy||[]).includes(au?.uid)} count={selE.likes||0} onToggle={()=>{toggleLike("events",selE.id,selE,setEvents);setSelE(p=>{const lb=p.likedBy||[];const has=lb.includes(au.uid);const nlb=has?lb.filter(u=>u!==au.uid):[...lb,au.uid];return{...p,likedBy:nlb,likes:nlb.length}})}}/>
                 <ShareBar title={selE.title} url={`${window.location.origin}/?event=${selE.id}`} description={selE.body?.slice(0,120)} itemId={selE.id} itemType="events" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
               </div>
-              <CommentThread collection="events" itemId={selE.id} item={selE} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} onUpdate={(id,comments)=>{setEvents(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelE(p=>({...p,comments}))}}/>
+              <CommentThread collection="events" itemId={selE.id} item={selE} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} sendEmail={sendEmail} onUpdate={(id,comments)=>{setEvents(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelE(p=>({...p,comments}))}}/>
             </div>
           </div>
         </div>);
@@ -3810,7 +3867,7 @@ export default function App(){
               </div>
 
               {/* Comment thread */}
-              <CommentThread collection="forum" itemId={p.id} item={p} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} onUpdate={(id,comments)=>setForumPosts(prev=>prev.map(x=>x.id===id?{...x,comments,replies:comments.length}:x))} onAfterPost={(text)=>{if(text.trim().length>=20)awardPoints("forum_comment")}}/>
+              <CommentThread collection="forum" itemId={p.id} item={p} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} sendEmail={sendEmail} onUpdate={(id,comments)=>setForumPosts(prev=>prev.map(x=>x.id===id?{...x,comments,replies:comments.length}:x))} onAfterPost={(text)=>{if(text.trim().length>=20)awardPoints("forum_comment")}}/>
             </div>
           </div></ViewTracker>)})}
           </div>
@@ -3959,7 +4016,7 @@ export default function App(){
         const acc2=u.totalAnswered?Math.round(u.totalCorrect/u.totalAnswered*100):0;
 
         return(<div style={{maxWidth:780}}>
-          <button onClick={()=>setSelU(null)} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back</button>
+          <button onClick={()=>{setSelU(null);setPg(profileReturnPg||"home")}} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back</button>
 
           {/* HERO HEADER */}
           <div style={{...T.card,padding:0,overflow:"hidden",marginBottom:14}}>
@@ -4270,6 +4327,48 @@ export default function App(){
           </div>
           <button onClick={()=>{setSubmitType("");go("submit")}} style={{...T.btn,padding:"10px 20px",fontSize:".85rem",whiteSpace:"nowrap"}}>📨 Submit</button>
         </div>}
+
+        {/* ═══ EMAIL PREFERENCES ═══ */}
+        {!editingProfile&&(()=>{
+          const prefs=prof?.emailPreferences||{welcome:true,submissions:true,replies:true,weeklyDigest:true};
+          const updatePref=async(key,value)=>{
+            const newPrefs={...prefs,[key]:value};
+            const newProf={...prof,emailPreferences:newPrefs};
+            try{
+              await fbSet("users",au.uid,{emailPreferences:newPrefs});
+              setProf(newProf);
+              sh(`Email preference updated`);
+            }catch(err){
+              console.error("Pref update failed:",err);
+              sh("Update failed");
+            }
+          };
+          return(<details style={{...T.card,padding:0,marginBottom:14}}>
+            <summary style={{padding:"14px 16px",cursor:"pointer",listStyle:"none",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+              <div>
+                <div style={{fontSize:".92rem",fontWeight:700}}>📧 Email notifications</div>
+                <div style={{fontSize:".74rem",color:T.mute,marginTop:2}}>Control what we email you about</div>
+              </div>
+              <span style={{fontSize:".75rem",color:T.teal,fontWeight:600}}>Configure ↓</span>
+            </summary>
+            <div style={{padding:"4px 16px 18px",borderTop:"1px solid "+T.border}}>
+              {[
+                {key:"submissions",label:"My submission updates",desc:"When your event/article/video/ad/news is approved or needs changes",disabled:false},
+                {key:"replies",label:"Replies to my posts",desc:"When someone comments on your forum post, case, or article",disabled:false},
+                {key:"weeklyDigest",label:"Weekly digest",desc:"Every Sunday: top quiz, hot discussions, new events (coming soon)",disabled:true},
+              ].map(item=><label key={item.key} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"10px 0",borderBottom:"1px solid "+T.border,cursor:item.disabled?"not-allowed":"pointer",opacity:item.disabled?0.6:1}}>
+                <input type="checkbox" checked={prefs[item.key]!==false} disabled={item.disabled} onChange={e=>!item.disabled&&updatePref(item.key,e.target.checked)} style={{marginTop:3,width:16,height:16,cursor:item.disabled?"not-allowed":"pointer",accentColor:T.teal}}/>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:".86rem",fontWeight:600,color:T.txt}}>{item.label}{item.disabled&&<span style={{fontSize:".68rem",color:T.mute,fontWeight:400,marginLeft:8}}>(not yet active)</span>}</div>
+                  <div style={{fontSize:".74rem",color:T.txt2,lineHeight:1.5,marginTop:3}}>{item.desc}</div>
+                </div>
+              </label>)}
+              <div style={{padding:"10px 12px",marginTop:10,background:T.bg,borderRadius:6,fontSize:".72rem",color:T.txt2,lineHeight:1.55}}>
+                💡 Welcome and password reset emails are always sent — they're essential to your account. You can unsubscribe from everything else here.
+              </div>
+            </div>
+          </details>);
+        })()}
 
         {/* ═══ ROLE APPLICATION CARD (visible only if no role yet & no pending app) ═══ */}
         {!editingProfile&&!prof?.role&&!isAdminUser(au?.email)&&(()=>{
