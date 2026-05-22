@@ -1096,7 +1096,8 @@ export default function App(){
   const[newForum,setNewForum]=useState(false);const[fpT,setFpT]=useState("");const[fpB,setFpB]=useState("");const[fpC,setFpC]=useState(TOPICS[0]);const[fpImgs,setFpImgs]=useState([]);const[fpUp,setFpUp]=useState(false);
   const[newCase,setNewCase]=useState(false);const[ccT,setCcT]=useState("");const[ccB,setCcB]=useState("");const[ccC,setCcC]=useState(TOPICS[0]);const[ccImgs,setCcImgs]=useState([]);const[ccUp,setCcUp]=useState(false);const[ccDiag,setCcDiag]=useState("");const[ccHistory,setCcHistory]=useState("");const[ccTreatment,setCcTreatment]=useState("");const[ccOutcome,setCcOutcome]=useState("");
 
-  const sh=m=>setToast(m);const go=p=>{setPg(p);setSelA(null);setSelV(null);setSelAd(null);setSelE(null);setSelU(null);setEdForm(null)};
+  const KNOWN_PAGES=["home","me","forum","cases","rewards","submit","rank","events","articles","videos","resources","admin","profile","ad","article","video","event"];
+  const sh=m=>setToast(m);const go=p=>{const safe=KNOWN_PAGES.includes(p)?p:"home";setPg(safe);setSelA(null);setSelV(null);setSelAd(null);setSelE(null);setSelU(null);setEdForm(null)};
   // ═══ VIEW PROFILE — open any user's profile page ═══
   const viewProfile=(uid)=>{
     if(!uid)return;
@@ -2141,9 +2142,75 @@ export default function App(){
           {/* RIGHT — Hero image (doctor + phone mockup) */}
           <FadeIn delay={300}>
             <div style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"center",minHeight:520}}>
-              <img src="/landing-hero.png" alt="SKINARIO doctor community" style={{maxWidth:"100%",height:"auto",maxHeight:600,objectFit:"contain",filter:"drop-shadow(0 20px 40px rgba(74,31,61,0.15))"}} onError={e=>{e.currentTarget.style.display="none"}}/>
-              {/* Trust badge */}
-              <div style={{position:"absolute",bottom:30,right:0,background:"#4a1f3d",color:"#f5ede2",padding:"14px 20px",borderRadius:"50%",width:120,height:120,display:"flex",alignItems:"center",justifyContent:"center",textAlign:"center",boxShadow:"0 8px 24px rgba(74,31,61,0.25)",border:"2px solid #c8a84e"}}>
+              {/* Image with graceful fallback to elegant SVG illustration */}
+              <img src="/landing-hero.png" alt="SKINARIO — Aesthetic medicine community" id="sk-hero-img"
+                style={{maxWidth:"100%",height:"auto",maxHeight:600,objectFit:"contain",filter:"drop-shadow(0 20px 40px rgba(74,31,61,0.15))",position:"relative",zIndex:2}}
+                onLoad={e=>{const ph=document.getElementById("sk-hero-fallback");if(ph)ph.style.display="none"}}
+                onError={e=>{e.currentTarget.style.display="none";const ph=document.getElementById("sk-hero-fallback");if(ph)ph.style.display="flex"}}
+              />
+              {/* Elegant SVG fallback — shown if landing-hero.png is missing */}
+              <div id="sk-hero-fallback" style={{display:"none",position:"absolute",inset:0,alignItems:"center",justifyContent:"center",flexDirection:"column",gap:30}}>
+                {/* Decorative concentric circles with gradient */}
+                <svg viewBox="0 0 400 400" style={{width:"75%",maxWidth:400,height:"auto",filter:"drop-shadow(0 12px 30px rgba(74,31,61,0.1))"}}>
+                  <defs>
+                    <radialGradient id="ringGlow" cx="50%" cy="50%" r="50%">
+                      <stop offset="0%" stopColor="#c8a84e" stopOpacity="0.15"/>
+                      <stop offset="70%" stopColor="#c8a84e" stopOpacity="0.05"/>
+                      <stop offset="100%" stopColor="#c8a84e" stopOpacity="0"/>
+                    </radialGradient>
+                    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#d4b558"/>
+                      <stop offset="50%" stopColor="#c8a84e"/>
+                      <stop offset="100%" stopColor="#a88a3a"/>
+                    </linearGradient>
+                  </defs>
+                  {/* Glow background */}
+                  <circle cx="200" cy="200" r="190" fill="url(#ringGlow)"/>
+                  {/* Outer decorative rings */}
+                  <circle cx="200" cy="200" r="170" fill="none" stroke="url(#goldGrad)" strokeWidth="1.5" opacity="0.6"/>
+                  <circle cx="200" cy="200" r="155" fill="none" stroke="url(#goldGrad)" strokeWidth="1" opacity="0.4"/>
+                  <circle cx="200" cy="200" r="140" fill="none" stroke="url(#goldGrad)" strokeWidth="0.75" opacity="0.25"/>
+                  {/* Central card — phone mockup style */}
+                  <rect x="135" y="100" width="130" height="220" rx="18" fill="#4a1f3d" stroke="url(#goldGrad)" strokeWidth="2"/>
+                  <rect x="142" y="120" width="116" height="180" rx="6" fill="#faf3e7"/>
+                  {/* Inside phone — abstract content rows */}
+                  <text x="200" y="142" textAnchor="middle" fontSize="9" fill="#4a1f3d" fontFamily="Georgia,serif" fontWeight="600">SKINARIO</text>
+                  <line x1="155" y1="150" x2="245" y2="150" stroke="#c8a84e" strokeWidth="0.5" opacity="0.5"/>
+                  {/* Quiz card preview */}
+                  <rect x="152" y="160" width="96" height="38" rx="4" fill="#fff" stroke="#c8a84e" strokeWidth="0.5"/>
+                  <rect x="158" y="166" width="32" height="3" rx="1" fill="#c8a84e"/>
+                  <rect x="158" y="174" width="60" height="2.5" rx="1" fill="#4a1f3d"/>
+                  <rect x="158" y="180" width="48" height="2.5" rx="1" fill="#4a1f3d" opacity="0.6"/>
+                  <rect x="218" y="174" width="20" height="14" rx="2" fill="#4a1f3d"/>
+                  {/* Article card preview */}
+                  <rect x="152" y="206" width="96" height="38" rx="4" fill="#fff" stroke="#c8a84e" strokeWidth="0.5"/>
+                  <rect x="158" y="212" width="40" height="3" rx="1" fill="#c8a84e"/>
+                  <rect x="158" y="220" width="56" height="2.5" rx="1" fill="#4a1f3d"/>
+                  <rect x="158" y="226" width="44" height="2.5" rx="1" fill="#4a1f3d" opacity="0.6"/>
+                  <rect x="218" y="220" width="20" height="14" rx="2" fill="#c8a84e" opacity="0.3"/>
+                  {/* Masterclass card preview */}
+                  <rect x="152" y="252" width="96" height="38" rx="4" fill="#fff" stroke="#c8a84e" strokeWidth="0.5"/>
+                  <rect x="158" y="258" width="50" height="3" rx="1" fill="#c8a84e"/>
+                  <rect x="158" y="266" width="62" height="2.5" rx="1" fill="#4a1f3d"/>
+                  <rect x="158" y="272" width="36" height="2.5" rx="1" fill="#4a1f3d" opacity="0.6"/>
+                  <rect x="218" y="266" width="20" height="14" rx="2" fill="#4a1f3d" opacity="0.4"/>
+                  {/* Decorative orbiting dots */}
+                  <circle cx="200" cy="30" r="4" fill="url(#goldGrad)"/>
+                  <circle cx="370" cy="200" r="4" fill="url(#goldGrad)"/>
+                  <circle cx="200" cy="370" r="4" fill="url(#goldGrad)"/>
+                  <circle cx="30" cy="200" r="4" fill="url(#goldGrad)"/>
+                  <circle cx="320" cy="80" r="2.5" fill="#c8a84e" opacity="0.6"/>
+                  <circle cx="80" cy="320" r="2.5" fill="#c8a84e" opacity="0.6"/>
+                  <circle cx="320" cy="320" r="2.5" fill="#c8a84e" opacity="0.6"/>
+                  <circle cx="80" cy="80" r="2.5" fill="#c8a84e" opacity="0.6"/>
+                </svg>
+                <div style={{textAlign:"center",maxWidth:280}}>
+                  <div style={{fontSize:".68rem",color:"#c8a84e",letterSpacing:3,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>Premium · Curated · Trusted</div>
+                  <div style={{fontSize:".78rem",color:"#7a5a6d",lineHeight:1.6,fontStyle:"italic"}}>A space designed for aesthetic medicine professionals.</div>
+                </div>
+              </div>
+              {/* Trust badge — always shown, sits over either image or fallback */}
+              <div style={{position:"absolute",bottom:30,right:0,background:"#4a1f3d",color:"#f5ede2",padding:"14px 20px",borderRadius:"50%",width:120,height:120,display:"flex",alignItems:"center",justifyContent:"center",textAlign:"center",boxShadow:"0 8px 24px rgba(74,31,61,0.25)",border:"2px solid #c8a84e",zIndex:3}}>
                 <div>
                   <div style={{fontSize:"1.2rem",marginBottom:4}}>✓</div>
                   <div style={{fontSize:".68rem",fontWeight:700,letterSpacing:1,lineHeight:1.3}}>Trusted.<br/>Curated.<br/>For Doctors.</div>
@@ -4475,9 +4542,14 @@ export default function App(){
 
       {/* ADMIN */}
       {pg==="admin"&&isAdm&&<div>
-        <h3 style={{fontSize:"1.15rem",fontWeight:700,marginBottom:12}}>⚙️ Admin dashboard</h3>
-        <div style={{display:"flex",gap:5,marginBottom:16,flexWrap:"wrap"}}>
-          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null)}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
+        <h3 style={{fontSize:"1.15rem",fontWeight:700,marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+          <span>⚙️ Admin dashboard</span>
+          {aTab!=="stats"&&<button onClick={()=>setATab("stats")} style={{...T.btnO,padding:"6px 14px",fontSize:".78rem",fontWeight:600}}>← Back to Overview</button>}
+        </h3>
+        <div style={{position:"sticky",top:0,zIndex:30,background:T.bg,padding:"10px 0",marginBottom:16,marginInline:-12,paddingInline:12,borderBottom:"1px solid "+T.border}}>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null);window.scrollTo({top:0,behavior:"smooth"})}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
+          </div>
         </div>
         {aTab==="stats"&&<><div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length],["Events",events.length],["Ads",ads.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>
           {/* ═══ ANALYTICS — top viewed content ═══ */}
@@ -5117,6 +5189,14 @@ export default function App(){
       <div style={{textAlign:"center",padding:"22px 0",borderTop:"1px solid "+T.border,marginTop:20}}>
         <Logo size={28}/><div style={{fontSize:".65rem",color:T.light,letterSpacing:2,textTransform:"uppercase",marginTop:6}}>SKINARIO · <span style={{color:T.gold,fontWeight:600}}>{BRAND.sub}</span></div>
       </div>
+
+      {/* SAFETY FALLBACK — if pg is somehow an unknown value, show this instead of blank */}
+      {!KNOWN_PAGES.includes(pg)&&<div style={{maxWidth:520,margin:"40px auto",padding:"30px 24px",textAlign:"center",background:"#fff",borderRadius:14,border:"1px solid "+T.border}}>
+        <div style={{fontSize:"2.4rem",marginBottom:10}}>🤔</div>
+        <h3 style={{fontSize:"1.1rem",fontWeight:700,marginBottom:6}}>Lost your way?</h3>
+        <p style={{color:T.txt2,fontSize:".88rem",lineHeight:1.6,marginBottom:18}}>The page you were on is no longer available. Let's get you back home.</p>
+        <button onClick={()=>go("home")} style={{...T.btn,padding:"9px 20px",fontSize:".85rem"}}>← Go to home</button>
+      </div>}
 
       </div>
       {toast&&<div style={{position:"fixed",bottom:22,left:"50%",transform:"translateX(-50%)",padding:"11px 28px",background:T.teal,color:"#fff",borderRadius:12,fontSize:".9rem",zIndex:1000,boxShadow:"0 4px 20px rgba(13,107,110,.25)"}}>{toast}</div>}
