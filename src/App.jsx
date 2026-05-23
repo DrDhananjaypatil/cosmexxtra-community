@@ -2826,6 +2826,28 @@ export default function App(){
             <div key={l} onClick={onClick} style={{...T.card,textAlign:"center",padding:"12px 4px",marginBottom:0,cursor:"pointer",transition:"transform .1s, box-shadow .1s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.05)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}><div style={{fontSize:"1rem"}}>{i}</div><div style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".55rem",color:T.mute,textTransform:"uppercase",marginTop:2}}>{l}</div></div>)}
         </div>
 
+        {/* ═══ QUICK-ACCESS NEWS BUTTONS ═══
+            Each button smooth-scrolls to its corresponding section below.
+            Section IDs: sk-trials, sk-industry, sk-research, sk-fda */}
+        {(()=>{
+          const scrollTo=(id)=>{const el=document.getElementById(id);if(el)el.scrollIntoView({behavior:"smooth",block:"start"})};
+          const btns=[
+            {id:"sk-trials",   icon:"🧪",label:"Clinical Trials", desc:"Recruiting now",     color:"#0d6b6e",bg:"#e1f5ee"},
+            {id:"sk-industry", icon:"📰",label:"Industry News",   desc:"Aesthetic medicine", color:"#bf6a00",bg:"#fff8e1"},
+            {id:"sk-research", icon:"🔬",label:"Latest Research", desc:"PubMed papers",      color:"#7a3e9a",bg:"#f3e8ff"},
+            {id:"sk-fda",      icon:"⚠️",label:"FDA Alerts",      desc:"Safety updates",     color:"#c5392a",bg:"#fce8e6"},
+          ];
+          return(<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:14}}>
+            {btns.map(b=><div key={b.id} onClick={()=>scrollTo(b.id)} style={{...T.card,padding:"14px 12px",cursor:"pointer",borderLeft:"3px solid "+b.color,display:"flex",alignItems:"center",gap:10,marginBottom:0,transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 6px 16px rgba(0,0,0,0.06)";e.currentTarget.style.borderLeftColor=b.color}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
+              <div style={{width:38,height:38,borderRadius:10,background:b.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.2rem",flexShrink:0}}>{b.icon}</div>
+              <div style={{minWidth:0,flex:1}}>
+                <div style={{fontSize:".82rem",fontWeight:700,color:T.txt,lineHeight:1.2,marginBottom:2}}>{b.label}</div>
+                <div style={{fontSize:".66rem",color:T.mute,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{b.desc}</div>
+              </div>
+            </div>)}
+          </div>);
+        })()}
+
         {/* ═══ INDUSTRY NEWS, FDA ALERTS, RESEARCH, TRIALS — 4 SECTIONS ═══ */}
         {(()=>{
           const isAdmin=ADMINS.includes(au?.email);
@@ -2848,7 +2870,7 @@ export default function App(){
           return(<>
 
             {/* ═════════ CLINICAL TRIALS ═════════ */}
-            {hasTrials&&<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.teal}}>
+            {hasTrials&&<div id="sk-trials" style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.teal,scrollMarginTop:80}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
                 <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>🧪 Active Clinical Trials</h3>
                 <span style={{fontSize:".7rem",color:T.mute}}>Recruiting now on ClinicalTrials.gov</span>
@@ -2875,7 +2897,7 @@ export default function App(){
 
             {/* Admin-only empty hint when ALL sources are empty */}
             {/* ═════════ INDUSTRY NEWS ═════════ */}
-            {(hasIndustry||(isAdmin&&!industryNewsConfigured))&&<div style={{...T.card,padding:18,marginBottom:14}}>
+            {(hasIndustry||(isAdmin&&!industryNewsConfigured))&&<div id="sk-industry" style={{...T.card,padding:18,marginBottom:14,scrollMarginTop:80}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
                 <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>📰 Industry News</h3>
                 <span style={{fontSize:".7rem",color:T.mute}}>From aesthetic medicine news sources</span>
@@ -2894,6 +2916,9 @@ export default function App(){
                     :<div style={{height:80,background:T.tealBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.8rem"}}>📰</div>
                   }
                   <div style={{padding:12}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,flexWrap:"wrap"}}>
+                      {n.region==="India"&&<span style={{padding:"2px 7px",borderRadius:10,fontSize:".62rem",fontWeight:700,background:"#fff4e0",color:"#bf6a00",letterSpacing:.3}}>🇮🇳 INDIA</span>}
+                    </div>
                     <div style={{fontSize:".88rem",fontWeight:600,color:T.txt,lineHeight:1.35,marginBottom:6,display:"-webkit-box",WebkitLineClamp:3,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{n.title}</div>
                     <div style={{fontSize:".68rem",color:T.mute,fontStyle:"italic"}}>{n.source||"News source"}{n.pubdate?` · ${n.pubdate}`:""}</div>
                   </div>
@@ -2902,7 +2927,7 @@ export default function App(){
             </div>}
 
             {/* ═════════ LATEST RESEARCH + EDITORIAL ═════════ */}
-            {(hasResearch||researchLoading)&&<div style={{...T.card,padding:18,marginBottom:14}}>
+            {(hasResearch||researchLoading)&&<div id="sk-research" style={{...T.card,padding:18,marginBottom:14,scrollMarginTop:80}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
                 <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>🔬 Latest Research</h3>
                 <span style={{fontSize:".7rem",color:T.mute}}>Peer-reviewed papers from PubMed</span>
@@ -2972,7 +2997,7 @@ export default function App(){
             </div>}
 
             {/* ═════════ FDA ALERTS ═════════ */}
-            {hasFda&&<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid #c2185b"}}>
+            {hasFda&&<div id="sk-fda" style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid #c2185b",scrollMarginTop:80}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
                 <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0,color:"#880e4f"}}>🚨 FDA Alerts</h3>
                 <span style={{fontSize:".7rem",color:T.mute}}>Drug & device recalls relevant to aesthetic medicine</span>
