@@ -166,11 +166,11 @@ function canSubmitType(typeKey, user, profile) {
 
 // ═══ TIER SYSTEM — sticky badges based on lifetime points ═══
 const TIERS=[
-  {id:"beginner",label:"Beginner",min:0,max:49,color:"#888",bg:"#f0f0f0"},
-  {id:"contributor",label:"Contributor",min:50,max:199,color:"#0d6b6e",bg:"#e1f5ee"},
-  {id:"pro",label:"Pro",min:200,max:499,color:"#785f1e",bg:"#fdf6e3"},
-  {id:"expert",label:"Expert",min:500,max:999,color:"#7a3e9a",bg:"#f3e8ff"},
-  {id:"master",label:"Master",min:1000,max:Infinity,color:"#b91c1c",bg:"#fef2f2"}
+  {id:"beginner",label:"Beginner",min:0,max:499,color:"#888",bg:"#f0f0f0"},
+  {id:"contributor",label:"Contributor",min:500,max:1999,color:"#0d6b6e",bg:"#e1f5ee"},
+  {id:"pro",label:"Pro",min:2000,max:4999,color:"#785f1e",bg:"#fdf6e3"},
+  {id:"expert",label:"Expert",min:5000,max:9999,color:"#7a3e9a",bg:"#f3e8ff"},
+  {id:"master",label:"Master",min:10000,max:Infinity,color:"#b91c1c",bg:"#fef2f2"}
 ];
 function getTier(points){
   const p=points||0;
@@ -298,6 +298,9 @@ const getVideoThumbnail=(embedUrl)=>{
 const dN=s=>{try{return new Date(s+"T12:00:00").toLocaleDateString("en-IN",{weekday:"short"})}catch{return""}};
 
 const BRAND={name:"SKINARIO",tagline:"Professional Aesthetic & Cosmetology Community",sub:"By Absolute Institute",logo:"/skinario-logo.jpg"};
+// Canonical site URL — used for share links so they always point at skinario.app
+// regardless of which mirror domain the user is currently browsing on.
+const SITE_URL="https://skinario.app";
 
 const T={bg:"#f8f7f4",white:"#fff",teal:"#0d6b6e",tealL:"#1ab5a5",tealBg:"#e1f5ee",gold:"#c8a84e",goldBg:"#fdf6e3",goldD:"#a08030",txt:"#1a1a1a",txt2:"#555",mute:"#999",light:"#bbb",border:"#e8e6e0",ok:"#1a7d42",okBg:"#e1f9ec",err:"#c0392b",errBg:"#fde8e8",warn:"#854f0b",warnBg:"#fef3e2",
   card:{background:"#fff",border:"1px solid #e8e6e0",borderRadius:14,padding:20,marginBottom:14},
@@ -329,7 +332,7 @@ const LiIcon=()=><svg width="14" height="14" viewBox="0 0 24 24" fill="currentCo
 const ShareBar=({title,url,description,itemId,itemType,currentUser,prof,onSaveToggle,onShare})=>{
   const[copied,setCopied]=useState(false);
   const shareText=`🔬 ${title} — read this on SKINARIO, the Professional Aesthetic & Cosmetology Community.`;
-  const fullUrl=url||window.location.href;
+  const fullUrl=url||SITE_URL;
   const enc=encodeURIComponent;
   const waUrl=`https://wa.me/?text=${enc(shareText+" 👉 "+fullUrl)}`;
   const twUrl=`https://twitter.com/intent/tweet?text=${enc(shareText)}&url=${enc(fullUrl)}`;
@@ -1922,7 +1925,7 @@ export default function App(){
   };
 
   const recomputeAllPoints=async()=>{
-    if(!confirm("This will recompute ALL users' points from their quiz answer history. It rewards 1pt (Easy), 2pt (Moderate), 3pt (Hard) per correct answer. Streak bonuses are NOT retroactive (no way to know historical streak order). Continue?"))return;
+    if(!confirm("This will recompute ALL users' points from their quiz answer history.\n\nNEW scale: 10pt (Easy), 20pt (Moderate), 30pt (Hard) per correct answer.\nStreak bonuses are NOT retroactive (no way to know historical streak order).\n\nContinue?"))return;
     sh("⏳ Recomputing... please wait");
     try{
       // Build a map: userId -> { points, totalAnswered, totalCorrect }
@@ -1931,7 +1934,7 @@ export default function App(){
       quizzes.forEach(q=>{
         if(!q.answers||!q.ci===undefined)return;
         const diff=q.diff||"Easy";
-        const pointsForCorrect=diff==="Hard"?3:diff==="Moderate"?2:1;
+        const pointsForCorrect=diff==="Hard"?30:diff==="Moderate"?20:10;
         Object.entries(q.answers).forEach(([uid,answerIdx])=>{
           if(!userStats[uid])userStats[uid]={points:0,totalAnswered:0,totalCorrect:0};
           userStats[uid].totalAnswered++;
@@ -1975,12 +1978,12 @@ export default function App(){
     // ═══ DIFFICULTY-WEIGHTED POINTS ═══
     let pointsEarned=0;
     if(ok){
-      pointsEarned=qObj.diff==="Hard"?3:qObj.diff==="Moderate"?2:1;
+      pointsEarned=qObj.diff==="Hard"?30:qObj.diff==="Moderate"?20:10;
     }
     const newStreak=ok?(prof.streak||0)+1:0;
     // Streak bonus: +5 every 7 consecutive days
     let streakBonus=0;
-    if(ok&&newStreak>0&&newStreak%7===0){streakBonus=5}
+    if(ok&&newStreak>0&&newStreak%7===0){streakBonus=50}
     const totalEarned=pointsEarned+streakBonus;
     const upd={
       totalAnswered:(prof.totalAnswered||0)+1,
@@ -3196,7 +3199,7 @@ export default function App(){
             {/* Engagement */}
             <div style={{display:"flex",alignItems:"center",gap:12,marginTop:28,paddingTop:18,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
               <LikeBtn liked={(selA.likedBy||[]).includes(au?.uid)} count={selA.likes||0} onToggle={()=>{toggleLike("articles",selA.id,selA,setArticles);setSelA(p=>{const lb=p.likedBy||[];const has=lb.includes(au.uid);const nlb=has?lb.filter(u=>u!==au.uid):[...lb,au.uid];return{...p,likedBy:nlb,likes:nlb.length}})}}/>
-              <ShareBar title={selA.title} url={`${window.location.origin}/?article=${selA.id}`} description={selA.body?.slice(0,120)} itemId={selA.id} itemType="articles" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
+              <ShareBar title={selA.title} url={`${SITE_URL}/?article=${selA.id}`} description={selA.body?.slice(0,120)} itemId={selA.id} itemType="articles" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
             </div>
 
             {/* Author bio block at end (if authorBio present) */}
@@ -3344,7 +3347,7 @@ export default function App(){
             {((uA!==undefined&&rev)||(!canA&&rev&&dd>0))&&qObj.expl&&<div style={{background:T.goldBg,border:"1px solid #f0e6c8",borderRadius:12,padding:16,marginTop:12}}><div style={{color:T.goldD,fontWeight:700,marginBottom:8}}>💡 Explanation</div><div style={{fontSize:".88rem",color:T.txt2,lineHeight:1.75}} dangerouslySetInnerHTML={{__html:qObj.expl}}/></div>}
             <div style={{display:"flex",alignItems:"center",gap:12,marginTop:14,paddingTop:12,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
               <LikeBtn liked={(qObj.likedBy||[]).includes(au?.uid)} count={qObj.likes||0} onToggle={()=>toggleLike("quizzes",qObj.id,qObj,setQuizzes)}/>
-              <ShareBar title={`SKINARIO Daily Quiz: ${qObj.cat} (${qObj.diff})`} url={`${window.location.origin}/?quiz=${qObj.id}`} description={qObj.question?.slice(0,120)} itemId={qObj.id} itemType="quizzes" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
+              <ShareBar title={`SKINARIO Daily Quiz: ${qObj.cat} (${qObj.diff})`} url={`${SITE_URL}/?quiz=${qObj.id}`} description={qObj.question?.slice(0,120)} itemId={qObj.id} itemType="quizzes" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
             </div>
             </div>
           </div>
@@ -3475,7 +3478,7 @@ export default function App(){
           <h3 style={{fontWeight:700,fontSize:"1.2rem"}}>{selV.title||selV.t}</h3><p style={{color:T.mute,fontSize:".82rem",marginTop:4}}>{selV.dur}</p><p style={{color:T.txt2,marginTop:12,lineHeight:1.8}}>{selV.desc}</p>
           <div style={{display:"flex",alignItems:"center",gap:12,marginTop:16,paddingTop:14,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
             <LikeBtn liked={(selV.likedBy||[]).includes(au?.uid)} count={selV.likes||0} onToggle={()=>{toggleLike("videos",selV.id,selV,setVideos);setSelV(p=>{const lb=p.likedBy||[];const has=lb.includes(au.uid);const nlb=has?lb.filter(u=>u!==au.uid):[...lb,au.uid];return{...p,likedBy:nlb,likes:nlb.length}})}}/>
-            <ShareBar title={selV.title||selV.t} url={`${window.location.origin}/?video=${selV.id}`} description={selV.desc?.slice(0,120)} itemId={selV.id} itemType="videos" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
+            <ShareBar title={selV.title||selV.t} url={`${SITE_URL}/?video=${selV.id}`} description={selV.desc?.slice(0,120)} itemId={selV.id} itemType="videos" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
           </div>
           <CommentThread collection="videos" itemId={selV.id} item={selV} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} sendEmail={sendEmail} onUpdate={(id,comments)=>{setVideos(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelV(p=>({...p,comments}))}}/>
         </div>
@@ -3505,7 +3508,7 @@ export default function App(){
             {selAd.contact&&<div style={{marginTop:18,padding:14,background:T.bg,borderRadius:10,fontSize:".85rem",color:T.txt2}}><b style={{color:T.txt}}>Contact:</b> {selAd.contact}</div>}
             <div style={{display:"flex",alignItems:"center",gap:12,marginTop:18,paddingTop:14,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
               <LikeBtn liked={(selAd.likedBy||[]).includes(au?.uid)} count={selAd.likes||0} onToggle={()=>{toggleLike("ads",selAd.id,selAd,setAds);setSelAd(p=>{const lb=p.likedBy||[];const has=lb.includes(au.uid);const nlb=has?lb.filter(u=>u!==au.uid):[...lb,au.uid];return{...p,likedBy:nlb,likes:nlb.length}})}}/>
-              <ShareBar title={selAd.title} url={`${window.location.origin}/?ad=${selAd.id}`} description={selAd.desc?.slice(0,120)} itemId={selAd.id} itemType="ads" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
+              <ShareBar title={selAd.title} url={`${SITE_URL}/?ad=${selAd.id}`} description={selAd.desc?.slice(0,120)} itemId={selAd.id} itemType="ads" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
             </div>
           </div>
         </div>
@@ -3621,7 +3624,7 @@ export default function App(){
               {/* Like + share */}
               <div style={{display:"flex",alignItems:"center",gap:12,marginTop:18,paddingTop:14,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
                 <LikeBtn liked={(selE.likedBy||[]).includes(au?.uid)} count={selE.likes||0} onToggle={()=>{toggleLike("events",selE.id,selE,setEvents);setSelE(p=>{const lb=p.likedBy||[];const has=lb.includes(au.uid);const nlb=has?lb.filter(u=>u!==au.uid):[...lb,au.uid];return{...p,likedBy:nlb,likes:nlb.length}})}}/>
-                <ShareBar title={selE.title} url={`${window.location.origin}/?event=${selE.id}`} description={selE.body?.slice(0,120)} itemId={selE.id} itemType="events" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
+                <ShareBar title={selE.title} url={`${SITE_URL}/?event=${selE.id}`} description={selE.body?.slice(0,120)} itemId={selE.id} itemType="events" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
               </div>
               <CommentThread collection="events" itemId={selE.id} item={selE} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} sendEmail={sendEmail} onUpdate={(id,comments)=>{setEvents(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelE(p=>({...p,comments}))}}/>
             </div>
@@ -3758,7 +3761,7 @@ export default function App(){
               <LikeBtn liked={(cs.likedBy||[]).includes(au?.uid)} count={cs.likes||0} onToggle={()=>toggleLike("cases",cs.id,cs,setCases)}/>
               <span style={{fontSize:".75rem",color:T.mute}}>💬 {cs.comments?.length||0} comments</span>
               {(cs.views||0)>0&&<span style={{fontSize:".75rem",color:T.mute}}>👁️ {cs.views} views</span>}
-              <ShareBar title={cs.title} url={`${window.location.origin}/?case=${cs.id}`} description={(cs.history||cs.body||"").slice(0,120)} itemId={cs.id} itemType="cases" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
+              <ShareBar title={cs.title} url={`${SITE_URL}/?case=${cs.id}`} description={(cs.history||cs.body||"").slice(0,120)} itemId={cs.id} itemType="cases" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
             </div>
 
             {/* Comments */}
@@ -3865,7 +3868,7 @@ export default function App(){
                 <LikeBtn liked={(p.likedBy||[]).includes(au?.uid)} count={p.likes||0} onToggle={()=>toggleLike("forum",p.id,p,setForumPosts)}/>
                 <span style={{fontSize:".78rem",color:T.mute,display:"flex",alignItems:"center",gap:4}}>💬 {p.comments?.length||0} {p.comments?.length===1?"reply":"replies"}</span>
                 {(p.views||0)>0&&<span style={{fontSize:".78rem",color:T.mute,display:"flex",alignItems:"center",gap:4}}>👁️ {p.views}</span>}
-                <ShareBar title={p.title} url={`${window.location.origin}/?forum=${p.id}`} description={p.body?.slice(0,120)} itemId={p.id} itemType="forum" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
+                <ShareBar title={p.title} url={`${SITE_URL}/?forum=${p.id}`} description={p.body?.slice(0,120)} itemId={p.id} itemType="forum" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
               </div>
 
               {/* Comment thread */}
@@ -3889,7 +3892,7 @@ export default function App(){
           <div onClick={()=>setShowPoints(!showPoints)} style={{padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",gap:10}}>
             <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0,flex:1}}>
               <span style={{fontSize:".95rem",fontWeight:600,whiteSpace:"nowrap"}}>💯 How points work</span>
-              {!showPoints&&<span style={{fontSize:".72rem",color:T.mute,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>1pt easy · 2pt mod · 3pt hard · +5 streak</span>}
+              {!showPoints&&<span style={{fontSize:".72rem",color:T.mute,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>10pt easy · 20pt mod · 30pt hard · +50 streak</span>}
             </div>
             <span style={{fontSize:".85rem",color:T.mute,transition:"transform .2s",transform:showPoints?"rotate(180deg)":"rotate(0deg)",display:"inline-block"}}>▾</span>
           </div>
