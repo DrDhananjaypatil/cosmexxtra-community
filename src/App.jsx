@@ -523,6 +523,124 @@ const ImgUpload=({images,setImages,uploading,setUploading})=>{
   </div>)
 };
 
+// ═══ MARKDOWN UTILITIES ═══
+// Renders simple markdown: **bold**, *italic*, ## headers, - lists, 1. numbered lists.
+// CRITICAL: escapes HTML first to prevent XSS — never trust user input.
+const escapeHtml=(s)=>String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+function renderMarkdownToHtml(src){
+  if(!src)return "";
+  // 1. Escape HTML first
+  let html=escapeHtml(src);
+  // 2. Process line-by-line for block-level (headers, lists)
+  const lines=html.split(/\r?\n/);
+  const out=[];
+  let inUl=false, inOl=false;
+  const closeLists=()=>{
+    if(inUl){out.push("</ul>");inUl=false}
+    if(inOl){out.push("</ol>");inOl=false}
+  };
+  for(let raw of lines){
+    const line=raw;
+    // Header (## )
+    if(/^##\s+/.test(line)){
+      closeLists();
+      out.push("<h3 style=\"font-size:1.05rem;font-weight:700;margin:14px 0 6px;line-height:1.3\">"+line.replace(/^##\s+/,"")+"</h3>");
+      continue;
+    }
+    // Bullet (- )
+    if(/^-\s+/.test(line)){
+      if(inOl){out.push("</ol>");inOl=false}
+      if(!inUl){out.push("<ul style=\"margin:6px 0;padding-left:22px\">");inUl=true}
+      out.push("<li style=\"margin:2px 0\">"+line.replace(/^-\s+/,"")+"</li>");
+      continue;
+    }
+    // Numbered (1. )
+    if(/^\d+\.\s+/.test(line)){
+      if(inUl){out.push("</ul>");inUl=false}
+      if(!inOl){out.push("<ol style=\"margin:6px 0;padding-left:22px\">");inOl=true}
+      out.push("<li style=\"margin:2px 0\">"+line.replace(/^\d+\.\s+/,"")+"</li>");
+      continue;
+    }
+    // Blank line — close lists, add a break for paragraph spacing
+    if(line.trim()===""){closeLists();out.push("<br/>");continue}
+    // Regular line — close lists if open
+    closeLists();
+    out.push(line+"<br/>");
+  }
+  closeLists();
+  let joined=out.join("");
+  // 3. Inline formatting: bold **...** and italic *...*
+  // Bold first (** is more specific than *)
+  joined=joined.replace(/\*\*([^*\n]+?)\*\*/g,"<b>$1</b>");
+  // Italic — be careful not to match across words like " * " by itself
+  joined=joined.replace(/(^|[\s>(])\*([^*\n]+?)\*(?=[\s.,;:!?)<]|$)/g,"$1<i>$2</i>");
+  return joined;
+}
+
+// ═══ MARKDOWN VIEW — renders a markdown string as HTML safely ═══
+const MarkdownView=({text,style={}})=>{
+  if(!text)return null;
+  return <div style={{lineHeight:1.6,wordBreak:"break-word",...style}} dangerouslySetInnerHTML={{__html:renderMarkdownToHtml(text)}}/>;
+};
+
+// ═══ MARKDOWN EDITOR — textarea + toolbar + preview ═══
+const MarkdownEditor=({value,onChange,placeholder,rows=4,style={}})=>{
+  const taRef=useRef(null);
+  const[preview,setPreview]=useState(false);
+  // Wrap selected text or insert at cursor
+  const wrap=(before,after="")=>{
+    const ta=taRef.current;if(!ta)return;
+    const s=ta.selectionStart,e=ta.selectionEnd;
+    const sel=value.substring(s,e);
+    const next=value.substring(0,s)+before+sel+after+value.substring(e);
+    onChange(next);
+    // Restore selection after React re-renders
+    setTimeout(()=>{ta.focus();const pos=s+before.length+sel.length;ta.setSelectionRange(pos,pos)},0);
+  };
+  // Insert at start of current line
+  const prefix=(p)=>{
+    const ta=taRef.current;if(!ta)return;
+    const s=ta.selectionStart;
+    // Find start of current line
+    const before=value.substring(0,s);
+    const lineStart=before.lastIndexOf("\n")+1;
+    const next=value.substring(0,lineStart)+p+value.substring(lineStart);
+    onChange(next);
+    setTimeout(()=>{ta.focus();const pos=s+p.length;ta.setSelectionRange(pos,pos)},0);
+  };
+  // Keyboard shortcuts
+  const onKey=(e)=>{
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="b"){e.preventDefault();wrap("**","**")}
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="i"){e.preventDefault();wrap("*","*")}
+  };
+  const btnStyle={padding:"4px 9px",fontSize:".75rem",fontWeight:600,background:"#fff",border:"1px solid "+T.border,borderRadius:5,cursor:"pointer",fontFamily:"inherit",color:T.txt,lineHeight:1};
+  return(<div style={{...style}}>
+    {/* Toolbar */}
+    <div style={{display:"flex",gap:4,marginBottom:6,flexWrap:"wrap",alignItems:"center"}}>
+      <button type="button" onClick={()=>wrap("**","**")} title="Bold (Ctrl+B)" style={{...btnStyle,fontWeight:900}}>B</button>
+      <button type="button" onClick={()=>wrap("*","*")} title="Italic (Ctrl+I)" style={{...btnStyle,fontStyle:"italic"}}>I</button>
+      <button type="button" onClick={()=>prefix("## ")} title="Header" style={btnStyle}>H</button>
+      <button type="button" onClick={()=>prefix("- ")} title="Bullet list" style={btnStyle}>• List</button>
+      <button type="button" onClick={()=>prefix("1. ")} title="Numbered list" style={btnStyle}>1. List</button>
+      <div style={{flex:1}}/>
+      <button type="button" onClick={()=>setPreview(!preview)} title="Toggle preview" style={{...btnStyle,background:preview?T.tealBg:"#fff",color:preview?T.teal:T.txt,fontWeight:preview?700:600}}>{preview?"✏️ Edit":"👁 Preview"}</button>
+    </div>
+    {/* Editor or preview */}
+    {preview?
+      <div style={{minHeight:rows*22,padding:"10px 12px",background:"#fff",border:"1px solid "+T.border,borderRadius:8,fontSize:".9rem"}}>
+        {value?<MarkdownView text={value}/>:<span style={{color:T.mute,fontStyle:"italic"}}>(nothing to preview)</span>}
+      </div>
+      :
+      <textarea ref={taRef} value={value} onChange={e=>onChange(e.target.value)} onKeyDown={onKey} placeholder={placeholder} rows={rows} style={{width:"100%",padding:"10px 12px",border:"1px solid "+T.border,borderRadius:8,fontSize:".9rem",fontFamily:"inherit",resize:"vertical",boxSizing:"border-box"}}/>
+    }
+    {/* Hint */}
+    <div style={{fontSize:".68rem",color:T.mute,marginTop:4,lineHeight:1.4}}>
+      Tip: use <b>**bold**</b>, <i>*italic*</i>, <code style={{background:T.bg,padding:"0 4px",borderRadius:3}}>## Header</code>, <code style={{background:T.bg,padding:"0 4px",borderRadius:3}}>- bullet</code>, <code style={{background:T.bg,padding:"0 4px",borderRadius:3}}>1. number</code>
+    </div>
+  </div>);
+};
+
 // ═══ IMAGE GALLERY ═══
 const ImgGallery=({images})=>{
   const[big,setBig]=useState(null);
@@ -613,6 +731,7 @@ const AdminForm=({type,fields,edForm,setEdForm,onSave})=>{
     {fields.map(([k,l,tp,opts])=><div key={k} style={{marginBottom:10}}>
       <label style={{display:"block",fontSize:".75rem",color:T.teal,marginBottom:4}}>{l}</label>
       {tp==="textarea"?<textarea value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.txa}/>
+      :tp==="markdown"?<MarkdownEditor value={d[k]||""} onChange={v=>set(k,v)} placeholder="" rows={6}/>
       :tp==="select"?<select value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.inp}>{(opts||TOPICS).map(t=><option key={t} value={t}>{t}</option>)}{!opts&&<option value="General">General</option>}</select>
       :tp==="check"?<label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}><input type="checkbox" checked={!!d[k]} onChange={e=>set(k,e.target.checked)}/> {l}</label>
       :tp==="image"?<AdminImgField value={d[k]} onChange={url=>set(k,url)}/>
@@ -3212,7 +3331,7 @@ export default function App(){
             </div>}
 
             {/* Article body */}
-            <div style={{fontSize:"1.05rem",color:T.txt,lineHeight:1.85,whiteSpace:"pre-wrap",fontFamily:"Georgia, 'Times New Roman', serif"}}>{selA.body}</div>
+            <MarkdownView text={selA.body} style={{fontSize:"1.05rem",color:T.txt,fontFamily:"Georgia, 'Times New Roman', serif"}}/>
 
             {/* References */}
             {selA.refs&&<div style={{marginTop:32,paddingTop:18,borderTop:"1px solid "+T.border}}>
@@ -3700,19 +3819,19 @@ export default function App(){
               <div style={{padding:"12px 14px",background:T.bg,borderRadius:8,marginBottom:14,fontSize:".75rem",color:T.txt2,lineHeight:1.5}}>💡 The fields below are optional — fill in what's relevant for your case. You can always edit later.</div>
 
               <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>📝 History &amp; presentation</label>
-              <textarea value={ccHistory} onChange={e=>setCcHistory(e.target.value)} placeholder="Patient demographics, chief complaint, duration of symptoms, relevant past history..." rows={3} style={{...T.txa,marginBottom:12}}/>
+              <div style={{marginBottom:12}}><MarkdownEditor value={ccHistory} onChange={setCcHistory} placeholder="Patient demographics, chief complaint, duration of symptoms, relevant past history..." rows={3}/></div>
 
               <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>💊 Treatment given</label>
-              <textarea value={ccTreatment} onChange={e=>setCcTreatment(e.target.value)} placeholder="Medications prescribed, procedures performed, dosage, duration..." rows={3} style={{...T.txa,marginBottom:12}}/>
+              <div style={{marginBottom:12}}><MarkdownEditor value={ccTreatment} onChange={setCcTreatment} placeholder="Medications prescribed, procedures performed, dosage, duration..." rows={3}/></div>
 
               <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>📈 Outcome</label>
-              <textarea value={ccOutcome} onChange={e=>setCcOutcome(e.target.value)} placeholder="Response to treatment, follow-up findings, current status..." rows={2} style={{...T.txa,marginBottom:12}}/>
+              <div style={{marginBottom:12}}><MarkdownEditor value={ccOutcome} onChange={setCcOutcome} placeholder="Response to treatment, follow-up findings, current status..." rows={2}/></div>
 
               <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>💡 Discussion question</label>
               <input value={ccDiag} onChange={e=>setCcDiag(e.target.value)} placeholder="What's your differential? Any thoughts on management?" style={{...T.inp,marginBottom:14}}/>
 
               <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Additional notes</label>
-              <textarea value={ccB} onChange={e=>setCcB(e.target.value)} placeholder="Any additional context (optional)..." rows={2} style={{...T.txa,marginBottom:4}}/>
+              <div style={{marginBottom:4}}><MarkdownEditor value={ccB} onChange={setCcB} placeholder="Any additional context (optional)..." rows={2}/></div>
             </div>
 
             {/* Modal footer */}
@@ -3760,18 +3879,18 @@ export default function App(){
             {/* Structured sections — only render if filled */}
             {cs.history&&<div style={{marginBottom:14}}>
               <div style={{fontSize:".68rem",color:T.teal,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:5}}>📝 History & Presentation</div>
-              <div style={{fontSize:".9rem",color:T.txt2,lineHeight:1.7,whiteSpace:"pre-wrap"}}>{cs.history}</div>
+              <MarkdownView text={cs.history} style={{fontSize:".9rem",color:T.txt2}}/>
             </div>}
             {cs.treatment&&<div style={{marginBottom:14}}>
               <div style={{fontSize:".68rem",color:T.teal,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:5}}>💊 Treatment Given</div>
-              <div style={{fontSize:".9rem",color:T.txt2,lineHeight:1.7,whiteSpace:"pre-wrap"}}>{cs.treatment}</div>
+              <MarkdownView text={cs.treatment} style={{fontSize:".9rem",color:T.txt2}}/>
             </div>}
             {cs.outcome&&<div style={{marginBottom:14}}>
               <div style={{fontSize:".68rem",color:T.teal,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:5}}>📈 Outcome</div>
-              <div style={{fontSize:".9rem",color:T.txt2,lineHeight:1.7,whiteSpace:"pre-wrap"}}>{cs.outcome}</div>
+              <MarkdownView text={cs.outcome} style={{fontSize:".9rem",color:T.txt2}}/>
             </div>}
             {cs.body&&<div style={{marginBottom:14}}>
-              <div style={{fontSize:".9rem",color:T.txt2,lineHeight:1.7,whiteSpace:"pre-wrap"}}>{cs.body}</div>
+              <MarkdownView text={cs.body} style={{fontSize:".9rem",color:T.txt2}}/>
             </div>}
 
             {/* Discussion question — gold-tinted callout */}
@@ -3833,7 +3952,7 @@ export default function App(){
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:500,textTransform:"uppercase",letterSpacing:1}}>Category</label>
             <select value={fpC} onChange={e=>setFpC(e.target.value)} style={{...T.inp,marginBottom:12}}>{TOPICS.map(t=><option key={t} value={t}>{t}</option>)}</select>
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:500,textTransform:"uppercase",letterSpacing:1}}>Your post</label>
-            <textarea value={fpB} onChange={e=>setFpB(e.target.value)} placeholder="Share your question, insight, or experience..." rows={5} style={{...T.txa,marginBottom:12,fontSize:".95rem",lineHeight:1.6}}/>
+            <div style={{marginBottom:12}}><MarkdownEditor value={fpB} onChange={setFpB} placeholder="Share your question, insight, or experience..." rows={5}/></div>
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:500,textTransform:"uppercase",letterSpacing:1}}>Add images (optional)</label>
             <div style={{marginBottom:14,padding:12,background:T.bg,borderRadius:10}}><ImgUpload images={fpImgs} setImages={setFpImgs} uploading={fpUp} setUploading={setFpUp}/></div>
             <button onClick={postForum} style={T.btn}>Publish discussion</button>
@@ -3885,7 +4004,7 @@ export default function App(){
               <h3 style={{fontSize:"1.3rem",fontWeight:700,lineHeight:1.35,marginBottom:10,color:T.txt}}>{p.title}</h3>
 
               {/* Body */}
-              {p.body&&<p style={{fontSize:".95rem",color:T.txt2,lineHeight:1.75,whiteSpace:"pre-wrap",marginBottom:14}}>{p.body}</p>}
+              {p.body&&<div style={{fontSize:".95rem",color:T.txt2,marginBottom:14}}><MarkdownView text={p.body}/></div>}
 
               {/* Engagement bar */}
               <div style={{display:"flex",alignItems:"center",gap:12,paddingTop:12,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
@@ -4720,7 +4839,7 @@ export default function App(){
         {aTab==="quiz"&&<div style={T.card}>{edForm?.type==="quizzes"?<AdminForm type="Quiz sponsor" edForm={edForm} setEdForm={setEdForm} fields={[["sponsored","Mark as sponsored quiz","check"],["sponsor","Sponsor name (e.g. 'Sun Pharma')"],["sponsorLogo","Sponsor logo","image"],["sponsorUrl","Sponsor URL (optional — makes name clickable)"]]} onSave={()=>saveContent("quizzes")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{quizzes.length} questions</span><button onClick={genQuiz} style={T.btn}>🤖 Generate today</button></div>
           {quizzes.map(q=><div key={q.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border,gap:10}}><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,fontSize:".88rem"}}>{q.cat} — {q.diff} {q.sponsored&&<span style={{...T.tag(T.goldBg,T.goldD),marginLeft:6}}>📢 {q.sponsor||"Sponsored"}</span>}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(q.date)} · {Object.keys(q.answers||{}).length} answers · ❤️ {q.likes||0}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>{setSelD(q.date);go("quiz")}} style={{...T.btnO,...T.btnSm}}>View</button><button onClick={()=>setEdForm({type:"quizzes",data:{...q},editing:true})} style={{...T.btnO,...T.btnSm}}>📢 Sponsor</button><button onClick={()=>deleteContent("quizzes",q.id,q.cat)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
-        {aTab==="articles"&&<div style={T.card}>{edForm?.type==="articles"?<AdminForm type="Article" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["subtitle","Subtitle / Tagline (italic, shown below title — optional)"],["cat","Category","select"],["author","Author name (e.g. 'Dr. Dhananjay Patil, MD')"],["authorPhoto","Author profile photo","image"],["authorAffiliation","Author affiliation (e.g. 'Absolute Institute of Aesthetic Medicine, Pune')"],["date","Publication date","date"],["cover","Cover image","image"],["abstract","Abstract / Summary (italic boxed quote — optional)","textarea"],["body","Article body","textarea"],["refs","References (optional)","textarea"],["authorBio","Author bio (shown at end of article — optional)","textarea"],["sponsored","Sponsored content (paid editorial)","check"],["sponsor","Sponsored by — brand name (e.g. 'Sun Pharma') — only if Sponsored is checked"],["sponsorLogo","Sponsor logo","image"],["sponsorUrl","Sponsor website URL (optional — makes sponsor name clickable)"],["feat","Featured","check"]]} onSave={()=>saveContent("articles")}/>
+        {aTab==="articles"&&<div style={T.card}>{edForm?.type==="articles"?<AdminForm type="Article" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["subtitle","Subtitle / Tagline (italic, shown below title — optional)"],["cat","Category","select"],["author","Author name (e.g. 'Dr. Dhananjay Patil, MD')"],["authorPhoto","Author profile photo","image"],["authorAffiliation","Author affiliation (e.g. 'Absolute Institute of Aesthetic Medicine, Pune')"],["date","Publication date","date"],["cover","Cover image","image"],["abstract","Abstract / Summary (italic boxed quote — optional)","textarea"],["body","Article body","markdown"],["refs","References (optional)","textarea"],["authorBio","Author bio (shown at end of article — optional)","textarea"],["sponsored","Sponsored content (paid editorial)","check"],["sponsor","Sponsored by — brand name (e.g. 'Sun Pharma') — only if Sponsored is checked"],["sponsorLogo","Sponsor logo","image"],["sponsorUrl","Sponsor website URL (optional — makes sponsor name clickable)"],["feat","Featured","check"]]} onSave={()=>saveContent("articles")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{articles.length}</span><button onClick={()=>setEdForm({type:"articles",data:{date:today,author:uName,cat:TOPICS[0]},editing:false})} style={T.btn}>+ New</button></div>
           {articles.map(a=><div key={a.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div style={{display:"flex",gap:10,alignItems:"center"}}>{a.cover&&<img src={a.cover} style={{width:50,height:36,objectFit:"cover",borderRadius:6}}/>}<div><div style={{fontWeight:500,fontSize:".88rem"}}>{a.title}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(a.date)}</div></div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"articles",data:{...a},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("articles",a.id,a.title)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
         {aTab==="resources"&&<div style={T.card}>{edForm?.type==="resources"?<AdminForm type="Resource" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["url","Download URL"],["pages","Pages"],["size","Size"],["icon","Emoji (fallback)"],["thumb","Thumbnail image","image"],["free","Free","check"]]} onSave={()=>saveContent("resources")}/>
