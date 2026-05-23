@@ -2832,8 +2832,8 @@ export default function App(){
         {(()=>{
           const scrollTo=(id)=>{const el=document.getElementById(id);if(el)el.scrollIntoView({behavior:"smooth",block:"start"})};
           const btns=[
-            {id:"sk-trials",   icon:"🧪",label:"Clinical Trials", desc:"Recruiting now",     color:"#0d6b6e",bg:"#e1f5ee"},
             {id:"sk-industry", icon:"📰",label:"Industry News",   desc:"Aesthetic medicine", color:"#bf6a00",bg:"#fff8e1"},
+            {id:"sk-trials",   icon:"🧪",label:"Clinical Trials", desc:"Recruiting now",     color:"#0d6b6e",bg:"#e1f5ee"},
             {id:"sk-research", icon:"🔬",label:"Latest Research", desc:"PubMed papers",      color:"#7a3e9a",bg:"#f3e8ff"},
             {id:"sk-fda",      icon:"⚠️",label:"FDA Alerts",      desc:"Safety updates",     color:"#c5392a",bg:"#fce8e6"},
           ];
@@ -2869,33 +2869,6 @@ export default function App(){
 
           return(<>
 
-            {/* ═════════ CLINICAL TRIALS ═════════ */}
-            {hasTrials&&<div id="sk-trials" style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.teal,scrollMarginTop:80}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
-                <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>🧪 Active Clinical Trials</h3>
-                <span style={{fontSize:".7rem",color:T.mute}}>Recruiting now on ClinicalTrials.gov</span>
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {trials.slice(0,6).map((t,i)=><a key={t.nctId||i} href={t.url} target="_blank" rel="noopener noreferrer"
-                  style={{display:"flex",gap:12,padding:"12px 14px",borderRadius:10,border:"1px solid "+T.border,textDecoration:"none",color:"inherit",background:"#fff",transition:"all .15s"}}
-                  onMouseEnter={e=>{e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.background=T.tealBg+"22"}}
-                  onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background="#fff"}}
-                >
-                  <div style={{width:48,height:48,borderRadius:8,background:T.tealBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.4rem",flexShrink:0}}>{t.icon||"🧪"}</div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{display:"flex",gap:5,marginBottom:5,flexWrap:"wrap"}}>
-                      {t.status&&<span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:700,background:t.status==="RECRUITING"?"#e8f5e9":T.bg,color:t.status==="RECRUITING"?"#1b5e20":T.mute}}>{t.status.replace(/_/g," ")}</span>}
-                      {t.phase&&<span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:600,background:T.bg,color:T.mute}}>{t.phase}</span>}
-                      {t.condition&&<span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:600,background:T.tealBg,color:T.teal}}>{t.condition}</span>}
-                    </div>
-                    <div style={{fontSize:".86rem",fontWeight:600,color:T.txt,lineHeight:1.4,marginBottom:4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{t.title}</div>
-                    <div style={{fontSize:".68rem",color:T.mute,fontStyle:"italic"}}>{t.sponsor||"ClinicalTrials.gov"}{t.country?` · ${t.country}`:""}{t.startDate?` · Started ${t.startDate}`:""} · {t.nctId} →</div>
-                  </div>
-                </a>)}
-              </div>
-            </div>}
-
-            {/* Admin-only empty hint when ALL sources are empty */}
             {/* ═════════ INDUSTRY NEWS ═════════ */}
             {(hasIndustry||(isAdmin&&!industryNewsConfigured))&&<div id="sk-industry" style={{...T.card,padding:18,marginBottom:14,scrollMarginTop:80}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
@@ -2924,6 +2897,32 @@ export default function App(){
                   </div>
                 </a>)}
               </div>}
+            </div>}
+
+            {/* ═════════ CLINICAL TRIALS ═════════ */}
+            {hasTrials&&<div id="sk-trials" style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.teal,scrollMarginTop:80}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
+                <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>🧪 Active Clinical Trials</h3>
+                <span style={{fontSize:".7rem",color:T.mute}}>Recruiting now on ClinicalTrials.gov</span>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {trials.slice(0,6).map((t,i)=><a key={t.nctId||i} href={t.url} target="_blank" rel="noopener noreferrer"
+                  style={{display:"flex",gap:12,padding:"12px 14px",borderRadius:10,border:"1px solid "+T.border,textDecoration:"none",color:"inherit",background:"#fff",transition:"all .15s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.background=T.tealBg+"22"}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background="#fff"}}
+                >
+                  <div style={{width:48,height:48,borderRadius:8,background:T.tealBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.4rem",flexShrink:0}}>{t.icon||"🧪"}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",gap:5,marginBottom:5,flexWrap:"wrap"}}>
+                      {t.status&&<span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:700,background:t.status==="RECRUITING"?"#e8f5e9":T.bg,color:t.status==="RECRUITING"?"#1b5e20":T.mute}}>{t.status.replace(/_/g," ")}</span>}
+                      {t.phase&&<span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:600,background:T.bg,color:T.mute}}>{t.phase}</span>}
+                      {t.condition&&<span style={{padding:"2px 8px",borderRadius:10,fontSize:".64rem",fontWeight:600,background:T.tealBg,color:T.teal}}>{t.condition}</span>}
+                    </div>
+                    <div style={{fontSize:".86rem",fontWeight:600,color:T.txt,lineHeight:1.4,marginBottom:4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{t.title}</div>
+                    <div style={{fontSize:".68rem",color:T.mute,fontStyle:"italic"}}>{t.sponsor||"ClinicalTrials.gov"}{t.country?` · ${t.country}`:""}{t.startDate?` · Started ${t.startDate}`:""} · {t.nctId} →</div>
+                  </div>
+                </a>)}
+              </div>
             </div>}
 
             {/* ═════════ LATEST RESEARCH + EDITORIAL ═════════ */}
