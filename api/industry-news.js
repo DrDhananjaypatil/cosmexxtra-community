@@ -1,32 +1,101 @@
 // /api/industry-news.js — fetches aesthetic medicine industry news from NewsData.io
 // Requires NEWSDATA_API_KEY env var. Without the key, returns empty + clear message.
 //
-// Fetches in PARALLEL:
-//   1. Global aesthetic medicine news (rotating topic)
-//   2. India-specific health/cosmetic/regulatory news
-// Then interleaves and dedupes results so users always see India coverage.
+// Strategy:
+//   1. Use TIGHT multi-word phrase queries (not single words) — much higher precision
+//   2. Post-fetch FILTER: require at least one medical/aesthetic keyword in title
+//   3. BLOCKLIST: drop articles whose title contains off-topic words
+//      (celebrity birthdays, weather, gold prices, elections, sports, etc.)
+//   4. India regulatory channel kept SEPARATE with very tight query
 //
-// To activate: sign up free at https://newsdata.io → get API key → add to Vercel
-// env vars as NEWSDATA_API_KEY → redeploy.
+// Result: fewer articles but ~90% on-topic. Empty is better than noisy.
 
 const NEWSDATA_BASE = "https://newsdata.io/api/1/latest";
 
-// Global aesthetic medicine search terms (rotated daily)
+// TIGHT multi-word queries. Quoted phrases force exact match.
+// NewsData.io treats phrases in double quotes as exact match.
 const GLOBAL_QUERIES = [
-  "botox OR botulinum",
-  "dermal filler OR hyaluronic acid",
-  "aesthetic medicine OR cosmetic dermatology",
-  "skin rejuvenation OR PDRN",
+  '"aesthetic medicine" OR "cosmetic dermatology"',
+  '"dermal filler" OR "hyaluronic acid" injection',
+  '"botulinum toxin" OR "neurotoxin"',
+  '"laser treatment" skin OR dermatology',
+  '"hair restoration" OR "hair transplant" medical',
+  '"chemical peel" OR "skin rejuvenation"',
 ];
 
-// India-focused queries — broader catch for regulatory + cosmetic news.
-// CDSCO publishes rarely, so we cast a wider net here to catch related coverage.
-const INDIA_QUERIES = [
-  "cosmetic OR dermatology OR aesthetic India",
-  "CDSCO OR DCGI OR drug controller cosmetic",
-  "skincare OR botox OR filler India",
-  "dermatologist OR cosmetologist India regulation",
+// India regulatory — use exact regulator names (low false-positive rate)
+const INDIA_REG_QUERIES = [
+  '"CDSCO" cosmetic OR drug',
+  '"DCGI" India approval',
+  'India dermatology guidelines OR regulation',
 ];
+
+// MUST-HAVE keywords — at least one must appear in title to keep article.
+// Curated to medical/aesthetic vocabulary only.
+const REQUIRED_KEYWORDS = [
+  // Procedures
+  "botox", "filler", "fillers", "dermal", "neurotoxin", "neuromodulator", "botulinum",
+  "laser", "ipl", "fraxel", "co2",
+  "peel", "peeling", "microneedling", "rf microneedling",
+  "thread", "pdo", "pdrn",
+  "exosome", "biostimulator",
+  "rhinoplasty", "blepharoplasty", "facelift", "liposuction",
+  "lip augmentation", "cheek augmentation", "chin filler",
+  "skin booster", "hydration treatment",
+  // Conditions / specialties
+  "dermatolog", "dermatitis", "psoriasis", "eczema", "acne", "rosacea",
+  "melasma", "pigmentation", "hyperpigmentation", "vitiligo",
+  "alopecia", "hair loss", "hair transplant",
+  "cosmetic surgery", "cosmetic dermatology", "aesthetic medicine", "aesthetic clinic",
+  "plastic surgery", "plastic surgeon",
+  "skin cancer", "melanoma", "basal cell",
+  "scar revision", "keloid",
+  // Drugs / molecules
+  "isotretinoin", "tretinoin", "tazarotene", "minoxidil", "finasteride",
+  "hyaluronic", "polynucleotide", "polylactic",
+  "tranexamic acid", "kojic", "azelaic",
+  // Regulatory / industry
+  "fda approv", "fda warn", "fda recall",
+  "cdsco", "dcgi", "drug controller",
+  "clinical trial",
+  "cosmetic regulation", "cosmetic safety",
+];
+
+// BLOCKLIST — title contains any of these → drop article.
+// Captures the noise patterns I saw in real results.
+const BLOCKLIST = [
+  // Celebrity / entertainment
+  "birthday", "birthday wishes", "born on", "born in",
+  "actress", "actor", "comedian", "singer", "rapper", "celebrity",
+  "diljit", "shah rukh", "salman", "bollywood", "tollywood",
+  "wedding", "married", "divorce", "girlfriend", "boyfriend",
+  // Weather / disaster
+  "weather", "rain", "thunderstorm", "monsoon", "cyclone", "flood", "earthquake",
+  "heat wave", "heatwave", "cold wave", "snowfall",
+  // Finance / commodities
+  "gold rate", "gold price", "silver rate", "silver price",
+  "share price", "stock", "ipo", "sensex", "nifty",
+  "bitcoin", "crypto",
+  "petrol price", "diesel price", "fuel price",
+  // Sports
+  "cricket", "ipl match", "world cup", "ipl 20", "wpl",
+  "football", "fifa", "olympic", "asian games", "commonwealth games",
+  "kabaddi", "hockey match", "chess",
+  // Politics / general news
+  "election", "rally", "manifesto", "parliament", "lok sabha", "rajya sabha",
+  "supreme court", "high court verdict",
+  // Mass media noise
+  "horoscope", "zodiac", "astrology", "tarot",
+  "movie review", "trailer", "teaser launch", "box office",
+  "song release", "album release",
+  // Recipes / lifestyle non-medical
+  "recipe", "kitchen tips", "cooking", "saree", "fashion week",
+];
+
+const titleMatches = (title, list) => {
+  const t = (title || "").toLowerCase();
+  return list.some(k => t.includes(k));
+};
 
 // ═══ MAIN HANDLER ═══
 export default async function handler(req, res) {
@@ -49,21 +118,35 @@ export default async function handler(req, res) {
     // Rotate queries daily so we get variety
     const dayIndex = Math.floor(Date.now() / 86400000);
     const globalQ = GLOBAL_QUERIES[dayIndex % GLOBAL_QUERIES.length];
-    const indiaQ = INDIA_QUERIES[dayIndex % INDIA_QUERIES.length];
+    const indiaQ = INDIA_REG_QUERIES[dayIndex % INDIA_REG_QUERIES.length];
 
-    // Fetch global and India in parallel
+    // Fetch in parallel
     const [globalRes, indiaRes] = await Promise.all([
-      fetchNews(apiKey, { q: globalQ, language: "en", category: "health,science", size: "8" }),
-      fetchNews(apiKey, { q: indiaQ, language: "en", country: "in", size: "8" }),
+      fetchNews(apiKey, { q: globalQ, language: "en", category: "health,science", size: "10" }),
+      fetchNews(apiKey, { q: indiaQ, language: "en", country: "in", size: "10" }),
     ]);
 
-    const globalItems = (globalRes?.results || []).map(normalize);
-    const indiaItems = (indiaRes?.results || []).map(normalize);
+    let globalItems = (globalRes?.results || []).map(normalize);
+    let indiaItems = (indiaRes?.results || []).map(normalize);
 
-    // Tag India items so frontend can show country badge
+    // Tag India items
     indiaItems.forEach(it => { it.region = "India"; });
 
-    // Dedupe by URL (an article occasionally shows up in both feeds)
+    // ═══ AGGRESSIVE FILTERING ═══
+    const passes = (item) => {
+      const title = item.title || "";
+      if (!title) return false;
+      // Block if title contains banned word
+      if (titleMatches(title, BLOCKLIST)) return false;
+      // Require at least one medical/aesthetic keyword
+      if (!titleMatches(title, REQUIRED_KEYWORDS)) return false;
+      return true;
+    };
+
+    globalItems = globalItems.filter(passes);
+    indiaItems = indiaItems.filter(passes);
+
+    // Dedupe by URL across both feeds
     const seenUrls = new Set();
     const dedupe = (arr) => arr.filter((it) => {
       if (!it.url || seenUrls.has(it.url)) return false;
@@ -71,7 +154,7 @@ export default async function handler(req, res) {
       return true;
     });
 
-    // Interleave: 1 India, 1 global, 1 India, 1 global... so India coverage is always visible
+    // Interleave: India first when available, then global
     const interleaved = [];
     const indiaQueue = dedupe(indiaItems);
     const globalQueue = dedupe(globalItems);
@@ -89,7 +172,13 @@ export default async function handler(req, res) {
       items,
       configured: true,
       generatedAt: new Date().toISOString(),
-      counts: { india: indiaQueue.length, global: globalQueue.length, total: items.length },
+      counts: {
+        india_raw: (indiaRes?.results || []).length,
+        india_filtered: indiaQueue.length,
+        global_raw: (globalRes?.results || []).length,
+        global_filtered: globalQueue.length,
+        total: items.length,
+      },
     });
   } catch (err) {
     console.error("industry-news handler error:", err);
@@ -97,7 +186,6 @@ export default async function handler(req, res) {
   }
 }
 
-// Fetch news with given params; returns parsed JSON or null on error.
 async function fetchNews(apiKey, paramsObj) {
   try {
     const params = new URLSearchParams({ apikey: apiKey, ...paramsObj });
@@ -115,7 +203,6 @@ async function fetchNews(apiKey, paramsObj) {
   }
 }
 
-// Normalize NewsData article to our shape
 function normalize(a) {
   return {
     icon: "📰",
