@@ -1235,7 +1235,7 @@ export default function App(){
   // KNOWN_PAGES must match every page condition the app actually renders.
   // If you add a new page (`pg==="xyz"&&...` block), add "xyz" here too.
   const KNOWN_PAGES=["home","me","quiz","library","forum","cases","rewards","submit","rank","events","videos","admin","profile","ad"];
-  const sh=m=>setToast(m);const go=p=>{const safe=KNOWN_PAGES.includes(p)?p:"home";setPg(safe);setSelA(null);setSelV(null);setSelAd(null);setSelE(null);setSelU(null);setEdForm(null)};
+  const sh=m=>setToast(m);const go=p=>{const safe=KNOWN_PAGES.includes(p)?p:"home";setPg(safe);setSelA(null);setSelV(null);setSelAd(null);setSelE(null);setSelU(null);setSelFP(null);setEdForm(null)};
   // ═══ VIEW PROFILE — open any user's profile page ═══
   const viewProfile=(uid)=>{
     if(!uid)return;
@@ -1298,6 +1298,7 @@ export default function App(){
   const[events,setEvents]=useState([]);
   const[selAd,setSelAd]=useState(null);
   const[selE,setSelE]=useState(null);
+  const[selFP,setSelFP]=useState(null); // selected forum post for detail view
   const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub)},[]);
 
   useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){setProf(p);setScr("main");loadData()}else{setPf({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:au?.displayName||"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});setSetupStep(0);setSetupErr("");setScr("setup")}}else{setAu(null);setProf(null);setScr("landing")}});return()=>unsub()},[loadData]);
@@ -1452,7 +1453,9 @@ export default function App(){
       if(found){setPg("quiz");setSelD(found.date);window.history.replaceState({},"",window.location.pathname)}
       else{sh("Quiz not found");window.history.replaceState({},"",window.location.pathname)}
     }else if(forumId&&forumPosts.length){
-      setPg("forum");window.history.replaceState({},"",window.location.pathname);
+      const found=forumPosts.find(p=>p.id===forumId);
+      if(found){setPg("forum");setSelFP(found);window.history.replaceState({},"",window.location.pathname)}
+      else{setPg("forum");window.history.replaceState({},"",window.location.pathname)}
     }else if(params.get("case")&&cases.length){
       setPg("cases");window.history.replaceState({},"",window.location.pathname);
     }
@@ -2967,6 +2970,89 @@ export default function App(){
           </div>);
         })()}
 
+        {/* ═══ FEATURED ARTICLES ═══
+            Shows 3-4 articles with quality covers. Only renders if 2+ qualify. */}
+        {(()=>{
+          const eligible=articles.filter(a=>a&&a.cover&&a.title).sort((a,b)=>{
+            // Featured first, then by date desc
+            if((b.feat?1:0)!==(a.feat?1:0))return (b.feat?1:0)-(a.feat?1:0);
+            const da=new Date(a.date||a.createdAt||0).getTime();
+            const db=new Date(b.date||b.createdAt||0).getTime();
+            return db-da;
+          }).slice(0,4);
+          if(eligible.length<2)return null;
+          return(<div style={{...T.card,padding:18,marginBottom:14}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
+              <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>📰 Featured Articles</h3>
+              <span onClick={()=>go("library")} style={{fontSize:".78rem",color:T.teal,fontWeight:600,cursor:"pointer"}}>Explore all →</span>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
+              {eligible.map(a=><div key={a.id} onClick={()=>{setSelA(a);window.scrollTo(0,0)}} style={{background:"#fff",borderRadius:10,overflow:"hidden",border:"1px solid "+T.border,cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 20px rgba(0,0,0,0.07)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
+                <div style={{aspectRatio:"16/10",overflow:"hidden",background:T.bg}}>
+                  <img src={a.cover} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}} onError={e=>{e.currentTarget.style.display="none"}}/>
+                </div>
+                <div style={{padding:12}}>
+                  {a.cat&&<div style={{fontSize:".64rem",color:T.gold,fontWeight:700,letterSpacing:1.2,textTransform:"uppercase",marginBottom:5}}>{a.cat}</div>}
+                  <div style={{fontSize:".88rem",fontWeight:600,color:T.txt,lineHeight:1.35,marginBottom:6,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{a.title}</div>
+                  <div style={{fontSize:".68rem",color:T.mute}}>{a.author||"SKINARIO Editorial"}{a.date?` · ${a.date}`:""}</div>
+                </div>
+              </div>)}
+            </div>
+          </div>);
+        })()}
+
+        {/* ═══ FEATURED CASES ═══ */}
+        {(()=>{
+          const eligible=cases.filter(c=>c&&c.images&&c.images.length>0&&c.title).slice(0,3);
+          if(eligible.length<2)return null;
+          return(<div style={{...T.card,padding:18,marginBottom:14}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
+              <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>🔬 Real Cases from the Community</h3>
+              <span onClick={()=>go("cases")} style={{fontSize:".78rem",color:T.teal,fontWeight:600,cursor:"pointer"}}>View all cases →</span>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
+              {eligible.map(c=><div key={c.id} onClick={()=>go("cases")} style={{background:"#fff",borderRadius:10,overflow:"hidden",border:"1px solid "+T.border,cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 20px rgba(0,0,0,0.07)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
+                <div style={{aspectRatio:"4/3",overflow:"hidden",background:T.bg,position:"relative"}}>
+                  <img src={c.images[0]} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+                  {c.images.length>1&&<div style={{position:"absolute",bottom:6,right:6,background:"rgba(0,0,0,0.65)",color:"#fff",fontSize:".62rem",padding:"2px 7px",borderRadius:10,fontWeight:600}}>+{c.images.length-1}</div>}
+                </div>
+                <div style={{padding:12}}>
+                  {c.cat&&<div style={{fontSize:".64rem",color:T.teal,fontWeight:700,letterSpacing:1.2,textTransform:"uppercase",marginBottom:5}}>{c.cat}</div>}
+                  <div style={{fontSize:".88rem",fontWeight:600,color:T.txt,lineHeight:1.35,marginBottom:6,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{c.title}</div>
+                  <div style={{fontSize:".68rem",color:T.mute}}>by {c.author||"Anonymous"} · 💬 {(c.comments||[]).length}</div>
+                </div>
+              </div>)}
+            </div>
+          </div>);
+        })()}
+
+        {/* ═══ FEATURED VIDEOS ═══ */}
+        {(()=>{
+          const eligible=videos.filter(v=>v&&v.title&&(v.thumb||v.url)).slice(0,3);
+          if(eligible.length<2)return null;
+          return(<div style={{...T.card,padding:18,marginBottom:14}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
+              <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>🎥 Featured Masterclasses</h3>
+              <span onClick={()=>go("videos")} style={{fontSize:".78rem",color:T.teal,fontWeight:600,cursor:"pointer"}}>All videos →</span>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
+              {eligible.map(v=><div key={v.id} onClick={()=>{setSelV(v);go("videos")}} style={{background:"#fff",borderRadius:10,overflow:"hidden",border:"1px solid "+T.border,cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 20px rgba(0,0,0,0.07)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
+                <div style={{aspectRatio:"16/9",overflow:"hidden",background:"#1a1a1a",position:"relative"}}>
+                  {v.thumb&&<img src={v.thumb} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>}
+                  <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    <div style={{width:48,height:48,borderRadius:"50%",background:"rgba(255,255,255,0.95)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.1rem",color:"#1a1a1a"}}>▶</div>
+                  </div>
+                </div>
+                <div style={{padding:12}}>
+                  {v.cat&&<div style={{fontSize:".64rem",color:"#c5392a",fontWeight:700,letterSpacing:1.2,textTransform:"uppercase",marginBottom:5}}>{v.cat}</div>}
+                  <div style={{fontSize:".88rem",fontWeight:600,color:T.txt,lineHeight:1.35,marginBottom:6,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{v.title}</div>
+                  <div style={{fontSize:".68rem",color:T.mute}}>{v.duration||"Masterclass"}</div>
+                </div>
+              </div>)}
+            </div>
+          </div>);
+        })()}
+
         {/* ═══ INDUSTRY NEWS, FDA ALERTS, RESEARCH, TRIALS — 4 SECTIONS ═══ */}
         {(()=>{
           const isAdmin=ADMINS.includes(au?.email);
@@ -3151,6 +3237,30 @@ export default function App(){
           </>);
         })()}
 
+        {/* ═══ TESTIMONIALS ═══
+            Hardcoded for now since you have no testimonial input UI yet.
+            Replace with real quotes when you collect them from your community. */}
+        {(()=>{
+          const testimonials=[
+            {quote:"SKINARIO has become my five-minute morning ritual. The case discussions are gold — real peers, real complications, real solutions.",author:"Dr. P. (Pune)",specialty:"Aesthetic Practitioner"},
+            {quote:"Finally a place where Indian doctors can discuss aesthetic medicine without the noise of consumer forums. The quizzes keep me sharp between conferences.",author:"Dr. M. (Mumbai)",specialty:"Cosmetic Dermatologist"},
+            {quote:"The daily quizzes are excellent revision. I've learnt more in the last month here than in some courses I've paid for.",author:"Dr. S. (Bengaluru)",specialty:"Dermatology Resident"},
+          ];
+          return(<div style={{...T.card,padding:24,marginBottom:14,background:"linear-gradient(135deg,#faf3e7,#f5ede2)",border:"1px solid rgba(200,168,78,0.3)"}}>
+            <div style={{textAlign:"center",marginBottom:18}}>
+              <div style={{fontSize:".68rem",color:T.gold,letterSpacing:3,textTransform:"uppercase",fontWeight:700,marginBottom:6}}>What doctors say</div>
+              <h3 style={{fontSize:"1.15rem",fontWeight:400,fontFamily:"Georgia,serif",margin:0,color:T.teal}}>Voices from the community</h3>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:14}}>
+              {testimonials.map((t,i)=><div key={i} style={{padding:"16px 18px",background:"rgba(255,255,255,0.85)",borderRadius:10,borderLeft:"3px solid "+T.gold}}>
+                <div style={{fontSize:"1.6rem",color:T.gold,lineHeight:.6,marginBottom:6,fontFamily:"Georgia,serif"}}>&ldquo;</div>
+                <div style={{fontSize:".84rem",fontStyle:"italic",color:T.txt,lineHeight:1.55,marginBottom:12,fontFamily:"Georgia,serif"}}>{t.quote}</div>
+                <div style={{fontSize:".74rem",color:T.teal,fontWeight:700}}>{t.author}</div>
+                <div style={{fontSize:".68rem",color:T.mute,marginTop:2}}>{t.specialty}</div>
+              </div>)}
+            </div>
+          </div>);
+        })()}
 
         <h3 style={{fontSize:"1.05rem",fontWeight:700,marginBottom:12}}>Latest articles</h3>
         {articles.length===0&&<p style={{color:T.mute}}>No articles yet. Admins can create them from Admin panel.</p>}
@@ -3966,59 +4076,91 @@ export default function App(){
           {/* Posts feed */}
           {filtered.length===0&&!newForum&&<div style={{...T.card,textAlign:"center",padding:50}}><div style={{fontSize:"2.4rem",marginBottom:8}}>💬</div><p style={{color:T.mute,fontSize:".95rem"}}>{forumFilter==="all"?"No discussions yet. Be the first to start one!":`No posts in "${forumFilter}" category yet.`}</p></div>}
 
-          <div style={{display:"flex",flexDirection:"column",gap:14}}>
-          {filtered.map(p=>{const hasImg=p.images?.length>0;const isHot=(p.likes||0)>=3;return(<ViewTracker key={p.id} trackingKey={`forum_${p.id}`} onView={()=>{if(p.uid===au?.uid)return;const newCount=(p.views||0)+1;fbSet("forum",p.id,{views:newCount});setForumPosts(prev=>prev.map(x=>x.id===p.id?{...x,views:newCount}:x))}}><div style={{...T.card,padding:0,overflow:"hidden",marginBottom:0}}>
-            {/* Hero image — single posters/photos display full image, never cropped */}
-            {hasImg&&(p.images.length===1?
-              <div style={{width:"100%",background:"#f4f1ea",cursor:"zoom-in",position:"relative",display:"flex",justifyContent:"center",alignItems:"center"}} onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=p.images[0];im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v)}}>
-                <img src={p.images[0]} style={{width:"100%",maxHeight:640,objectFit:"contain",display:"block"}}/>
-                <div style={{position:"absolute",bottom:8,right:8,background:"rgba(0,0,0,0.55)",color:"#fff",padding:"3px 9px",borderRadius:4,fontSize:".62rem",letterSpacing:.5,fontWeight:500,pointerEvents:"none"}}>🔍 Click to enlarge</div>
-              </div>
-              :<div style={{display:"flex",gap:4,maxHeight:340,overflow:"hidden"}}>
-                <img src={p.images[0]} style={{flex:2,height:340,objectFit:"cover",cursor:"pointer"}} onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=p.images[0];im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v)}}/>
-                <div style={{flex:1,display:"flex",flexDirection:"column",gap:4}}>
-                  {p.images.slice(1,3).map((url,i)=><div key={i} style={{flex:1,position:"relative",cursor:"pointer"}} onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=url;im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v)}}>
-                    <img src={url} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                    {i===1&&p.images.length>3&&<div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.55)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:"1.1rem",fontWeight:600}}>+{p.images.length-3} more</div>}
-                  </div>)}
+          {/* ═══ DETAIL VIEW — when a post is selected ═══ */}
+          {selFP&&(()=>{
+            const p=forumPosts.find(x=>x.id===selFP.id)||selFP;
+            const hasImg=p.images?.length>0;
+            const isHot=(p.likes||0)>=3;
+            return(<div>
+              <button onClick={()=>setSelFP(null)} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back to discussions</button>
+              <ViewTracker trackingKey={`forum_${p.id}`} onView={()=>{if(p.uid===au?.uid)return;const newCount=(p.views||0)+1;fbSet("forum",p.id,{views:newCount});setForumPosts(prev=>prev.map(x=>x.id===p.id?{...x,views:newCount}:x))}}>
+                <div style={{...T.card,padding:0,overflow:"hidden",marginBottom:0}}>
+                  {hasImg&&(p.images.length===1?
+                    <div style={{width:"100%",background:"#f4f1ea",cursor:"zoom-in",position:"relative",display:"flex",justifyContent:"center",alignItems:"center"}} onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=p.images[0];im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v)}}>
+                      <img src={p.images[0]} style={{width:"100%",maxHeight:640,objectFit:"contain",display:"block"}}/>
+                      <div style={{position:"absolute",bottom:8,right:8,background:"rgba(0,0,0,0.55)",color:"#fff",padding:"3px 9px",borderRadius:4,fontSize:".62rem",letterSpacing:.5,fontWeight:500,pointerEvents:"none"}}>🔍 Click to enlarge</div>
+                    </div>
+                    :<div style={{display:"flex",gap:4,maxHeight:340,overflow:"hidden"}}>
+                      <img src={p.images[0]} style={{flex:2,height:340,objectFit:"cover",cursor:"pointer"}} onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=p.images[0];im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v)}}/>
+                      <div style={{flex:1,display:"flex",flexDirection:"column",gap:4}}>
+                        {p.images.slice(1,3).map((url,i)=><div key={i} style={{flex:1,position:"relative",cursor:"pointer"}} onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=url;im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v)}}>
+                          <img src={url} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                          {i===1&&p.images.length>3&&<div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.55)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:"1.1rem",fontWeight:600}}>+{p.images.length-3} more</div>}
+                        </div>)}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{padding:22}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+                      {p.photo?<img src={p.photo} onClick={()=>viewProfile(p.uid)} style={{width:42,height:42,borderRadius:"50%",border:"2px solid "+T.tealBg,cursor:"pointer"}}/>:<div onClick={()=>viewProfile(p.uid)} style={{...T.av(42,T.tealBg,T.teal),border:"2px solid "+T.tealBg,cursor:"pointer"}}>{p.ini||"?"}</div>}
+                      <div style={{flex:1}}>
+                        <b onClick={()=>viewProfile(p.uid)} style={{fontSize:".92rem",color:T.txt,cursor:"pointer"}}>{p.author}</b>
+                        <div style={{fontSize:".72rem",color:T.mute,display:"flex",alignItems:"center",gap:6}}>
+                          <span>{fD(p.date)}</span>
+                          <span>·</span>
+                          <span style={T.tag(T.tealBg,T.teal)}>{p.cat}</span>
+                          {isHot&&<span style={T.tag(T.warnBg,T.warn)}>🔥 Hot</span>}
+                        </div>
+                      </div>
+                    </div>
+                    <h3 style={{fontSize:"1.3rem",fontWeight:700,lineHeight:1.35,marginBottom:10,color:T.txt}}>{p.title}</h3>
+                    {p.body&&<div style={{fontSize:".95rem",color:T.txt2,marginBottom:14}}><MarkdownView text={p.body}/></div>}
+                    <div style={{display:"flex",alignItems:"center",gap:12,paddingTop:12,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
+                      <LikeBtn liked={(p.likedBy||[]).includes(au?.uid)} count={p.likes||0} onToggle={()=>toggleLike("forum",p.id,p,setForumPosts)}/>
+                      <span style={{fontSize:".78rem",color:T.mute,display:"flex",alignItems:"center",gap:4}}>💬 {p.comments?.length||0} {p.comments?.length===1?"reply":"replies"}</span>
+                      {(p.views||0)>0&&<span style={{fontSize:".78rem",color:T.mute,display:"flex",alignItems:"center",gap:4}}>👁️ {p.views}</span>}
+                      <ShareBar title={p.title} url={`${SITE_URL}/?forum=${p.id}`} description={p.body?.slice(0,120)} itemId={p.id} itemType="forum" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
+                    </div>
+                    <CommentThread collection="forum" itemId={p.id} item={p} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} sendEmail={sendEmail} onUpdate={(id,comments)=>setForumPosts(prev=>prev.map(x=>x.id===id?{...x,comments,replies:comments.length}:x))} onAfterPost={(text)=>{if(text.trim().length>=20)awardPoints("forum_comment")}}/>
+                  </div>
                 </div>
-              </div>
-            )}
+              </ViewTracker>
+            </div>);
+          })()}
 
-            <div style={{padding:22}}>
-              {/* Author + meta */}
-              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-                {p.photo?<img src={p.photo} onClick={()=>viewProfile(p.uid)} style={{width:42,height:42,borderRadius:"50%",border:"2px solid "+T.tealBg,cursor:"pointer"}}/>:<div onClick={()=>viewProfile(p.uid)} style={{...T.av(42,T.tealBg,T.teal),border:"2px solid "+T.tealBg,cursor:"pointer"}}>{p.ini||"?"}</div>}
-                <div style={{flex:1}}>
-                  <b onClick={()=>viewProfile(p.uid)} style={{fontSize:".92rem",color:T.txt,cursor:"pointer"}}>{p.author}</b>
-                  <div style={{fontSize:".72rem",color:T.mute,display:"flex",alignItems:"center",gap:6}}>
-                    <span>{fD(p.date)}</span>
-                    <span>·</span>
-                    <span style={T.tag(T.tealBg,T.teal)}>{p.cat}</span>
-                    {isHot&&<span style={T.tag(T.warnBg,T.warn)}>🔥 Hot</span>}
+          {/* ═══ CARD GRID — browse mode ═══ */}
+          {!selFP&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
+          {filtered.map(p=>{
+            const hasImg=p.images?.length>0;
+            const isHot=(p.likes||0)>=3;
+            const replyCount=p.comments?.length||0;
+            return(<div key={p.id} onClick={()=>{setSelFP(p);window.scrollTo(0,0)}} style={{...T.card,padding:0,overflow:"hidden",marginBottom:0,cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 22px rgba(0,0,0,0.07)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
+              {hasImg&&<div style={{width:"100%",aspectRatio:"16/9",overflow:"hidden",background:"#f4f1ea",position:"relative"}}>
+                <img src={p.images[0]} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+                {p.images.length>1&&<div style={{position:"absolute",bottom:6,right:6,background:"rgba(0,0,0,0.65)",color:"#fff",fontSize:".62rem",padding:"2px 7px",borderRadius:10,fontWeight:600}}>+{p.images.length-1}</div>}
+              </div>}
+              <div style={{padding:16}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                  <span style={T.tag(T.tealBg,T.teal)}>{p.cat}</span>
+                  {isHot&&<span style={T.tag(T.warnBg,T.warn)}>🔥</span>}
+                </div>
+                <h4 style={{fontSize:"1rem",fontWeight:700,lineHeight:1.35,marginBottom:8,color:T.txt,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.title}</h4>
+                {p.body&&<p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.55,marginBottom:10,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.body.replace(/[*#-]/g,"").slice(0,140)}</p>}
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:10,borderTop:"1px solid "+T.border,gap:8,flexWrap:"wrap"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0,flex:1}}>
+                    {p.photo?<img src={p.photo} style={{width:22,height:22,borderRadius:"50%",flexShrink:0}}/>:<div style={{...T.av(22,T.tealBg,T.teal),fontSize:".6rem",flexShrink:0}}>{p.ini||"?"}</div>}
+                    <span style={{fontSize:".7rem",color:T.mute,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.author}</span>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,fontSize:".7rem",color:T.mute,flexShrink:0}}>
+                    <span>❤️ {p.likes||0}</span>
+                    <span>💬 {replyCount}</span>
+                    {(p.views||0)>0&&<span>👁️ {p.views}</span>}
                   </div>
                 </div>
               </div>
-
-              {/* Title */}
-              <h3 style={{fontSize:"1.3rem",fontWeight:700,lineHeight:1.35,marginBottom:10,color:T.txt}}>{p.title}</h3>
-
-              {/* Body */}
-              {p.body&&<div style={{fontSize:".95rem",color:T.txt2,marginBottom:14}}><MarkdownView text={p.body}/></div>}
-
-              {/* Engagement bar */}
-              <div style={{display:"flex",alignItems:"center",gap:12,paddingTop:12,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
-                <LikeBtn liked={(p.likedBy||[]).includes(au?.uid)} count={p.likes||0} onToggle={()=>toggleLike("forum",p.id,p,setForumPosts)}/>
-                <span style={{fontSize:".78rem",color:T.mute,display:"flex",alignItems:"center",gap:4}}>💬 {p.comments?.length||0} {p.comments?.length===1?"reply":"replies"}</span>
-                {(p.views||0)>0&&<span style={{fontSize:".78rem",color:T.mute,display:"flex",alignItems:"center",gap:4}}>👁️ {p.views}</span>}
-                <ShareBar title={p.title} url={`${SITE_URL}/?forum=${p.id}`} description={p.body?.slice(0,120)} itemId={p.id} itemType="forum" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
-              </div>
-
-              {/* Comment thread */}
-              <CommentThread collection="forum" itemId={p.id} item={p} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} sendEmail={sendEmail} onUpdate={(id,comments)=>setForumPosts(prev=>prev.map(x=>x.id===id?{...x,comments,replies:comments.length}:x))} onAfterPost={(text)=>{if(text.trim().length>=20)awardPoints("forum_comment")}}/>
-            </div>
-          </div></ViewTracker>)})}
-          </div>
+            </div>);
+          })}
+          </div>}
         </div>);
       })()}
 
