@@ -4702,6 +4702,19 @@ export default function App(){
 
         {/* ═══ MAIN COLUMN: Profile + Saved Items ═══ */}
         <div style={{minWidth:0}}>
+
+        {/* ═══ POINTS + REDEEM PILL — only for doctor accounts (other types don't earn quiz points) ═══ */}
+        {!editingProfile&&prof?.accountType==="doctor"&&<div onClick={()=>go("rewards")} style={{...T.card,padding:"12px 16px",marginBottom:12,borderLeft:"3px solid "+T.gold,background:"linear-gradient(135deg,"+T.goldBg+"55,#fff)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.07)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,minWidth:0}}>
+            <div style={{fontSize:"1.5rem"}}>🏆</div>
+            <div>
+              <div style={{fontSize:".7rem",color:T.mute,letterSpacing:1,textTransform:"uppercase",fontWeight:600,marginBottom:2}}>Your points</div>
+              <div style={{fontSize:"1.3rem",fontWeight:700,color:T.gold,lineHeight:1}}>{prof?.points||0} <span style={{fontSize:".7rem",color:T.mute,fontWeight:500}}>pts</span></div>
+            </div>
+          </div>
+          <div style={{fontSize:".82rem",color:T.teal,fontWeight:600,whiteSpace:"nowrap"}}>Redeem rewards →</div>
+        </div>}
+
         {/* ═══ EDITABLE PROFILE SECTION ═══ */}
         {editingProfile?<div style={{...T.card,borderLeft:"3px solid "+T.gold,padding:22}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
@@ -4949,14 +4962,16 @@ export default function App(){
             Each type button navigates straight to its form, skipping the intermediate "pick a type" page. */}
         {!editingProfile&&(()=>{
           const isAdminU=isAdminUser(au?.email);
-          const hasContribRole=prof?.role==="content_contributor"||isAdminU;
+          // Use canSubmitType for permission logic — it's the single source of truth (used everywhere else).
+          // It returns true if: openToAll, OR user is admin, OR user has Content Contributor / Forum Moderator role.
+          const hasContribRole=canSubmitType("article",au,prof); // any restricted type — they share the same permission rule
           // Types in order. Each: { key, icon, label, desc, canUse }
           const types=[
-            {key:"event",   icon:"📅", label:"Event",     desc:"Conference, workshop, webinar", canUse:true},
-            {key:"article", icon:"📰", label:"Article",   desc:"Educational article",            canUse:hasContribRole},
-            {key:"video",   icon:"🎥", label:"Video",     desc:"Masterclass or tutorial",        canUse:hasContribRole},
-            {key:"news",    icon:"📢", label:"News",      desc:"Industry news, CDSCO, FDA",      canUse:hasContribRole},
-            {key:"ad",      icon:"📌", label:"Ad",        desc:"Sponsored placement",            canUse:isAdminU},
+            {key:"event",   icon:"📅", label:"Event",     desc:"Conference, workshop, webinar", canUse:canSubmitType("event",au,prof)},
+            {key:"article", icon:"📰", label:"Article",   desc:"Educational article",            canUse:canSubmitType("article",au,prof)},
+            {key:"video",   icon:"🎥", label:"Video",     desc:"Masterclass or tutorial",        canUse:canSubmitType("video",au,prof)},
+            {key:"news",    icon:"📢", label:"News",      desc:"Industry news, CDSCO, FDA",      canUse:canSubmitType("news",au,prof)},
+            {key:"ad",      icon:"📌", label:"Ad",        desc:"Sponsored placement",            canUse:canSubmitType("ad",au,prof)},
           ];
           return(<div style={{...T.card,padding:14,marginBottom:14,borderLeft:"3px solid "+T.gold,background:"linear-gradient(135deg,#fff,"+T.goldBg+"33)"}}>
             <div style={{fontSize:".88rem",fontWeight:700,marginBottom:4,display:"flex",alignItems:"center",gap:6}}>📨 Submit to SKINARIO</div>
