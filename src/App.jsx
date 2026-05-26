@@ -1254,7 +1254,7 @@ export default function App(){
   // KNOWN_PAGES must match every page condition the app actually renders.
   // If you add a new page (`pg==="xyz"&&...` block), add "xyz" here too.
   const KNOWN_PAGES=["home","me","quiz","library","forum","cases","rewards","submit","rank","events","videos","admin","profile","ad"];
-  const sh=m=>setToast(m);const go=p=>{const safe=KNOWN_PAGES.includes(p)?p:"home";setPg(safe);setSelA(null);setSelV(null);setSelAd(null);setSelE(null);setSelU(null);setSelFP(null);setEdForm(null)};
+  const sh=m=>setToast(m);const go=p=>{const safe=KNOWN_PAGES.includes(p)?p:"home";setPg(safe);setSelA(null);setSelV(null);setSelAd(null);setSelE(null);setSelU(null);setSelFP(null);setSelCs(null);setEdForm(null)};
   // ═══ VIEW PROFILE — open any user's profile page ═══
   const viewProfile=(uid)=>{
     if(!uid)return;
@@ -1279,6 +1279,8 @@ export default function App(){
   const[rewards,setRewards]=useState([]);
   const[redemptions,setRedemptions]=useState([]);
   const[vendorApplications,setVendorApplications]=useState([]); // vendor proposals + approved partners
+  const[vrImage,setVrImage]=useState(""); // vendor reward proposal: uploaded image URL
+  const[vrUploading,setVrUploading]=useState(false);
   const[roleApplications,setRoleApplications]=useState([]);
   const[moderationLog,setModerationLog]=useState([]);
   const[submissions,setSubmissions]=useState([]);
@@ -1319,6 +1321,7 @@ export default function App(){
   const[selAd,setSelAd]=useState(null);
   const[selE,setSelE]=useState(null);
   const[selFP,setSelFP]=useState(null); // selected forum post for detail view
+  const[selCs,setSelCs]=useState(null); // selected clinical case for detail view
   const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va)},[]);
 
   useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){setProf(p);setScr("main");loadData()}else{setPf({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:au?.displayName||"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});setSetupStep(0);setSetupErr("");setScr("setup")}}else{setAu(null);setProf(null);setScr("landing")}});return()=>unsub()},[loadData]);
@@ -1477,7 +1480,10 @@ export default function App(){
       if(found){setPg("forum");setSelFP(found);window.history.replaceState({},"",window.location.pathname)}
       else{setPg("forum");window.history.replaceState({},"",window.location.pathname)}
     }else if(params.get("case")&&cases.length){
-      setPg("cases");window.history.replaceState({},"",window.location.pathname);
+      const caseId=params.get("case");
+      const found=cases.find(c=>c.id===caseId);
+      if(found){setPg("cases");setSelCs(found);window.history.replaceState({},"",window.location.pathname)}
+      else{setPg("cases");window.history.replaceState({},"",window.location.pathname)}
     }
   },[scr,articles,videos,forumPosts,events,ads,quizzes,cases]);
 
@@ -4044,77 +4050,105 @@ export default function App(){
         </div>}
 
         {cases.length===0&&!newCase&&<div style={{...T.card,textAlign:"center",padding:48}}><div style={{fontSize:"2.4rem",marginBottom:8}}>🔬</div><p style={{color:T.mute,fontSize:".95rem"}}>No cases yet. Be the first to share a clinical case!</p></div>}
-        {cases.map(cs=><ViewTracker key={cs.id} trackingKey={`cases_${cs.id}`} onView={()=>{if(cs.uid===au?.uid)return;const newCount=(cs.views||0)+1;fbSet("cases",cs.id,{views:newCount});setCases(prev=>prev.map(x=>x.id===cs.id?{...x,views:newCount}:x))}}><div style={{...T.card,padding:0,overflow:"hidden"}}>
-          {/* IMAGES AT TOP — full image (no cropping) for clinical accuracy */}
-          {cs.images?.length>0&&<div style={{padding:14,paddingBottom:0}}>
-            {cs.images.length===1?
-              <div style={{position:"relative",background:"#f4f1ea",borderRadius:10,overflow:"hidden",cursor:"zoom-in",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=cs.images[0];im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v)}}>
-                <img src={cs.images[0]} style={{width:"100%",maxHeight:600,objectFit:"contain",display:"block"}}/>
-                <div style={{position:"absolute",bottom:8,right:8,background:"rgba(0,0,0,0.55)",color:"#fff",padding:"3px 9px",borderRadius:4,fontSize:".62rem",letterSpacing:.5,fontWeight:500,pointerEvents:"none"}}>🔍 Click to enlarge</div>
+        {/* ═══ CASE DETAIL VIEW — when a case is selected ═══ */}
+        {selCs&&(()=>{
+          const cs=cases.find(x=>x.id===selCs.id)||selCs;
+          return(<div>
+            <button onClick={()=>setSelCs(null)} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back to cases</button>
+            <ViewTracker trackingKey={`cases_${cs.id}`} onView={()=>{if(cs.uid===au?.uid)return;const newCount=(cs.views||0)+1;fbSet("cases",cs.id,{views:newCount});setCases(prev=>prev.map(x=>x.id===cs.id?{...x,views:newCount}:x))}}>
+              <div style={{...T.card,padding:0,overflow:"hidden"}}>
+                {/* IMAGES AT TOP — full image (no cropping) for clinical accuracy */}
+                {cs.images?.length>0&&<div style={{padding:14,paddingBottom:0}}>
+                  {cs.images.length===1?
+                    <div style={{position:"relative",background:"#f4f1ea",borderRadius:10,overflow:"hidden",cursor:"zoom-in",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=cs.images[0];im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v)}}>
+                      <img src={cs.images[0]} style={{width:"100%",maxHeight:600,objectFit:"contain",display:"block"}}/>
+                      <div style={{position:"absolute",bottom:8,right:8,background:"rgba(0,0,0,0.55)",color:"#fff",padding:"3px 9px",borderRadius:4,fontSize:".62rem",letterSpacing:.5,fontWeight:500,pointerEvents:"none"}}>🔍 Click to enlarge</div>
+                    </div>
+                  :<div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:6,scrollSnapType:"x mandatory"}}>
+                    {cs.images.map((url,i)=><div key={i} style={{flexShrink:0,width:cs.images.length===2?"calc(50% - 4px)":300,height:cs.images.length===2?340:300,background:"#f4f1ea",borderRadius:10,scrollSnapAlign:"start",cursor:"zoom-in",position:"relative",overflow:"hidden"}} onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=url;im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v)}}>
+                      <img src={url} style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}}/>
+                      <div style={{position:"absolute",bottom:6,right:6,background:"rgba(0,0,0,0.55)",color:"#fff",padding:"2px 7px",borderRadius:3,fontSize:".58rem",fontWeight:500,pointerEvents:"none"}}>🔍 {i+1}/{cs.images.length}</div>
+                    </div>)}
+                  </div>}
+                </div>}
+                <div style={{padding:18}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                    {cs.photo?<img src={cs.photo} onClick={()=>viewProfile(cs.uid)} style={{width:36,height:36,borderRadius:"50%",cursor:"pointer"}}/>:<div onClick={()=>viewProfile(cs.uid)} style={{...T.av(36,T.tealBg,T.teal),cursor:"pointer"}}>{cs.ini||"?"}</div>}
+                    <div style={{flex:1}}>
+                      <b onClick={()=>viewProfile(cs.uid)} style={{fontSize:".88rem",cursor:"pointer"}}>{cs.author}</b>
+                      <div style={{fontSize:".7rem",color:T.mute}}>{fD(cs.date)}</div>
+                    </div>
+                    <span style={T.tag(T.tealBg,T.teal)}>{cs.cat}</span>
+                  </div>
+                  <h3 style={{fontSize:"1.2rem",fontWeight:700,lineHeight:1.35,marginBottom:14}}>{cs.title}</h3>
+                  {cs.history&&<div style={{marginBottom:14}}>
+                    <div style={{fontSize:".68rem",color:T.teal,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:5}}>📝 History & Presentation</div>
+                    <MarkdownView text={cs.history} style={{fontSize:".9rem",color:T.txt2}}/>
+                  </div>}
+                  {cs.treatment&&<div style={{marginBottom:14}}>
+                    <div style={{fontSize:".68rem",color:T.teal,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:5}}>💊 Treatment Given</div>
+                    <MarkdownView text={cs.treatment} style={{fontSize:".9rem",color:T.txt2}}/>
+                  </div>}
+                  {cs.outcome&&<div style={{marginBottom:14}}>
+                    <div style={{fontSize:".68rem",color:T.teal,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:5}}>📈 Outcome</div>
+                    <MarkdownView text={cs.outcome} style={{fontSize:".9rem",color:T.txt2}}/>
+                  </div>}
+                  {cs.body&&<div style={{marginBottom:14}}>
+                    <MarkdownView text={cs.body} style={{fontSize:".9rem",color:T.txt2}}/>
+                  </div>}
+                  {cs.diagnosis&&<div style={{background:T.goldBg,borderLeft:"3px solid "+T.gold,padding:"12px 16px",marginBottom:14,borderRadius:"0 10px 10px 0"}}>
+                    <div style={{fontSize:".68rem",color:T.goldD,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>💡 Discussion</div>
+                    <div style={{fontSize:".95rem",color:T.txt,lineHeight:1.6,fontWeight:500}}>{cs.diagnosis}</div>
+                  </div>}
+                  <div style={{display:"flex",alignItems:"center",gap:12,paddingTop:12,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
+                    <LikeBtn liked={(cs.likedBy||[]).includes(au?.uid)} count={cs.likes||0} onToggle={()=>toggleLike("cases",cs.id,cs,setCases)}/>
+                    <span style={{fontSize:".75rem",color:T.mute}}>💬 {cs.comments?.length||0} comments</span>
+                    {(cs.views||0)>0&&<span style={{fontSize:".75rem",color:T.mute}}>👁️ {cs.views} views</span>}
+                    <ShareBar title={cs.title} url={`${SITE_URL}/?case=${cs.id}`} description={(cs.history||cs.body||"").slice(0,120)} itemId={cs.id} itemType="cases" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
+                  </div>
+                  {(cs.comments||[]).length>0&&<div style={{marginTop:12,paddingLeft:10,borderLeft:"2px solid "+T.border}}>
+                    {cs.comments.map((x,i)=><div key={i} style={{padding:"6px 0",fontSize:".85rem"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}><div style={T.av(20,T.tealBg,T.teal)}>{x.ini}</div><b style={{color:T.txt,fontSize:".82rem"}}>{x.n}</b><span style={{color:T.mute,fontSize:".62rem"}}>{x.tm}</span></div>
+                      <div style={{color:T.txt2,paddingLeft:26,lineHeight:1.5}}>{renderTextWithMentions(x.txt)}</div>
+                    </div>)}
+                  </div>}
+                  <CaseCmtInput caseId={cs.id} caseObj={cs} addCaseComment={addCaseComment} allUsers={allUsers}/>
+                </div>
               </div>
-            :<div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:6,scrollSnapType:"x mandatory"}}>
-              {cs.images.map((url,i)=><div key={i} style={{flexShrink:0,width:cs.images.length===2?"calc(50% - 4px)":300,height:cs.images.length===2?340:300,background:"#f4f1ea",borderRadius:10,scrollSnapAlign:"start",cursor:"zoom-in",position:"relative",overflow:"hidden"}} onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=url;im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v)}}>
-                <img src={url} style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}}/>
-                <div style={{position:"absolute",bottom:6,right:6,background:"rgba(0,0,0,0.55)",color:"#fff",padding:"2px 7px",borderRadius:3,fontSize:".58rem",fontWeight:500,pointerEvents:"none"}}>🔍 {i+1}/{cs.images.length}</div>
-              </div>)}
-            </div>}
-          </div>}
+            </ViewTracker>
+          </div>);
+        })()}
 
-          <div style={{padding:18}}>
-            {/* Author + meta */}
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-              {cs.photo?<img src={cs.photo} onClick={()=>viewProfile(cs.uid)} style={{width:36,height:36,borderRadius:"50%",cursor:"pointer"}}/>:<div onClick={()=>viewProfile(cs.uid)} style={{...T.av(36,T.tealBg,T.teal),cursor:"pointer"}}>{cs.ini||"?"}</div>}
-              <div style={{flex:1}}>
-                <b onClick={()=>viewProfile(cs.uid)} style={{fontSize:".88rem",cursor:"pointer"}}>{cs.author}</b>
-                <div style={{fontSize:".7rem",color:T.mute}}>{fD(cs.date)}</div>
+        {/* ═══ CASE CARD GRID — browse mode ═══ */}
+        {!selCs&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
+          {cases.map(cs=>{
+            const replyCount=cs.comments?.length||0;
+            return(<div key={cs.id} onClick={()=>{setSelCs(cs);window.scrollTo(0,0)}} style={{...T.card,padding:0,overflow:"hidden",cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 22px rgba(0,0,0,0.07)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
+              {cs.images?.length>0?<div style={{width:"100%",aspectRatio:"4/3",overflow:"hidden",background:"#f4f1ea",position:"relative"}}>
+                <img src={cs.images[0]} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+                {cs.images.length>1&&<div style={{position:"absolute",bottom:6,right:6,background:"rgba(0,0,0,0.65)",color:"#fff",fontSize:".62rem",padding:"2px 7px",borderRadius:10,fontWeight:600}}>+{cs.images.length-1}</div>}
+              </div>:<div style={{width:"100%",aspectRatio:"4/3",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2rem",color:T.mute}}>🔬</div>}
+              <div style={{padding:14}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,flexWrap:"wrap"}}>
+                  <span style={T.tag(T.tealBg,T.teal)}>{cs.cat}</span>
+                </div>
+                <h4 style={{fontSize:".98rem",fontWeight:700,lineHeight:1.35,marginBottom:8,color:T.txt,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{cs.title}</h4>
+                {cs.history&&<p style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5,marginBottom:10,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{cs.history.replace(/[*#-]/g,"").slice(0,120)}</p>}
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:10,borderTop:"1px solid "+T.border,gap:8,flexWrap:"wrap"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0,flex:1}}>
+                    {cs.photo?<img src={cs.photo} style={{width:22,height:22,borderRadius:"50%",flexShrink:0}}/>:<div style={{...T.av(22,T.tealBg,T.teal),fontSize:".6rem",flexShrink:0}}>{cs.ini||"?"}</div>}
+                    <span style={{fontSize:".7rem",color:T.mute,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cs.author}</span>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,fontSize:".7rem",color:T.mute,flexShrink:0}}>
+                    <span>❤️ {cs.likes||0}</span>
+                    <span>💬 {replyCount}</span>
+                    {(cs.views||0)>0&&<span>👁️ {cs.views}</span>}
+                  </div>
+                </div>
               </div>
-              <span style={T.tag(T.tealBg,T.teal)}>{cs.cat}</span>
-            </div>
-
-            {/* Title */}
-            <h3 style={{fontSize:"1.2rem",fontWeight:700,lineHeight:1.35,marginBottom:14}}>{cs.title}</h3>
-
-            {/* Structured sections — only render if filled */}
-            {cs.history&&<div style={{marginBottom:14}}>
-              <div style={{fontSize:".68rem",color:T.teal,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:5}}>📝 History & Presentation</div>
-              <MarkdownView text={cs.history} style={{fontSize:".9rem",color:T.txt2}}/>
-            </div>}
-            {cs.treatment&&<div style={{marginBottom:14}}>
-              <div style={{fontSize:".68rem",color:T.teal,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:5}}>💊 Treatment Given</div>
-              <MarkdownView text={cs.treatment} style={{fontSize:".9rem",color:T.txt2}}/>
-            </div>}
-            {cs.outcome&&<div style={{marginBottom:14}}>
-              <div style={{fontSize:".68rem",color:T.teal,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:5}}>📈 Outcome</div>
-              <MarkdownView text={cs.outcome} style={{fontSize:".9rem",color:T.txt2}}/>
-            </div>}
-            {cs.body&&<div style={{marginBottom:14}}>
-              <MarkdownView text={cs.body} style={{fontSize:".9rem",color:T.txt2}}/>
-            </div>}
-
-            {/* Discussion question — gold-tinted callout */}
-            {cs.diagnosis&&<div style={{background:T.goldBg,borderLeft:"3px solid "+T.gold,padding:"12px 16px",marginBottom:14,borderRadius:"0 10px 10px 0"}}>
-              <div style={{fontSize:".68rem",color:T.goldD,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>💡 Discussion</div>
-              <div style={{fontSize:".95rem",color:T.txt,lineHeight:1.6,fontWeight:500}}>{cs.diagnosis}</div>
-            </div>}
-
-            {/* Engagement bar */}
-            <div style={{display:"flex",alignItems:"center",gap:12,paddingTop:12,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
-              <LikeBtn liked={(cs.likedBy||[]).includes(au?.uid)} count={cs.likes||0} onToggle={()=>toggleLike("cases",cs.id,cs,setCases)}/>
-              <span style={{fontSize:".75rem",color:T.mute}}>💬 {cs.comments?.length||0} comments</span>
-              {(cs.views||0)>0&&<span style={{fontSize:".75rem",color:T.mute}}>👁️ {cs.views} views</span>}
-              <ShareBar title={cs.title} url={`${SITE_URL}/?case=${cs.id}`} description={(cs.history||cs.body||"").slice(0,120)} itemId={cs.id} itemType="cases" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
-            </div>
-
-            {/* Comments */}
-            {(cs.comments||[]).length>0&&<div style={{marginTop:12,paddingLeft:10,borderLeft:"2px solid "+T.border}}>
-              {cs.comments.map((x,i)=><div key={i} style={{padding:"6px 0",fontSize:".85rem"}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}><div style={T.av(20,T.tealBg,T.teal)}>{x.ini}</div><b style={{color:T.txt,fontSize:".82rem"}}>{x.n}</b><span style={{color:T.mute,fontSize:".62rem"}}>{x.tm}</span></div>
-                <div style={{color:T.txt2,paddingLeft:26,lineHeight:1.5}}>{renderTextWithMentions(x.txt)}</div>
-              </div>)}
-            </div>}
-            <CaseCmtInput caseId={cs.id} caseObj={cs} addCaseComment={addCaseComment} allUsers={allUsers}/>
-          </div>
-        </div></ViewTracker>)}
+            </div>);
+          })}
+        </div>}
       </div>}
 
       {/* FORUM */}
@@ -5092,6 +5126,35 @@ export default function App(){
               <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:10}}>
                 <input id="vr-title" placeholder="Title (e.g. '10% off any Cynosure equipment')" style={T.inp}/>
                 <textarea id="vr-desc" placeholder="Describe what the doctor gets, terms, limitations..." style={T.txa} rows={3}/>
+
+                {/* Image upload */}
+                <div>
+                  <label style={{fontSize:".78rem",color:T.txt2,fontWeight:600,display:"block",marginBottom:6}}>Reward image (optional, 600×400 recommended)</label>
+                  {vrImage&&<div style={{marginBottom:6}}>
+                    <img src={vrImage} alt="" style={{maxWidth:200,maxHeight:130,borderRadius:6,border:"1px solid "+T.border,display:"block"}}/>
+                    <button type="button" onClick={()=>setVrImage("")} style={{...T.btnO,...T.btnSm,marginTop:4,fontSize:".72rem"}}>✕ Remove image</button>
+                  </div>}
+                  <input type="file" accept="image/*" disabled={vrUploading} onChange={async(e)=>{
+                    const f=e.target.files?.[0];if(!f)return;
+                    if(f.size>5*1024*1024){sh("Image must be under 5MB");return}
+                    setVrUploading(true);
+                    try{
+                      const path=`rewards/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;
+                      const sRef=ref(storage,path);
+                      await uploadBytes(sRef,f);
+                      const url=await getDownloadURL(sRef);
+                      setVrImage(url);
+                      sh("✓ Image uploaded");
+                    }catch(err){
+                      console.error("vr upload error:",err);
+                      sh("Upload failed: "+(err.message||"check console"));
+                    }
+                    setVrUploading(false);
+                    e.target.value="";
+                  }} style={{fontSize:".82rem"}}/>
+                  {vrUploading&&<div style={{fontSize:".72rem",color:T.mute,marginTop:4}}>⏳ Uploading...</div>}
+                </div>
+
                 <select id="vr-fulfillment" style={T.inp} defaultValue="voucher">
                   <option value="voucher">Voucher code (we'll provide a code)</option>
                   <option value="contact">Contact info (doctor's email shared with us)</option>
@@ -5116,6 +5179,7 @@ export default function App(){
                       submitterEmail:au.email,
                       submitterAccountType:"vendor",
                       data:{title,desc,fulfillment,voucher,stock,vendorId:au.uid,vendorName:myApp.companyName},
+                      coverImage:vrImage||"",
                       status:"pending",
                       createdAt:Date.now(),
                       date:ds(getIST()),
@@ -5125,6 +5189,7 @@ export default function App(){
                     document.getElementById("vr-desc").value="";
                     document.getElementById("vr-voucher").value="";
                     document.getElementById("vr-stock").value="";
+                    setVrImage("");
                     loadData();
                   }catch(err){console.error(err);sh("Submission failed")}
                 }} style={{...T.btn,padding:"9px 18px",fontSize:".85rem"}}>Submit proposal →</button>
@@ -5812,18 +5877,40 @@ export default function App(){
                         </div>
                       </div>
                     </div>
-                    <div style={{display:"flex",gap:8,flexWrap:"wrap",paddingTop:10,borderTop:"1px solid "+T.border}}>
-                      <button onClick={async()=>{
-                        if(confirm(`Approve & publish this ${cfg.label}?`)){
-                          await approveSubmission(sub.id);
-                        }
-                      }} style={{...T.btn,padding:"8px 16px",fontSize:".82rem"}}>✓ Approve & publish</button>
-                      <button onClick={async()=>{
-                        const reason=prompt("Why are you rejecting? (visible to submitter):","");
-                        if(reason===null)return;
-                        await rejectSubmission(sub.id,reason);
-                      }} style={{...T.btnDanger,padding:"8px 16px",fontSize:".82rem"}}>✗ Reject</button>
-                      <button onClick={()=>viewProfile(sub.submitterUid)} style={{...T.btnO,padding:"8px 16px",fontSize:".82rem"}}>View submitter →</button>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap",paddingTop:10,borderTop:"1px solid "+T.border,alignItems:"center"}}>
+                      {sub.type==="vendor_reward"?
+                        // Vendor reward needs pointCost — show inline input + custom approve
+                        <>
+                          <label style={{fontSize:".78rem",color:T.txt2,fontWeight:600,whiteSpace:"nowrap"}}>Set point cost:</label>
+                          <input id={`pc-${sub.id}`} type="number" placeholder="e.g. 500" min="1" defaultValue={sub.data?.pointCost||""} style={{...T.inp,width:120,padding:"6px 10px",fontSize:".82rem"}}/>
+                          <button onClick={async()=>{
+                            const pc=parseInt(document.getElementById(`pc-${sub.id}`).value);
+                            if(!pc||pc<=0){sh("Enter a valid point cost first");return}
+                            // Pass pointCost via edits — approveSubmission merges this into finalData
+                            await approveSubmission(sub.id,{pointCost:pc});
+                          }} style={{...T.btn,padding:"8px 16px",fontSize:".82rem"}}>✓ Set cost & approve</button>
+                          <button onClick={async()=>{
+                            const reason=prompt("Why are you rejecting? (visible to submitter):","");
+                            if(reason===null)return;
+                            await rejectSubmission(sub.id,reason);
+                          }} style={{...T.btnDanger,padding:"8px 16px",fontSize:".82rem"}}>✗ Reject</button>
+                        </>
+                      :
+                        // All other submission types — original buttons
+                        <>
+                          <button onClick={async()=>{
+                            if(confirm(`Approve & publish this ${cfg.label}?`)){
+                              await approveSubmission(sub.id);
+                            }
+                          }} style={{...T.btn,padding:"8px 16px",fontSize:".82rem"}}>✓ Approve & publish</button>
+                          <button onClick={async()=>{
+                            const reason=prompt("Why are you rejecting? (visible to submitter):","");
+                            if(reason===null)return;
+                            await rejectSubmission(sub.id,reason);
+                          }} style={{...T.btnDanger,padding:"8px 16px",fontSize:".82rem"}}>✗ Reject</button>
+                          <button onClick={()=>viewProfile(sub.submitterUid)} style={{...T.btnO,padding:"8px 16px",fontSize:".82rem"}}>View submitter →</button>
+                        </>
+                      }
                     </div>
                   </div>);
                 })}
