@@ -3477,6 +3477,7 @@ export default function App(){
           @media (max-width: 900px) {
             .home-grid { grid-template-columns: 1fr !important; }
             .home-sidebar { order: 2; }
+            .me-grid { grid-template-columns: 1fr !important; }
           }
         `}</style>
       </div>}
@@ -4252,15 +4253,18 @@ export default function App(){
       })()}
 
       {/* RANK */}
-      {pg==="rank"&&<div style={{maxWidth:680}}>
+      {pg==="rank"&&<div style={{maxWidth:920}}>
         {/* ═══ HEADER (compact) ═══ */}
         <div style={{...T.card,padding:18,background:"linear-gradient(135deg,#fff,"+T.goldBg+"55)",borderLeft:"3px solid "+T.gold,marginBottom:10}}>
           <h3 style={{fontSize:"1.2rem",fontWeight:700,margin:0}}>🏆 SKINARIO Leaderboard</h3>
           <p style={{color:T.txt2,fontSize:".82rem",marginTop:5,lineHeight:1.5}}>Compete with peers across India based on knowledge and consistency.</p>
         </div>
 
+        {/* ═══ EXPLAINER ROW: How points + Tier system side-by-side ═══ */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:10,marginBottom:14}} className="rank-explainer-grid">
+
         {/* ═══ COLLAPSIBLE: How points work ═══ */}
-        <div style={{...T.card,marginBottom:8,padding:0,overflow:"hidden"}}>
+        <div style={{...T.card,marginBottom:0,padding:0,overflow:"hidden"}}>
           <div onClick={()=>setShowPoints(!showPoints)} style={{padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",gap:10}}>
             <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0,flex:1}}>
               <span style={{fontSize:".95rem",fontWeight:600,whiteSpace:"nowrap"}}>💯 How points work</span>
@@ -4269,21 +4273,21 @@ export default function App(){
             <span style={{fontSize:".85rem",color:T.mute,transition:"transform .2s",transform:showPoints?"rotate(180deg)":"rotate(0deg)",display:"inline-block"}}>▾</span>
           </div>
           {showPoints&&<div style={{padding:"4px 16px 16px",borderTop:"1px solid "+T.border}}>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginTop:14}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginTop:14}}>
               <div style={{padding:"10px 12px",background:T.bg,borderRadius:8}}>
-                <div style={{fontSize:"1.1rem",fontWeight:700,color:T.gold,marginBottom:2}}>1 pt</div>
+                <div style={{fontSize:"1.1rem",fontWeight:700,color:T.gold,marginBottom:2}}>10 pts</div>
                 <div style={{fontSize:".74rem",color:T.txt2}}>Easy question</div>
               </div>
               <div style={{padding:"10px 12px",background:T.bg,borderRadius:8}}>
-                <div style={{fontSize:"1.1rem",fontWeight:700,color:T.gold,marginBottom:2}}>2 pts</div>
+                <div style={{fontSize:"1.1rem",fontWeight:700,color:T.gold,marginBottom:2}}>20 pts</div>
                 <div style={{fontSize:".74rem",color:T.txt2}}>Moderate question</div>
               </div>
               <div style={{padding:"10px 12px",background:T.bg,borderRadius:8}}>
-                <div style={{fontSize:"1.1rem",fontWeight:700,color:T.gold,marginBottom:2}}>3 pts</div>
+                <div style={{fontSize:"1.1rem",fontWeight:700,color:T.gold,marginBottom:2}}>30 pts</div>
                 <div style={{fontSize:".74rem",color:T.txt2}}>Hard question</div>
               </div>
               <div style={{padding:"10px 12px",background:T.goldBg,borderRadius:8,border:"1px solid "+T.gold+"55"}}>
-                <div style={{fontSize:"1.1rem",fontWeight:700,color:T.goldD,marginBottom:2}}>+5 pts</div>
+                <div style={{fontSize:"1.1rem",fontWeight:700,color:T.goldD,marginBottom:2}}>+50 pts</div>
                 <div style={{fontSize:".74rem",color:T.txt2}}>Every 7-day streak</div>
               </div>
             </div>
@@ -4292,7 +4296,7 @@ export default function App(){
         </div>
 
         {/* ═══ COLLAPSIBLE: Tier system ═══ */}
-        <div style={{...T.card,marginBottom:14,padding:0,overflow:"hidden"}}>
+        <div style={{...T.card,marginBottom:0,padding:0,overflow:"hidden"}}>
           <div onClick={()=>setShowTiers(!showTiers)} style={{padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",gap:10}}>
             <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0,flex:1}}>
               <span style={{fontSize:".95rem",fontWeight:600,whiteSpace:"nowrap"}}>🎖️ Tier system</span>
@@ -4321,6 +4325,8 @@ export default function App(){
             </div>
           </div>}
         </div>
+
+        </div>{/* end explainer grid */}
 
         {/* Top 20 Leaderboard */}
         <div style={{...T.card,padding:18,marginBottom:14}}>
@@ -4692,228 +4698,10 @@ export default function App(){
         })()}
       </div>}
 
-      {pg==="me"&&<div style={{maxWidth:640}}>
+      {pg==="me"&&<div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 340px",gap:18,alignItems:"start"}} className="me-grid">
 
-        {/* ═══ SUBMIT CONTENT BUTTON ═══ */}
-        {!editingProfile&&<div style={{...T.card,padding:16,marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",borderLeft:"3px solid "+T.gold,background:"linear-gradient(135deg,#fff,"+T.goldBg+"55)"}}>
-          <div style={{flex:1,minWidth:200}}>
-            <div style={{fontSize:".95rem",fontWeight:700,marginBottom:3}}>📨 Submit content to SKINARIO</div>
-            <div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.55}}>
-              Events, articles, videos, news, and ads — your contributions help grow the community.
-              {!prof?.role&&!isAdminUser(au?.email)&&<> Events are open to all; rest needs Content Contributor role.</>}
-            </div>
-          </div>
-          <button onClick={()=>{setSubmitType("");go("submit")}} style={{...T.btn,padding:"10px 20px",fontSize:".85rem",whiteSpace:"nowrap"}}>📨 Submit</button>
-        </div>}
-
-        {/* ═══ VENDOR REWARD PARTNER SECTION (only for vendor accounts) ═══ */}
-        {prof?.accountType==="vendor"&&(()=>{
-          // Find this vendor's application
-          const myApp=vendorApplications.find(a=>a.uid===au?.uid);
-          const status=myApp?.status||"none"; // none | pending | approved | rejected
-          const myRewards=rewards.filter(r=>r.vendorId===au?.uid);
-          const myRedemptions=redemptions.filter(rd=>{
-            const r=rewards.find(x=>x.id===rd.rewardId);
-            return r&&r.vendorId===au?.uid;
-          });
-
-          if(status==="none"){
-            return(<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.gold}}>
-              <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:8,display:"flex",alignItems:"center",gap:8}}>🏢 Become a Reward Partner</h4>
-              <p style={{fontSize:".85rem",color:T.txt2,lineHeight:1.6,marginBottom:14}}>
-                Offer your products, vouchers, or services as rewards on SKINARIO. Doctors redeem with their points — you get qualified leads and brand exposure.
-              </p>
-              <ul style={{fontSize:".82rem",color:T.txt2,paddingLeft:20,marginBottom:14,lineHeight:1.7}}>
-                <li><b>Free participation</b> for early partners (paid annually later)</li>
-                <li><b>You propose rewards</b>, admin approves and sets point cost</li>
-                <li><b>Get notified</b> via email when doctors redeem</li>
-                <li><b>You fulfill</b> via voucher code, contact share, or admin help</li>
-              </ul>
-              <button onClick={async()=>{
-                const company=prompt("Your company name (will be shown on rewards):",prof?.companyName||prof?.name||"");
-                if(!company)return;
-                const offerings=prompt("Briefly describe what you offer (e.g. 'Premium cosmetic devices', 'Aesthetic training courses'):");
-                if(!offerings)return;
-                try{
-                  await fbAdd("vendorApplications",{
-                    uid:au.uid,email:au.email,
-                    companyName:company,
-                    contactName:prof.name||"",
-                    contactEmail:au.email,
-                    offerings,
-                    status:"pending",
-                    createdAt:Date.now(),
-                  });
-                  sh("📨 Application submitted! Admin will review.");
-                  loadData();
-                }catch(err){console.error(err);sh("Application failed")}
-              }} style={{...T.btn,padding:"9px 18px",fontSize:".88rem"}}>Apply to become a partner →</button>
-            </div>);
-          }
-
-          if(status==="pending"){
-            return(<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.warn,background:T.warnBg+"22"}}>
-              <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:6}}>⏳ Vendor application pending</h4>
-              <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.6}}>Your application to become a SKINARIO Reward Partner is being reviewed. You'll be notified once approved (usually within 48 hours).</p>
-            </div>);
-          }
-
-          if(status==="rejected"){
-            return(<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.err,background:"#ffeeee"}}>
-              <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:6}}>Application not approved</h4>
-              <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.6,marginBottom:8}}>Your vendor application was not approved.</p>
-              {myApp.reviewReason&&<p style={{fontSize:".78rem",color:T.txt2,padding:"8px 12px",background:"#fff",borderRadius:6,fontStyle:"italic"}}>Admin note: "{myApp.reviewReason}"</p>}
-            </div>);
-          }
-
-          // Approved — show propose form + their rewards
-          return(<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.teal}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
-              <h4 style={{fontSize:".95rem",fontWeight:700,display:"flex",alignItems:"center",gap:8,margin:0}}>✓ Reward Partner · <span style={{color:T.teal}}>{myApp.companyName}</span></h4>
-              <span style={{fontSize:".7rem",color:T.mute}}>{myRewards.length} active · {myRedemptions.length} redemptions</span>
-            </div>
-
-            {/* Propose new reward */}
-            <details style={{marginBottom:14,padding:"10px 12px",background:T.bg,borderRadius:8}}>
-              <summary style={{cursor:"pointer",fontSize:".88rem",fontWeight:600}}>+ Propose a new reward offering</summary>
-              <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:10}}>
-                <input id="vr-title" placeholder="Title (e.g. '10% off any Cynosure equipment')" style={T.inp}/>
-                <textarea id="vr-desc" placeholder="Describe what the doctor gets, terms, limitations..." style={T.txa} rows={3}/>
-                <select id="vr-fulfillment" style={T.inp} defaultValue="voucher">
-                  <option value="voucher">Voucher code (we'll provide a code)</option>
-                  <option value="contact">Contact info (doctor's email shared with us)</option>
-                  <option value="manual">Manual (admin coordinates fulfillment)</option>
-                </select>
-                <input id="vr-voucher" placeholder="(If voucher type) Voucher code or instructions" style={T.inp}/>
-                <input id="vr-stock" type="number" placeholder="Stock limit (e.g. 50). Leave blank for unlimited." style={T.inp}/>
-                <p style={{fontSize:".74rem",color:T.mute,lineHeight:1.5}}>Admin will set the points cost and approve before this appears in the rewards catalog. You'll be notified by email.</p>
-                <button onClick={async()=>{
-                  const title=document.getElementById("vr-title").value.trim();
-                  const desc=document.getElementById("vr-desc").value.trim();
-                  const fulfillment=document.getElementById("vr-fulfillment").value;
-                  const voucher=document.getElementById("vr-voucher").value.trim();
-                  const stock=parseInt(document.getElementById("vr-stock").value)||0;
-                  if(!title){sh("Title required");return}
-                  if(!desc){sh("Description required");return}
-                  try{
-                    await fbAdd("submissions",{
-                      type:"vendor_reward",
-                      submitterUid:au.uid,
-                      submitterName:myApp.companyName,
-                      submitterEmail:au.email,
-                      submitterAccountType:"vendor",
-                      data:{title,desc,fulfillment,voucher,stock,vendorId:au.uid,vendorName:myApp.companyName},
-                      status:"pending",
-                      createdAt:Date.now(),
-                      date:ds(getIST()),
-                    });
-                    sh("📨 Reward proposed! Admin will review and set point cost.");
-                    document.getElementById("vr-title").value="";
-                    document.getElementById("vr-desc").value="";
-                    document.getElementById("vr-voucher").value="";
-                    document.getElementById("vr-stock").value="";
-                    loadData();
-                  }catch(err){console.error(err);sh("Submission failed")}
-                }} style={{...T.btn,padding:"9px 18px",fontSize:".85rem"}}>Submit proposal →</button>
-              </div>
-            </details>
-
-            {/* My active rewards */}
-            {myRewards.length>0&&<div>
-              <div style={{fontSize:".78rem",fontWeight:700,marginBottom:8,color:T.txt2}}>My active rewards</div>
-              {myRewards.map(r=><div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:T.bg,borderRadius:6,marginBottom:6,gap:8,flexWrap:"wrap"}}>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:".85rem",fontWeight:600}}>{r.title}</div>
-                  <div style={{fontSize:".7rem",color:T.mute}}>{r.pointCost} pts · {r.timesRedeemed||0} redeemed · {r.stock>0?`${r.stock} left`:"unlimited"}</div>
-                </div>
-                <span style={{...T.tag(r.active?T.tealBg:T.warnBg,r.active?T.teal:T.warn)}}>{r.active?"Active":"Disabled"}</span>
-              </div>)}
-            </div>}
-
-            {/* Recent redemptions */}
-            {myRedemptions.length>0&&<div style={{marginTop:14}}>
-              <div style={{fontSize:".78rem",fontWeight:700,marginBottom:8,color:T.txt2}}>Recent redemptions (last {Math.min(myRedemptions.length,5)})</div>
-              {myRedemptions.slice(0,5).map(rd=>{
-                const r=rewards.find(x=>x.id===rd.rewardId);
-                return(<div key={rd.id} style={{padding:"8px 10px",background:T.bg,borderRadius:6,marginBottom:6,fontSize:".78rem"}}>
-                  <div style={{fontWeight:600}}>{r?.title||"(deleted reward)"}</div>
-                  <div style={{color:T.mute,fontSize:".7rem"}}>{rd.userName} ({rd.userEmail}) · {fD(rd.date||"")}</div>
-                </div>);
-              })}
-            </div>}
-          </div>);
-        })()}
-
-        {/* ═══ EMAIL PREFERENCES ═══ */}
-        {!editingProfile&&(()=>{
-          const prefs=prof?.emailPreferences||{welcome:true,submissions:true,replies:true,weeklyDigest:true};
-          const updatePref=async(key,value)=>{
-            const newPrefs={...prefs,[key]:value};
-            const newProf={...prof,emailPreferences:newPrefs};
-            try{
-              await fbSet("users",au.uid,{emailPreferences:newPrefs});
-              setProf(newProf);
-              sh(`Email preference updated`);
-            }catch(err){
-              console.error("Pref update failed:",err);
-              sh("Update failed");
-            }
-          };
-          return(<details style={{...T.card,padding:0,marginBottom:14}}>
-            <summary style={{padding:"14px 16px",cursor:"pointer",listStyle:"none",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-              <div>
-                <div style={{fontSize:".92rem",fontWeight:700}}>📧 Email notifications</div>
-                <div style={{fontSize:".74rem",color:T.mute,marginTop:2}}>Control what we email you about</div>
-              </div>
-              <span style={{fontSize:".75rem",color:T.teal,fontWeight:600}}>Configure ↓</span>
-            </summary>
-            <div style={{padding:"4px 16px 18px",borderTop:"1px solid "+T.border}}>
-              {[
-                {key:"submissions",label:"My submission updates",desc:"When your event/article/video/ad/news is approved or needs changes",disabled:false},
-                {key:"replies",label:"Replies to my posts",desc:"When someone comments on your forum post, case, or article",disabled:false},
-                {key:"weeklyDigest",label:"Weekly digest",desc:"Every Sunday: top quiz, hot discussions, new events (coming soon)",disabled:true},
-              ].map(item=><label key={item.key} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"10px 0",borderBottom:"1px solid "+T.border,cursor:item.disabled?"not-allowed":"pointer",opacity:item.disabled?0.6:1}}>
-                <input type="checkbox" checked={prefs[item.key]!==false} disabled={item.disabled} onChange={e=>!item.disabled&&updatePref(item.key,e.target.checked)} style={{marginTop:3,width:16,height:16,cursor:item.disabled?"not-allowed":"pointer",accentColor:T.teal}}/>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:".86rem",fontWeight:600,color:T.txt}}>{item.label}{item.disabled&&<span style={{fontSize:".68rem",color:T.mute,fontWeight:400,marginLeft:8}}>(not yet active)</span>}</div>
-                  <div style={{fontSize:".74rem",color:T.txt2,lineHeight:1.5,marginTop:3}}>{item.desc}</div>
-                </div>
-              </label>)}
-              <div style={{padding:"10px 12px",marginTop:10,background:T.bg,borderRadius:6,fontSize:".72rem",color:T.txt2,lineHeight:1.55}}>
-                💡 Welcome and password reset emails are always sent — they're essential to your account. You can unsubscribe from everything else here.
-              </div>
-            </div>
-          </details>);
-        })()}
-
-        {/* ═══ ROLE APPLICATION CARD (visible only if no role yet & no pending app) ═══ */}
-        {!editingProfile&&!prof?.role&&!isAdminUser(au?.email)&&(()=>{
-          const myPending=roleApplications.find(a=>a.uid===au?.uid&&a.status==="pending");
-          const myLatest=roleApplications.filter(a=>a.uid===au?.uid).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0];
-          return(<RoleApplicationCard
-            T={T}
-            prof={prof}
-            myPending={myPending}
-            myLatest={myLatest}
-            ROLES={ROLES}
-            ROLE_DISPLAY={ROLE_DISPLAY}
-            submitRoleApplication={submitRoleApplication}
-            getTier={getTier}
-            TIERS={TIERS}
-          />);
-        })()}
-
-        {/* If user already has a role, show their badge prominently */}
-        {!editingProfile&&prof?.role&&ROLE_DISPLAY[prof.role]&&<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+(ROLE_DISPLAY[prof.role].fg||T.gold)}}>
-          <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-            <span style={{fontSize:"1.6rem"}}>{ROLE_DISPLAY[prof.role].icon}</span>
-            <div>
-              <div style={{fontSize:".7rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600}}>Your role</div>
-              <div style={{fontSize:"1.1rem",fontWeight:700,color:ROLE_DISPLAY[prof.role].fg}}>{ROLE_DISPLAY[prof.role].label}</div>
-            </div>
-          </div>
-        </div>}
-
+        {/* ═══ MAIN COLUMN: Profile + Saved Items ═══ */}
+        <div style={{minWidth:0}}>
         {/* ═══ EDITABLE PROFILE SECTION ═══ */}
         {editingProfile?<div style={{...T.card,borderLeft:"3px solid "+T.gold,padding:22}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
@@ -5153,6 +4941,279 @@ export default function App(){
             {prof.saved.forum.map(id=>{const f=forumPosts.find(x=>x.id===id);return f?<div key={id} onClick={()=>go("forum")} style={{padding:"8px 10px",borderRadius:8,background:T.bg,marginBottom:5,cursor:"pointer",fontSize:".85rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}><span>{f.title}</span><span style={{fontSize:".7rem",color:T.mute}}>→</span></div>:null})}
           </div>}
         </div>}
+        </div>
+
+        {/* ═══ RIGHT COLUMN: Submit + Vendor + Email + Role ═══ */}
+        <div style={{minWidth:0}}>
+        {/* ═══ SUBMIT CONTENT — direct type buttons ═══
+            Each type button navigates straight to its form, skipping the intermediate "pick a type" page. */}
+        {!editingProfile&&(()=>{
+          const isAdminU=isAdminUser(au?.email);
+          const hasContribRole=prof?.role==="content_contributor"||isAdminU;
+          // Types in order. Each: { key, icon, label, desc, canUse }
+          const types=[
+            {key:"event",   icon:"📅", label:"Event",     desc:"Conference, workshop, webinar", canUse:true},
+            {key:"article", icon:"📰", label:"Article",   desc:"Educational article",            canUse:hasContribRole},
+            {key:"video",   icon:"🎥", label:"Video",     desc:"Masterclass or tutorial",        canUse:hasContribRole},
+            {key:"news",    icon:"📢", label:"News",      desc:"Industry news, CDSCO, FDA",      canUse:hasContribRole},
+            {key:"ad",      icon:"📌", label:"Ad",        desc:"Sponsored placement",            canUse:isAdminU},
+          ];
+          return(<div style={{...T.card,padding:14,marginBottom:14,borderLeft:"3px solid "+T.gold,background:"linear-gradient(135deg,#fff,"+T.goldBg+"33)"}}>
+            <div style={{fontSize:".88rem",fontWeight:700,marginBottom:4,display:"flex",alignItems:"center",gap:6}}>📨 Submit to SKINARIO</div>
+            <div style={{fontSize:".72rem",color:T.txt2,marginBottom:10,lineHeight:1.5}}>
+              Pick what you want to submit:
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {types.map(t=>{
+                const locked=!t.canUse;
+                return(<button key={t.key}
+                  onClick={()=>{
+                    if(locked){
+                      // Don't navigate; show toast hint
+                      if(t.key==="ad"){sh("Ads require admin role");return}
+                      sh("This type needs Content Contributor role. Apply below ↓");
+                      return;
+                    }
+                    setSubmitType(t.key);go("submit");
+                  }}
+                  style={{
+                    display:"flex",alignItems:"center",gap:10,padding:"10px 12px",
+                    background:locked?T.bg:"#fff",
+                    border:"1px solid "+(locked?T.border:T.gold),
+                    borderRadius:8,cursor:"pointer",fontFamily:"inherit",textAlign:"left",
+                    opacity:locked?.6:1,transition:"all .15s"
+                  }}
+                  onMouseEnter={e=>{if(!locked){e.currentTarget.style.background=T.goldBg+"44";e.currentTarget.style.transform="translateX(2px)"}}}
+                  onMouseLeave={e=>{if(!locked){e.currentTarget.style.background="#fff";e.currentTarget.style.transform=""}}}
+                  title={locked?(t.key==="ad"?"Admin only":"Apply for Content Contributor role"):`Submit a new ${t.label}`}
+                >
+                  <div style={{fontSize:"1.2rem",width:28,textAlign:"center",flexShrink:0}}>{t.icon}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:".84rem",fontWeight:600,color:locked?T.mute:T.txt,display:"flex",alignItems:"center",gap:6}}>
+                      {t.label} {locked&&<span style={{fontSize:".62rem",color:T.mute,fontWeight:500}}>🔒 locked</span>}
+                    </div>
+                    <div style={{fontSize:".7rem",color:T.mute,lineHeight:1.4}}>{t.desc}</div>
+                  </div>
+                  {!locked&&<span style={{color:T.gold,fontSize:".9rem",flexShrink:0}}>→</span>}
+                </button>);
+              })}
+            </div>
+            {!hasContribRole&&!isAdminU&&<div style={{fontSize:".7rem",color:T.txt2,marginTop:10,padding:"8px 10px",background:T.bg,borderRadius:6,lineHeight:1.5}}>
+              💡 Want to submit articles, videos, or news? Apply for the <b>Content Contributor</b> role below.
+            </div>}
+          </div>);
+        })()}
+
+        {/* ═══ VENDOR REWARD PARTNER SECTION (only for vendor accounts) ═══ */}
+        {prof?.accountType==="vendor"&&(()=>{
+          // Find this vendor's application
+          const myApp=vendorApplications.find(a=>a.uid===au?.uid);
+          const status=myApp?.status||"none"; // none | pending | approved | rejected
+          const myRewards=rewards.filter(r=>r.vendorId===au?.uid);
+          const myRedemptions=redemptions.filter(rd=>{
+            const r=rewards.find(x=>x.id===rd.rewardId);
+            return r&&r.vendorId===au?.uid;
+          });
+
+          if(status==="none"){
+            return(<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.gold}}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:8,display:"flex",alignItems:"center",gap:8}}>🏢 Become a Reward Partner</h4>
+              <p style={{fontSize:".85rem",color:T.txt2,lineHeight:1.6,marginBottom:14}}>
+                Offer your products, vouchers, or services as rewards on SKINARIO. Doctors redeem with their points — you get qualified leads and brand exposure.
+              </p>
+              <ul style={{fontSize:".82rem",color:T.txt2,paddingLeft:20,marginBottom:14,lineHeight:1.7}}>
+                <li><b>Free participation</b> for early partners (paid annually later)</li>
+                <li><b>You propose rewards</b>, admin approves and sets point cost</li>
+                <li><b>Get notified</b> via email when doctors redeem</li>
+                <li><b>You fulfill</b> via voucher code, contact share, or admin help</li>
+              </ul>
+              <button onClick={async()=>{
+                const company=prompt("Your company name (will be shown on rewards):",prof?.companyName||prof?.name||"");
+                if(!company)return;
+                const offerings=prompt("Briefly describe what you offer (e.g. 'Premium cosmetic devices', 'Aesthetic training courses'):");
+                if(!offerings)return;
+                try{
+                  await fbAdd("vendorApplications",{
+                    uid:au.uid,email:au.email,
+                    companyName:company,
+                    contactName:prof.name||"",
+                    contactEmail:au.email,
+                    offerings,
+                    status:"pending",
+                    createdAt:Date.now(),
+                  });
+                  sh("📨 Application submitted! Admin will review.");
+                  loadData();
+                }catch(err){console.error(err);sh("Application failed")}
+              }} style={{...T.btn,padding:"9px 18px",fontSize:".88rem"}}>Apply to become a partner →</button>
+            </div>);
+          }
+
+          if(status==="pending"){
+            return(<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.warn,background:T.warnBg+"22"}}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:6}}>⏳ Vendor application pending</h4>
+              <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.6}}>Your application to become a SKINARIO Reward Partner is being reviewed. You'll be notified once approved (usually within 48 hours).</p>
+            </div>);
+          }
+
+          if(status==="rejected"){
+            return(<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.err,background:"#ffeeee"}}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:6}}>Application not approved</h4>
+              <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.6,marginBottom:8}}>Your vendor application was not approved.</p>
+              {myApp.reviewReason&&<p style={{fontSize:".78rem",color:T.txt2,padding:"8px 12px",background:"#fff",borderRadius:6,fontStyle:"italic"}}>Admin note: "{myApp.reviewReason}"</p>}
+            </div>);
+          }
+
+          // Approved — show propose form + their rewards
+          return(<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.teal}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,display:"flex",alignItems:"center",gap:8,margin:0}}>✓ Reward Partner · <span style={{color:T.teal}}>{myApp.companyName}</span></h4>
+              <span style={{fontSize:".7rem",color:T.mute}}>{myRewards.length} active · {myRedemptions.length} redemptions</span>
+            </div>
+
+            {/* Propose new reward */}
+            <details style={{marginBottom:14,padding:"10px 12px",background:T.bg,borderRadius:8}}>
+              <summary style={{cursor:"pointer",fontSize:".88rem",fontWeight:600}}>+ Propose a new reward offering</summary>
+              <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:10}}>
+                <input id="vr-title" placeholder="Title (e.g. '10% off any Cynosure equipment')" style={T.inp}/>
+                <textarea id="vr-desc" placeholder="Describe what the doctor gets, terms, limitations..." style={T.txa} rows={3}/>
+                <select id="vr-fulfillment" style={T.inp} defaultValue="voucher">
+                  <option value="voucher">Voucher code (we'll provide a code)</option>
+                  <option value="contact">Contact info (doctor's email shared with us)</option>
+                  <option value="manual">Manual (admin coordinates fulfillment)</option>
+                </select>
+                <input id="vr-voucher" placeholder="(If voucher type) Voucher code or instructions" style={T.inp}/>
+                <input id="vr-stock" type="number" placeholder="Stock limit (e.g. 50). Leave blank for unlimited." style={T.inp}/>
+                <p style={{fontSize:".74rem",color:T.mute,lineHeight:1.5}}>Admin will set the points cost and approve before this appears in the rewards catalog. You'll be notified by email.</p>
+                <button onClick={async()=>{
+                  const title=document.getElementById("vr-title").value.trim();
+                  const desc=document.getElementById("vr-desc").value.trim();
+                  const fulfillment=document.getElementById("vr-fulfillment").value;
+                  const voucher=document.getElementById("vr-voucher").value.trim();
+                  const stock=parseInt(document.getElementById("vr-stock").value)||0;
+                  if(!title){sh("Title required");return}
+                  if(!desc){sh("Description required");return}
+                  try{
+                    await fbAdd("submissions",{
+                      type:"vendor_reward",
+                      submitterUid:au.uid,
+                      submitterName:myApp.companyName,
+                      submitterEmail:au.email,
+                      submitterAccountType:"vendor",
+                      data:{title,desc,fulfillment,voucher,stock,vendorId:au.uid,vendorName:myApp.companyName},
+                      status:"pending",
+                      createdAt:Date.now(),
+                      date:ds(getIST()),
+                    });
+                    sh("📨 Reward proposed! Admin will review and set point cost.");
+                    document.getElementById("vr-title").value="";
+                    document.getElementById("vr-desc").value="";
+                    document.getElementById("vr-voucher").value="";
+                    document.getElementById("vr-stock").value="";
+                    loadData();
+                  }catch(err){console.error(err);sh("Submission failed")}
+                }} style={{...T.btn,padding:"9px 18px",fontSize:".85rem"}}>Submit proposal →</button>
+              </div>
+            </details>
+
+            {/* My active rewards */}
+            {myRewards.length>0&&<div>
+              <div style={{fontSize:".78rem",fontWeight:700,marginBottom:8,color:T.txt2}}>My active rewards</div>
+              {myRewards.map(r=><div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:T.bg,borderRadius:6,marginBottom:6,gap:8,flexWrap:"wrap"}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:".85rem",fontWeight:600}}>{r.title}</div>
+                  <div style={{fontSize:".7rem",color:T.mute}}>{r.pointCost} pts · {r.timesRedeemed||0} redeemed · {r.stock>0?`${r.stock} left`:"unlimited"}</div>
+                </div>
+                <span style={{...T.tag(r.active?T.tealBg:T.warnBg,r.active?T.teal:T.warn)}}>{r.active?"Active":"Disabled"}</span>
+              </div>)}
+            </div>}
+
+            {/* Recent redemptions */}
+            {myRedemptions.length>0&&<div style={{marginTop:14}}>
+              <div style={{fontSize:".78rem",fontWeight:700,marginBottom:8,color:T.txt2}}>Recent redemptions (last {Math.min(myRedemptions.length,5)})</div>
+              {myRedemptions.slice(0,5).map(rd=>{
+                const r=rewards.find(x=>x.id===rd.rewardId);
+                return(<div key={rd.id} style={{padding:"8px 10px",background:T.bg,borderRadius:6,marginBottom:6,fontSize:".78rem"}}>
+                  <div style={{fontWeight:600}}>{r?.title||"(deleted reward)"}</div>
+                  <div style={{color:T.mute,fontSize:".7rem"}}>{rd.userName} ({rd.userEmail}) · {fD(rd.date||"")}</div>
+                </div>);
+              })}
+            </div>}
+          </div>);
+        })()}
+
+        {/* ═══ EMAIL PREFERENCES ═══ */}
+        {!editingProfile&&(()=>{
+          const prefs=prof?.emailPreferences||{welcome:true,submissions:true,replies:true,weeklyDigest:true};
+          const updatePref=async(key,value)=>{
+            const newPrefs={...prefs,[key]:value};
+            const newProf={...prof,emailPreferences:newPrefs};
+            try{
+              await fbSet("users",au.uid,{emailPreferences:newPrefs});
+              setProf(newProf);
+              sh(`Email preference updated`);
+            }catch(err){
+              console.error("Pref update failed:",err);
+              sh("Update failed");
+            }
+          };
+          return(<details style={{...T.card,padding:0,marginBottom:14}}>
+            <summary style={{padding:"14px 16px",cursor:"pointer",listStyle:"none",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+              <div>
+                <div style={{fontSize:".92rem",fontWeight:700}}>📧 Email notifications</div>
+                <div style={{fontSize:".74rem",color:T.mute,marginTop:2}}>Control what we email you about</div>
+              </div>
+              <span style={{fontSize:".75rem",color:T.teal,fontWeight:600}}>Configure ↓</span>
+            </summary>
+            <div style={{padding:"4px 16px 18px",borderTop:"1px solid "+T.border}}>
+              {[
+                {key:"submissions",label:"My submission updates",desc:"When your event/article/video/ad/news is approved or needs changes",disabled:false},
+                {key:"replies",label:"Replies to my posts",desc:"When someone comments on your forum post, case, or article",disabled:false},
+                {key:"weeklyDigest",label:"Weekly digest",desc:"Every Sunday: top quiz, hot discussions, new events (coming soon)",disabled:true},
+              ].map(item=><label key={item.key} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"10px 0",borderBottom:"1px solid "+T.border,cursor:item.disabled?"not-allowed":"pointer",opacity:item.disabled?0.6:1}}>
+                <input type="checkbox" checked={prefs[item.key]!==false} disabled={item.disabled} onChange={e=>!item.disabled&&updatePref(item.key,e.target.checked)} style={{marginTop:3,width:16,height:16,cursor:item.disabled?"not-allowed":"pointer",accentColor:T.teal}}/>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:".86rem",fontWeight:600,color:T.txt}}>{item.label}{item.disabled&&<span style={{fontSize:".68rem",color:T.mute,fontWeight:400,marginLeft:8}}>(not yet active)</span>}</div>
+                  <div style={{fontSize:".74rem",color:T.txt2,lineHeight:1.5,marginTop:3}}>{item.desc}</div>
+                </div>
+              </label>)}
+              <div style={{padding:"10px 12px",marginTop:10,background:T.bg,borderRadius:6,fontSize:".72rem",color:T.txt2,lineHeight:1.55}}>
+                💡 Welcome and password reset emails are always sent — they're essential to your account. You can unsubscribe from everything else here.
+              </div>
+            </div>
+          </details>);
+        })()}
+
+        {/* ═══ ROLE APPLICATION CARD (visible only if no role yet & no pending app) ═══ */}
+        {!editingProfile&&!prof?.role&&!isAdminUser(au?.email)&&(()=>{
+          const myPending=roleApplications.find(a=>a.uid===au?.uid&&a.status==="pending");
+          const myLatest=roleApplications.filter(a=>a.uid===au?.uid).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0];
+          return(<RoleApplicationCard
+            T={T}
+            prof={prof}
+            myPending={myPending}
+            myLatest={myLatest}
+            ROLES={ROLES}
+            ROLE_DISPLAY={ROLE_DISPLAY}
+            submitRoleApplication={submitRoleApplication}
+            getTier={getTier}
+            TIERS={TIERS}
+          />);
+        })()}
+
+        {/* If user already has a role, show their badge prominently */}
+        {!editingProfile&&prof?.role&&ROLE_DISPLAY[prof.role]&&<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+(ROLE_DISPLAY[prof.role].fg||T.gold)}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+            <span style={{fontSize:"1.6rem"}}>{ROLE_DISPLAY[prof.role].icon}</span>
+            <div>
+              <div style={{fontSize:".7rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600}}>Your role</div>
+              <div style={{fontSize:"1.1rem",fontWeight:700,color:ROLE_DISPLAY[prof.role].fg}}>{ROLE_DISPLAY[prof.role].label}</div>
+            </div>
+          </div>
+        </div>}
+
+        </div>
+
       </div>}
 
       {/* ADMIN */}
