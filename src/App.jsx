@@ -40,6 +40,25 @@ function hasAnyModRole(u){return u?.role&&Object.values(ROLES).includes(u.role)|
 // Each type defines: who can submit, target collection on approval, fields, image dims, label.
 // This is the single source of truth. Forms + review UI + approval handler all read from here.
 const SUBMISSION_TYPES={
+  vendor_reward:{
+    label:"Vendor Reward",
+    icon:"🎁",
+    color:"#785f1e",
+    targetCollection:"rewards",
+    openToAll:false, // only approved vendor partners (not in the normal submit flow)
+    description:"Vendor-proposed reward offering for the SKINARIO rewards catalog.",
+    imageHint:"Optional reward image (e.g. product photo, voucher graphic). 600×400 recommended.",
+    imageKey:"image",
+    imageRecommendedW:600,
+    imageRecommendedH:400,
+    fields:[
+      {key:"title",label:"Reward title",required:true,placeholder:"e.g. 10% off any laser purchase"},
+      {key:"desc",label:"Description",required:true,type:"textarea",rows:3,placeholder:"What does the doctor get, terms, limitations..."},
+      {key:"fulfillment",label:"Fulfillment type",required:true,type:"select",options:["voucher","contact","manual"]},
+      {key:"voucher",label:"Voucher code or instructions",required:false,placeholder:"e.g. SKINARIO10"},
+      {key:"stock",label:"Stock limit (blank = unlimited)",required:false,type:"number"},
+    ],
+  },
   event:{
     label:"Event",
     icon:"📅",
@@ -1259,6 +1278,7 @@ export default function App(){
   const[newsFeedsLoading,setNewsFeedsLoading]=useState(false);
   const[rewards,setRewards]=useState([]);
   const[redemptions,setRedemptions]=useState([]);
+  const[vendorApplications,setVendorApplications]=useState([]); // vendor proposals + approved partners
   const[roleApplications,setRoleApplications]=useState([]);
   const[moderationLog,setModerationLog]=useState([]);
   const[submissions,setSubmissions]=useState([]);
@@ -1299,7 +1319,7 @@ export default function App(){
   const[selAd,setSelAd]=useState(null);
   const[selE,setSelE]=useState(null);
   const[selFP,setSelFP]=useState(null); // selected forum post for detail view
-  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub)},[]);
+  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va)},[]);
 
   useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){setProf(p);setScr("main");loadData()}else{setPf({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:au?.displayName||"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});setSetupStep(0);setSetupErr("");setScr("setup")}}else{setAu(null);setProf(null);setScr("landing")}});return()=>unsub()},[loadData]);
 
@@ -1911,6 +1931,58 @@ export default function App(){
       if(sub.type==="event"&&!targetDoc.regType){
         targetDoc.regType="internal";
       }
+      // Special handling for vendor_reward — creates a reward doc with vendor metadata
+      if(sub.type==="vendor_reward"){
+        // Admin must set the point cost via edits before approving
+        const pointCost=parseInt(finalData.pointCost);
+        if(!pointCost||pointCost<=0){
+          sh("⚠️ Set a point cost first (use edit, enter pointCost)");return;
+        }
+        // Rebuild as a reward doc (the rewards collection has different schema)
+        const stockNum=parseInt(finalData.stock)||0;
+        const rewardDoc={
+          title:finalData.title,
+          desc:finalData.desc,
+          partner:sub.data.vendorName||sub.submitterName,
+          vendorId:sub.data.vendorId||sub.submitterUid,
+          vendorName:sub.data.vendorName||sub.submitterName,
+          pointCost,
+          stock:stockNum,
+          category:finalData.category||"Partner Offer",
+          instructions:finalData.voucher||"",
+          fulfillmentType:finalData.fulfillment||"manual",
+          voucherCode:finalData.voucher||"",
+          image:sub.coverImage||"",
+          active:true,
+          timesRedeemed:0,
+          createdAt:Date.now(),
+          date:ds(getIST()),
+          sourceSubmissionId:submissionId,
+        };
+        const newId=await fbAdd("rewards",rewardDoc);
+        await fbSet("submissions",submissionId,{
+          status:"approved",
+          reviewedAt:Date.now(),
+          reviewedBy:au.email,
+          publishedId:newId,
+        });
+        createNotif({
+          toUid:sub.submitterUid,fromUid:au.uid,fromName:uName,fromIni:uIni,fromPhoto:uPhoto,
+          type:"announcement",
+          text:`approved your reward proposal "${(finalData.title||"").slice(0,40)}"`,
+        });
+        const submitter=allUsers.find(u=>u.id===sub.submitterUid);
+        if(submitter?.email||sub.submitterEmail){
+          sendEmail("submission_approved",submitter?.email||sub.submitterEmail,{
+            name:sub.submitterName,
+            contentType:"vendor reward",
+            title:finalData.title||"",
+          },submitter?.emailPreferences);
+        }
+        sh(`✅ Reward published to catalog`);
+        loadData();
+        return;
+      }
       // Insert into target collection
       const newId=await fbAdd(cfg.targetCollection,targetDoc);
       // Update submission status
@@ -2037,6 +2109,21 @@ export default function App(){
       const newRedeemed=(prof.redeemedPoints||0)+cost;
       await fbSet("users",au.uid,{redeemedPoints:newRedeemed});
       setProf(p=>({...p,redeemedPoints:newRedeemed}));
+      // 4. If this is a vendor reward, email the vendor with redemption details
+      if(reward.vendorId){
+        const vendor=allUsers.find(u=>u.id===reward.vendorId);
+        if(vendor?.email){
+          // Construct message based on fulfillment type
+          const ft=reward.fulfillmentType||"manual";
+          const doctorContact=ft==="contact"?`\n\nDoctor's contact: ${au.email}`:"";
+          const voucherInfo=ft==="voucher"?`\n\nVoucher code shared with doctor: ${reward.voucherCode||code}`:"";
+          sendEmail("submission_approved",vendor.email,{
+            name:vendor.name||reward.vendorName||"Partner",
+            contentType:"redemption",
+            title:`${uName} redeemed "${reward.title}"${doctorContact}${voucherInfo}`,
+          },vendor.emailPreferences);
+        }
+      }
       sh(`✅ Redeemed! Your code: ${code}`);
       loadData();
       return{code,redemptionId};
@@ -4567,6 +4654,7 @@ export default function App(){
                   <div style={{display:"flex",gap:5,marginBottom:6,flexWrap:"wrap"}}>
                     {r.category&&<span style={T.tag(T.tealBg,T.teal)}>{r.category}</span>}
                     <span style={T.tag(T.goldBg,T.goldD)}>{r.partner}</span>
+                    {r.vendorId&&<span style={{...T.tag(T.tealBg,T.teal),fontSize:".62rem"}}>✓ Verified Partner</span>}
                   </div>
                   <div style={{fontSize:".95rem",fontWeight:600,color:T.txt,lineHeight:1.35,marginBottom:6}}>{r.title}</div>
                   {r.desc&&<div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5,marginBottom:8,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{r.desc}</div>}
@@ -4617,6 +4705,144 @@ export default function App(){
           </div>
           <button onClick={()=>{setSubmitType("");go("submit")}} style={{...T.btn,padding:"10px 20px",fontSize:".85rem",whiteSpace:"nowrap"}}>📨 Submit</button>
         </div>}
+
+        {/* ═══ VENDOR REWARD PARTNER SECTION (only for vendor accounts) ═══ */}
+        {prof?.accountType==="vendor"&&(()=>{
+          // Find this vendor's application
+          const myApp=vendorApplications.find(a=>a.uid===au?.uid);
+          const status=myApp?.status||"none"; // none | pending | approved | rejected
+          const myRewards=rewards.filter(r=>r.vendorId===au?.uid);
+          const myRedemptions=redemptions.filter(rd=>{
+            const r=rewards.find(x=>x.id===rd.rewardId);
+            return r&&r.vendorId===au?.uid;
+          });
+
+          if(status==="none"){
+            return(<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.gold}}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:8,display:"flex",alignItems:"center",gap:8}}>🏢 Become a Reward Partner</h4>
+              <p style={{fontSize:".85rem",color:T.txt2,lineHeight:1.6,marginBottom:14}}>
+                Offer your products, vouchers, or services as rewards on SKINARIO. Doctors redeem with their points — you get qualified leads and brand exposure.
+              </p>
+              <ul style={{fontSize:".82rem",color:T.txt2,paddingLeft:20,marginBottom:14,lineHeight:1.7}}>
+                <li><b>Free participation</b> for early partners (paid annually later)</li>
+                <li><b>You propose rewards</b>, admin approves and sets point cost</li>
+                <li><b>Get notified</b> via email when doctors redeem</li>
+                <li><b>You fulfill</b> via voucher code, contact share, or admin help</li>
+              </ul>
+              <button onClick={async()=>{
+                const company=prompt("Your company name (will be shown on rewards):",prof?.companyName||prof?.name||"");
+                if(!company)return;
+                const offerings=prompt("Briefly describe what you offer (e.g. 'Premium cosmetic devices', 'Aesthetic training courses'):");
+                if(!offerings)return;
+                try{
+                  await fbAdd("vendorApplications",{
+                    uid:au.uid,email:au.email,
+                    companyName:company,
+                    contactName:prof.name||"",
+                    contactEmail:au.email,
+                    offerings,
+                    status:"pending",
+                    createdAt:Date.now(),
+                  });
+                  sh("📨 Application submitted! Admin will review.");
+                  loadData();
+                }catch(err){console.error(err);sh("Application failed")}
+              }} style={{...T.btn,padding:"9px 18px",fontSize:".88rem"}}>Apply to become a partner →</button>
+            </div>);
+          }
+
+          if(status==="pending"){
+            return(<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.warn,background:T.warnBg+"22"}}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:6}}>⏳ Vendor application pending</h4>
+              <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.6}}>Your application to become a SKINARIO Reward Partner is being reviewed. You'll be notified once approved (usually within 48 hours).</p>
+            </div>);
+          }
+
+          if(status==="rejected"){
+            return(<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.err,background:"#ffeeee"}}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:6}}>Application not approved</h4>
+              <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.6,marginBottom:8}}>Your vendor application was not approved.</p>
+              {myApp.reviewReason&&<p style={{fontSize:".78rem",color:T.txt2,padding:"8px 12px",background:"#fff",borderRadius:6,fontStyle:"italic"}}>Admin note: "{myApp.reviewReason}"</p>}
+            </div>);
+          }
+
+          // Approved — show propose form + their rewards
+          return(<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.teal}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,display:"flex",alignItems:"center",gap:8,margin:0}}>✓ Reward Partner · <span style={{color:T.teal}}>{myApp.companyName}</span></h4>
+              <span style={{fontSize:".7rem",color:T.mute}}>{myRewards.length} active · {myRedemptions.length} redemptions</span>
+            </div>
+
+            {/* Propose new reward */}
+            <details style={{marginBottom:14,padding:"10px 12px",background:T.bg,borderRadius:8}}>
+              <summary style={{cursor:"pointer",fontSize:".88rem",fontWeight:600}}>+ Propose a new reward offering</summary>
+              <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:10}}>
+                <input id="vr-title" placeholder="Title (e.g. '10% off any Cynosure equipment')" style={T.inp}/>
+                <textarea id="vr-desc" placeholder="Describe what the doctor gets, terms, limitations..." style={T.txa} rows={3}/>
+                <select id="vr-fulfillment" style={T.inp} defaultValue="voucher">
+                  <option value="voucher">Voucher code (we'll provide a code)</option>
+                  <option value="contact">Contact info (doctor's email shared with us)</option>
+                  <option value="manual">Manual (admin coordinates fulfillment)</option>
+                </select>
+                <input id="vr-voucher" placeholder="(If voucher type) Voucher code or instructions" style={T.inp}/>
+                <input id="vr-stock" type="number" placeholder="Stock limit (e.g. 50). Leave blank for unlimited." style={T.inp}/>
+                <p style={{fontSize:".74rem",color:T.mute,lineHeight:1.5}}>Admin will set the points cost and approve before this appears in the rewards catalog. You'll be notified by email.</p>
+                <button onClick={async()=>{
+                  const title=document.getElementById("vr-title").value.trim();
+                  const desc=document.getElementById("vr-desc").value.trim();
+                  const fulfillment=document.getElementById("vr-fulfillment").value;
+                  const voucher=document.getElementById("vr-voucher").value.trim();
+                  const stock=parseInt(document.getElementById("vr-stock").value)||0;
+                  if(!title){sh("Title required");return}
+                  if(!desc){sh("Description required");return}
+                  try{
+                    await fbAdd("submissions",{
+                      type:"vendor_reward",
+                      submitterUid:au.uid,
+                      submitterName:myApp.companyName,
+                      submitterEmail:au.email,
+                      submitterAccountType:"vendor",
+                      data:{title,desc,fulfillment,voucher,stock,vendorId:au.uid,vendorName:myApp.companyName},
+                      status:"pending",
+                      createdAt:Date.now(),
+                      date:ds(getIST()),
+                    });
+                    sh("📨 Reward proposed! Admin will review and set point cost.");
+                    document.getElementById("vr-title").value="";
+                    document.getElementById("vr-desc").value="";
+                    document.getElementById("vr-voucher").value="";
+                    document.getElementById("vr-stock").value="";
+                    loadData();
+                  }catch(err){console.error(err);sh("Submission failed")}
+                }} style={{...T.btn,padding:"9px 18px",fontSize:".85rem"}}>Submit proposal →</button>
+              </div>
+            </details>
+
+            {/* My active rewards */}
+            {myRewards.length>0&&<div>
+              <div style={{fontSize:".78rem",fontWeight:700,marginBottom:8,color:T.txt2}}>My active rewards</div>
+              {myRewards.map(r=><div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:T.bg,borderRadius:6,marginBottom:6,gap:8,flexWrap:"wrap"}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:".85rem",fontWeight:600}}>{r.title}</div>
+                  <div style={{fontSize:".7rem",color:T.mute}}>{r.pointCost} pts · {r.timesRedeemed||0} redeemed · {r.stock>0?`${r.stock} left`:"unlimited"}</div>
+                </div>
+                <span style={{...T.tag(r.active?T.tealBg:T.warnBg,r.active?T.teal:T.warn)}}>{r.active?"Active":"Disabled"}</span>
+              </div>)}
+            </div>}
+
+            {/* Recent redemptions */}
+            {myRedemptions.length>0&&<div style={{marginTop:14}}>
+              <div style={{fontSize:".78rem",fontWeight:700,marginBottom:8,color:T.txt2}}>Recent redemptions (last {Math.min(myRedemptions.length,5)})</div>
+              {myRedemptions.slice(0,5).map(rd=>{
+                const r=rewards.find(x=>x.id===rd.rewardId);
+                return(<div key={rd.id} style={{padding:"8px 10px",background:T.bg,borderRadius:6,marginBottom:6,fontSize:".78rem"}}>
+                  <div style={{fontWeight:600}}>{r?.title||"(deleted reward)"}</div>
+                  <div style={{color:T.mute,fontSize:".7rem"}}>{rd.userName} ({rd.userEmail}) · {fD(rd.date||"")}</div>
+                </div>);
+              })}
+            </div>}
+          </div>);
+        })()}
 
         {/* ═══ EMAIL PREFERENCES ═══ */}
         {!editingProfile&&(()=>{
@@ -4937,7 +5163,7 @@ export default function App(){
         </h3>
         <div style={{position:"sticky",top:0,zIndex:30,background:T.bg,padding:"10px 0",marginBottom:16,marginInline:-12,paddingInline:12,borderBottom:"1px solid "+T.border}}>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null);window.scrollTo({top:0,behavior:"smooth"})}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
+          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["vendors","🏢 Vendors"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null);window.scrollTo({top:0,behavior:"smooth"})}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
           </div>
         </div>
         {aTab==="stats"&&<><div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length],["Events",events.length],["Ads",ads.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>
@@ -5246,6 +5472,96 @@ export default function App(){
               </div>
             </div>)}
           </div>
+        </div>}
+
+        {aTab==="vendors"&&<div>
+          <div style={{...T.card,marginBottom:14}}>
+            <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>🏢 Vendor Partners</h4>
+            <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.55,marginBottom:0}}>
+              Vendors who have applied to offer rewards. Approve to let them propose offerings. Their reward proposals appear in the Submissions tab with type "vendor_reward".
+            </p>
+          </div>
+
+          {(()=>{
+            const pending=vendorApplications.filter(a=>a.status==="pending");
+            const approved=vendorApplications.filter(a=>a.status==="approved");
+            const rejected=vendorApplications.filter(a=>a.status==="rejected");
+
+            return(<>
+              {/* Pending applications */}
+              <h5 style={{fontSize:".88rem",fontWeight:700,marginBottom:10}}>⏳ Pending applications ({pending.length})</h5>
+              {pending.length===0?<p style={{color:T.mute,fontSize:".82rem",marginBottom:16}}>No pending applications.</p>:
+                pending.map(va=><div key={va.id} style={{...T.card,marginBottom:10,borderLeft:"3px solid "+T.warn}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:14,flexWrap:"wrap"}}>
+                    <div style={{flex:1,minWidth:240}}>
+                      <div style={{fontSize:".95rem",fontWeight:700,marginBottom:4}}>{va.companyName}</div>
+                      <div style={{fontSize:".78rem",color:T.txt2,marginBottom:6}}>{va.contactName} · {va.contactEmail}</div>
+                      <div style={{fontSize:".82rem",color:T.txt,padding:"8px 10px",background:T.bg,borderRadius:6,marginBottom:8}}><b>Offerings:</b> {va.offerings}</div>
+                      <div style={{fontSize:".7rem",color:T.mute}}>Applied {fD(new Date(va.createdAt).toISOString().slice(0,10))}</div>
+                    </div>
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      <button onClick={async()=>{
+                        try{
+                          await fbSet("vendorApplications",va.id,{status:"approved",approvedAt:Date.now(),approvedBy:au.email});
+                          sh("✅ Vendor approved");
+                          // Email vendor
+                          sendEmail("submission_approved",va.contactEmail,{
+                            name:va.contactName,
+                            contentType:"vendor",
+                            title:`${va.companyName} approved as Reward Partner`,
+                          });
+                          loadData();
+                        }catch(err){console.error(err);sh("Approval failed")}
+                      }} style={{...T.btn,...T.btnSm,fontSize:".75rem"}}>✓ Approve</button>
+                      <button onClick={async()=>{
+                        const reason=prompt("Reason for rejection (will be shown to vendor):");
+                        if(!reason)return;
+                        try{
+                          await fbSet("vendorApplications",va.id,{status:"rejected",reviewReason:reason,rejectedAt:Date.now()});
+                          sh("Application rejected");
+                          loadData();
+                        }catch(err){console.error(err);sh("Rejection failed")}
+                      }} style={{...T.btnO,...T.btnSm,fontSize:".75rem"}}>✕ Reject</button>
+                    </div>
+                  </div>
+                </div>)
+              }
+
+              {/* Approved partners */}
+              <h5 style={{fontSize:".88rem",fontWeight:700,marginBottom:10,marginTop:18}}>✓ Approved partners ({approved.length})</h5>
+              {approved.length===0?<p style={{color:T.mute,fontSize:".82rem",marginBottom:16}}>No approved partners yet.</p>:
+                approved.map(va=>{
+                  const vrewards=rewards.filter(r=>r.vendorId===va.uid);
+                  const vredemptions=redemptions.filter(rd=>{
+                    const r=rewards.find(x=>x.id===rd.rewardId);
+                    return r&&r.vendorId===va.uid;
+                  });
+                  return(<div key={va.id} style={{...T.card,marginBottom:10,borderLeft:"3px solid "+T.teal}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                      <div>
+                        <div style={{fontSize:".92rem",fontWeight:700}}>{va.companyName}</div>
+                        <div style={{fontSize:".74rem",color:T.mute}}>{va.contactName} · {va.contactEmail} · {vrewards.length} rewards · {vredemptions.length} redemptions</div>
+                      </div>
+                      <button onClick={async()=>{
+                        if(!confirm(`Suspend ${va.companyName}? Their rewards will stay active until you disable them in the Rewards tab.`))return;
+                        await fbSet("vendorApplications",va.id,{status:"pending"});
+                        sh("Vendor moved back to pending");
+                        loadData();
+                      }} style={{...T.btnO,...T.btnSm,fontSize:".72rem"}}>Suspend</button>
+                    </div>
+                  </div>);
+                })
+              }
+
+              {rejected.length>0&&<>
+                <h5 style={{fontSize:".88rem",fontWeight:700,marginBottom:10,marginTop:18,color:T.mute}}>Rejected ({rejected.length})</h5>
+                {rejected.map(va=><div key={va.id} style={{padding:"8px 12px",background:T.bg,borderRadius:6,marginBottom:6,fontSize:".78rem",color:T.mute}}>
+                  <b>{va.companyName}</b> · {va.contactEmail}
+                  {va.reviewReason&&<div style={{fontStyle:"italic",fontSize:".74rem",marginTop:2}}>Reason: {va.reviewReason}</div>}
+                </div>)}
+              </>}
+            </>);
+          })()}
         </div>}
 
         {aTab==="roles"&&<div>
