@@ -3029,6 +3029,19 @@ export default function App(){
           </div>
           <div style={{display:"flex",gap:10,flexWrap:"wrap"}}><button onClick={()=>go("quiz")} style={T.btn}>🧠 Today's quiz</button><button onClick={()=>go("events")} style={T.btnO}>📅 Events</button><button onClick={()=>go("cases")} style={T.btnO}>🔬 Clinical cases</button><button onClick={()=>go("forum")} style={T.btnO}>💬 Forum</button></div>
         </div>
+
+        {/* ═══ POINTS + REDEEM HIGHLIGHT (doctor accounts only) ═══ */}
+        {prof?.accountType==="doctor"&&<div onClick={()=>go("rewards")} style={{...T.card,padding:"14px 18px",margin:"0 0 12px",borderLeft:"3px solid "+T.gold,background:"linear-gradient(135deg,"+T.goldBg+"88,#fff)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:14,cursor:"pointer",transition:"all .15s",flexWrap:"wrap"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.08)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
+          <div style={{display:"flex",alignItems:"center",gap:14,minWidth:0,flex:1}}>
+            <div style={{fontSize:"1.8rem"}}>🏆</div>
+            <div>
+              <div style={{fontSize:".64rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:700,marginBottom:1}}>Your points balance</div>
+              <div style={{fontSize:"1.5rem",fontWeight:700,color:T.gold,lineHeight:1}}>{prof?.points||0} <span style={{fontSize:".72rem",color:T.mute,fontWeight:500}}>pts available to redeem</span></div>
+            </div>
+          </div>
+          <div style={{...T.btn,padding:"10px 20px",fontSize:".88rem",background:"linear-gradient(135deg,"+T.gold+","+T.goldD+")",whiteSpace:"nowrap"}}>🎁 Redeem Rewards →</div>
+        </div>}
+
         <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:8,margin:"16px 0"}}>
           {[
             ["🧠",totA,"Quizzes",()=>go("quiz")],
@@ -4289,9 +4302,19 @@ export default function App(){
       {/* RANK */}
       {pg==="rank"&&<div style={{maxWidth:920}}>
         {/* ═══ HEADER (compact) ═══ */}
-        <div style={{...T.card,padding:18,background:"linear-gradient(135deg,#fff,"+T.goldBg+"55)",borderLeft:"3px solid "+T.gold,marginBottom:10}}>
-          <h3 style={{fontSize:"1.2rem",fontWeight:700,margin:0}}>🏆 SKINARIO Leaderboard</h3>
-          <p style={{color:T.txt2,fontSize:".82rem",marginTop:5,lineHeight:1.5}}>Compete with peers across India based on knowledge and consistency.</p>
+        <div style={{...T.card,padding:18,background:"linear-gradient(135deg,#fff,"+T.goldBg+"55)",borderLeft:"3px solid "+T.gold,marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+          <div style={{flex:1,minWidth:240}}>
+            <h3 style={{fontSize:"1.2rem",fontWeight:700,margin:0}}>🏆 SKINARIO Leaderboard</h3>
+            <p style={{color:T.txt2,fontSize:".82rem",marginTop:5,marginBottom:0,lineHeight:1.5}}>Compete with peers across India based on knowledge and consistency.</p>
+          </div>
+          {/* Personal points + Redeem CTA — only for doctor accounts */}
+          {prof?.accountType==="doctor"&&<div onClick={()=>go("rewards")} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",background:"#fff",borderRadius:10,border:"1px solid "+T.gold+"55",cursor:"pointer",transition:"all .15s",flexShrink:0}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.08)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:".62rem",color:T.mute,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>Your points</div>
+              <div style={{fontSize:"1.2rem",fontWeight:700,color:T.gold,lineHeight:1}}>{prof?.points||0}</div>
+            </div>
+            <div style={{...T.btn,padding:"7px 14px",fontSize:".76rem",whiteSpace:"nowrap"}}>🎁 Redeem</div>
+          </div>}
         </div>
 
         {/* ═══ EXPLAINER ROW: How points + Tier system side-by-side ═══ */}
