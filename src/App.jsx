@@ -3030,28 +3030,20 @@ export default function App(){
           <div style={{display:"flex",gap:10,flexWrap:"wrap"}}><button onClick={()=>go("quiz")} style={T.btn}>🧠 Today's quiz</button><button onClick={()=>go("events")} style={T.btnO}>📅 Events</button><button onClick={()=>go("cases")} style={T.btnO}>🔬 Clinical cases</button><button onClick={()=>go("forum")} style={T.btnO}>💬 Forum</button></div>
         </div>
 
-        {/* ═══ POINTS + REDEEM HIGHLIGHT (doctor accounts only) ═══ */}
-        {prof?.accountType==="doctor"&&<div onClick={()=>go("rewards")} style={{...T.card,padding:"14px 18px",margin:"0 0 12px",borderLeft:"3px solid "+T.gold,background:"linear-gradient(135deg,"+T.goldBg+"88,#fff)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:14,cursor:"pointer",transition:"all .15s",flexWrap:"wrap"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.08)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
-          <div style={{display:"flex",alignItems:"center",gap:14,minWidth:0,flex:1}}>
-            <div style={{fontSize:"1.8rem"}}>🏆</div>
-            <div>
-              <div style={{fontSize:".64rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:700,marginBottom:1}}>Your points balance</div>
-              <div style={{fontSize:"1.5rem",fontWeight:700,color:T.gold,lineHeight:1}}>{prof?.points||0} <span style={{fontSize:".72rem",color:T.mute,fontWeight:500}}>pts available to redeem</span></div>
-            </div>
-          </div>
-          <div style={{...T.btn,padding:"10px 20px",fontSize:".88rem",background:"linear-gradient(135deg,"+T.gold+","+T.goldD+")",whiteSpace:"nowrap"}}>🎁 Redeem Rewards →</div>
-        </div>}
-
         <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:8,margin:"16px 0"}}>
           {[
-            ["🧠",totA,"Quizzes",()=>go("quiz")],
-            ["✅",acc+"%","Accuracy",()=>go("rank")],
-            ["⭐",prof?.points||0,"Points",()=>go("rewards")],
-            ["🔬",cases.length,"Cases",()=>go("cases")],
-            ["💬",forumPosts.length,"Forum",()=>go("forum")],
-            ["🎥",videos.length,"Videos",()=>go("videos")]
-          ].map(([i,v,l,onClick])=>
-            <div key={l} onClick={onClick} style={{...T.card,textAlign:"center",padding:"12px 4px",marginBottom:0,cursor:"pointer",transition:"transform .1s, box-shadow .1s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.05)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}><div style={{fontSize:"1rem"}}>{i}</div><div style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".55rem",color:T.mute,textTransform:"uppercase",marginTop:2}}>{l}</div></div>)}
+            ["🧠",totA,"Quizzes",()=>go("quiz"),false],
+            ["✅",acc+"%","Accuracy",()=>go("rank"),false],
+            ["🏆",prof?.points||0,"Redeem",()=>go("rewards"),true],
+            ["🔬",cases.length,"Cases",()=>go("cases"),false],
+            ["💬",forumPosts.length,"Forum",()=>go("forum"),false],
+            ["🎥",videos.length,"Videos",()=>go("videos"),false]
+          ].map(([i,v,l,onClick,highlight])=>
+            <div key={l} onClick={onClick} style={{...T.card,textAlign:"center",padding:"12px 4px",marginBottom:0,cursor:"pointer",transition:"transform .12s, box-shadow .12s",borderLeft:highlight?"3px solid "+T.gold:undefined,background:highlight?"linear-gradient(135deg,"+T.goldBg+"55,#fff)":"#fff",boxShadow:"0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow=highlight?"0 6px 16px rgba(200,168,78,0.22)":"0 6px 16px rgba(0,0,0,0.08)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)"}}>
+              <div style={{fontSize:"1rem"}}>{i}</div>
+              <div style={{fontSize:"1.2rem",fontWeight:700,color:highlight?T.gold:T.teal}}>{v}</div>
+              <div style={{fontSize:".55rem",color:highlight?T.gold:T.mute,textTransform:"uppercase",marginTop:2,fontWeight:highlight?700:400,letterSpacing:highlight?1:0}}>{l}{highlight?" →":""}</div>
+            </div>)}
         </div>
 
         {/* ═══ QUICK-ACCESS NEWS BUTTONS ═══
@@ -3066,7 +3058,7 @@ export default function App(){
             {id:"sk-fda",      icon:"⚠️",label:"FDA Alerts",      desc:"Safety updates",     color:"#c5392a",bg:"#fce8e6"},
           ];
           return(<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:14}}>
-            {btns.map(b=><div key={b.id} onClick={()=>scrollTo(b.id)} style={{...T.card,padding:"14px 12px",cursor:"pointer",borderLeft:"3px solid "+b.color,display:"flex",alignItems:"center",gap:10,marginBottom:0,transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 6px 16px rgba(0,0,0,0.06)";e.currentTarget.style.borderLeftColor=b.color}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
+            {btns.map(b=><div key={b.id} onClick={()=>scrollTo(b.id)} style={{...T.card,padding:"14px 12px",cursor:"pointer",borderLeft:"3px solid "+b.color,display:"flex",alignItems:"center",gap:10,marginBottom:0,transition:"all .15s",boxShadow:"0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 16px rgba(0,0,0,0.08)";e.currentTarget.style.borderLeftColor=b.color}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)"}}>
               <div style={{width:38,height:38,borderRadius:10,background:b.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.2rem",flexShrink:0}}>{b.icon}</div>
               <div style={{minWidth:0,flex:1}}>
                 <div style={{fontSize:".82rem",fontWeight:700,color:T.txt,lineHeight:1.2,marginBottom:2}}>{b.label}</div>
@@ -3343,30 +3335,8 @@ export default function App(){
           </>);
         })()}
 
-        {/* ═══ TESTIMONIALS ═══
-            Hardcoded for now since you have no testimonial input UI yet.
-            Replace with real quotes when you collect them from your community. */}
-        {(()=>{
-          const testimonials=[
-            {quote:"SKINARIO has become my five-minute morning ritual. The case discussions are gold — real peers, real complications, real solutions.",author:"Dr. P. (Pune)",specialty:"Aesthetic Practitioner"},
-            {quote:"Finally a place where Indian doctors can discuss aesthetic medicine without the noise of consumer forums. The quizzes keep me sharp between conferences.",author:"Dr. M. (Mumbai)",specialty:"Cosmetic Dermatologist"},
-            {quote:"The daily quizzes are excellent revision. I've learnt more in the last month here than in some courses I've paid for.",author:"Dr. S. (Bengaluru)",specialty:"Dermatology Resident"},
-          ];
-          return(<div style={{...T.card,padding:24,marginBottom:14,background:"linear-gradient(135deg,#faf3e7,#f5ede2)",border:"1px solid rgba(200,168,78,0.3)"}}>
-            <div style={{textAlign:"center",marginBottom:18}}>
-              <div style={{fontSize:".68rem",color:T.gold,letterSpacing:3,textTransform:"uppercase",fontWeight:700,marginBottom:6}}>What doctors say</div>
-              <h3 style={{fontSize:"1.15rem",fontWeight:400,fontFamily:"Georgia,serif",margin:0,color:T.teal}}>Voices from the community</h3>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:14}}>
-              {testimonials.map((t,i)=><div key={i} style={{padding:"16px 18px",background:"rgba(255,255,255,0.85)",borderRadius:10,borderLeft:"3px solid "+T.gold}}>
-                <div style={{fontSize:"1.6rem",color:T.gold,lineHeight:.6,marginBottom:6,fontFamily:"Georgia,serif"}}>&ldquo;</div>
-                <div style={{fontSize:".84rem",fontStyle:"italic",color:T.txt,lineHeight:1.55,marginBottom:12,fontFamily:"Georgia,serif"}}>{t.quote}</div>
-                <div style={{fontSize:".74rem",color:T.teal,fontWeight:700}}>{t.author}</div>
-                <div style={{fontSize:".68rem",color:T.mute,marginTop:2}}>{t.specialty}</div>
-              </div>)}
-            </div>
-          </div>);
-        })()}
+        {/* Testimonials section removed — will be added back when 3+ real quotes are collected
+            from the community via direct outreach. Don't use placeholder/fake quotes here. */}
 
         <h3 style={{fontSize:"1.05rem",fontWeight:700,marginBottom:12}}>Latest articles</h3>
         {articles.length===0&&<p style={{color:T.mute}}>No articles yet. Admins can create them from Admin panel.</p>}
@@ -4133,10 +4103,10 @@ export default function App(){
         })()}
 
         {/* ═══ CASE CARD GRID — browse mode ═══ */}
-        {!selCs&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
+        {!selCs&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
           {cases.map(cs=>{
             const replyCount=cs.comments?.length||0;
-            return(<div key={cs.id} onClick={()=>{setSelCs(cs);window.scrollTo(0,0)}} style={{...T.card,padding:0,overflow:"hidden",cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 22px rgba(0,0,0,0.07)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
+            return(<div key={cs.id} onClick={()=>{setSelCs(cs);window.scrollTo(0,0)}} style={{...T.card,padding:0,overflow:"hidden",cursor:"pointer",transition:"all .15s",boxShadow:"0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 22px rgba(0,0,0,0.07)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)"}}>
               {cs.images?.length>0?<div style={{width:"100%",aspectRatio:"4/3",overflow:"hidden",background:"#f4f1ea",position:"relative"}}>
                 <img src={cs.images[0]} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
                 {cs.images.length>1&&<div style={{position:"absolute",bottom:6,right:6,background:"rgba(0,0,0,0.65)",color:"#fff",fontSize:".62rem",padding:"2px 7px",borderRadius:10,fontWeight:600}}>+{cs.images.length-1}</div>}
@@ -4264,7 +4234,7 @@ export default function App(){
           })()}
 
           {/* ═══ CARD GRID — browse mode ═══ */}
-          {!selFP&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
+          {!selFP&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
           {filtered.map(p=>{
             const hasImg=p.images?.length>0;
             const isHot=(p.likes||0)>=3;
