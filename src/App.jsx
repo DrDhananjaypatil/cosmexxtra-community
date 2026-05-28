@@ -1264,6 +1264,18 @@ export default function App(){
     setProfileReturnPg(pg); // remember where we came from
     setPg("profile");
     window.scrollTo(0,0);
+    // If current user is admin, load this profile's points history
+    setProfileLedger([]);
+    if(isAdminUser(au?.email)){
+      (async()=>{
+        try{
+          const qy=query(fbCol("pointsActivity"),where("uid","==",uid),limit(500));
+          const snap=await getDocs(qy);
+          const rows=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt||b.updatedAt||0)-(a.createdAt||a.updatedAt||0));
+          setProfileLedger(rows);
+        }catch(err){console.error("profile ledger error:",err)}
+      })();
+    }
   };
   useEffect(()=>{if(toast){const t=setTimeout(()=>setToast(null),3000);return()=>clearTimeout(t)}},[toast]);
 
@@ -1282,6 +1294,7 @@ export default function App(){
   const[vrImage,setVrImage]=useState(""); // vendor reward proposal: uploaded image URL
   const[vrUploading,setVrUploading]=useState(false);
   const[myLedger,setMyLedger]=useState([]); // current user's points-earning history
+  const[profileLedger,setProfileLedger]=useState([]); // viewed user's ledger (admin only)
   const[rankMonth,setRankMonth]=useState(todayIST_YMD().slice(0,7)); // selected month for monthly leaderboard
   const[roleApplications,setRoleApplications]=useState([]);
   const[moderationLog,setModerationLog]=useState([]);
@@ -2213,8 +2226,10 @@ export default function App(){
   const backfillLedgerThisMonth=async()=>{
     if(!isAdminUser(au?.email)){sh("Admin only");return}
     const monthKey=todayIST_YMD().slice(0,7); // e.g. "2026-05"
-    const eligible=allUsers.filter(u=>(u.points||0)>0&&u.accountType==="doctor");
-    if(!confirm(`Backfill the points ledger for ${eligible.length} doctors?\n\nThis creates one "${monthKey}" ledger entry per user equal to their CURRENT total points, so the monthly leaderboard works immediately.\n\nSafe to run again (won't duplicate). Only do this if the points system started this month.\n\nContinue?`))return;
+    // Backfill anyone with points who isn't an admin (matches who appears on the leaderboard).
+    // Don't require accountType==="doctor" strictly — older accounts may lack the field.
+    const eligible=allUsers.filter(u=>(u.points||0)>0&&!isExcludedFromLeaderboard(u));
+    if(!confirm(`Backfill the points ledger for ${eligible.length} users?\n\nThis sets each user's "${monthKey}" monthly points equal to their CURRENT total, so the monthly leaderboard works immediately.\n\nSafe to run again (won't duplicate). Only do this if the points system started this month.\n\nContinue?`))return;
     let done=0,failed=0;
     for(const u of eligible){
       try{
@@ -2237,6 +2252,7 @@ export default function App(){
       }catch(e){failed++;console.error("backfill error for",u.id,e)}
     }
     sh(`✅ Backfilled ${done} users${failed>0?` (${failed} failed)`:""}`);
+    await loadData();
     loadMyLedger();
   };
 
@@ -4368,7 +4384,7 @@ export default function App(){
       })()}
 
       {/* RANK */}
-      {pg==="rank"&&<div style={{maxWidth:920}}>
+      {pg==="rank"&&<div style={{maxWidth:1100}}>
         {/* ═══ HEADER (compact) ═══ */}
         <div style={{...T.card,padding:18,background:"linear-gradient(135deg,#fff,"+T.goldBg+"55)",borderLeft:"3px solid "+T.gold,marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center",gap:14,flexWrap:"wrap"}}>
           <div style={{flex:1,minWidth:240}}>
@@ -4690,6 +4706,31 @@ export default function App(){
                   sh("Flag cleared");
                 }} style={{...T.btnO,padding:"8px 16px",fontSize:".82rem"}}>Clear flag</button>}
               </div>
+            </div>}
+
+            {/* ═══ ADMIN: this user's points history ═══ */}
+            {isAdmin&&!isMe&&u.accountType==="doctor"&&<div style={{...T.card,marginBottom:14}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+                <h4 style={{fontSize:".95rem",fontWeight:700,margin:0}}>📊 Points history (admin view)</h4>
+                <span style={{fontSize:".72rem",color:T.mute}}>{u.points||0} total · {profileLedger.reduce((s,e)=>s+(e.pointsEarned||0),0)} logged</span>
+              </div>
+              {profileLedger.length===0?
+                <p style={{fontSize:".82rem",color:T.mute,fontStyle:"italic"}}>No logged history yet (points earned before logging started won't appear, but the total above is accurate).</p>
+              :<div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {profileLedger.slice(0,20).map(e=>{
+                  const meta={quiz_correct:{icon:"🧠",color:T.teal},forum_comment:{icon:"💬",color:"#7a3e9a"},case_post:{icon:"🔬",color:T.gold},share_unique:{icon:"🔗",color:"#0d6b6e"},legacy_backfill:{icon:"📅",color:T.mute}}[e.action]||{icon:"⭐",color:T.mute};
+                  const label=e.label||e.action;
+                  return(<div key={e.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",background:T.bg,borderRadius:8}}>
+                    <div style={{fontSize:"1rem",width:24,textAlign:"center"}}>{meta.icon}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:".8rem",fontWeight:500,color:T.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{label}</div>
+                      <div style={{fontSize:".64rem",color:T.mute}}>{e.date}{e.month?` · ${e.month}`:""}</div>
+                    </div>
+                    <div style={{fontSize:".85rem",fontWeight:700,color:meta.color}}>+{e.pointsEarned}</div>
+                  </div>);
+                })}
+                {profileLedger.length>20&&<div style={{fontSize:".7rem",color:T.mute,textAlign:"center",marginTop:6}}>Showing 20 of {profileLedger.length}</div>}
+              </div>}
             </div>}
           </>}
         </div>);
