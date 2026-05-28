@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updateProfile } from "firebase/auth";
-import { getFirestore, doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, addDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, addDoc, deleteDoc, serverTimestamp, where } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const firebaseConfig={apiKey:"AIzaSyAzW8kouNGmK11tLIDftwlg5QEtffecYEM",authDomain:"skinario-369.firebaseapp.com",projectId:"skinario-369",storageBucket:"skinario-369.firebasestorage.app",messagingSenderId:"647411585151",appId:"1:647411585151:web:210827226e649d96b42f4a"};
@@ -1281,6 +1281,8 @@ export default function App(){
   const[vendorApplications,setVendorApplications]=useState([]); // vendor proposals + approved partners
   const[vrImage,setVrImage]=useState(""); // vendor reward proposal: uploaded image URL
   const[vrUploading,setVrUploading]=useState(false);
+  const[myLedger,setMyLedger]=useState([]); // current user's points-earning history
+  const[rankMonth,setRankMonth]=useState(todayIST_YMD().slice(0,7)); // selected month for monthly leaderboard
   const[roleApplications,setRoleApplications]=useState([]);
   const[moderationLog,setModerationLog]=useState([]);
   const[submissions,setSubmissions]=useState([]);
@@ -1324,7 +1326,22 @@ export default function App(){
   const[selCs,setSelCs]=useState(null); // selected clinical case for detail view
   const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va)},[]);
 
+  // Load current user's points-earning history from pointsActivity ledger.
+  // Uses where(uid) so the list query satisfies security rules (can't list others' docs).
+  const loadMyLedger=useCallback(async()=>{
+    if(!au?.uid)return;
+    try{
+      const qy=query(fbCol("pointsActivity"),where("uid","==",au.uid),limit(500));
+      const snap=await getDocs(qy);
+      const mine=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt||b.updatedAt||0)-(a.createdAt||a.updatedAt||0));
+      setMyLedger(mine);
+    }catch(err){console.error("loadMyLedger error:",err);setMyLedger([])}
+  },[au]);
+
   useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){setProf(p);setScr("main");loadData()}else{setPf({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:au?.displayName||"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});setSetupStep(0);setSetupErr("");setScr("setup")}}else{setAu(null);setProf(null);setScr("landing")}});return()=>unsub()},[loadData]);
+
+  // Load the current user's points ledger once authenticated
+  useEffect(()=>{if(au?.uid)loadMyLedger()},[au,loadMyLedger]);
 
   // ═══ Fetch latest quiz for landing page preview (unauthenticated users) ═══
   useEffect(()=>{
@@ -1696,8 +1713,12 @@ export default function App(){
       });
       // Add to user's running total
       const newTotal=(prof.points||0)+points;
-      await fbSet("users",au.uid,{points:newTotal});
-      setProf(p=>({...p,points:newTotal}));
+      const mKey=todayIST_YMD().slice(0,7);
+      const curM=(prof.monthlyPoints||{})[mKey]||0;
+      const newMonthly={...(prof.monthlyPoints||{}),[mKey]:curM+points};
+      await fbSet("users",au.uid,{points:newTotal,monthlyPoints:newMonthly});
+      setProf(p=>({...p,points:newTotal,monthlyPoints:newMonthly}));
+      loadMyLedger();
       // Show cap-warning toast on last allowed point
       if(spec.cap>0&&newCount===spec.cap){
         sh(`+${points} pt for "${spec.label}" — that's the last one for today! 🎯`);
@@ -2185,6 +2206,40 @@ export default function App(){
     }
   };
 
+  // ═══ ONE-TIME BACKFILL: seed the ledger with current points as "this month" ═══
+  // Safe to run multiple times — uses a fixed doc ID per user+month so re-running
+  // overwrites instead of duplicating. Only for the case where the points system
+  // started this month and all current points belong to the current month.
+  const backfillLedgerThisMonth=async()=>{
+    if(!isAdminUser(au?.email)){sh("Admin only");return}
+    const monthKey=todayIST_YMD().slice(0,7); // e.g. "2026-05"
+    const eligible=allUsers.filter(u=>(u.points||0)>0&&u.accountType==="doctor");
+    if(!confirm(`Backfill the points ledger for ${eligible.length} doctors?\n\nThis creates one "${monthKey}" ledger entry per user equal to their CURRENT total points, so the monthly leaderboard works immediately.\n\nSafe to run again (won't duplicate). Only do this if the points system started this month.\n\nContinue?`))return;
+    let done=0,failed=0;
+    for(const u of eligible){
+      try{
+        const docId=`${u.id}_backfill_${monthKey}`;
+        await fbSet("pointsActivity",docId,{
+          uid:u.id,
+          date:todayIST_YMD(),
+          month:monthKey,
+          action:"legacy_backfill",
+          label:`Points earned in ${monthKey}`,
+          pointsEarned:u.points||0,
+          createdAt:Date.now(),
+          backfill:true,
+        });
+        // Also set monthlyPoints on the user doc (this is what the leaderboard reads,
+        // since users can't read each other's pointsActivity entries)
+        const monthlyPoints={...(u.monthlyPoints||{}),[monthKey]:u.points||0};
+        await fbSet("users",u.id,{monthlyPoints});
+        done++;
+      }catch(e){failed++;console.error("backfill error for",u.id,e)}
+    }
+    sh(`✅ Backfilled ${done} users${failed>0?` (${failed} failed)`:""}`);
+    loadMyLedger();
+  };
+
   const submitAnswer=async(qid,qObj,idx)=>{
     if(!au)return;
     const ok=idx===qObj.ci;
@@ -2200,15 +2255,40 @@ export default function App(){
     let streakBonus=0;
     if(ok&&newStreak>0&&newStreak%7===0){streakBonus=50}
     const totalEarned=pointsEarned+streakBonus;
+    const monthKey=todayIST_YMD().slice(0,7);
+    const curMonthly=(prof.monthlyPoints||{})[monthKey]||0;
     const upd={
       totalAnswered:(prof.totalAnswered||0)+1,
       totalCorrect:(prof.totalCorrect||0)+(ok?1:0),
       streak:newStreak,
-      points:(prof.points||0)+totalEarned
+      points:(prof.points||0)+totalEarned,
+      monthlyPoints:{...(prof.monthlyPoints||{}),[monthKey]:curMonthly+totalEarned},
     };
     await fbSet("users",au.uid,upd);
     setProf(p=>({...p,...upd}));
     setQuizzes(p=>p.map(q=>q.id===qid?{...q,answers}:q));
+    // ═══ LEDGER: log this quiz point grant to pointsActivity ═══
+    // Enables earning history + future monthly leaderboards.
+    // Unique docId per user+quiz so re-renders never double-log.
+    if(totalEarned>0){
+      try{
+        const date=todayIST_YMD();
+        const ledgerId=`${au.uid}_quiz_${qid}`;
+        await fbSet("pointsActivity",ledgerId,{
+          uid:au.uid,
+          date,
+          action:"quiz_correct",
+          label:`Quiz: ${(qObj.q||"question").slice(0,50)}`,
+          pointsEarned:totalEarned,
+          quizId:qid,
+          difficulty:qObj.diff||"Easy",
+          streakBonus,
+          createdAt:Date.now(),
+        });
+        // Refresh this user's ledger in local state
+        loadMyLedger();
+      }catch(err){console.error("ledger log error:",err)}
+    }
     if(ok){
       if(streakBonus>0){sh(`🎉 Correct! +${pointsEarned} points • 🔥 ${newStreak}-day streak bonus +${streakBonus}!`)}
       else{sh(`🎉 Correct! +${pointsEarned} points`)}
@@ -2290,6 +2370,23 @@ export default function App(){
     .filter(u=>!isExcludedFromLeaderboard(u))
     .filter(u=>(u.totalAnswered||0)>0&&(u.totalAnswered||0)<MIN_Q_FOR_RANK)
     .sort((a,b)=>(b.totalAnswered||0)-(a.totalAnswered||0));
+
+  // ═══ MONTHLY LEADERBOARD ═══
+  // Reads user.monthlyPoints[month] (written on each point grant + backfill).
+  // Available months = union of all months present across users, newest first.
+  const availableMonths=(()=>{
+    const set=new Set();
+    allUsers.forEach(u=>{if(u.monthlyPoints)Object.keys(u.monthlyPoints).forEach(m=>set.add(m))});
+    set.add(todayIST_YMD().slice(0,7)); // always include current month
+    return Array.from(set).sort().reverse();
+  })();
+  const monthlyLeaderboard=allUsers
+    .filter(u=>!isExcludedFromLeaderboard(u))
+    .map(u=>({...u,monthScore:(u.monthlyPoints||{})[rankMonth]||0}))
+    .filter(u=>u.monthScore>0)
+    .sort((a,b)=>b.monthScore-a.monthScore)
+    .slice(0,20);
+  const monthLabel=(m)=>{try{const[y,mo]=m.split("-");return new Date(y,mo-1).toLocaleDateString("en-US",{month:"long",year:"numeric"})}catch{return m}};
 
   const W="1400px";const dates=Array.from({length:14},(_,i)=>{let d=new Date(getIST());d.setDate(d.getDate()-(13-i));return ds(d)});
   const qObj=quizzes.find(q=>q.date===selD);const uA=qObj?.answers?.[au?.uid];const isT=selD===today;const rev=!isT||hr>=21;const dd=Math.floor((new Date(today)-new Date(selD))/864e5);const canA=uA===undefined&&(isT||(dd<=3&&dd>0));
@@ -3034,7 +3131,7 @@ export default function App(){
           {[
             ["🧠",totA,"Quizzes",()=>go("quiz"),false],
             ["✅",acc+"%","Accuracy",()=>go("rank"),false],
-            ["🏆",prof?.points||0,"Redeem",()=>go("rewards"),true],
+            ["🏆",spendablePoints,"Redeem",()=>go("rewards"),true],
             ["🔬",cases.length,"Cases",()=>go("cases"),false],
             ["💬",forumPosts.length,"Forum",()=>go("forum"),false],
             ["🎥",videos.length,"Videos",()=>go("videos"),false]
@@ -3467,6 +3564,7 @@ export default function App(){
             .home-grid { grid-template-columns: 1fr !important; }
             .home-sidebar { order: 2; }
             .me-grid { grid-template-columns: 1fr !important; }
+            .leaderboard-grid { grid-template-columns: 1fr !important; }
           }
         `}</style>
       </div>}
@@ -4280,8 +4378,8 @@ export default function App(){
           {/* Personal points + Redeem CTA — only for doctor accounts */}
           {prof?.accountType==="doctor"&&<div onClick={()=>go("rewards")} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",background:"#fff",borderRadius:10,border:"1px solid "+T.gold+"55",cursor:"pointer",transition:"all .15s",flexShrink:0}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.08)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
             <div style={{textAlign:"right"}}>
-              <div style={{fontSize:".62rem",color:T.mute,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>Your points</div>
-              <div style={{fontSize:"1.2rem",fontWeight:700,color:T.gold,lineHeight:1}}>{prof?.points||0}</div>
+              <div style={{fontSize:".62rem",color:T.mute,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>Available to redeem</div>
+              <div style={{fontSize:"1.2rem",fontWeight:700,color:T.gold,lineHeight:1}}>{spendablePoints}</div>
             </div>
             <div style={{...T.btn,padding:"7px 14px",fontSize:".76rem",whiteSpace:"nowrap"}}>🎁 Redeem</div>
           </div>}
@@ -4355,42 +4453,74 @@ export default function App(){
 
         </div>{/* end explainer grid */}
 
-        {/* Top 20 Leaderboard */}
-        <div style={{...T.card,padding:18,marginBottom:14}}>
+        {/* Leaderboards: All-time + Monthly side by side */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(320px,1fr))",gap:14,marginBottom:14}} className="leaderboard-grid">
+
+        {/* All-time Leaderboard */}
+        <div style={{...T.card,padding:18,marginBottom:0}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-            <h4 style={{fontSize:".95rem",fontWeight:700,margin:0}}>🏆 Top {Math.min(leaderboard.length,20)}</h4>
-            <span style={{fontSize:".7rem",color:T.mute}}>Min {MIN_Q_FOR_RANK} questions to qualify</span>
+            <h4 style={{fontSize:".95rem",fontWeight:700,margin:0}}>🏆 All-Time Top {Math.min(leaderboard.length,20)}</h4>
+            <span style={{fontSize:".7rem",color:T.mute}}>Min {MIN_Q_FOR_RANK} Q</span>
           </div>
 
           {/* Admin-only notice — visible only to admins so they understand they're filtered out */}
           {ADMINS.includes(au?.email)&&<div style={{padding:"8px 12px",background:T.bg,borderLeft:"3px solid "+T.mute,borderRadius:"0 6px 6px 0",marginBottom:12,fontSize:".74rem",color:T.txt2,lineHeight:1.55}}>
-            🛡️ <b>Admins are hidden from the public leaderboard</b> for fairness. You still earn points normally — just not displayed here.
+            🛡️ <b>Admins are hidden</b> from the public leaderboard for fairness.
           </div>}
 
           {leaderboard.length===0&&<div style={{textAlign:"center",padding:30,color:T.mute,fontSize:".88rem"}}>
             <div style={{fontSize:"2rem",marginBottom:6}}>🌱</div>
-            No qualified rankings yet. Doctors need to answer {MIN_Q_FOR_RANK} questions to appear here.
+            No qualified rankings yet. Doctors need {MIN_Q_FOR_RANK} questions to appear.
           </div>}
 
           {leaderboard.map((u,i)=>{const uAcc=u.totalAnswered?Math.round(u.totalCorrect/u.totalAnswered*100):0;const isMe=u.id===au?.uid;
-            return<div key={u.id} onClick={()=>viewProfile(u.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 12px",borderRadius:10,marginBottom:6,background:isMe?T.tealBg:"#fff",border:`1px solid ${isMe?T.teal:T.border}`,cursor:"pointer"}}>
-              <div style={{width:32,textAlign:"center",fontWeight:700,fontSize:i<3?"1.3rem":".95rem",color:i<3?["#d4a017","#888","#a0703a"][i]:T.txt2}}>{i<3?["🥇","🥈","🥉"][i]:`#${i+1}`}</div>
-              {u.photo?<img src={u.photo} style={{width:38,height:38,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(38,isMe?T.teal:T.tealBg,isMe?"#fff":T.teal)}>{u.initials||"?"}</div>}
+            return<div key={u.id} onClick={()=>viewProfile(u.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:10,marginBottom:6,background:isMe?T.tealBg:"#fff",border:`1px solid ${isMe?T.teal:T.border}`,cursor:"pointer"}}>
+              <div style={{width:28,textAlign:"center",fontWeight:700,fontSize:i<3?"1.2rem":".9rem",color:i<3?["#d4a017","#888","#a0703a"][i]:T.txt2}}>{i<3?["🥇","🥈","🥉"][i]:`#${i+1}`}</div>
+              {u.photo?<img src={u.photo} style={{width:34,height:34,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(34,isMe?T.teal:T.tealBg,isMe?"#fff":T.teal)}>{u.initials||"?"}</div>}
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontWeight:600,fontSize:".9rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6}}>{u.name}{isMe?" (You)":""}{(()=>{const t=getTier(u.points||0);if(t.id==="beginner")return null;return<span style={{padding:"1px 6px",borderRadius:8,fontSize:".58rem",fontWeight:700,letterSpacing:.5,background:t.bg,color:t.color}}>{t.label}</span>;})()}</div>
-                <div style={{fontSize:".7rem",color:T.mute,display:"flex",gap:6,flexWrap:"wrap"}}>
-                  <span>{uAcc}% accuracy</span>
-                  <span>·</span>
-                  <span>{u.totalAnswered||0}Q</span>
+                <div style={{fontWeight:600,fontSize:".86rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.name}{isMe?" (You)":""}</div>
+                <div style={{fontSize:".68rem",color:T.mute,display:"flex",gap:5,flexWrap:"wrap"}}>
+                  <span>{uAcc}%</span><span>·</span><span>{u.totalAnswered||0}Q</span>
                   {(u.streak||0)>0&&<><span>·</span><span style={{color:T.gold}}>🔥{u.streak}d</span></>}
                 </div>
               </div>
-              <div style={{textAlign:"right",minWidth:60}}>
-                <div style={{fontWeight:700,color:T.teal,fontSize:"1.05rem",lineHeight:1}}>{u.points||0}</div>
-                <div style={{fontSize:".62rem",color:T.mute,letterSpacing:1,textTransform:"uppercase"}}>points</div>
+              <div style={{textAlign:"right",minWidth:48}}>
+                <div style={{fontWeight:700,color:T.teal,fontSize:"1rem",lineHeight:1}}>{u.points||0}</div>
+                <div style={{fontSize:".58rem",color:T.mute,letterSpacing:.5,textTransform:"uppercase"}}>pts</div>
               </div>
             </div>})}
         </div>
+
+        {/* Monthly Leaderboard */}
+        <div style={{...T.card,padding:18,marginBottom:0}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,gap:8,flexWrap:"wrap"}}>
+            <h4 style={{fontSize:".95rem",fontWeight:700,margin:0}}>📅 Monthly Top {Math.min(monthlyLeaderboard.length,20)}</h4>
+            <select value={rankMonth} onChange={e=>setRankMonth(e.target.value)} style={{...T.inp,padding:"4px 8px",fontSize:".74rem",width:"auto",cursor:"pointer"}}>
+              {availableMonths.map(m=><option key={m} value={m}>{monthLabel(m)}</option>)}
+            </select>
+          </div>
+
+          {monthlyLeaderboard.length===0&&<div style={{textAlign:"center",padding:30,color:T.mute,fontSize:".88rem"}}>
+            <div style={{fontSize:"2rem",marginBottom:6}}>📅</div>
+            No points earned in {monthLabel(rankMonth)} yet.
+          </div>}
+
+          {monthlyLeaderboard.map((u,i)=>{const isMe=u.id===au?.uid;
+            return<div key={u.id} onClick={()=>viewProfile(u.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:10,marginBottom:6,background:isMe?T.goldBg+"66":"#fff",border:`1px solid ${isMe?T.gold:T.border}`,cursor:"pointer"}}>
+              <div style={{width:28,textAlign:"center",fontWeight:700,fontSize:i<3?"1.2rem":".9rem",color:i<3?["#d4a017","#888","#a0703a"][i]:T.txt2}}>{i<3?["🥇","🥈","🥉"][i]:`#${i+1}`}</div>
+              {u.photo?<img src={u.photo} style={{width:34,height:34,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(34,isMe?T.gold:T.goldBg,isMe?"#fff":T.goldD)}>{u.initials||"?"}</div>}
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:600,fontSize:".86rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.name}{isMe?" (You)":""}</div>
+                <div style={{fontSize:".68rem",color:T.mute}}>{monthLabel(rankMonth)}</div>
+              </div>
+              <div style={{textAlign:"right",minWidth:48}}>
+                <div style={{fontWeight:700,color:T.gold,fontSize:"1rem",lineHeight:1}}>{u.monthScore}</div>
+                <div style={{fontSize:".58rem",color:T.mute,letterSpacing:.5,textTransform:"uppercase"}}>pts</div>
+              </div>
+            </div>})}
+        </div>
+
+        </div>{/* end leaderboard grid */}
 
         {/* Rising Stars (newcomers below the threshold) */}
         {risingStars.length>0&&<div style={{...T.card,padding:18}}>
@@ -4704,6 +4834,45 @@ export default function App(){
           </div>
         }
 
+        {/* ═══ MY EARNING HISTORY (points ledger) ═══ */}
+        {prof?.accountType==="doctor"&&myLedger.length>0&&(()=>{
+          // Friendly labels per action type
+          const actionMeta={
+            quiz_correct:{icon:"🧠",color:T.teal},
+            forum_comment:{icon:"💬",color:"#7a3e9a"},
+            case_post:{icon:"🔬",color:T.gold},
+            share_unique:{icon:"🔗",color:"#0d6b6e"},
+            article_publish:{icon:"📰",color:T.gold},
+            profile_complete:{icon:"✅",color:T.ok},
+          };
+          const shown=myLedger.slice(0,15);
+          const totalLogged=myLedger.reduce((s,e)=>s+(e.pointsEarned||0),0);
+          return(<div style={{...T.card,padding:18,marginBottom:14}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,margin:0}}>📈 How you earned your points</h4>
+              <span style={{fontSize:".72rem",color:T.mute}}>{totalLogged} pts logged</span>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {shown.map(e=>{
+                const meta=actionMeta[e.action]||{icon:"⭐",color:T.mute};
+                const label=e.label||({quiz_correct:"Quiz answered correctly",forum_comment:"Forum comment",case_post:"Case posted",share_unique:"Shared content",article_publish:"Article published",profile_complete:"Profile completed"}[e.action]||e.action);
+                return(<div key={e.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:T.bg,borderRadius:8}}>
+                  <div style={{fontSize:"1rem",width:24,textAlign:"center",flexShrink:0}}>{meta.icon}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:".82rem",fontWeight:500,color:T.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{label}</div>
+                    <div style={{fontSize:".66rem",color:T.mute}}>{e.date}{e.streakBonus>0?` · 🔥 +${e.streakBonus} streak bonus`:""}</div>
+                  </div>
+                  <div style={{fontSize:".88rem",fontWeight:700,color:meta.color,flexShrink:0}}>+{e.pointsEarned}</div>
+                </div>);
+              })}
+            </div>
+            {myLedger.length>15&&<div style={{fontSize:".72rem",color:T.mute,textAlign:"center",marginTop:10}}>Showing 15 most recent of {myLedger.length} entries</div>}
+            <div style={{fontSize:".68rem",color:T.mute,marginTop:10,paddingTop:10,borderTop:"1px solid "+T.border,lineHeight:1.5}}>
+              💡 History tracks points from this update onward. Points earned before may not all appear here, but your total balance is always accurate.
+            </div>
+          </div>);
+        })()}
+
         {/* My redemption history */}
         {(()=>{
           const myRedemptions=redemptions.filter(r=>r.uid===au?.uid);
@@ -4735,8 +4904,9 @@ export default function App(){
           <div style={{display:"flex",alignItems:"center",gap:12,minWidth:0}}>
             <div style={{fontSize:"1.5rem"}}>🏆</div>
             <div>
-              <div style={{fontSize:".7rem",color:T.mute,letterSpacing:1,textTransform:"uppercase",fontWeight:600,marginBottom:2}}>Your points</div>
-              <div style={{fontSize:"1.3rem",fontWeight:700,color:T.gold,lineHeight:1}}>{prof?.points||0} <span style={{fontSize:".7rem",color:T.mute,fontWeight:500}}>pts</span></div>
+              <div style={{fontSize:".7rem",color:T.mute,letterSpacing:1,textTransform:"uppercase",fontWeight:600,marginBottom:2}}>Available to redeem</div>
+              <div style={{fontSize:"1.3rem",fontWeight:700,color:T.gold,lineHeight:1}}>{spendablePoints} <span style={{fontSize:".7rem",color:T.mute,fontWeight:500}}>pts</span></div>
+              <div style={{fontSize:".64rem",color:T.mute,marginTop:2}}>{prof?.points||0} earned lifetime</div>
             </div>
           </div>
           <div style={{fontSize:".82rem",color:T.teal,fontWeight:600,whiteSpace:"nowrap"}}>Redeem rewards →</div>
@@ -5333,8 +5503,13 @@ export default function App(){
             <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:10}}>🛠️ Admin Tools</h4>
             <div style={{padding:"12px 14px",background:T.goldBg,borderLeft:"3px solid "+T.gold,borderRadius:"0 8px 8px 0",marginBottom:10}}>
               <div style={{fontSize:".88rem",fontWeight:600,marginBottom:4}}>♻️ Recompute leaderboard points</div>
-              <p style={{fontSize:".78rem",color:T.txt2,lineHeight:1.55,marginBottom:10}}>Reads every user's quiz answer history and recalculates their points using the difficulty-weighted system (1pt Easy, 2pt Moderate, 3pt Hard). Run this ONCE after launching the new scoring system to fairly assign points to existing users. Streak bonuses are not retroactive.</p>
+              <p style={{fontSize:".78rem",color:T.txt2,lineHeight:1.55,marginBottom:10}}>Reads every user's quiz answer history and recalculates their points using the difficulty-weighted system (10pt Easy, 20pt Moderate, 30pt Hard). Run this ONCE after launching the new scoring system to fairly assign points to existing users. Streak bonuses are not retroactive.</p>
               <button onClick={recomputeAllPoints} style={{...T.btn,padding:"9px 18px",fontSize:".85rem"}}>♻️ Recompute all points now</button>
+            </div>
+            <div style={{padding:"12px 14px",background:T.tealBg+"66",borderLeft:"3px solid "+T.teal,borderRadius:"0 8px 8px 0",marginBottom:10}}>
+              <div style={{fontSize:".88rem",fontWeight:600,marginBottom:4}}>📅 Seed monthly leaderboard (one-time)</div>
+              <p style={{fontSize:".78rem",color:T.txt2,lineHeight:1.55,marginBottom:10}}>Creates a ledger entry for each doctor equal to their current points, dated this month. Run this ONCE so the monthly leaderboard shows correct totals immediately. Only valid because the points system started this month. Safe to re-run (won't duplicate).</p>
+              <button onClick={backfillLedgerThisMonth} style={{...T.btn,padding:"9px 18px",fontSize:".85rem",background:T.teal}}>📅 Seed this month's ledger</button>
             </div>
           </div>
         </>}
