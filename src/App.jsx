@@ -2183,7 +2183,7 @@ export default function App(){
   };
 
   const recomputeAllPoints=async()=>{
-    if(!confirm("This will recompute ALL users' points from their quiz answer history + logged action points.\n\nNEW scale: 10pt (Easy), 20pt (Moderate), 30pt (Hard) per correct answer.\nStreak bonuses are NOT retroactive (no way to know historical streak order).\nLedger entries (forum, cases, shares, backfill) are added back in.\n\nUsers with NO answered quizzes are LEFT UNCHANGED (not zeroed).\n\nContinue?"))return;
+    if(!confirm("Recompute ALL users' total points from scratch.\n\n• Quiz history: 10pt Easy / 20pt Moderate / 30pt Hard per correct answer\n• Action points: forum comments, case posts, shares (from ledger)\n• EXCLUDES backfill and quiz ledger entries (those would double-count)\n\nUsers with no answered quizzes are LEFT UNCHANGED.\nStreak bonuses are NOT retroactive.\n\nContinue?"))return;
     sh("⏳ Recomputing... please wait");
     try{
       // Build a map: userId -> { points, totalAnswered, totalCorrect }
@@ -2203,13 +2203,18 @@ export default function App(){
           }
         });
       });
-      // 2. Read all pointsActivity (action points + backfill) and add those too
+      // 2. Read pointsActivity ledger and add ONLY action points (forum, cases, shares).
+      // CRITICAL: skip `legacy_backfill` entries — those were a snapshot of pre-ledger
+      // quiz points and would double-count if added to the freshly-computed quiz totals.
+      // The quiz answers in step 1 already represent that history correctly.
       try{
         const ledgerQy=query(fbCol("pointsActivity"),limit(5000));
         const ledgerSnap=await getDocs(ledgerQy);
         ledgerSnap.docs.forEach(d=>{
           const e=d.data();
           if(!e.uid||typeof e.pointsEarned!=="number")return;
+          // Skip backfill and quiz entries — quiz_correct is already counted in step 1 via quiz answers
+          if(e.action==="legacy_backfill"||e.action==="quiz_correct")return;
           if(!userStats[e.uid])userStats[e.uid]={points:0,totalAnswered:0,totalCorrect:0};
           userStats[e.uid].points+=e.pointsEarned;
         });
