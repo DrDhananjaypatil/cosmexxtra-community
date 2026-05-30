@@ -2276,6 +2276,32 @@ export default function App(){
     loadMyLedger();
   };
 
+  // ═══ RECOVERY: restore each user's lifetime points from their May 2026 monthly total ═══
+  // Use this when recompute has corrupted lifetime totals but monthlyPoints["2026-05"] is intact.
+  // Only valid because all points were earned in May 2026 (per user confirmation).
+  // Idempotent — safe to re-run.
+  const restorePointsFromMay=async()=>{
+    if(!isAdminUser(au?.email)){sh("Admin only");return}
+    const sourceMonth="2026-05";
+    const eligible=allUsers.filter(u=>{
+      const v=(u.monthlyPoints||{})[sourceMonth];
+      return typeof v==="number"&&v>0;
+    });
+    if(!confirm(`Restore lifetime points for ${eligible.length} users from their ${sourceMonth} monthly totals?\n\nFor each user: sets points = monthlyPoints["${sourceMonth}"].\nUse this to recover from a broken recompute.\nAll points are assumed to be from May (per your earlier confirmation).\n\nSafe to re-run. Continue?`))return;
+    sh("⏳ Restoring... please wait");
+    let done=0,failed=0;
+    for(const u of eligible){
+      try{
+        const val=u.monthlyPoints[sourceMonth];
+        await fbSet("users",u.id,{points:val});
+        if(u.id===au.uid)setProf(p=>({...p,points:val}));
+        done++;
+      }catch(e){failed++;console.error("restore error for",u.id,e)}
+    }
+    await loadData();
+    sh(`✅ Restored ${done} users${failed>0?` (${failed} failed)`:""}`);
+  };
+
   const submitAnswer=async(qid,qObj,idx)=>{
     if(!au)return;
     const ok=idx===qObj.ci;
@@ -5579,16 +5605,37 @@ export default function App(){
           {/* ═══ ADMIN TOOLS ═══ */}
           <div style={{...T.card,marginTop:14}}>
             <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:10}}>🛠️ Admin Tools</h4>
-            <div style={{padding:"12px 14px",background:T.goldBg,borderLeft:"3px solid "+T.gold,borderRadius:"0 8px 8px 0",marginBottom:10}}>
-              <div style={{fontSize:".88rem",fontWeight:600,marginBottom:4}}>♻️ Recompute leaderboard points</div>
-              <p style={{fontSize:".78rem",color:T.txt2,lineHeight:1.55,marginBottom:10}}>Reads every user's quiz answer history and recalculates their points using the difficulty-weighted system (10pt Easy, 20pt Moderate, 30pt Hard). Run this ONCE after launching the new scoring system to fairly assign points to existing users. Streak bonuses are not retroactive.</p>
-              <button onClick={recomputeAllPoints} style={{...T.btn,padding:"9px 18px",fontSize:".85rem"}}>♻️ Recompute all points now</button>
+
+            {/* RECOVERY: restore from May totals (use after a broken recompute) */}
+            <div style={{padding:"12px 14px",background:"#fff4f4",borderLeft:"3px solid "+T.err,borderRadius:"0 8px 8px 0",marginBottom:10}}>
+              <div style={{fontSize:".88rem",fontWeight:600,marginBottom:4}}>🩹 Restore points from May 2026 totals</div>
+              <p style={{fontSize:".78rem",color:T.txt2,lineHeight:1.55,marginBottom:10}}>
+                For each user, sets their lifetime points equal to <code>monthlyPoints["2026-05"]</code>.
+                Use this when lifetime totals are wrong but May monthly totals look right.
+                All points are assumed to be from May 2026. Safe to re-run.
+              </p>
+              <button onClick={restorePointsFromMay} style={{...T.btn,padding:"9px 18px",fontSize:".85rem",background:T.err}}>🩹 Restore from May totals</button>
             </div>
+
+            {/* SEED MONTHLY (kept — useful for one-time backfill on first launch) */}
             <div style={{padding:"12px 14px",background:T.tealBg+"66",borderLeft:"3px solid "+T.teal,borderRadius:"0 8px 8px 0",marginBottom:10}}>
               <div style={{fontSize:".88rem",fontWeight:600,marginBottom:4}}>📅 Seed monthly leaderboard (one-time)</div>
               <p style={{fontSize:".78rem",color:T.txt2,lineHeight:1.55,marginBottom:10}}>Creates a ledger entry for each doctor equal to their current points, dated this month. Run this ONCE so the monthly leaderboard shows correct totals immediately. Only valid because the points system started this month. Safe to re-run (won't duplicate).</p>
               <button onClick={backfillLedgerThisMonth} style={{...T.btn,padding:"9px 18px",fontSize:".85rem",background:T.teal}}>📅 Seed this month's ledger</button>
             </div>
+
+            {/* RECOMPUTE — INTENTIONALLY HIDDEN
+                The old recompute function has caused data corruption (lost quizzes = lost points).
+                Until quiz history is reliable enough to rebuild totals from, don't use this.
+                Code is preserved for reference; UI removed to prevent accidental damage.
+                If you genuinely need to recompute from quiz answers, uncomment below. */}
+            {/*
+            <div style={{padding:"12px 14px",background:T.goldBg,borderLeft:"3px solid "+T.gold,borderRadius:"0 8px 8px 0",marginBottom:10}}>
+              <div style={{fontSize:".88rem",fontWeight:600,marginBottom:4}}>♻️ Recompute leaderboard points</div>
+              <p style={{fontSize:".78rem",color:T.txt2,lineHeight:1.55,marginBottom:10}}>Reads every user's quiz answer history and recalculates their points using the difficulty-weighted system (10pt Easy, 20pt Moderate, 30pt Hard). Run this ONCE after launching the new scoring system to fairly assign points to existing users. Streak bonuses are not retroactive.</p>
+              <button onClick={recomputeAllPoints} style={{...T.btn,padding:"9px 18px",fontSize:".85rem"}}>♻️ Recompute all points now</button>
+            </div>
+            */}
           </div>
         </>}
         {aTab==="quiz"&&<div style={T.card}>{edForm?.type==="quizzes"?<AdminForm type="Quiz sponsor" edForm={edForm} setEdForm={setEdForm} fields={[["sponsored","Mark as sponsored quiz","check"],["sponsor","Sponsor name (e.g. 'Sun Pharma')"],["sponsorLogo","Sponsor logo","image"],["sponsorUrl","Sponsor URL (optional — makes name clickable)"]]} onSave={()=>saveContent("quizzes")}/>
