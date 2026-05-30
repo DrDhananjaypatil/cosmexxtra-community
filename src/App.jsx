@@ -1724,11 +1724,20 @@ export default function App(){
         uniqueKeys:newUnique,
         updatedAt:Date.now(),
       });
-      // Add to user's running total
-      const newTotal=(prof.points||0)+points;
+      // Add to user's running total — read fresh from Firestore to avoid stale-state wipes
+      let basePoints=prof.points||0;
+      let baseMonthly=prof.monthlyPoints||{};
+      try{
+        const fresh=await fbGet("users",au.uid);
+        if(fresh){
+          basePoints=fresh.points||0;
+          baseMonthly=fresh.monthlyPoints||{};
+        }
+      }catch(err){console.error("fresh read failed in awardPoints:",err)}
+      const newTotal=basePoints+points;
       const mKey=todayIST_YMD().slice(0,7);
-      const curM=(prof.monthlyPoints||{})[mKey]||0;
-      const newMonthly={...(prof.monthlyPoints||{}),[mKey]:curM+points};
+      const curM=baseMonthly[mKey]||0;
+      const newMonthly={...baseMonthly,[mKey]:curM+points};
       await fbSet("users",au.uid,{points:newTotal,monthlyPoints:newMonthly});
       setProf(p=>({...p,points:newTotal,monthlyPoints:newMonthly}));
       loadMyLedger();
@@ -2174,14 +2183,15 @@ export default function App(){
   };
 
   const recomputeAllPoints=async()=>{
-    if(!confirm("This will recompute ALL users' points from their quiz answer history.\n\nNEW scale: 10pt (Easy), 20pt (Moderate), 30pt (Hard) per correct answer.\nStreak bonuses are NOT retroactive (no way to know historical streak order).\n\nContinue?"))return;
+    if(!confirm("This will recompute ALL users' points from their quiz answer history + logged action points.\n\nNEW scale: 10pt (Easy), 20pt (Moderate), 30pt (Hard) per correct answer.\nStreak bonuses are NOT retroactive (no way to know historical streak order).\nLedger entries (forum, cases, shares, backfill) are added back in.\n\nUsers with NO answered quizzes are LEFT UNCHANGED (not zeroed).\n\nContinue?"))return;
     sh("⏳ Recomputing... please wait");
     try{
       // Build a map: userId -> { points, totalAnswered, totalCorrect }
       const userStats={};
-      // Read all quizzes (we already have them in `quizzes` state)
+      // 1. Read all quizzes and tally correct answers per user
       quizzes.forEach(q=>{
-        if(!q.answers||!q.ci===undefined)return;
+        // Fix the buggy condition: properly check for ci undefined
+        if(!q.answers||typeof q.ci!=="number")return;
         const diff=q.diff||"Easy";
         const pointsForCorrect=diff==="Hard"?30:diff==="Moderate"?20:10;
         Object.entries(q.answers).forEach(([uid,answerIdx])=>{
@@ -2193,7 +2203,18 @@ export default function App(){
           }
         });
       });
-      // Save back to each user
+      // 2. Read all pointsActivity (action points + backfill) and add those too
+      try{
+        const ledgerQy=query(fbCol("pointsActivity"),limit(5000));
+        const ledgerSnap=await getDocs(ledgerQy);
+        ledgerSnap.docs.forEach(d=>{
+          const e=d.data();
+          if(!e.uid||typeof e.pointsEarned!=="number")return;
+          if(!userStats[e.uid])userStats[e.uid]={points:0,totalAnswered:0,totalCorrect:0};
+          userStats[e.uid].points+=e.pointsEarned;
+        });
+      }catch(err){console.error("ledger read in recompute failed:",err);sh("⚠️ Could not read ledger; aborting recompute to avoid wiping action points");return}
+      // 3. Save back to each user (only update users we have stats for — never zero out)
       const updates=Object.entries(userStats);
       let success=0,failed=0;
       for(const[uid,stats]of updates){
@@ -2201,12 +2222,6 @@ export default function App(){
           await fbSet("users",uid,{points:stats.points,totalAnswered:stats.totalAnswered,totalCorrect:stats.totalCorrect});
           success++;
         }catch(e){failed++}
-      }
-      // Also update users with no answers — set points to 0 (in case they had stale data)
-      for(const u of allUsers){
-        if(!userStats[u.id]){
-          try{await fbSet("users",u.id,{points:0});}catch{}
-        }
       }
       // Update local current user if affected
       if(userStats[au.uid]){
@@ -2266,19 +2281,36 @@ export default function App(){
     if(ok){
       pointsEarned=qObj.diff==="Hard"?30:qObj.diff==="Moderate"?20:10;
     }
-    const newStreak=ok?(prof.streak||0)+1:0;
+    // SAFETY: read fresh user doc from Firestore before computing newTotal.
+    // Prevents stale-state wipes if prof.points was temporarily 0 in memory.
+    let basePoints=prof.points||0;
+    let baseMonthly=prof.monthlyPoints||{};
+    let baseAnswered=prof.totalAnswered||0;
+    let baseCorrect=prof.totalCorrect||0;
+    let baseStreak=prof.streak||0;
+    try{
+      const fresh=await fbGet("users",au.uid);
+      if(fresh){
+        basePoints=fresh.points||0;
+        baseMonthly=fresh.monthlyPoints||{};
+        baseAnswered=fresh.totalAnswered||0;
+        baseCorrect=fresh.totalCorrect||0;
+        baseStreak=fresh.streak||0;
+      }
+    }catch(err){console.error("fresh read failed, using local state:",err)}
+    const newStreak=ok?baseStreak+1:0;
     // Streak bonus: +5 every 7 consecutive days
     let streakBonus=0;
     if(ok&&newStreak>0&&newStreak%7===0){streakBonus=50}
     const totalEarned=pointsEarned+streakBonus;
     const monthKey=todayIST_YMD().slice(0,7);
-    const curMonthly=(prof.monthlyPoints||{})[monthKey]||0;
+    const curMonthly=baseMonthly[monthKey]||0;
     const upd={
-      totalAnswered:(prof.totalAnswered||0)+1,
-      totalCorrect:(prof.totalCorrect||0)+(ok?1:0),
+      totalAnswered:baseAnswered+1,
+      totalCorrect:baseCorrect+(ok?1:0),
       streak:newStreak,
-      points:(prof.points||0)+totalEarned,
-      monthlyPoints:{...(prof.monthlyPoints||{}),[monthKey]:curMonthly+totalEarned},
+      points:basePoints+totalEarned,
+      monthlyPoints:{...baseMonthly,[monthKey]:curMonthly+totalEarned},
     };
     await fbSet("users",au.uid,upd);
     setProf(p=>({...p,...upd}));
