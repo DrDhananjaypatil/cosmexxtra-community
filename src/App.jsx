@@ -2302,6 +2302,33 @@ export default function App(){
     sh(`✅ Restored ${done} users${failed>0?` (${failed} failed)`:""}`);
   };
 
+  // ═══ RECOVERY: rebuild MY points by summing my own pointsActivity ledger ═══
+  // Use when restore-from-May can't help (no monthlyPoints field) but the user has
+  // action-point ledger entries. Reads only current user's ledger.
+  // Excludes backfill entries (those represent total-at-backfill-time, not a separate event).
+  const recoverMyPointsFromLedger=async()=>{
+    if(!au?.uid)return;
+    try{
+      const qy=query(fbCol("pointsActivity"),where("uid","==",au.uid),limit(2000));
+      const snap=await getDocs(qy);
+      const rows=snap.docs.map(d=>d.data());
+      // Sum all entries except backfill (which is a snapshot, not an addition)
+      const sum=rows.filter(e=>e.action!=="legacy_backfill"&&typeof e.pointsEarned==="number")
+                    .reduce((s,e)=>s+e.pointsEarned,0);
+      const backfillEntry=rows.find(e=>e.action==="legacy_backfill");
+      const baseFromBackfill=backfillEntry?backfillEntry.pointsEarned:0;
+      const total=sum+baseFromBackfill;
+      if(!confirm(`Recover your points to ${total}?\n\nBreakdown:\n• Action ledger sum: ${sum}\n• Backfill snapshot: ${baseFromBackfill}\n\nThis writes ${total} to your points field. Continue?`))return;
+      await fbSet("users",au.uid,{points:total});
+      setProf(p=>({...p,points:total}));
+      sh(`✅ Your points restored to ${total}`);
+      await loadData();
+    }catch(err){
+      console.error("recoverMyPointsFromLedger error:",err);
+      sh("❌ Recovery failed: "+(err.message||"check console"));
+    }
+  };
+
   const submitAnswer=async(qid,qObj,idx)=>{
     if(!au)return;
     const ok=idx===qObj.ci;
@@ -2432,7 +2459,10 @@ export default function App(){
   };
   const leaderboard=allUsers
     .filter(u=>!isExcludedFromLeaderboard(u))
-    .filter(u=>(u.totalAnswered||0)>=MIN_Q_FOR_RANK)
+    // Qualify if EITHER answered 5+ quizzes (quiz-focused users)
+    // OR earned 50+ points through any means (community contributors).
+    // This way action-only users (forum/cases/shares) appear too.
+    .filter(u=>(u.totalAnswered||0)>=MIN_Q_FOR_RANK||(u.points||0)>=50)
     .sort((a,b)=>{
       // Primary: points
       const pDiff=(b.points||0)-(a.points||0);
@@ -4539,7 +4569,7 @@ export default function App(){
         <div style={{...T.card,padding:18,marginBottom:0}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
             <h4 style={{fontSize:".95rem",fontWeight:700,margin:0}}>🏆 All-Time Top {Math.min(leaderboard.length,20)}</h4>
-            <span style={{fontSize:".7rem",color:T.mute}}>Min {MIN_Q_FOR_RANK} Q</span>
+            <span style={{fontSize:".7rem",color:T.mute}}>5+ Q or 50+ pts</span>
           </div>
 
           {/* Admin-only notice — visible only to admins so they understand they're filtered out */}
@@ -4549,7 +4579,7 @@ export default function App(){
 
           {leaderboard.length===0&&<div style={{textAlign:"center",padding:30,color:T.mute,fontSize:".88rem"}}>
             <div style={{fontSize:"2rem",marginBottom:6}}>🌱</div>
-            No qualified rankings yet. Doctors need {MIN_Q_FOR_RANK} questions to appear.
+            No qualified rankings yet. Users need 5+ quizzes or 50+ points to appear.
           </div>}
 
           {leaderboard.map((u,i)=>{const uAcc=u.totalAnswered?Math.round(u.totalCorrect/u.totalAnswered*100):0;const isMe=u.id===au?.uid;
@@ -5615,6 +5645,15 @@ export default function App(){
                 All points are assumed to be from May 2026. Safe to re-run.
               </p>
               <button onClick={restorePointsFromMay} style={{...T.btn,padding:"9px 18px",fontSize:".85rem",background:T.err}}>🩹 Restore from May totals</button>
+            </div>
+
+            {/* Personal recovery — for admin/users with no monthlyPoints field */}
+            <div style={{padding:"12px 14px",background:"#f0e4ff",borderLeft:"3px solid #7a3e9a",borderRadius:"0 8px 8px 0",marginBottom:10}}>
+              <div style={{fontSize:".88rem",fontWeight:600,marginBottom:4}}>🧮 Recover my points from ledger</div>
+              <p style={{fontSize:".78rem",color:T.txt2,lineHeight:1.55,marginBottom:10}}>
+                Sums YOUR own <code>pointsActivity</code> ledger entries (action points + any backfill snapshot) and sets your <code>points</code> to that total. Use this when restore-from-May can't help because your account has no monthly data.
+              </p>
+              <button onClick={recoverMyPointsFromLedger} style={{...T.btn,padding:"9px 18px",fontSize:".85rem",background:"#7a3e9a"}}>🧮 Recover my points</button>
             </div>
 
             {/* SEED MONTHLY (kept — useful for one-time backfill on first launch) */}
