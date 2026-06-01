@@ -451,7 +451,12 @@ const CommentThread=({collection,itemId,item,currentUser,uName,uIni,uPhoto,allUs
     const trimmedTxt=txt;
     const c={n:uName,ini:uIni,txt,tm:getIST().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",hour12:true}),uid:currentUser.uid,likedBy:[],likes:0};
     const updated=[...comments,c];
-    await fbSet(collection,itemId,{comments:updated});
+    const ok=await fbSet(collection,itemId,{comments:updated});
+    if(!ok){
+      // Write failed (permissions, network, etc.). Don't update UI or send notifications.
+      alert("Couldn't post your comment. Please try again — if it keeps failing, the page may need a refresh.");
+      return;
+    }
     onUpdate(itemId,updated);
     // Notify the author of the original post (if not self)
     if(item.uid&&item.uid!==currentUser.uid){
@@ -776,7 +781,7 @@ const CaseCmtInput=({caseId,caseObj,addCaseComment,allUsers})=>{
 const fbCol=n=>collection(db,n);
 async function fbGetAll(c,ord="date",dir="desc",lim=100){try{const q=query(fbCol(c),orderBy(ord,dir),limit(lim));const s=await getDocs(q);return s.docs.map(d=>({id:d.id,...d.data()}))}catch(e){console.log("fb",c,e);return[]}}
 async function fbAdd(c,data){try{const r=await addDoc(fbCol(c),{...data,createdAt:serverTimestamp()});return r.id}catch{return null}}
-async function fbSet(c,id,data){try{await setDoc(doc(db,c,id),{...data,updatedAt:serverTimestamp()},{merge:true});return true}catch{return false}}
+async function fbSet(c,id,data){try{await setDoc(doc(db,c,id),{...data,updatedAt:serverTimestamp()},{merge:true});return true}catch(e){console.error(`[fbSet] failed: ${c}/${id}`,e,"data keys:",Object.keys(data));return false}}
 async function fbDel(c,id){try{await deleteDoc(doc(db,c,id));return true}catch{return false}}
 async function fbGet(c,id){try{const s=await getDoc(doc(db,c,id));return s.exists()?{id:s.id,...s.data()}:null}catch{return null}}
 
