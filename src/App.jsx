@@ -4823,7 +4823,8 @@ export default function App(){
             </div>}
 
             {/* ═══ ADMIN: this user's points history ═══ */}
-            {isAdmin&&!isMe&&u.accountType==="doctor"&&<div style={{...T.card,marginBottom:14}}>
+            {/* Show for any non-admin user — accountType might be missing/different on older accounts */}
+            {isAdmin&&!isMe&&<div style={{...T.card,marginBottom:14}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
                 <h4 style={{fontSize:".95rem",fontWeight:700,margin:0}}>📊 Points history (admin view)</h4>
                 <span style={{fontSize:".72rem",color:T.mute}}>{u.points||0} total · {profileLedger.reduce((s,e)=>s+(e.pointsEarned||0),0)} logged</span>
