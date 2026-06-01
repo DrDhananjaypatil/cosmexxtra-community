@@ -2339,9 +2339,15 @@ export default function App(){
     const ok=idx===qObj.ci;
     const answers={...(qObj.answers||{}),[au.uid]:idx};
     await fbSet("quizzes",qid,{answers});
+    // ═══ SAME-DAY POINTS RULE ═══
+    // Points are only awarded if the user answers ON THE DAY the quiz was published.
+    // Back-answering old quizzes is allowed (educational value), but no points.
+    // qObj.date is the publish date in YYYY-MM-DD IST format.
+    const todayKey=todayIST_YMD();
+    const isSameDay=qObj.date===todayKey;
     // ═══ DIFFICULTY-WEIGHTED POINTS ═══
     let pointsEarned=0;
-    if(ok){
+    if(ok&&isSameDay){
       pointsEarned=qObj.diff==="Hard"?30:qObj.diff==="Moderate"?20:10;
     }
     // SAFETY: read fresh user doc from Firestore before computing newTotal.
@@ -2361,10 +2367,11 @@ export default function App(){
         baseStreak=fresh.streak||0;
       }
     }catch(err){console.error("fresh read failed, using local state:",err)}
-    const newStreak=ok?baseStreak+1:0;
-    // Streak bonus: +5 every 7 consecutive days
+    // Streak only progresses on same-day quizzes (not retroactive)
+    const newStreak=(ok&&isSameDay)?baseStreak+1:(isSameDay?0:baseStreak);
+    // Streak bonus: +50 every 7 consecutive days
     let streakBonus=0;
-    if(ok&&newStreak>0&&newStreak%7===0){streakBonus=50}
+    if(ok&&isSameDay&&newStreak>0&&newStreak%7===0){streakBonus=50}
     const totalEarned=pointsEarned+streakBonus;
     const monthKey=todayIST_YMD().slice(0,7);
     const curMonthly=baseMonthly[monthKey]||0;
@@ -2401,10 +2408,12 @@ export default function App(){
       }catch(err){console.error("ledger log error:",err)}
     }
     if(ok){
-      if(streakBonus>0){sh(`🎉 Correct! +${pointsEarned} points • 🔥 ${newStreak}-day streak bonus +${streakBonus}!`)}
+      if(!isSameDay){sh(`🎉 Correct! (No points — this quiz was from ${qObj.date}; only today's quiz earns points)`)}
+      else if(streakBonus>0){sh(`🎉 Correct! +${pointsEarned} points • 🔥 ${newStreak}-day streak bonus +${streakBonus}!`)}
       else{sh(`🎉 Correct! +${pointsEarned} points`)}
     }else{
-      sh("Answer recorded. Try again tomorrow!");
+      if(!isSameDay){sh(`Answer recorded. (No points — this quiz was from ${qObj.date}; only today's quiz earns points)`)}
+      else{sh("Answer recorded. Try again tomorrow!")}
     }
   };
   const addComment=async(qid,qObj)=>{if(!cmt.trim())return;const c={n:uName,ini:uIni,txt:cmt,tm:getIST().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",hour12:true}),uid:au.uid,likedBy:[],likes:0};const comments=[...(qObj.comments||[]),c];await fbSet("quizzes",qid,{comments});setQuizzes(p=>p.map(q=>q.id===qid?{...q,comments}:q));setCmt("")};
@@ -3686,6 +3695,7 @@ export default function App(){
         <button onClick={()=>setSelA(null)} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back</button>
         <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 360px",gap:20,alignItems:"start"}} className="article-grid">
           <div style={{minWidth:0}}>{/* MAIN ARTICLE COLUMN */}
+        <ViewTracker trackingKey={`articles_${selA.id}`} onView={()=>{if(selA.authorUid===au?.uid||selA.uid===au?.uid)return;const newCount=(selA.views||0)+1;fbSet("articles",selA.id,{views:newCount});setArticles(prev=>prev.map(x=>x.id===selA.id?{...x,views:newCount}:x));setSelA(p=>({...p,views:newCount}))}}>
         <article style={{...T.card,overflow:"hidden",padding:0,background:"#fff",margin:0}}>
           {/* Cover image */}
           {selA.cover&&<img src={selA.cover} style={{width:"100%",maxHeight:380,objectFit:"cover",display:"block"}}/>}
@@ -3757,6 +3767,7 @@ export default function App(){
             <CommentThread collection="articles" itemId={selA.id} item={selA} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} sendEmail={sendEmail} onUpdate={(id,comments)=>{setArticles(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelA(p=>({...p,comments}))}}/>
           </div>
         </article>
+        </ViewTracker>
           </div>{/* END MAIN ARTICLE COLUMN */}
 
           {/* ═══ ARTICLE PAGE SIDEBAR ═══ */}
@@ -3879,6 +3890,9 @@ export default function App(){
               </div>
             </div>}
             <div style={{padding:20}}>
+            {!isT&&<div style={{background:T.warnBg,borderLeft:"3px solid "+T.warn,padding:"10px 14px",marginBottom:14,borderRadius:"0 8px 8px 0",fontSize:".82rem",color:T.warn,lineHeight:1.5}}>
+              📚 <b>Review mode</b> — this quiz was published on {fD(qObj.date)}. You can still answer it for learning, but <b>no points are awarded</b> for past quizzes. Only today's quiz earns points.
+            </div>}
             <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}><span style={{fontSize:".8rem",color:T.mute}}>📅 {fD(qObj.date)}</span>{isT&&hr<21&&<span style={T.tag(T.okBg,T.ok)}>● LIVE</span>}{rev&&!isT&&<span style={T.tag(T.errBg,T.err)}>Closed</span>}<span style={{fontSize:".72rem",color:T.mute,marginLeft:"auto"}}>{Object.keys(qObj.answers||{}).length} answered</span></div>
             <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}><span style={T.tag(T.tealBg,T.teal)}>{qObj.cat}</span><span style={T.tag(T.warnBg,T.warn)}>{qObj.diff}</span>{(qObj.views||0)>0&&<span style={{fontSize:".72rem",color:T.mute}}>👁️ {qObj.views} {qObj.views===1?"view":"views"}</span>}{Object.keys(qObj.answers||{}).length>0&&<span style={{fontSize:".72rem",color:T.mute}}>✏️ {Object.keys(qObj.answers).length} answered</span>}</div>
             {qObj.scen&&<div style={{background:T.bg,borderLeft:"3px solid "+T.gold,padding:"12px 16px",marginBottom:16,borderRadius:"0 10px 10px 0",fontSize:".9rem",color:T.txt2,lineHeight:1.65}}>{qObj.scen}</div>}
@@ -4007,6 +4021,7 @@ export default function App(){
         </div>);
       })()}
       {pg==="videos"&&selV&&<div><button onClick={()=>setSelV(null)} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back</button>
+        <ViewTracker trackingKey={`videos_${selV.id}`} onView={()=>{if(selV.authorUid===au?.uid||selV.uid===au?.uid)return;const newCount=(selV.views||0)+1;fbSet("videos",selV.id,{views:newCount});setVideos(prev=>prev.map(x=>x.id===selV.id?{...x,views:newCount}:x));setSelV(p=>({...p,views:newCount}))}}>
         <div style={{...T.card,maxWidth:720}}>{(()=>{
           const videoSrc=selV.videoFile||selV.embedUrl;
           const isDirect=videoSrc&&(videoSrc.includes("firebasestorage")||videoSrc.includes("storage.googleapis")||/\.(mp4|webm|ogg|mov)(\?|$)/i.test(videoSrc));
@@ -4024,6 +4039,7 @@ export default function App(){
           </div>
           <CommentThread collection="videos" itemId={selV.id} item={selV} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} sendEmail={sendEmail} onUpdate={(id,comments)=>{setVideos(p=>p.map(x=>x.id===id?{...x,comments}:x));setSelV(p=>({...p,comments}))}}/>
         </div>
+        </ViewTracker>
       </div>}
 
       {/* ═══ AD DETAIL PAGE (internal-type ads) ═══ */}
@@ -4829,6 +4845,43 @@ export default function App(){
                 })}
                 {profileLedger.length>20&&<div style={{fontSize:".7rem",color:T.mute,textAlign:"center",marginTop:6}}>Showing 20 of {profileLedger.length}</div>}
               </div>}
+
+              {/* ═══ MANUAL POINTS ADJUSTMENT (admin) ═══ */}
+              <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid "+T.border}}>
+                <div style={{fontSize:".82rem",fontWeight:600,color:T.err,marginBottom:6}}>⚠️ Manual points adjustment</div>
+                <p style={{fontSize:".72rem",color:T.txt2,lineHeight:1.5,marginBottom:8}}>Use sparingly — for correcting gaming exploits or one-off issues. The new value REPLACES the lifetime total. Also updates this month's monthlyPoints proportionally so leaderboards reconcile.</p>
+                <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                  <input id={`adj-${u.id}`} type="number" placeholder={`Current: ${u.points||0}`} style={{...T.inp,width:140,padding:"6px 10px",fontSize:".82rem"}}/>
+                  <button onClick={async()=>{
+                    const newVal=parseInt(document.getElementById(`adj-${u.id}`).value);
+                    if(isNaN(newVal)||newVal<0){sh("Enter a valid non-negative number");return}
+                    if(!confirm(`Set ${u.name}'s lifetime points to ${newVal}? (Currently ${u.points||0})`))return;
+                    try{
+                      const monthKey=todayIST_YMD().slice(0,7);
+                      const curMonthly=(u.monthlyPoints||{})[monthKey]||0;
+                      // Cap monthly at the new total — if newVal < curMonthly, monthly drops to newVal
+                      const newMonthly=Math.min(curMonthly,newVal);
+                      const monthlyPoints={...(u.monthlyPoints||{}),[monthKey]:newMonthly};
+                      await fbSet("users",u.id,{points:newVal,monthlyPoints});
+                      // Log the adjustment to the ledger for audit trail
+                      const adjId=`${u.id}_adj_${Date.now()}`;
+                      await fbSet("pointsActivity",adjId,{
+                        uid:u.id,
+                        date:todayIST_YMD(),
+                        month:monthKey,
+                        action:"admin_adjustment",
+                        label:`Admin set total to ${newVal} (was ${u.points||0})`,
+                        pointsEarned:newVal-(u.points||0),
+                        createdAt:Date.now(),
+                        adminUid:au.uid,
+                      });
+                      sh(`✅ ${u.name}: ${u.points||0} → ${newVal}`);
+                      document.getElementById(`adj-${u.id}`).value="";
+                      await loadData();
+                    }catch(err){console.error("adjustment failed:",err);sh("❌ Adjustment failed")}
+                  }} style={{...T.btnDanger,padding:"6px 14px",fontSize:".78rem"}}>Set new total</button>
+                </div>
+              </div>
             </div>}
           </>}
         </div>);
