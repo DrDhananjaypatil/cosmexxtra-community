@@ -3288,6 +3288,64 @@ export default function App(){
           </div>);
         })()}
 
+        {/* ═══ FEATURED FORUM ═══
+            Hybrid: posts manually marked feat=true rank first, then auto-pick by
+            engagement score from the last 14 days. Top 4 total. */}
+        {(()=>{
+          const FOURTEEN_DAYS=14*24*60*60*1000;
+          const cutoff=Date.now()-FOURTEEN_DAYS;
+          // Engagement score: likes + (replies × 2) — reward discussion more than passive likes
+          const scoreOf=p=>(p.likes||0)+((p.comments?.length||p.replies||0)*2);
+          // Eligible: must have title + body and either be marked featured OR posted within 14 days
+          const recent=forumPosts.filter(p=>{
+            if(!p||!p.title)return false;
+            const ts=new Date(p.date||p.createdAt||0).getTime();
+            return p.feat||ts>=cutoff;
+          });
+          const eligible=recent.sort((a,b)=>{
+            // Manual featured posts always rank first
+            if((b.feat?1:0)!==(a.feat?1:0))return (b.feat?1:0)-(a.feat?1:0);
+            // Then by engagement score descending
+            const sDiff=scoreOf(b)-scoreOf(a);
+            if(sDiff!==0)return sDiff;
+            // Tiebreaker: more recent first
+            const da=new Date(a.date||a.createdAt||0).getTime();
+            const db=new Date(b.date||b.createdAt||0).getTime();
+            return db-da;
+          }).slice(0,4);
+          if(eligible.length<2)return null;
+          return(<div style={{...T.card,padding:18,marginBottom:14}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
+              <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>💬 Featured Forum</h3>
+              <span onClick={()=>go("forum")} style={{fontSize:".78rem",color:T.teal,fontWeight:600,cursor:"pointer"}}>Browse all →</span>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
+              {eligible.map(p=>{
+                const replyCount=p.comments?.length||p.replies||0;
+                return(<div key={p.id} onClick={()=>{go("forum");setTimeout(()=>{setSelFP(p);window.scrollTo(0,0)},50)}} style={{background:"#fff",borderRadius:10,overflow:"hidden",border:"1px solid "+T.border,cursor:"pointer",transition:"all .15s",display:"flex",flexDirection:"column"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 20px rgba(0,0,0,0.07)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
+                  {/* Image if available, else colored band so card has visual presence */}
+                  {p.images?.length>0?
+                    <div style={{aspectRatio:"16/10",overflow:"hidden",background:T.bg,position:"relative"}}>
+                      <img src={p.images[0]} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}} onError={e=>{e.currentTarget.style.display="none"}}/>
+                      {p.feat&&<div style={{position:"absolute",top:6,left:6,background:T.gold,color:"#fff",fontSize:".6rem",padding:"2px 7px",borderRadius:10,fontWeight:700,letterSpacing:.5}}>★ FEATURED</div>}
+                    </div>
+                    :
+                    <div style={{aspectRatio:"16/10",background:"linear-gradient(135deg,"+T.tealBg+","+T.goldBg+")",display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+                      <div style={{fontSize:"2rem",opacity:.6}}>💬</div>
+                      {p.feat&&<div style={{position:"absolute",top:6,left:6,background:T.gold,color:"#fff",fontSize:".6rem",padding:"2px 7px",borderRadius:10,fontWeight:700,letterSpacing:.5}}>★ FEATURED</div>}
+                    </div>
+                  }
+                  <div style={{padding:12,flex:1,display:"flex",flexDirection:"column"}}>
+                    {p.cat&&<div style={{fontSize:".64rem",color:T.teal,fontWeight:700,letterSpacing:1.2,textTransform:"uppercase",marginBottom:5}}>{p.cat}</div>}
+                    <div style={{fontSize:".88rem",fontWeight:600,color:T.txt,lineHeight:1.35,marginBottom:6,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden",flex:1}}>{p.title}</div>
+                    <div style={{fontSize:".68rem",color:T.mute}}>{p.author||"Anonymous"} · ❤️ {p.likes||0} · 💬 {replyCount}</div>
+                  </div>
+                </div>);
+              })}
+            </div>
+          </div>);
+        })()}
+
         {/* ═══ FEATURED ARTICLES ═══
             Shows 3-4 articles with quality covers. Only renders if 2+ qualify. */}
         {(()=>{
@@ -5773,10 +5831,17 @@ export default function App(){
                   <span>❤️ {p.likes||0}</span>
                   <span>💬 {p.replies||0}</span>
                   {p.images?.length>0&&<span>🖼 {p.images.length}</span>}
+                  {p.feat&&<span style={T.tag(T.goldBg,T.goldD)}>★ FEATURED</span>}
                 </div>
               </div>
             </div>
             <div style={{display:"flex",gap:4}}>
+              <button onClick={async()=>{
+                const newFeat=!p.feat;
+                await fbSet("forum",p.id,{feat:newFeat});
+                setForumPosts(prev=>prev.map(x=>x.id===p.id?{...x,feat:newFeat}:x));
+                sh(newFeat?"⭐ Marked as Featured":"Removed from Featured");
+              }} style={{...T.btnO,...T.btnSm,...(p.feat?{background:T.gold,color:"#fff",borderColor:T.gold}:{})}}>{p.feat?"★ Unfeature":"☆ Feature"}</button>
               <button onClick={()=>setEdForm({type:"forum",data:{...p},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button>
               <button onClick={()=>deleteContent("forum",p.id,p.title)} style={T.btnDanger}>Del</button>
             </div>
