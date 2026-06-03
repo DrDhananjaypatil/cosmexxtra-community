@@ -4897,7 +4897,22 @@ export default function App(){
                     <div style={{fontSize:"1rem",width:24,textAlign:"center"}}>{meta.icon}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:".8rem",fontWeight:500,color:T.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{label}</div>
-                      <div style={{fontSize:".64rem",color:T.mute}}>{e.date}{e.month?` · ${e.month}`:""}</div>
+                      <div style={{fontSize:".64rem",color:T.mute}}>
+                        {(() => {
+                          const ts = e.createdAt || e.updatedAt;
+                          if (ts) {
+                            try {
+                              return new Date(ts).toLocaleString("en-IN", {
+                                day: "2-digit", month: "short", year: "2-digit",
+                                hour: "2-digit", minute: "2-digit", second: "2-digit",
+                                hour12: true
+                              });
+                            } catch { return e.date; }
+                          }
+                          return e.date;
+                        })()}
+                        {e.action ? ` · ${e.action}` : ""}
+                      </div>
                     </div>
                     <div style={{fontSize:".85rem",fontWeight:700,color:meta.color}}>+{e.pointsEarned}</div>
                   </div>);
@@ -5111,7 +5126,22 @@ export default function App(){
                   <div style={{fontSize:"1rem",width:24,textAlign:"center",flexShrink:0}}>{meta.icon}</div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:".82rem",fontWeight:500,color:T.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{label}</div>
-                    <div style={{fontSize:".66rem",color:T.mute}}>{e.date}{e.streakBonus>0?` · 🔥 +${e.streakBonus} streak bonus`:""}</div>
+                    <div style={{fontSize:".66rem",color:T.mute}}>
+                      {(() => {
+                        const ts = e.createdAt || e.updatedAt;
+                        if (ts) {
+                          try {
+                            return new Date(ts).toLocaleString("en-IN", {
+                              day: "2-digit", month: "short",
+                              hour: "2-digit", minute: "2-digit",
+                              hour12: true
+                            });
+                          } catch { return e.date; }
+                        }
+                        return e.date;
+                      })()}
+                      {e.streakBonus>0?` · 🔥 +${e.streakBonus} streak bonus`:""}
+                    </div>
                   </div>
                   <div style={{fontSize:".88rem",fontWeight:700,color:meta.color,flexShrink:0}}>+{e.pointsEarned}</div>
                 </div>);
