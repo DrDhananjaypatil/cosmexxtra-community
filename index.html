@@ -14,8 +14,8 @@
     <meta property="og:type" content="website" />
     <meta property="og:title" content="SKINARIO — Learn. Discuss. Lead the field." />
     <meta property="og:description" content="The professional community for aesthetic and cosmetology doctors. Daily clinical quizzes, peer case discussions, and expert articles on Botox, fillers, threads, PDRN, lasers and more." />
-    <meta property="og:url" content="https://cosmexxtra-community.vercel.app" />
-    <meta property="og:image" content="https://cosmexxtra-community.vercel.app/skinario-logo.jpg" />
+    <meta property="og:url" content="https://skinario.app" />
+    <meta property="og:image" content="https://skinario.app/skinario-logo.jpg" />
     <meta property="og:image:alt" content="SKINARIO logo" />
     <meta property="og:site_name" content="SKINARIO" />
 
@@ -23,14 +23,70 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="SKINARIO — Learn. Discuss. Lead the field." />
     <meta name="twitter:description" content="The professional community for aesthetic and cosmetology doctors. Daily clinical quizzes, peer case discussions, and expert articles on Botox, fillers, threads, PDRN, lasers and more." />
-    <meta name="twitter:image" content="https://cosmexxtra-community.vercel.app/skinario-logo.jpg" />
+    <meta name="twitter:image" content="https://skinario.app/skinario-logo.jpg" />
 
     <!-- ═══ KEYWORDS (mostly for legacy SEO; modern engines mostly ignore) ═══ -->
     <meta name="keywords" content="aesthetic medicine, cosmetology, Botox, dermal fillers, threads, PDRN, polynucleotides, peptides, chemical peels, laser treatment, hair restoration, body contouring, India aesthetic doctors, SKINARIO" />
 
     <!-- ═══ AUTHOR & PUBLISHER ═══ -->
     <meta name="author" content="Absolute Institute" />
-    <link rel="canonical" href="https://cosmexxtra-community.vercel.app" />
+    <link rel="canonical" href="https://skinario.app" />
+
+    <!-- ═══ JSON-LD STRUCTURED DATA (helps Google understand site) ═══ -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://skinario.app/#website",
+          "url": "https://skinario.app",
+          "name": "SKINARIO",
+          "description": "The professional community for aesthetic and cosmetology doctors in India. Daily clinical quizzes, peer case discussions, and expert articles.",
+          "publisher": { "@id": "https://skinario.app/#organization" },
+          "inLanguage": "en-IN"
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://skinario.app/#organization",
+          "name": "SKINARIO",
+          "alternateName": "SKINARIO by Absolute Institute",
+          "url": "https://skinario.app",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://skinario.app/skinario-logo.jpg",
+            "width": 512,
+            "height": 512
+          },
+          "founder": { "@type": "Organization", "name": "Absolute Institute" },
+          "areaServed": { "@type": "Country", "name": "India" },
+          "knowsAbout": [
+            "Aesthetic Medicine",
+            "Cosmetology",
+            "Botulinum Toxin",
+            "Dermal Fillers",
+            "Threads",
+            "Polynucleotides",
+            "Chemical Peels",
+            "Laser Dermatology",
+            "Hair Restoration"
+          ]
+        },
+        {
+          "@type": "ProfessionalService",
+          "name": "SKINARIO Professional Community",
+          "description": "Membership platform offering daily clinical quizzes, expert articles, peer case discussions, and video masterclasses for aesthetic and cosmetology practitioners.",
+          "url": "https://skinario.app",
+          "image": "https://skinario.app/skinario-logo.jpg",
+          "areaServed": { "@type": "Country", "name": "India" },
+          "audience": {
+            "@type": "PeopleAudience",
+            "audienceType": "Aesthetic and Cosmetology Doctors"
+          }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
