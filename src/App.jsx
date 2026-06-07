@@ -1242,6 +1242,231 @@ function ViewTracker({ trackingKey, onView, children, style }) {
   return <div ref={ref} style={style}>{children}</div>;
 }
 
+// ═══ INSTAGRAM POST GENERATOR ═══
+// Renders a 1080x1080 Canvas with the content title + branding, lets admin
+// download the image + copy the caption for manual Instagram posting.
+// Single-template design across content types — type shown via badge color/label.
+const IGPostGenerator = ({ item, type, onClose }) => {
+  const canvasRef = useRef(null);
+  const [imageDataUrl, setImageDataUrl] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  // Per-type metadata: label, color, emoji, hashtags
+  const typeMeta = {
+    article: { label: "ARTICLE", icon: "📰", color: "#4a1f3d", tags: ["#article", "#clinicalreading"] },
+    quiz:    { label: "DAILY QUIZ", icon: "🧠", color: "#0d6b6e", tags: ["#dailyquiz", "#clinicaltest"] },
+    case:    { label: "CLINICAL CASE", icon: "🔬", color: "#a08030", tags: ["#clinicalcase", "#peerlearning"] },
+    video:   { label: "VIDEO", icon: "🎥", color: "#7a3e9a", tags: ["#videomasterclass", "#cme"] },
+    news:    { label: "NEWS", icon: "📡", color: "#c0392b", tags: ["#aestheticnews", "#industry"] },
+  };
+  const meta = typeMeta[type] || typeMeta.article;
+
+  // Auto-generated caption — admin can edit before posting
+  const captionLines = [
+    `${meta.icon} ${meta.label} on SKINARIO`,
+    "",
+    item.title || item.question || "",
+    "",
+    item.author || item.submitterName ? `By ${item.author || item.submitterName}` : "",
+    "",
+    "Daily clinical learning for aesthetic & cosmetology doctors in India.",
+    "",
+    "Read more at skinario.app",
+    "",
+    "#aestheticmedicine #cosmetology #indiandoctors #medicaleducation " + meta.tags.join(" "),
+  ].filter(l => l !== null).join("\n");
+
+  const [caption, setCaption] = useState(captionLines);
+
+  // Draw the post image on Canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const SIZE = 1080;
+    canvas.width = SIZE;
+    canvas.height = SIZE;
+
+    // Background: cream gradient
+    const bgGrad = ctx.createLinearGradient(0, 0, SIZE, SIZE);
+    bgGrad.addColorStop(0, "#faf3e7");
+    bgGrad.addColorStop(0.5, "#f5ede2");
+    bgGrad.addColorStop(1, "#faecda");
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, SIZE, SIZE);
+
+    // Decorative gold arc (top-right corner)
+    ctx.strokeStyle = "rgba(200, 168, 78, 0.25)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(SIZE + 100, -100, 500, Math.PI * 0.5, Math.PI * 1.0);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(SIZE + 100, -100, 440, Math.PI * 0.5, Math.PI * 1.0);
+    ctx.stroke();
+
+    // Subtle dots (bottom-left) — molecular pattern reference
+    ctx.fillStyle = "rgba(200, 168, 78, 0.35)";
+    [[80, 880], [150, 940], [60, 960], [180, 860], [120, 920]].forEach(([x, y]) => {
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Type badge — top-left
+    ctx.fillStyle = meta.color;
+    const badgeText = `${meta.icon}  ${meta.label}`;
+    ctx.font = "700 28px 'Helvetica Neue', Arial, sans-serif";
+    const badgeWidth = ctx.measureText(badgeText).width + 56;
+    // Rounded rect for badge
+    const drawRoundRect = (x, y, w, h, r) => {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    };
+    drawRoundRect(80, 80, badgeWidth, 56, 28);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.textBaseline = "middle";
+    ctx.fillText(badgeText, 108, 80 + 28);
+
+    // Title — wrapped, dark burgundy, serif
+    ctx.fillStyle = "#4a1f3d";
+    ctx.font = "700 64px Georgia, serif";
+    ctx.textBaseline = "top";
+    const titleText = item.title || item.question || "Untitled";
+    const maxWidth = SIZE - 160;
+    const lineHeight = 80;
+    const words = titleText.split(" ");
+    const lines = [];
+    let current = "";
+    for (const word of words) {
+      const test = current ? current + " " + word : word;
+      if (ctx.measureText(test).width > maxWidth) {
+        if (current) lines.push(current);
+        current = word;
+      } else {
+        current = test;
+      }
+    }
+    if (current) lines.push(current);
+    // Center title vertically in the available space
+    const titleStartY = 260;
+    lines.slice(0, 7).forEach((line, i) => {
+      ctx.fillText(line, 80, titleStartY + i * lineHeight);
+    });
+
+    // Author/date line — gold accent
+    if (item.author || item.submitterName || item.date) {
+      ctx.fillStyle = "#a08030";
+      ctx.font = "italic 28px Georgia, serif";
+      const authorBits = [];
+      if (item.author || item.submitterName) authorBits.push("By " + (item.author || item.submitterName));
+      if (item.date) {
+        try {
+          authorBits.push(new Date(item.date + "T12:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }));
+        } catch {}
+      }
+      const authorY = titleStartY + Math.min(lines.length, 7) * lineHeight + 24;
+      ctx.fillText(authorBits.join(" · "), 80, authorY);
+    }
+
+    // Bottom band — SKINARIO branding
+    const bandY = SIZE - 140;
+    ctx.fillStyle = "#4a1f3d";
+    ctx.fillRect(0, bandY, SIZE, 140);
+    // Wordmark
+    ctx.fillStyle = "#faf3e7";
+    ctx.font = "300 56px Georgia, serif";
+    ctx.textBaseline = "middle";
+    ctx.fillText("S K I N A R I O", 80, bandY + 50);
+    // Tagline
+    ctx.fillStyle = "#c8a84e";
+    ctx.font = "700 18px 'Helvetica Neue', Arial, sans-serif";
+    ctx.fillText("LEARN · DISCUSS · LEAD THE FIELD", 80, bandY + 100);
+    // URL — right side
+    ctx.fillStyle = "#c8a84e";
+    ctx.font = "600 28px 'Helvetica Neue', Arial, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("skinario.app", SIZE - 80, bandY + 70);
+    ctx.textAlign = "left";
+
+    // Export as data URL
+    setImageDataUrl(canvas.toDataURL("image/png"));
+  }, [item, type]);
+
+  const handleDownload = () => {
+    if (!imageDataUrl) return;
+    const a = document.createElement("a");
+    const filename = `skinario_${type}_${(item.title || "post").slice(0, 30).replace(/[^a-z0-9]+/gi, "_").toLowerCase()}.png`;
+    a.href = imageDataUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleCopyCaption = async () => {
+    try {
+      await navigator.clipboard.writeText(caption);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for browsers without clipboard API
+      const ta = document.createElement("textarea");
+      ta.value = caption;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
+      document.body.removeChild(ta);
+    }
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
+      <div style={{ background: "#fff", borderRadius: 14, maxWidth: 920, width: "100%", maxHeight: "92vh", overflow: "auto", padding: 24 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, borderBottom: "1px solid #e8e6e0", paddingBottom: 12 }}>
+          <h3 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>📸 Instagram post</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: "1.4rem", cursor: "pointer", color: "#999" }}>✕</button>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }} className="ig-grid">
+          {/* Left: image preview */}
+          <div>
+            <div style={{ fontSize: ".7rem", color: "#999", marginBottom: 6, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>Preview (1080 × 1080)</div>
+            <div style={{ background: "#f4f1ea", borderRadius: 10, overflow: "hidden", aspectRatio: "1 / 1" }}>
+              <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
+            </div>
+            <button onClick={handleDownload} disabled={!imageDataUrl} style={{ width: "100%", marginTop: 10, padding: "12px 18px", background: "#0d6b6e", color: "#fff", border: "none", borderRadius: 999, fontSize: ".88rem", fontWeight: 600, cursor: "pointer" }}>⬇️  Download image</button>
+          </div>
+
+          {/* Right: caption */}
+          <div>
+            <div style={{ fontSize: ".7rem", color: "#999", marginBottom: 6, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>Caption (editable)</div>
+            <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={14} style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #e8e6e0", fontSize: ".82rem", fontFamily: "inherit", lineHeight: 1.5, resize: "vertical", boxSizing: "border-box" }} />
+            <button onClick={handleCopyCaption} disabled={!caption} style={{ width: "100%", marginTop: 10, padding: "12px 18px", background: copied ? "#1a7d42" : "#4a1f3d", color: "#fff", border: "none", borderRadius: 999, fontSize: ".88rem", fontWeight: 600, cursor: "pointer", transition: "background .15s" }}>{copied ? "✓ Copied!" : "📋 Copy caption"}</button>
+
+            {/* Steps */}
+            <div style={{ marginTop: 14, padding: "10px 12px", background: "#fdf6e3", borderLeft: "3px solid #c8a84e", borderRadius: "0 8px 8px 0", fontSize: ".74rem", lineHeight: 1.6, color: "#555" }}>
+              <b>How to post:</b><br/>
+              1. Click <b>Download image</b><br/>
+              2. Click <b>Copy caption</b><br/>
+              3. Open Instagram → New post → upload the image<br/>
+              4. Paste the caption → Publish
+            </div>
+          </div>
+        </div>
+
+        <style>{`@media(max-width:680px){.ig-grid{grid-template-columns:1fr !important}}`}</style>
+      </div>
+    </div>
+  );
+};
+
 export default function App(){
   const[au,setAu]=useState(null);const[prof,setProf]=useState(null);const[scr,setScr]=useState("loading");const[pg,setPg]=useState("home");
   const[publicQuiz,setPublicQuiz]=useState(null);
@@ -1299,6 +1524,7 @@ export default function App(){
   const[vrImage,setVrImage]=useState(""); // vendor reward proposal: uploaded image URL
   const[vrUploading,setVrUploading]=useState(false);
   const[myLedger,setMyLedger]=useState([]); // current user's points-earning history
+  const[igPost,setIgPost]=useState(null); // {item, type} when admin opens IG post generator
   const[profileLedger,setProfileLedger]=useState([]); // viewed user's ledger (admin only)
   const[rankMonth,setRankMonth]=useState(todayIST_YMD().slice(0,7)); // selected month for monthly leaderboard
   const[roleApplications,setRoleApplications]=useState([]);
@@ -5866,16 +6092,16 @@ export default function App(){
         </>}
         {aTab==="quiz"&&<div style={T.card}>{edForm?.type==="quizzes"?<AdminForm type="Quiz sponsor" edForm={edForm} setEdForm={setEdForm} fields={[["sponsored","Mark as sponsored quiz","check"],["sponsor","Sponsor name (e.g. 'Sun Pharma')"],["sponsorLogo","Sponsor logo","image"],["sponsorUrl","Sponsor URL (optional — makes name clickable)"]]} onSave={()=>saveContent("quizzes")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{quizzes.length} questions</span><button onClick={genQuiz} style={T.btn}>🤖 Generate today</button></div>
-          {quizzes.map(q=><div key={q.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border,gap:10}}><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,fontSize:".88rem"}}>{q.cat} — {q.diff} {q.sponsored&&<span style={{...T.tag(T.goldBg,T.goldD),marginLeft:6}}>📢 {q.sponsor||"Sponsored"}</span>}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(q.date)} · {Object.keys(q.answers||{}).length} answers · ❤️ {q.likes||0}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>{setSelD(q.date);go("quiz")}} style={{...T.btnO,...T.btnSm}}>View</button><button onClick={()=>setEdForm({type:"quizzes",data:{...q},editing:true})} style={{...T.btnO,...T.btnSm}}>📢 Sponsor</button><button onClick={()=>deleteContent("quizzes",q.id,q.cat)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
+          {quizzes.map(q=><div key={q.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border,gap:10}}><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,fontSize:".88rem"}}>{q.cat} — {q.diff} {q.sponsored&&<span style={{...T.tag(T.goldBg,T.goldD),marginLeft:6}}>📢 {q.sponsor||"Sponsored"}</span>}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(q.date)} · {Object.keys(q.answers||{}).length} answers · ❤️ {q.likes||0}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>{setSelD(q.date);go("quiz")}} style={{...T.btnO,...T.btnSm}}>View</button><button onClick={()=>setIgPost({item:q,type:"quiz"})} style={{...T.btnO,...T.btnSm}} title="Generate Instagram post">📸 IG</button><button onClick={()=>setEdForm({type:"quizzes",data:{...q},editing:true})} style={{...T.btnO,...T.btnSm}}>📢 Sponsor</button><button onClick={()=>deleteContent("quizzes",q.id,q.cat)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
         {aTab==="articles"&&<div style={T.card}>{edForm?.type==="articles"?<AdminForm type="Article" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["subtitle","Subtitle / Tagline (italic, shown below title — optional)"],["cat","Category","select"],["author","Author name (e.g. 'Dr. Dhananjay Patil, MD')"],["authorPhoto","Author profile photo","image"],["authorAffiliation","Author affiliation (e.g. 'Absolute Institute of Aesthetic Medicine, Pune')"],["date","Publication date","date"],["cover","Cover image","image"],["abstract","Abstract / Summary (italic boxed quote — optional)","textarea"],["body","Article body","markdown"],["refs","References (optional)","textarea"],["authorBio","Author bio (shown at end of article — optional)","textarea"],["sponsored","Sponsored content (paid editorial)","check"],["sponsor","Sponsored by — brand name (e.g. 'Sun Pharma') — only if Sponsored is checked"],["sponsorLogo","Sponsor logo","image"],["sponsorUrl","Sponsor website URL (optional — makes sponsor name clickable)"],["feat","Featured","check"]]} onSave={()=>saveContent("articles")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{articles.length}</span><button onClick={()=>setEdForm({type:"articles",data:{date:today,author:uName,cat:TOPICS[0]},editing:false})} style={T.btn}>+ New</button></div>
-          {articles.map(a=><div key={a.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div style={{display:"flex",gap:10,alignItems:"center"}}>{a.cover&&<img src={a.cover} style={{width:50,height:36,objectFit:"cover",borderRadius:6}}/>}<div><div style={{fontWeight:500,fontSize:".88rem"}}>{a.title}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(a.date)}</div></div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"articles",data:{...a},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("articles",a.id,a.title)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
+          {articles.map(a=><div key={a.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div style={{display:"flex",gap:10,alignItems:"center"}}>{a.cover&&<img src={a.cover} style={{width:50,height:36,objectFit:"cover",borderRadius:6}}/>}<div><div style={{fontWeight:500,fontSize:".88rem"}}>{a.title}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(a.date)}</div></div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setIgPost({item:a,type:"article"})} style={{...T.btnO,...T.btnSm}} title="Generate Instagram post">📸 IG</button><button onClick={()=>setEdForm({type:"articles",data:{...a},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("articles",a.id,a.title)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
         {aTab==="resources"&&<div style={T.card}>{edForm?.type==="resources"?<AdminForm type="Resource" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["url","Download URL"],["pages","Pages"],["size","Size"],["icon","Emoji (fallback)"],["thumb","Thumbnail image","image"],["free","Free","check"]]} onSave={()=>saveContent("resources")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{resources.length}</span><button onClick={()=>setEdForm({type:"resources",data:{icon:"📄",free:true},editing:false})} style={T.btn}>+ New</button></div>
           {resources.map(r=><div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div style={{display:"flex",gap:10,alignItems:"center"}}>{r.thumb?<img src={r.thumb} style={{width:36,height:36,objectFit:"cover",borderRadius:6}}/>:<span style={{fontSize:"1.4rem"}}>{r.icon||"📄"}</span>}<div><div style={{fontWeight:500,fontSize:".88rem"}}>{r.title||r.t}</div><div style={{fontSize:".72rem",color:T.mute}}>{r.free?"Free":"Premium"}</div></div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"resources",data:{...r},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("resources",r.id,r.title||r.t)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
         {aTab==="videos"&&<div style={T.card}>{edForm?.type==="videos"?<AdminForm type="Video" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["cat","Category","select"],["dur","Duration (e.g. '12:34')"],["desc","Description","textarea"],["embedUrl","YouTube/Vimeo URL (paste any format — share link, watch URL, or embed URL)"],["icon","Emoji thumbnail"],["free","Free","check"]]} onSave={()=>saveContent("videos")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{videos.length}</span><button onClick={()=>setEdForm({type:"videos",data:{icon:"🎥",free:true,cat:TOPICS[0]},editing:false})} style={T.btn}>+ New</button></div>
-          {videos.map(v=><div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div><div style={{fontWeight:500,fontSize:".88rem"}}>{v.title||v.t}</div><div style={{fontSize:".72rem",color:T.mute}}>{v.cat} · {v.free?"Free":"Premium"}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"videos",data:{...v},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("videos",v.id,v.title||v.t)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
+          {videos.map(v=><div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div><div style={{fontWeight:500,fontSize:".88rem"}}>{v.title||v.t}</div><div style={{fontSize:".72rem",color:T.mute}}>{v.cat} · {v.free?"Free":"Premium"}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setIgPost({item:v,type:"video"})} style={{...T.btnO,...T.btnSm}} title="Generate Instagram post">📸 IG</button><button onClick={()=>setEdForm({type:"videos",data:{...v},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("videos",v.id,v.title||v.t)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
         {aTab==="events"&&<div style={T.card}>{edForm?.type==="events"?<AdminForm type="Event" edForm={edForm} setEdForm={setEdForm} fields={[["title","Event title"],["cat","Category","select",["Conference","Workshop","Masterclass","Webinar","Product Launch","Course Deadline","Other"]],["date","Start date","date"],["endDate","End date (leave blank for single-day event)","date"],["time","Time (e.g. '10:00 AM - 4:00 PM IST')"],["location","Location (or 'Online')"],["organizer","Organizer / Host"],["banner","Banner image","image"],["body","Description","textarea"],["speakers","Speakers (comma-separated)","textarea"],["sponsor","Sponsored by (e.g. 'Sun Pharma') — leave blank if not sponsored"],["sponsorLogo","Sponsor logo image","image"],["regType","Registration type","select",["internal","external"]],["regUrl","External registration URL (if regType is external)"],["regCta","CTA button text (e.g. 'Buy ticket', 'Register on Eventbrite')"]]} onSave={()=>saveContent("events")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{events.length} events</span><button onClick={()=>setEdForm({type:"events",data:{cat:"Conference",regType:"internal"},editing:false})} style={T.btn}>+ New event</button></div>
           {events.length===0&&<p style={{color:T.mute,fontSize:".85rem",padding:"12px 0"}}>No events yet. Click "+ New event" to add your first event.</p>}
@@ -5937,6 +6163,7 @@ export default function App(){
               </div>
             </div>
             <div style={{display:"flex",gap:4}}>
+              <button onClick={()=>setIgPost({item:cs,type:"case"})} style={{...T.btnO,...T.btnSm}} title="Generate Instagram post">📸 IG</button>
               <button onClick={()=>setEdForm({type:"cases",data:{...cs},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button>
               <button onClick={()=>deleteContent("cases",cs.id,cs.title)} style={T.btnDanger}>Del</button>
             </div>
@@ -6014,7 +6241,10 @@ export default function App(){
               {n.cat&&<span style={T.tag(T.tealBg,T.teal)}>{n.cat}</span>}
               <div style={{fontSize:".7rem",color:T.mute,marginTop:4}}>{fD(n.date)} · by {n.author||"admin"}{(n.views||0)>0?` · 👁️ ${n.views} clicks`:""}</div>
             </div>
-            <button onClick={async()=>{if(confirm("Delete this news item?")){await fbDel("news",n.id);loadData();sh("Deleted")}}} style={{...T.btnDanger,...T.btnSm}}>Delete</button>
+            <div style={{display:"flex",gap:4,flexShrink:0}}>
+              <button onClick={()=>setIgPost({item:n,type:"news"})} style={{...T.btnO,...T.btnSm}} title="Generate Instagram post">📸 IG</button>
+              <button onClick={async()=>{if(confirm("Delete this news item?")){await fbDel("news",n.id);loadData();sh("Deleted")}}} style={{...T.btnDanger,...T.btnSm}}>Delete</button>
+            </div>
           </div>)}
         </div>}
 
@@ -6594,5 +6824,6 @@ export default function App(){
 
       </div>
       {toast&&<div style={{position:"fixed",bottom:22,left:"50%",transform:"translateX(-50%)",padding:"11px 28px",background:T.teal,color:"#fff",borderRadius:12,fontSize:".9rem",zIndex:1000,boxShadow:"0 4px 20px rgba(13,107,110,.25)"}}>{toast}</div>}
+      {igPost&&<IGPostGenerator item={igPost.item} type={igPost.type} onClose={()=>setIgPost(null)}/>}
     </div>);
 }
