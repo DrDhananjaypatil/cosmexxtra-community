@@ -4742,6 +4742,33 @@ export default function App(){
         // If profile is private and viewer isn't owner or admin, show locked state
         const canSee=isMe||isAdmin||!isPrivate;
         const acc2=u.totalAnswered?Math.round(u.totalCorrect/u.totalAnswered*100):0;
+        // ═══ SUSPICION SIGNALS (admin-only) ═══
+        // Multiple rules; user is "suspicious" if ANY hit. Each rule contributes a reason
+        // string so admin sees WHY. Tunable thresholds based on the same-day quiz rule.
+        const suspicionReasons=(()=>{
+          if(!isAdmin||isMe)return[]; // admin-only, never on own profile
+          const reasons=[];
+          const total=u.totalAnswered||0;
+          const pts=u.points||0;
+          // Rule 1: back-answer farming (lots of quizzes, almost no points)
+          if(total>=5&&pts/total<3){
+            reasons.push(`Low points-per-quiz ratio (${pts} pts / ${total} answers = ${(pts/total).toFixed(1)} per quiz). Suggests back-answering old quizzes.`);
+          }
+          // Rule 2: implausibly perfect accuracy on 8+ quizzes
+          if(total>=8&&acc2===100){
+            reasons.push(`100% accuracy across ${total} quizzes. Statistically unlikely without pattern-exploitation or back-answering with hindsight.`);
+          }
+          // Rule 3: new account with heavy activity
+          try{
+            const joinedDate=new Date(u.joined+"T00:00:00");
+            const ageHours=(Date.now()-joinedDate.getTime())/(1000*60*60);
+            if(ageHours<48&&total>=6){
+              reasons.push(`Joined ${Math.round(ageHours)}h ago but already answered ${total} quizzes. Only one quiz published per day — this implies heavy back-answering.`);
+            }
+          }catch{}
+          return reasons;
+        })();
+        const isSuspicious=suspicionReasons.length>0;
 
         return(<div style={{maxWidth:780}}>
           <button onClick={()=>{setSelU(null);setPg(profileReturnPg||"home")}} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back</button>
@@ -4759,6 +4786,7 @@ export default function App(){
                     {u.role&&ROLE_DISPLAY[u.role]&&<span style={{padding:"3px 9px",borderRadius:12,fontSize:".7rem",fontWeight:700,letterSpacing:.5,background:ROLE_DISPLAY[u.role].bg,color:ROLE_DISPLAY[u.role].fg}}>{ROLE_DISPLAY[u.role].icon} {ROLE_DISPLAY[u.role].label}</span>}
                     {u.verified&&<span title="Verified by SKINARIO admin" style={{fontSize:"1.1rem",color:"#1d9bf0"}}>✓</span>}
                     {u.regFlagged&&isAdmin&&<span style={T.tag(T.errBg,T.err)} title={u.regFlagReason}>🚩 Flagged</span>}
+                    {isSuspicious&&<span style={T.tag(T.errBg,T.err)} title="Pattern matches gaming behavior — see details below">⚠️ Suspicious activity</span>}
                     {acc&&<span style={T.tag(T.tealBg,T.teal)}>{acc.icon} {acc.label}</span>}
                   </div>
                   {u.degree&&<div style={{fontSize:".88rem",color:T.txt2,fontStyle:"italic"}}>{u.degree}</div>}
@@ -4849,6 +4877,18 @@ export default function App(){
                   <div style={{fontSize:"1.4rem",fontWeight:700,color:T.gold}}>🔥{u.streak||0}</div>
                   <div style={{fontSize:".62rem",color:T.mute,textTransform:"uppercase",letterSpacing:1}}>Streak</div>
                 </div>
+              </div>
+            </div>}
+
+            {/* Suspicion details — admin-only, only when signals fire */}
+            {isSuspicious&&<div style={{...T.card,marginBottom:14,background:T.errBg,borderLeft:"3px solid "+T.err}}>
+              <h4 style={{fontSize:".88rem",fontWeight:700,marginBottom:8,color:T.err}}>⚠️ Suspicious Activity Detected</h4>
+              <p style={{fontSize:".78rem",color:T.txt2,lineHeight:1.55,marginBottom:10}}>This user's profile matches one or more gaming patterns. Review the signals below and decide on any action (warn, contact, or use manual points adjustment). Not all flagged users are bad actors — review context first.</p>
+              <ul style={{paddingLeft:18,margin:0,fontSize:".82rem",color:T.txt,lineHeight:1.6}}>
+                {suspicionReasons.map((r,i)=><li key={i} style={{marginBottom:6}}>{r}</li>)}
+              </ul>
+              <div style={{fontSize:".7rem",color:T.mute,marginTop:10,paddingTop:10,borderTop:"1px solid "+T.border}}>
+                💡 Only visible to admins. The user does not see this flag.
               </div>
             </div>}
 
