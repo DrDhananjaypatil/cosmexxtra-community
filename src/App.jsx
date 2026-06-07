@@ -1246,12 +1246,22 @@ function ViewTracker({ trackingKey, onView, children, style }) {
 // Renders a 1080x1080 Canvas with the content title + branding, lets admin
 // download the image + copy the caption for manual Instagram posting.
 // Single-template design across content types — type shown via badge color/label.
-const IGPostGenerator = ({ item, type, onClose }) => {
+// ═══ INSTAGRAM POST GENERATOR ═══
+// Magazine-cover layout: full-bleed background image with text overlay.
+// Image sources:
+//   - Articles: item.cover
+//   - Cases: item.images[0]
+//   - Videos: YouTube thumbnail (auto-extracted from embed URL)
+//   - News: item.image / item.urlToImage
+//   - Quizzes: call /api/quiz-image to AI-generate, then cache on the quiz doc
+const IGPostGenerator = ({ item, type, onClose, onQuizImageCached }) => {
   const canvasRef = useRef(null);
   const [imageDataUrl, setImageDataUrl] = useState("");
   const [copied, setCopied] = useState(false);
+  const [bgImageUrl, setBgImageUrl] = useState(null);
+  const [loadingImage, setLoadingImage] = useState(false);
+  const [imageError, setImageError] = useState("");
 
-  // Per-type metadata: label, color, emoji, hashtags
   const typeMeta = {
     article: { label: "ARTICLE", icon: "📰", color: "#4a1f3d", tags: ["#article", "#clinicalreading"] },
     quiz:    { label: "DAILY QUIZ", icon: "🧠", color: "#0d6b6e", tags: ["#dailyquiz", "#clinicaltest"] },
@@ -1261,7 +1271,54 @@ const IGPostGenerator = ({ item, type, onClose }) => {
   };
   const meta = typeMeta[type] || typeMeta.article;
 
-  // Auto-generated caption — admin can edit before posting
+  // Extract YouTube video ID for thumbnail
+  const youtubeThumb = (url) => {
+    if (!url) return null;
+    const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    return m ? `https://img.youtube.com/vi/${m[1]}/maxresdefault.jpg` : null;
+  };
+
+  // Resolve image source based on content type
+  useEffect(() => {
+    setImageError("");
+    setBgImageUrl(null);
+    if (type === "article" && item.cover) {
+      setBgImageUrl(item.cover);
+    } else if (type === "case" && item.images?.[0]) {
+      setBgImageUrl(item.images[0]);
+    } else if (type === "video") {
+      const yt = youtubeThumb(item.embedUrl);
+      if (yt) setBgImageUrl(yt);
+    } else if (type === "news" && (item.image || item.urlToImage)) {
+      setBgImageUrl(item.image || item.urlToImage);
+    } else if (type === "quiz") {
+      // Quizzes have no inherent image. We could generate one with AI ($0.04/quiz)
+      // but at the current scale that's premature optimization. Fall back to the
+      // branded gradient design — the text-on-cream layout still looks editorial.
+      // To enable AI generation later: uncomment the fetch block and ensure
+      // /api/quiz-image is deployed.
+      //
+      // if (item.igImageUrl) {
+      //   setBgImageUrl(item.igImageUrl);
+      // } else {
+      //   setLoadingImage(true);
+      //   fetch("/api/quiz-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic: item.cat, difficulty: item.diff }) })
+      //     .then(r => r.json())
+      //     .then(data => {
+      //       if (data.ok && data.imageBase64) {
+      //         const url = "data:image/png;base64," + data.imageBase64;
+      //         setBgImageUrl(url);
+      //         if (onQuizImageCached) onQuizImageCached(item.id, data.imageBase64);
+      //       } else { setImageError(data.error || "Generation failed"); }
+      //       setLoadingImage(false);
+      //     })
+      //     .catch(err => { setImageError(err.message || "Network error"); setLoadingImage(false); });
+      // }
+      setBgImageUrl(null); // use branded fallback
+    }
+  }, [item, type, onQuizImageCached]);
+
+  // Caption (same as before — pre-fills editor)
   const captionLines = [
     `${meta.icon} ${meta.label} on SKINARIO`,
     "",
@@ -1274,11 +1331,10 @@ const IGPostGenerator = ({ item, type, onClose }) => {
     "Read more at skinario.app",
     "",
     "#aestheticmedicine #cosmetology #indiandoctors #medicaleducation " + meta.tags.join(" "),
-  ].filter(l => l !== null).join("\n");
-
+  ].filter((l) => l !== null).join("\n");
   const [caption, setCaption] = useState(captionLines);
 
-  // Draw the post image on Canvas
+  // Draw on canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1287,83 +1343,98 @@ const IGPostGenerator = ({ item, type, onClose }) => {
     canvas.width = SIZE;
     canvas.height = SIZE;
 
-    // Background: cream gradient
-    const bgGrad = ctx.createLinearGradient(0, 0, SIZE, SIZE);
-    bgGrad.addColorStop(0, "#faf3e7");
-    bgGrad.addColorStop(0.5, "#f5ede2");
-    bgGrad.addColorStop(1, "#faecda");
-    ctx.fillStyle = bgGrad;
-    ctx.fillRect(0, 0, SIZE, SIZE);
-
-    // Decorative gold arc (top-right corner)
-    ctx.strokeStyle = "rgba(200, 168, 78, 0.25)";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(SIZE + 100, -100, 500, Math.PI * 0.5, Math.PI * 1.0);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(SIZE + 100, -100, 440, Math.PI * 0.5, Math.PI * 1.0);
-    ctx.stroke();
-
-    // Subtle dots (bottom-left) — molecular pattern reference
-    ctx.fillStyle = "rgba(200, 168, 78, 0.35)";
-    [[80, 880], [150, 940], [60, 960], [180, 860], [120, 920]].forEach(([x, y]) => {
-      ctx.beginPath();
-      ctx.arc(x, y, 4, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // Type badge — top-left
-    ctx.fillStyle = meta.color;
-    const badgeText = `${meta.icon}  ${meta.label}`;
-    ctx.font = "700 28px 'Helvetica Neue', Arial, sans-serif";
-    const badgeWidth = ctx.measureText(badgeText).width + 56;
-    // Rounded rect for badge
-    const drawRoundRect = (x, y, w, h, r) => {
-      ctx.beginPath();
-      ctx.moveTo(x + r, y);
-      ctx.arcTo(x + w, y, x + w, y + h, r);
-      ctx.arcTo(x + w, y + h, x, y + h, r);
-      ctx.arcTo(x, y + h, x, y, r);
-      ctx.arcTo(x, y, x + w, y, r);
-      ctx.closePath();
-    };
-    drawRoundRect(80, 80, badgeWidth, 56, 28);
-    ctx.fill();
-    ctx.fillStyle = "#fff";
-    ctx.textBaseline = "middle";
-    ctx.fillText(badgeText, 108, 80 + 28);
-
-    // Title — wrapped, dark burgundy, serif
-    ctx.fillStyle = "#4a1f3d";
-    ctx.font = "700 64px Georgia, serif";
-    ctx.textBaseline = "top";
-    const titleText = item.title || item.question || "Untitled";
-    const maxWidth = SIZE - 160;
-    const lineHeight = 80;
-    const words = titleText.split(" ");
-    const lines = [];
-    let current = "";
-    for (const word of words) {
-      const test = current ? current + " " + word : word;
-      if (ctx.measureText(test).width > maxWidth) {
-        if (current) lines.push(current);
-        current = word;
+    const drawCanvas = (bgImg) => {
+      // 1. Background — image (cropped center-cover) or branded gradient fallback
+      if (bgImg) {
+        // Cover-fit the image
+        const imgAspect = bgImg.width / bgImg.height;
+        let sw, sh, sx, sy;
+        if (imgAspect > 1) {
+          // Wider than tall — crop sides
+          sh = bgImg.height;
+          sw = bgImg.height;
+          sx = (bgImg.width - sw) / 2;
+          sy = 0;
+        } else {
+          // Taller than wide — crop top/bottom
+          sw = bgImg.width;
+          sh = bgImg.width;
+          sx = 0;
+          sy = (bgImg.height - sh) / 2;
+        }
+        ctx.drawImage(bgImg, sx, sy, sw, sh, 0, 0, SIZE, SIZE);
       } else {
-        current = test;
+        // Fallback: branded gradient
+        const bgGrad = ctx.createLinearGradient(0, 0, SIZE, SIZE);
+        bgGrad.addColorStop(0, "#faf3e7");
+        bgGrad.addColorStop(0.5, "#f5ede2");
+        bgGrad.addColorStop(1, "#faecda");
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, SIZE, SIZE);
       }
-    }
-    if (current) lines.push(current);
-    // Center title vertically in the available space
-    const titleStartY = 260;
-    lines.slice(0, 7).forEach((line, i) => {
-      ctx.fillText(line, 80, titleStartY + i * lineHeight);
-    });
 
-    // Author/date line — gold accent
-    if (item.author || item.submitterName || item.date) {
-      ctx.fillStyle = "#a08030";
-      ctx.font = "italic 28px Georgia, serif";
+      // 2. Dark gradient overlay (bottom-heavy) for text readability
+      const overlay = ctx.createLinearGradient(0, 0, 0, SIZE);
+      overlay.addColorStop(0, "rgba(74, 31, 61, 0.15)");
+      overlay.addColorStop(0.45, "rgba(74, 31, 61, 0.35)");
+      overlay.addColorStop(1, "rgba(74, 31, 61, 0.92)");
+      ctx.fillStyle = overlay;
+      ctx.fillRect(0, 0, SIZE, SIZE);
+
+      // 3. Type badge — top-left
+      const drawRoundRect = (x, y, w, h, r) => {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+      };
+      ctx.fillStyle = meta.color;
+      ctx.font = "700 28px 'Helvetica Neue', Arial, sans-serif";
+      const badgeText = `${meta.icon}  ${meta.label}`;
+      const badgeWidth = ctx.measureText(badgeText).width + 56;
+      drawRoundRect(60, 60, badgeWidth, 56, 28);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.textBaseline = "middle";
+      ctx.fillText(badgeText, 88, 60 + 28);
+
+      // 4. Title — wrapped, white, large serif, anchored from bottom
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "700 64px Georgia, serif";
+      ctx.textBaseline = "top";
+      const titleText = item.title || item.question || "Untitled";
+      const maxWidth = SIZE - 120;
+      const lineHeight = 78;
+      const words = titleText.split(" ");
+      const lines = [];
+      let current = "";
+      for (const word of words) {
+        const test = current ? current + " " + word : word;
+        if (ctx.measureText(test).width > maxWidth) {
+          if (current) lines.push(current);
+          current = word;
+        } else {
+          current = test;
+        }
+      }
+      if (current) lines.push(current);
+      const cappedLines = lines.slice(0, 6);
+      // Place title so its last line sits ~250px from bottom (above the brand band)
+      const titleTotalH = cappedLines.length * lineHeight;
+      const titleStartY = SIZE - 260 - titleTotalH;
+      cappedLines.forEach((line, i) => {
+        // Add subtle shadow for readability against busy backgrounds
+        ctx.shadowColor = "rgba(0,0,0,0.4)";
+        ctx.shadowBlur = 8;
+        ctx.fillText(line, 60, titleStartY + i * lineHeight);
+      });
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+
+      // 5. Author/date line — gold, italic
       const authorBits = [];
       if (item.author || item.submitterName) authorBits.push("By " + (item.author || item.submitterName));
       if (item.date) {
@@ -1371,38 +1442,57 @@ const IGPostGenerator = ({ item, type, onClose }) => {
           authorBits.push(new Date(item.date + "T12:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }));
         } catch {}
       }
-      const authorY = titleStartY + Math.min(lines.length, 7) * lineHeight + 24;
-      ctx.fillText(authorBits.join(" · "), 80, authorY);
+      if (authorBits.length) {
+        ctx.fillStyle = "#c8a84e";
+        ctx.font = "italic 26px Georgia, serif";
+        ctx.fillText(authorBits.join(" · "), 60, SIZE - 240);
+      }
+
+      // 6. Bottom brand band
+      const bandY = SIZE - 140;
+      ctx.fillStyle = "#4a1f3d";
+      ctx.fillRect(0, bandY, SIZE, 140);
+      ctx.fillStyle = "#faf3e7";
+      ctx.font = "300 52px Georgia, serif";
+      ctx.textBaseline = "middle";
+      ctx.fillText("S K I N A R I O", 60, bandY + 48);
+      ctx.fillStyle = "#c8a84e";
+      ctx.font = "700 16px 'Helvetica Neue', Arial, sans-serif";
+      ctx.fillText("LEARN · DISCUSS · LEAD THE FIELD", 60, bandY + 98);
+      ctx.fillStyle = "#c8a84e";
+      ctx.font = "600 28px 'Helvetica Neue', Arial, sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText("skinario.app", SIZE - 60, bandY + 70);
+      ctx.textAlign = "left";
+
+      // Export
+      try {
+        setImageDataUrl(canvas.toDataURL("image/png"));
+      } catch (err) {
+        // CORS tainted — happens if image came from a non-CORS source
+        console.error("Canvas export failed (CORS):", err);
+        setImageError("Image source blocks download. Try a different image or use the AI generator.");
+      }
+    };
+
+    if (bgImageUrl) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => drawCanvas(img);
+      img.onerror = () => {
+        console.warn("Background image failed to load, using fallback");
+        drawCanvas(null);
+      };
+      img.src = bgImageUrl;
+    } else {
+      drawCanvas(null);
     }
-
-    // Bottom band — SKINARIO branding
-    const bandY = SIZE - 140;
-    ctx.fillStyle = "#4a1f3d";
-    ctx.fillRect(0, bandY, SIZE, 140);
-    // Wordmark
-    ctx.fillStyle = "#faf3e7";
-    ctx.font = "300 56px Georgia, serif";
-    ctx.textBaseline = "middle";
-    ctx.fillText("S K I N A R I O", 80, bandY + 50);
-    // Tagline
-    ctx.fillStyle = "#c8a84e";
-    ctx.font = "700 18px 'Helvetica Neue', Arial, sans-serif";
-    ctx.fillText("LEARN · DISCUSS · LEAD THE FIELD", 80, bandY + 100);
-    // URL — right side
-    ctx.fillStyle = "#c8a84e";
-    ctx.font = "600 28px 'Helvetica Neue', Arial, sans-serif";
-    ctx.textAlign = "right";
-    ctx.fillText("skinario.app", SIZE - 80, bandY + 70);
-    ctx.textAlign = "left";
-
-    // Export as data URL
-    setImageDataUrl(canvas.toDataURL("image/png"));
-  }, [item, type]);
+  }, [item, type, bgImageUrl]);
 
   const handleDownload = () => {
     if (!imageDataUrl) return;
     const a = document.createElement("a");
-    const filename = `skinario_${type}_${(item.title || "post").slice(0, 30).replace(/[^a-z0-9]+/gi, "_").toLowerCase()}.png`;
+    const filename = `skinario_${type}_${(item.title || item.question || "post").slice(0, 30).replace(/[^a-z0-9]+/gi, "_").toLowerCase()}.png`;
     a.href = imageDataUrl;
     a.download = filename;
     document.body.appendChild(a);
@@ -1416,7 +1506,6 @@ const IGPostGenerator = ({ item, type, onClose }) => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Fallback for browsers without clipboard API
       const ta = document.createElement("textarea");
       ta.value = caption;
       document.body.appendChild(ta);
@@ -1428,29 +1517,39 @@ const IGPostGenerator = ({ item, type, onClose }) => {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 14, maxWidth: 920, width: "100%", maxHeight: "92vh", overflow: "auto", padding: 24 }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: "#fff", borderRadius: 14, maxWidth: 920, width: "100%", maxHeight: "92vh", overflow: "auto", padding: 24 }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, borderBottom: "1px solid #e8e6e0", paddingBottom: 12 }}>
           <h3 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>📸 Instagram post</h3>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: "1.4rem", cursor: "pointer", color: "#999" }}>✕</button>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }} className="ig-grid">
-          {/* Left: image preview */}
           <div>
-            <div style={{ fontSize: ".7rem", color: "#999", marginBottom: 6, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>Preview (1080 × 1080)</div>
-            <div style={{ background: "#f4f1ea", borderRadius: 10, overflow: "hidden", aspectRatio: "1 / 1" }}>
-              <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
+            <div style={{ fontSize: ".7rem", color: "#999", marginBottom: 6, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>
+              Preview (1080 × 1080)
+              {loadingImage && <span style={{ marginLeft: 8, color: "#0d6b6e" }}>⏳ Generating image...</span>}
             </div>
-            <button onClick={handleDownload} disabled={!imageDataUrl} style={{ width: "100%", marginTop: 10, padding: "12px 18px", background: "#0d6b6e", color: "#fff", border: "none", borderRadius: 999, fontSize: ".88rem", fontWeight: 600, cursor: "pointer" }}>⬇️  Download image</button>
+            <div style={{ background: "#f4f1ea", borderRadius: 10, overflow: "hidden", aspectRatio: "1 / 1", position: "relative" }}>
+              <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
+              {loadingImage && (
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.85)", fontSize: ".88rem", color: "#0d6b6e", fontWeight: 600 }}>
+                  ⏳ Generating AI image...
+                </div>
+              )}
+            </div>
+            {imageError && (
+              <div style={{ marginTop: 8, padding: "8px 12px", background: "#fde8e8", borderLeft: "3px solid #c0392b", borderRadius: "0 6px 6px 0", fontSize: ".74rem", color: "#c0392b", lineHeight: 1.5 }}>
+                ⚠️ {imageError}
+              </div>
+            )}
+            <button onClick={handleDownload} disabled={!imageDataUrl || loadingImage} style={{ width: "100%", marginTop: 10, padding: "12px 18px", background: loadingImage ? "#ccc" : "#0d6b6e", color: "#fff", border: "none", borderRadius: 999, fontSize: ".88rem", fontWeight: 600, cursor: loadingImage ? "wait" : "pointer" }}>⬇️ Download image</button>
           </div>
 
-          {/* Right: caption */}
           <div>
             <div style={{ fontSize: ".7rem", color: "#999", marginBottom: 6, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>Caption (editable)</div>
-            <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={14} style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #e8e6e0", fontSize: ".82rem", fontFamily: "inherit", lineHeight: 1.5, resize: "vertical", boxSizing: "border-box" }} />
+            <textarea value={caption} onChange={(e) => setCaption(e.target.value)} rows={14} style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #e8e6e0", fontSize: ".82rem", fontFamily: "inherit", lineHeight: 1.5, resize: "vertical", boxSizing: "border-box" }} />
             <button onClick={handleCopyCaption} disabled={!caption} style={{ width: "100%", marginTop: 10, padding: "12px 18px", background: copied ? "#1a7d42" : "#4a1f3d", color: "#fff", border: "none", borderRadius: 999, fontSize: ".88rem", fontWeight: 600, cursor: "pointer", transition: "background .15s" }}>{copied ? "✓ Copied!" : "📋 Copy caption"}</button>
 
-            {/* Steps */}
             <div style={{ marginTop: 14, padding: "10px 12px", background: "#fdf6e3", borderLeft: "3px solid #c8a84e", borderRadius: "0 8px 8px 0", fontSize: ".74rem", lineHeight: 1.6, color: "#555" }}>
               <b>How to post:</b><br/>
               1. Click <b>Download image</b><br/>
@@ -6824,6 +6923,22 @@ export default function App(){
 
       </div>
       {toast&&<div style={{position:"fixed",bottom:22,left:"50%",transform:"translateX(-50%)",padding:"11px 28px",background:T.teal,color:"#fff",borderRadius:12,fontSize:".9rem",zIndex:1000,boxShadow:"0 4px 20px rgba(13,107,110,.25)"}}>{toast}</div>}
-      {igPost&&<IGPostGenerator item={igPost.item} type={igPost.type} onClose={()=>setIgPost(null)}/>}
+      {igPost&&<IGPostGenerator item={igPost.item} type={igPost.type} onClose={()=>setIgPost(null)} onQuizImageCached={async(quizId,b64)=>{
+        try{
+          // Convert base64 to Blob, upload to Storage, save URL on quiz doc.
+          // Storing the raw base64 on Firestore would risk hitting the 1MB doc limit.
+          const binary=atob(b64);
+          const len=binary.length;
+          const bytes=new Uint8Array(len);
+          for(let i=0;i<len;i++)bytes[i]=binary.charCodeAt(i);
+          const blob=new Blob([bytes],{type:"image/png"});
+          const path=`quiz-ig-images/${quizId}.png`;
+          const sRef=ref(storage,path);
+          await uploadBytes(sRef,blob);
+          const url=await getDownloadURL(sRef);
+          await fbSet("quizzes",quizId,{igImageUrl:url});
+          setQuizzes(prev=>prev.map(q=>q.id===quizId?{...q,igImageUrl:url}:q));
+        }catch(err){console.error("cache quiz image failed:",err)}
+      }}/>}
     </div>);
 }
