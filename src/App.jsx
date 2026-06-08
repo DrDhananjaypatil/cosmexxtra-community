@@ -1981,16 +1981,43 @@ export default function App(){
   const[consentLanguage,setConsentLanguage]=useState("en");
   // Preview modal state
   const[consentPreview,setConsentPreview]=useState(null); // {vernacularHtml?, englishHtml, procName, langCode}
-  // Pre-fill clinic/doctor info from saved profile fields when entering consent page
+  const[consentHistory,setConsentHistory]=useState([]); // current user's consent generation history (metadata only — no PHI)
+  const[allConsents,setAllConsents]=useState([]); // admin view: ALL consent generations across all users
+  // Load my consent history when entering consent page
+  const loadMyConsentHistory=useCallback(async()=>{
+    if(!au?.uid)return;
+    try{
+      const qy=query(fbCol("consentGenerationLog"),where("uid","==",au.uid),limit(100));
+      const snap=await getDocs(qy);
+      const rows=snap.docs.map(d=>({id:d.id,...d.data()}));
+      rows.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+      setConsentHistory(rows);
+    }catch(err){console.error("consent history load failed:",err)}
+  },[au?.uid]);
+  // Load ALL consents (admin only)
+  const loadAllConsents=useCallback(async()=>{
+    if(!au?.email||!ADMINS.includes(au.email))return;
+    try{
+      // No where filter — admin sees all
+      const qy=query(fbCol("consentGenerationLog"),limit(500));
+      const snap=await getDocs(qy);
+      const rows=snap.docs.map(d=>({id:d.id,...d.data()}));
+      rows.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+      setAllConsents(rows);
+    }catch(err){console.error("all-consents load failed:",err)}
+  },[au?.email]);
+  useEffect(()=>{if(pg==="consent")loadMyConsentHistory()},[pg,loadMyConsentHistory]);
+  useEffect(()=>{if(pg==="admin"&&aTab==="consents")loadAllConsents()},[pg,aTab,loadAllConsents]);
+  // Pre-fill clinic/doctor info from saved profile fields when entering consent page.
+  // Uses BOTH old-style names (clinic, regNumber, name) and consent-specific names
+  // (clinicName, doctorRegNumber, doctorName) — falls back to registration data.
   useEffect(()=>{
     if(pg!=="consent"||!prof)return;
-    if(prof.clinicName&&!consentClinicName)setConsentClinicName(prof.clinicName);
-    if(prof.clinicAddress&&!consentClinicAddress)setConsentClinicAddress(prof.clinicAddress);
-    if(prof.clinicPhone&&!consentClinicPhone)setConsentClinicPhone(prof.clinicPhone);
-    if(prof.doctorName&&!consentDoctorName)setConsentDoctorName(prof.doctorName);
-    else if(prof.name&&!consentDoctorName)setConsentDoctorName(prof.name);
-    if(prof.doctorRegNumber&&!consentDoctorReg)setConsentDoctorReg(prof.doctorRegNumber);
-    else if(prof.regNumber&&!consentDoctorReg)setConsentDoctorReg(prof.regNumber);
+    if(!consentClinicName)setConsentClinicName(prof.clinicName||prof.clinic||"");
+    if(!consentClinicAddress)setConsentClinicAddress(prof.clinicAddress||prof.address||"");
+    if(!consentClinicPhone)setConsentClinicPhone(prof.clinicPhone||prof.mobile||"");
+    if(!consentDoctorName)setConsentDoctorName(prof.doctorName||prof.name||"");
+    if(!consentDoctorReg)setConsentDoctorReg(prof.doctorRegNumber||prof.regNumber||"");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[pg,prof]);
   const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va)},[]);
@@ -3266,6 +3293,8 @@ ${hasConcern ? `<h2>6. ${T_("h_patient_concern")}</h2>
       }
 
       sh("✅ Consent template ready — preview below");
+      // Refresh history list so the new entry shows
+      loadMyConsentHistory();
     } catch (err) {
       console.error("consent generation failed:", err);
       sh("❌ Generation failed: " + (err.message || "unknown error"));
@@ -6767,7 +6796,7 @@ ${hasConcern ? `<h2>6. ${T_("h_patient_concern")}</h2>
         </h3>
         <div style={{position:"sticky",top:0,zIndex:30,background:T.bg,padding:"10px 0",marginBottom:16,marginInline:-12,paddingInline:12,borderBottom:"1px solid "+T.border}}>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["vendors","🏢 Vendors"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null);window.scrollTo({top:0,behavior:"smooth"})}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
+          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["vendors","🏢 Vendors"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["consents","📋 Consents"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null);window.scrollTo({top:0,behavior:"smooth"})}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
           </div>
         </div>
         {aTab==="stats"&&<><div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length],["Events",events.length],["Ads",ads.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>
@@ -7538,6 +7567,43 @@ ${hasConcern ? `<h2>6. ${T_("h_patient_concern")}</h2>
           </div>
         </div>}
 
+        {aTab==="consents"&&<div style={T.card}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:8}}>
+            <div>
+              <h3 style={{fontSize:"1rem",fontWeight:700,margin:0}}>📋 Consent Generation Log</h3>
+              <p style={{color:T.mute,fontSize:".78rem",margin:"3px 0 0 0"}}>{allConsents.length} total generations across all users</p>
+            </div>
+            <button onClick={loadAllConsents} style={{...T.btnO,...T.btnSm}}>🔄 Refresh</button>
+          </div>
+          <div style={{padding:"8px 10px",background:T.tealBg+"33",borderLeft:"3px solid "+T.teal,borderRadius:"0 6px 6px 0",marginBottom:12,fontSize:".74rem",color:T.txt2,lineHeight:1.5}}>
+            🔐 <b>Privacy note:</b> No patient names or clinical details are logged. Each entry records only: procedure type, language, doctor's clinic name, and timestamp.
+          </div>
+          {allConsents.length===0?
+            <div style={{padding:"40px 12px",textAlign:"center",color:T.mute,fontSize:".82rem"}}>No consent generations yet.</div>
+          :
+            <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:600,overflowY:"auto"}}>
+              {allConsents.map(h=>{
+                const ts=h.createdAt?new Date(h.createdAt):null;
+                const tsLabel=ts?ts.toLocaleString("en-IN",{day:"2-digit",month:"short",year:"2-digit",hour:"2-digit",minute:"2-digit",hour12:true}):"";
+                const langLabel=CONSENT_LANGUAGES.find(l=>l.code===h.language)?.label||"English";
+                return(<div key={h.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",background:"#fafafa",borderRadius:6,border:"1px solid "+T.border,fontSize:".82rem",gap:10,flexWrap:"wrap"}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:600,color:T.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h.procedure||"(unknown)"} <span style={{fontWeight:400,color:T.mute,fontSize:".74rem"}}>· {langLabel}</span></div>
+                    <div style={{fontSize:".72rem",color:T.mute,marginTop:2,display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <span>👤 {h.name||"(unnamed)"}</span>
+                      <span>· {h.email||"(no email)"}</span>
+                      {h.clinicName&&<span>· 🏥 {h.clinicName}</span>}
+                      {h.usedCredit&&<span style={{color:T.gold,fontWeight:600}}>· 💳 credit</span>}
+                      {h.isCustomProcedure&&<span>· custom</span>}
+                    </div>
+                  </div>
+                  <div style={{fontSize:".72rem",color:T.mute,whiteSpace:"nowrap"}}>{tsLabel}</div>
+                </div>);
+              })}
+            </div>
+          }
+        </div>}
+
         {aTab==="users"&&<div style={T.card}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
             <p style={{color:T.mute,fontSize:".82rem",margin:0}}>{allUsers.length} users · click to view profile</p>
@@ -7776,6 +7842,41 @@ ${hasConcern ? `<h2>6. ${T_("h_patient_concern")}</h2>
               You'll see a preview before downloading. From the preview you can save as <b>Word (.doc)</b> or <b>PDF</b> (via your browser's print dialog).
               {credits>0&&" Bonus credits will only be used after your daily free generation."}
             </div>
+          </div>
+
+          {/* ═══ MY CONSENT HISTORY ═══
+              Shows metadata only — no patient names, mobiles, or concern text are
+              persisted to Firestore. Doctor uses this for audit/recall purposes
+              ("did I generate one for procedure X recently?"). Patient-specific
+              records should be kept by the clinic itself, not on SKINARIO. */}
+          <div style={{...T.card,padding:18,marginTop:16}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,flexWrap:"wrap",gap:8}}>
+              <h3 style={{fontSize:"1rem",fontWeight:700,margin:0}}>📜 My consent history</h3>
+              <span style={{fontSize:".68rem",color:T.mute}}>{consentHistory.length} {consentHistory.length===1?"generation":"generations"}</span>
+            </div>
+            <div style={{fontSize:".72rem",color:T.txt2,marginBottom:12,lineHeight:1.5,padding:"8px 10px",background:T.tealBg+"33",borderRadius:6,borderLeft:"3px solid "+T.teal}}>
+              🔐 <b>Privacy note:</b> Only metadata is saved (procedure, date, language, your clinic name). Patient names, mobiles, and specific concerns are NEVER stored on SKINARIO — they exist only in the document you downloaded.
+            </div>
+            {consentHistory.length===0?
+              <div style={{padding:"20px 12px",textAlign:"center",color:T.mute,fontSize:".82rem"}}>No consent forms generated yet. Your history will appear here.</div>
+            :
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {consentHistory.slice(0,20).map(h=>{
+                  const ts=h.createdAt?new Date(h.createdAt):null;
+                  const tsLabel=ts?ts.toLocaleString("en-IN",{day:"2-digit",month:"short",year:"2-digit",hour:"2-digit",minute:"2-digit",hour12:true}):"";
+                  const langLabel=CONSENT_LANGUAGES.find(l=>l.code===h.language)?.label||"English";
+                  return(<div key={h.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:"#fafafa",borderRadius:6,border:"1px solid "+T.border,fontSize:".82rem",gap:10,flexWrap:"wrap"}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:600,color:T.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h.procedure||"(unknown)"}</div>
+                      <div style={{fontSize:".7rem",color:T.mute,marginTop:2}}>
+                        {tsLabel} · {langLabel}{h.usedCredit?" · 💳 credit used":""}{h.isCustomProcedure?" · custom":""}
+                      </div>
+                    </div>
+                  </div>);
+                })}
+                {consentHistory.length>20&&<div style={{fontSize:".7rem",color:T.mute,textAlign:"center",marginTop:6}}>Showing 20 most recent of {consentHistory.length}</div>}
+              </div>
+            }
           </div>
 
           <style>{`@media(max-width:540px){.consent-grid{grid-template-columns:1fr !important}}`}</style>
