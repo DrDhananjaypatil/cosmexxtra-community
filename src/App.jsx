@@ -432,6 +432,85 @@ This document is a starting template based on common Indian aesthetic medicine c
 This template is provided by SKINARIO as a community educational resource. Liability for clinical use rests entirely with the treating practitioner and their clinic. SKINARIO and its affiliates make no warranty as to the legal adequacy of this template for any specific use.`;
 
 
+// ═══ CONSENT LANGUAGES ═══
+// Supported languages for consent generation. English-source body with selective
+// translation of common boilerplate phrases. Medical, procedure, and legal terms
+// are kept in English (universally understood in Indian clinical practice).
+const CONSENT_LANGUAGES = [
+  { code: "en", label: "English",  nativeLabel: "English",   rtl: false },
+  { code: "hi", label: "Hindi",    nativeLabel: "हिंदी",       rtl: false },
+  { code: "mr", label: "Marathi",  nativeLabel: "मराठी",      rtl: false },
+  { code: "gu", label: "Gujarati", nativeLabel: "ગુજરાતી",      rtl: false },
+  { code: "bn", label: "Bengali",  nativeLabel: "বাংলা",       rtl: false },
+  { code: "ta", label: "Tamil",    nativeLabel: "தமிழ்",       rtl: false },
+  { code: "te", label: "Telugu",   nativeLabel: "తెలుగు",      rtl: false },
+];
+
+// Translation map for boilerplate sentences and section headings.
+// Strict policy: medical, procedural, and statute names remain in English regardless.
+// These translations have been written by hand based on standard medical-Hindi/Marathi/etc.
+// Please have a native speaker verify before clinical use.
+const CONSENT_I18N = {
+  // Section headings (1-13 in numbered order)
+  "h_patient_info":     { en:"Patient Identification", hi:"रोगी की पहचान", mr:"रुग्णाची ओळख", gu:"દર્દીની ઓળખ", bn:"রোগীর পরিচয়", ta:"நோயாளி அடையாளம்", te:"రోగి గుర్తింపు" },
+  "h_procedure_desc":   { en:"Description of the Procedure", hi:"प्रक्रिया का विवरण", mr:"प्रक्रियेचे वर्णन", gu:"પ્રક્રિયાનું વર્ણન", bn:"পদ্ধতির বিবরণ", ta:"செயல்முறை விளக்கம்", te:"విధాన వివరణ" },
+  "h_risks":            { en:"Risks, Side Effects, and Complications", hi:"जोखिम, दुष्प्रभाव और जटिलताएँ", mr:"धोके, दुष्परिणाम आणि गुंतागुंत", gu:"જોખમો, આડઅસરો અને જટિલતાઓ", bn:"ঝুঁকি, পার্শ্বপ্রতিক্রিয়া এবং জটিলতা", ta:"அபாயங்கள், பக்க விளைவுகள் மற்றும் சிக்கல்கள்", te:"ప్రమాదాలు, దుష్ప్రభావాలు మరియు సంక్లిష్టతలు" },
+  "h_contra":           { en:"Contraindications and Medical History Disclosure", hi:"विपरीत संकेत और चिकित्सा इतिहास का खुलासा", mr:"विरोधी संकेत आणि वैद्यकीय इतिहासाचा खुलासा", gu:"વિરોધાભાસ અને તબીબી ઇતિહાસનો ખુલાસો", bn:"বিরোধী ইঙ্গিত এবং চিকিৎসা ইতিহাস প্রকাশ", ta:"முரண்பாடுகள் மற்றும் மருத்துவ வரலாறு வெளிப்படுத்துதல்", te:"వ్యతిరేక సూచనలు మరియు వైద్య చరిత్ర వెల్లడి" },
+  "h_alternatives":     { en:"Alternatives and Decision to Proceed", hi:"विकल्प और आगे बढ़ने का निर्णय", mr:"पर्याय आणि पुढे जाण्याचा निर्णय", gu:"વિકલ્પો અને આગળ વધવાનો નિર્ણય", bn:"বিকল্প এবং এগিয়ে যাওয়ার সিদ্ধান্ত", ta:"மாற்று வழிகள் மற்றும் தொடர முடிவு", te:"ప్రత్యామ్నాయాలు మరియు కొనసాగించాలనే నిర్ణయం" },
+  "h_photo":            { en:"Photography, Documentation, and Academic Use", hi:"फोटोग्राफी, दस्तावेज़ीकरण और शैक्षिक उपयोग", mr:"छायाचित्रण, दस्तऐवजीकरण आणि शैक्षणिक वापर", gu:"ફોટોગ્રાફી, દસ્તાવેજીકરણ અને શૈક્ષણિક ઉપયોગ", bn:"ফটোগ্রাফি, ডকুমেন্টেশন এবং একাডেমিক ব্যবহার", ta:"புகைப்படம், ஆவணப்படுத்தல் மற்றும் கல்வி பயன்பாடு", te:"ఫోటోగ్రఫీ, డాక్యుమెంటేషన్ మరియు విద్యా ఉపయోగం" },
+  "h_dpdp":             { en:"Data Protection Notice (DPDP Act, 2023)", hi:"डेटा संरक्षण सूचना (DPDP Act, 2023)", mr:"डेटा संरक्षण सूचना (DPDP Act, 2023)", gu:"ડેટા સંરક્ષણ સૂચના (DPDP Act, 2023)", bn:"ডেটা সুরক্ষা বিজ্ঞপ্তি (DPDP Act, 2023)", ta:"தரவு பாதுகாப்பு அறிவிப்பு (DPDP Act, 2023)", te:"డేటా రక్షణ నోటీసు (DPDP Act, 2023)" },
+  "h_cost":             { en:"Cost and Payment", hi:"शुल्क और भुगतान", mr:"शुल्क आणि देयक", gu:"ખર્ચ અને ચૂકવણી", bn:"খরচ এবং অর্থপ্রদান", ta:"செலவு மற்றும் கட்டணம்", te:"ఖర్చు మరియు చెల్లింపు" },
+  "h_aftercare":        { en:"Post-Procedure Care", hi:"प्रक्रिया के बाद की देखभाल", mr:"प्रक्रियेनंतरची काळजी", gu:"પ્રક્રિયા પછીની સંભાળ", bn:"পদ্ধতির পরের যত্ন", ta:"செயல்முறைக்கு பிந்தைய பராமரிப்பு", te:"విధానం తర్వాత సంరక్షణ" },
+  "h_patient_concern":  { en:"Patient's Specific Concern / Expected Outcome", hi:"रोगी की विशिष्ट चिंता / अपेक्षित परिणाम", mr:"रुग्णाची विशिष्ट चिंता / अपेक्षित परिणाम", gu:"દર્દીની વિશિષ્ટ ચિંતા / અપેક્ષિત પરિણામ", bn:"রোগীর নির্দিষ্ট উদ্বেগ / প্রত্যাশিত ফলাফল", ta:"நோயாளியின் குறிப்பிட்ட கவலை / எதிர்பார்க்கப்படும் முடிவு", te:"రోగి యొక్క నిర్దిష్ట ఆందోళన / ఆశించిన ఫలితం" },
+  "patient_concern_intro": { en:"The patient has specifically expressed the following concerns and expectations regarding this procedure. The treating doctor has discussed and aligned the treatment plan accordingly:", hi:"रोगी ने इस प्रक्रिया के संबंध में निम्नलिखित चिंताएँ और अपेक्षाएँ विशेष रूप से व्यक्त की हैं। उपचार करने वाले डॉक्टर ने उपचार योजना पर तदनुसार चर्चा की है और सामंजस्य स्थापित किया है:", mr:"रुग्णाने या प्रक्रियेबाबत खालील चिंता आणि अपेक्षा विशेषतः व्यक्त केल्या आहेत. उपचार करणाऱ्या डॉक्टरांनी त्यानुसार उपचार योजनेवर चर्चा केली आहे आणि ती जुळवली आहे:", gu:"દર્દીએ આ પ્રક્રિયા સંબંધિત નીચે મુજબની ચિંતાઓ અને અપેક્ષાઓ ખાસ વ્યક્ત કરી છે. સારવાર કરનાર ડોક્ટરે તે મુજબ સારવાર યોજનાની ચર્ચા કરી છે અને તેને સંરેખિત કર્યું છે:", bn:"রোগী এই পদ্ধতি সম্পর্কে নিম্নলিখিত উদ্বেগ এবং প্রত্যাশা বিশেষভাবে প্রকাশ করেছেন। চিকিৎসাকারী ডাক্তার সেই অনুযায়ী চিকিৎসা পরিকল্পনা নিয়ে আলোচনা করেছেন এবং সারিবদ্ধ করেছেন:", ta:"நோயாளி இந்த செயல்முறை குறித்து பின்வரும் கவலைகளையும் எதிர்பார்ப்புகளையும் குறிப்பாக வெளிப்படுத்தியுள்ளார். சிகிச்சை அளிக்கும் மருத்துவர் அதற்கேற்ப சிகிச்சை திட்டத்தை விவாதித்து சீரமைத்துள்ளார்:", te:"రోగి ఈ విధానం గురించి ఈ క్రింది ఆందోళనలు మరియు అంచనాలను ప్రత్యేకంగా వ్యక్తం చేశారు. చికిత్స చేస్తున్న వైద్యుడు అదే విధంగా చికిత్స ప్రణాళికను చర్చించి సర్దుబాటు చేశారు:" },
+  "h_authorization":    { en:"Authorization and Consent", hi:"प्राधिकरण और सहमति", mr:"प्राधिकरण आणि संमती", gu:"અધિકૃતતા અને સંમતિ", bn:"অনুমোদন এবং সম্মতি", ta:"அதிகாரம் மற்றும் சம்மதம்", te:"అధికారం మరియు అంగీకారం" },
+  "h_withdraw":         { en:"Right to Withdraw Consent", hi:"सहमति वापस लेने का अधिकार", mr:"संमती मागे घेण्याचा अधिकार", gu:"સંમતિ પાછી ખેંચવાનો અધિકાર", bn:"সম্মতি প্রত্যাহার করার অধিকার", ta:"சம்மதத்தை திரும்பப் பெறும் உரிமை", te:"అంగీకారాన్ని ఉపసంహరించుకునే హక్కు" },
+  "h_translation":      { en:"Translation (if applicable)", hi:"अनुवाद (यदि लागू हो)", mr:"भाषांतर (लागू असल्यास)", gu:"અનુવાદ (જો લાગુ હોય)", bn:"অনুবাদ (যদি প্রযোজ্য হয়)", ta:"மொழிபெயர்ப்பு (பொருந்தினால்)", te:"అనువాదం (వర్తిస్తే)" },
+  "h_signatures":       { en:"Signatures", hi:"हस्ताक्षर", mr:"स्वाक्षरी", gu:"સહીઓ", bn:"স্বাক্ষর", ta:"கையொப்பங்கள்", te:"సంతకాలు" },
+  // Common phrases
+  "title_main":         { en:"INFORMED CONSENT FOR", hi:"सूचित सहमति पत्र —", mr:"सूचित संमती पत्र —", gu:"સૂચિત સંમતિ પત્ર —", bn:"অবহিত সম্মতি পত্র —", ta:"தகவலறிந்த சம்மதம் —", te:"తెలియజేయబడిన అంగీకారం —" },
+  "informed_lang":      { en:"I have been informed, in the language I best understand, that:", hi:"मुझे उस भाषा में सूचित किया गया है जो मैं सबसे अच्छी तरह समझता/समझती हूँ कि:", mr:"मला मी सर्वोत्तम समजते त्या भाषेत खालीलप्रमाणे सूचित करण्यात आले आहे:", gu:"મને હું શ્રેષ્ઠ સમજુ છું તે ભાષામાં નીચે મુજબ જાણ કરવામાં આવી છે:", bn:"আমাকে আমি সবচেয়ে ভালো বুঝি এমন ভাষায় জানানো হয়েছে যে:", ta:"நான் சிறப்பாக புரிந்து கொள்ளும் மொழியில் எனக்கு பின்வருமாறு தெரிவிக்கப்பட்டுள்ளது:", te:"నేను బాగా అర్థం చేసుకునే భాషలో నాకు ఈ క్రింది విషయాలు తెలియజేయబడ్డాయి:" },
+  "no_guarantee":       { en:"I understand that the practice of medicine is not an exact science and that no guarantee, warranty, or assurance has been given to me about the outcome of this procedure.", hi:"मैं समझता/समझती हूँ कि चिकित्सा अभ्यास एक सटीक विज्ञान नहीं है और इस प्रक्रिया के परिणाम के बारे में मुझे कोई गारंटी, वारंटी या आश्वासन नहीं दिया गया है।", mr:"मला समजते की वैद्यकीय सराव हे अचूक विज्ञान नाही आणि या प्रक्रियेच्या परिणामाबद्दल मला कोणतीही हमी, वॉरंटी किंवा आश्वासन देण्यात आलेले नाही.", gu:"હું સમજું છું કે દવાનો અભ્યાસ ચોક્કસ વિજ્ઞાન નથી અને આ પ્રક્રિયાના પરિણામ વિશે મને કોઈ ગેરંટી, વોરંટી અથવા ખાતરી આપવામાં આવી નથી.", bn:"আমি বুঝি যে চিকিৎসার অনুশীলন একটি নির্ভুল বিজ্ঞান নয় এবং এই পদ্ধতির ফলাফল সম্পর্কে আমাকে কোনো গ্যারান্টি, ওয়ারেন্টি বা আশ্বাস দেওয়া হয়নি।", ta:"மருத்துவம் ஒரு துல்லியமான அறிவியல் அல்ல என்றும், இந்த செயல்முறையின் விளைவு குறித்து எனக்கு எந்த உத்தரவாதமும் வழங்கப்படவில்லை என்றும் நான் புரிந்து கொள்கிறேன்.", te:"వైద్యం ఖచ్చితమైన శాస్త్రం కాదని, ఈ విధానం ఫలితం గురించి నాకు ఎటువంటి హామీ ఇవ్వబడలేదని నేను అర్థం చేసుకున్నాను." },
+  "common_risks":       { en:"Common, generally short-term risks:", hi:"सामान्य, अल्पकालिक जोखिम:", mr:"सामान्य, अल्पकालीन धोके:", gu:"સામાન્ય, ટૂંકા ગાળાના જોખમો:", bn:"সাধারণ, স্বল্পমেয়াদী ঝুঁকি:", ta:"பொதுவான, பொதுவாக குறுகியகால அபாயங்கள்:", te:"సాధారణ, స్వల్పకాలిక ప్రమాదాలు:" },
+  "serious_risks":      { en:"Less common but potentially serious risks:", hi:"कम सामान्य लेकिन गंभीर जोखिम:", mr:"कमी सामान्य परंतु संभाव्य गंभीर धोके:", gu:"ઓછા સામાન્ય પણ સંભવિત ગંભીર જોખમો:", bn:"কম সাধারণ কিন্তু সম্ভাব্য গুরুতর ঝুঁকি:", ta:"குறைவான பொதுவான ஆனால் கடுமையான அபாயங்கள்:", te:"తక్కువ సాధారణ కానీ తీవ్రమైన ప్రమాదాలు:" },
+  "i_confirm_disclosed": { en:"I confirm that I have disclosed to my treating doctor any of the following that apply to me:", hi:"मैं पुष्टि करता/करती हूँ कि मैंने अपने उपचार करने वाले डॉक्टर को निम्नलिखित में से जो भी मुझ पर लागू होते हैं, उनकी जानकारी दी है:", mr:"मी पुष्टी करतो/करते की मला लागू असलेले खालीलपैकी कोणतेही माझ्या उपचार करणाऱ्या डॉक्टरांना सांगितले आहे:", gu:"હું પુષ્ટિ કરું છું કે મેં મારા સારવાર કરનાર ડોક્ટરને નીચે મુજબ જે મને લાગુ પડે છે તે જાહેર કર્યું છે:", bn:"আমি নিশ্চিত করছি যে আমার চিকিৎসাকারী ডাক্তারের কাছে নিম্নলিখিত যা আমার ক্ষেত্রে প্রযোজ্য তা প্রকাশ করেছি:", ta:"எனக்கு பொருந்தும் பின்வரும் எதையும் என் சிகிச்சை அளிக்கும் மருத்துவருக்கு வெளிப்படுத்தியுள்ளேன் என நான் உறுதிப்படுத்துகிறேன்:", te:"నాకు వర్తించే క్రింది వాటిని నేను నా చికిత్స చేస్తున్న వైద్యుడికి వెల్లడించానని నేను నిర్ధారిస్తున్నాను:" },
+  "alternatives_text":  { en:"The treating doctor has explained available alternatives to this procedure, including the option of not proceeding. I have had adequate opportunity to ask questions, and I have decided to proceed with the procedure of my own free will.", hi:"उपचार करने वाले डॉक्टर ने इस प्रक्रिया के उपलब्ध विकल्पों की व्याख्या की है, जिसमें आगे न बढ़ने का विकल्प भी शामिल है। मुझे प्रश्न पूछने का पर्याप्त अवसर मिला है, और मैंने अपनी स्वतंत्र इच्छा से प्रक्रिया के साथ आगे बढ़ने का निर्णय लिया है।", mr:"उपचार करणाऱ्या डॉक्टरांनी या प्रक्रियेच्या उपलब्ध पर्यायांची, पुढे न जाण्याच्या पर्यायासह, स्पष्टीकरण दिले आहे. मला प्रश्न विचारण्याची पुरेशी संधी मिळाली आहे, आणि मी माझ्या स्वेच्छेने प्रक्रिया पुढे चालू ठेवण्याचा निर्णय घेतला आहे.", gu:"સારવાર કરનાર ડોક્ટરે આ પ્રક્રિયા માટેના વિકલ્પોની, આગળ ન વધવાના વિકલ્પ સહિત, સમજૂતી આપી છે. મને પ્રશ્નો પૂછવાની પૂરતી તક મળી છે, અને મેં મારી સ્વતંત્ર ઇચ્છાથી પ્રક્રિયા સાથે આગળ વધવાનો નિર્ણય લીધો છે.", bn:"চিকিৎসাকারী ডাক্তার এই পদ্ধতির বিকল্পগুলি, এগিয়ে না যাওয়ার বিকল্প সহ, ব্যাখ্যা করেছেন। আমি প্রশ্ন জিজ্ঞাসা করার পর্যাপ্ত সুযোগ পেয়েছি, এবং আমি আমার স্বাধীন ইচ্ছায় পদ্ধতির সাথে এগিয়ে যাওয়ার সিদ্ধান্ত নিয়েছি।", ta:"சிகிச்சை அளிக்கும் மருத்துவர் இந்த செயல்முறைக்கான மாற்று வழிகளை, தொடராமல் இருக்கும் வழியையும் சேர்த்து, விளக்கியுள்ளார். கேள்விகள் கேட்க எனக்கு போதுமான வாய்ப்பு கிடைத்துள்ளது, மற்றும் என் சொந்த சுதந்திரமான விருப்பத்தின் பேரில் செயல்முறையை தொடர முடிவு செய்துள்ளேன்.", te:"చికిత్స చేస్తున్న వైద్యుడు ఈ విధానానికి ప్రత్యామ్నాయాలను, కొనసాగించకుండా ఉండే ఎంపికతో సహా, వివరించారు. ప్రశ్నలు అడిగే తగిన అవకాశం నాకు ఉంది, మరియు నేను నా స్వేచ్ఛతో విధానంతో ముందుకు సాగాలని నిర్ణయించుకున్నాను." },
+  "photo_consent":      { en:"I consent to pre-, intra-, and post-procedure photographs being taken for clinical documentation. Such photographs may be used for academic, scientific, or teaching purposes, provided that my identity is not disclosed and reasonable confidentiality is maintained.", hi:"मैं नैदानिक दस्तावेज़ीकरण के लिए प्रक्रिया से पहले, उसके दौरान और बाद की तस्वीरें लेने की सहमति देता/देती हूँ। ऐसी तस्वीरों का उपयोग शैक्षणिक, वैज्ञानिक या शिक्षण उद्देश्यों के लिए किया जा सकता है, बशर्ते कि मेरी पहचान उजागर न की जाए और उचित गोपनीयता बनाए रखी जाए।", mr:"मी क्लिनिकल दस्तऐवजीकरणासाठी प्रक्रियेपूर्वी, दरम्यान आणि नंतर छायाचित्रे घेण्यास संमती देतो/देते. अशा छायाचित्रांचा वापर शैक्षणिक, वैज्ञानिक किंवा शिक्षणाच्या उद्देशाने केला जाऊ शकतो, परंतु माझी ओळख उघड केली जाणार नाही आणि योग्य गोपनीयता राखली जाईल.", gu:"હું ક્લિનિકલ દસ્તાવેજીકરણ માટે પ્રક્રિયા પહેલા, દરમિયાન અને પછી તસવીરો લેવાની સંમતિ આપું છું. આવી તસવીરોનો ઉપયોગ શૈક્ષણિક, વૈજ્ઞાનિક અથવા શિક્ષણ હેતુ માટે કરી શકાય છે, જો કે મારી ઓળખ જાહેર ન કરવામાં આવે અને યોગ્ય ગોપનીયતા જાળવવામાં આવે.", bn:"আমি ক্লিনিক্যাল ডকুমেন্টেশনের জন্য পদ্ধতির আগে, চলাকালীন এবং পরে ফটো তোলার সম্মতি দিচ্ছি। এই ধরনের ফটো শিক্ষামূলক, বৈজ্ঞানিক বা শিক্ষাদানের উদ্দেশ্যে ব্যবহার করা যেতে পারে, যদি আমার পরিচয় প্রকাশ না করা হয় এবং যুক্তিসঙ্গত গোপনীয়তা বজায় রাখা হয়।", ta:"மருத்துவ ஆவணப்படுத்தலுக்காக செயல்முறைக்கு முன், போது மற்றும் பின் புகைப்படங்கள் எடுக்க நான் சம்மதிக்கிறேன். அத்தகைய புகைப்படங்கள் கல்வி, அறிவியல் அல்லது கற்பித்தல் நோக்கங்களுக்காக பயன்படுத்தப்படலாம், என் அடையாளம் வெளியிடப்படாமலும், நியாயமான ரகசியம் பேணப்பட்டும் இருந்தால்.", te:"క్లినికల్ డాక్యుమెంటేషన్ కోసం విధానం ముందు, మధ్యలో మరియు తర్వాత ఫోటోలు తీయడానికి నేను అంగీకరిస్తున్నాను. ఇటువంటి ఫోటోలను విద్యా, శాస్త్రీయ లేదా బోధనా ప్రయోజనాల కోసం ఉపయోగించవచ్చు, నా గుర్తింపు వెల్లడి కానంతవరకు మరియు సహేతుకమైన గోప్యత పాటించబడినంతవరకు." },
+  "withdraw_text":      { en:"I understand that I may withdraw this consent at any time before the procedure begins by communicating my decision verbally or in writing to the treating doctor or clinic staff. Once the procedure has commenced, withdrawal may be limited by clinical safety considerations.", hi:"मैं समझता/समझती हूँ कि मैं प्रक्रिया शुरू होने से पहले किसी भी समय अपना निर्णय उपचार करने वाले डॉक्टर या क्लिनिक स्टाफ को मौखिक या लिखित रूप में बताकर इस सहमति को वापस ले सकता/सकती हूँ। प्रक्रिया शुरू होने के बाद, नैदानिक सुरक्षा कारणों से वापसी सीमित हो सकती है।", mr:"मला समजते की प्रक्रिया सुरू होण्यापूर्वी कोणत्याही वेळी मी माझा निर्णय उपचार करणाऱ्या डॉक्टरांना किंवा क्लिनिक स्टाफला तोंडी किंवा लेखी कळवून ही संमती मागे घेऊ शकतो/शकते. प्रक्रिया सुरू झाल्यानंतर, क्लिनिकल सुरक्षेच्या कारणामुळे मागे घेणे मर्यादित असू शकते.", gu:"હું સમજું છું કે પ્રક્રિયા શરૂ થાય તે પહેલાં કોઈપણ સમયે હું મારો નિર્ણય સારવાર કરનાર ડોક્ટર અથવા ક્લિનિક સ્ટાફને મૌખિક અથવા લેખિતમાં જણાવીને આ સંમતિ પાછી ખેંચી શકું છું. પ્રક્રિયા શરૂ થયા પછી, ક્લિનિકલ સલામતીના કારણોને લીધે પાછી ખેંચવી મર્યાદિત હોઈ શકે છે.", bn:"আমি বুঝি যে পদ্ধতি শুরু হওয়ার আগে যেকোনো সময়ে আমি চিকিৎসাকারী ডাক্তার বা ক্লিনিক স্টাফকে মৌখিকভাবে বা লিখিতভাবে আমার সিদ্ধান্ত জানিয়ে এই সম্মতি প্রত্যাহার করতে পারি। পদ্ধতি শুরু হওয়ার পরে, ক্লিনিক্যাল সুরক্ষার কারণে প্রত্যাহার সীমিত হতে পারে।", ta:"செயல்முறை தொடங்குவதற்கு முன் எந்த நேரத்திலும் என் முடிவை சிகிச்சை அளிக்கும் மருத்துவர் அல்லது கிளினிக் ஊழியர்களுக்கு வாய்மொழியாகவோ அல்லது எழுத்தில் தெரிவித்து இந்த சம்மதத்தை திரும்பப் பெறலாம் என நான் புரிந்து கொள்கிறேன். செயல்முறை தொடங்கிய பின், மருத்துவ பாதுகாப்பு காரணங்களால் திரும்பப் பெறுவது வரம்புக்குட்படலாம்.", te:"విధానం ప్రారంభమయ్యే ముందు ఎప్పుడైనా చికిత్స చేస్తున్న వైద్యుడికి లేదా క్లినిక్ సిబ్బందికి నా నిర్ణయాన్ని మౌఖికంగా లేదా రాతపూర్వకంగా తెలియజేయడం ద్వారా ఈ అంగీకారాన్ని ఉపసంహరించుకోవచ్చని నేను అర్థం చేసుకున్నాను. విధానం ప్రారంభమైన తర్వాత, క్లినికల్ భద్రతా కారణాల వలన ఉపసంహరణ పరిమితం కావచ్చు." },
+  // Form field labels
+  "lbl_name":           { en:"Name", hi:"नाम", mr:"नाव", gu:"નામ", bn:"নাম", ta:"பெயர்", te:"పేరు" },
+  "lbl_age":            { en:"Age", hi:"उम्र", mr:"वय", gu:"ઉંમર", bn:"বয়স", ta:"வயது", te:"వయస్సు" },
+  "lbl_sex":            { en:"Sex", hi:"लिंग", mr:"लिंग", gu:"લિંગ", bn:"লিঙ্গ", ta:"பாலினம்", te:"లింగం" },
+  "lbl_mobile":         { en:"Mobile", hi:"मोबाइल", mr:"मोबाइल", gu:"મોબાઈલ", bn:"মোবাইল", ta:"மொபைல்", te:"మొబైల్" },
+  "lbl_patient_id":     { en:"Patient ID", hi:"रोगी आईडी", mr:"रुग्ण आयडी", gu:"દર્દી આઈડી", bn:"রোগী আইডি", ta:"நோயாளி ஐடி", te:"రోగి ID" },
+  "lbl_address":        { en:"Address", hi:"पता", mr:"पत्ता", gu:"સરનામું", bn:"ঠিকানা", ta:"முகவரி", te:"చిరునామా" },
+  "lbl_phone":          { en:"Phone", hi:"फ़ोन", mr:"फोन", gu:"ફોન", bn:"ফোন", ta:"தொலைபேசி", te:"ఫోన్" },
+  "lbl_email":          { en:"Email", hi:"ईमेल", mr:"ईमेल", gu:"ઈમેલ", bn:"ইমেইল", ta:"மின்னஞ்சல்", te:"ఈమెయిల్" },
+  "lbl_diagnosis":      { en:"Relevant medical diagnosis", hi:"प्रासंगिक चिकित्सा निदान", mr:"संबंधित वैद्यकीय निदान", gu:"સંબંધિત તબીબી નિદાન", bn:"প্রাসঙ্গিক চিকিৎসা নির্ণয়", ta:"தொடர்புடைய மருத்துவ நோய் கண்டறிதல்", te:"సంబంధిత వైద్య నిర్ధారణ" },
+  "lbl_procedure":      { en:"Procedure to be performed", hi:"की जाने वाली प्रक्रिया", mr:"करण्यात येणारी प्रक्रिया", gu:"કરવામાં આવનાર પ્રક્રિયા", bn:"সম্পাদিত হবে এমন পদ্ধতি", ta:"செய்யப்பட வேண்டிய செயல்முறை", te:"నిర్వహించబడే విధానం" },
+  "lbl_treatment_area": { en:"Area / site to be treated", hi:"उपचार किया जाने वाला क्षेत्र / स्थान", mr:"उपचार करण्यात येणारे क्षेत्र / स्थान", gu:"સારવાર કરવામાં આવનાર વિસ્તાર / સ્થાન", bn:"চিকিৎসার এলাকা / স্থান", ta:"சிகிச்சை அளிக்கப்பட வேண்டிய பகுதி / இடம்", te:"చికిత్స చేయవలసిన ప్రాంతం / స్థలం" },
+  "lbl_date":           { en:"Date", hi:"दिनांक", mr:"दिनांक", gu:"તારીખ", bn:"তারিখ", ta:"தேதி", te:"తేదీ" },
+  "lbl_expected":       { en:"Expected results and timeline", hi:"अपेक्षित परिणाम और समय-सीमा", mr:"अपेक्षित परिणाम आणि कालावधी", gu:"અપેક્ષિત પરિણામો અને સમય રેખા", bn:"প্রত্যাশিত ফলাফল এবং সময়রেখা", ta:"எதிர்பார்க்கப்படும் முடிவுகள் மற்றும் காலவரிசை", te:"ఆశించిన ఫలితాలు మరియు కాలక్రమం" },
+  "lbl_translator":     { en:"Was translation to the patient's preferred language required?", hi:"क्या रोगी की पसंदीदा भाषा में अनुवाद की आवश्यकता थी?", mr:"रुग्णाच्या पसंतीच्या भाषेत भाषांतर आवश्यक होते का?", gu:"દર્દીની પસંદગીની ભાષામાં અનુવાદ જરૂરી હતો?", bn:"রোগীর পছন্দের ভাষায় অনুবাদ প্রয়োজন ছিল?", ta:"நோயாளியின் விருப்பமான மொழியில் மொழிபெயர்ப்பு தேவைப்பட்டதா?", te:"రోగి ఇష్టమైన భాషలోకి అనువాదం అవసరమైందా?" },
+  "lbl_yes_no":         { en:"YES / NO", hi:"हाँ / नहीं", mr:"होय / नाही", gu:"હા / ના", bn:"হ্যাঁ / না", ta:"ஆம் / இல்லை", te:"అవును / కాదు" },
+  "lbl_translator_name":{ en:"Name of translator (if any)", hi:"अनुवादक का नाम (यदि कोई हो)", mr:"भाषांतरकाराचे नाव (असल्यास)", gu:"અનુવાદકનું નામ (જો કોઈ હોય)", bn:"অনুবাদকের নাম (যদি থাকে)", ta:"மொழிபெயர்ப்பாளர் பெயர் (ஏதேனும் இருந்தால்)", te:"అనువాదకుని పేరు (ఏదైనా ఉంటే)" },
+  "lbl_relationship":   { en:"Relationship to patient", hi:"रोगी के साथ संबंध", mr:"रुग्णाशी नाते", gu:"દર્દી સાથેનો સંબંધ", bn:"রোগীর সাথে সম্পর্ক", ta:"நோயாளியுடன் உறவு", te:"రోగితో సంబంధం" },
+  "lbl_patient_sig":    { en:"Patient / Authorized Representative", hi:"रोगी / अधिकृत प्रतिनिधि", mr:"रुग्ण / अधिकृत प्रतिनिधी", gu:"દર્દી / અધિકૃત પ્રતિનિધિ", bn:"রোগী / অনুমোদিত প্রতিনিধি", ta:"நோயாளி / அங்கீகரிக்கப்பட்ட பிரதிநிதி", te:"రోగి / అధికారిక ప్రతినిధి" },
+  "lbl_doctor_sig":     { en:"Treating Doctor", hi:"उपचार करने वाले डॉक्टर", mr:"उपचार करणारे डॉक्टर", gu:"સારવાર કરનાર ડોક્ટર", bn:"চিকিৎসাকারী ডাক্তার", ta:"சிகிச்சை அளிக்கும் மருத்துவர்", te:"చికిత్స చేస్తున్న వైద్యుడు" },
+  "lbl_witness":        { en:"Witness", hi:"गवाह", mr:"साक्षीदार", gu:"સાક્ષી", bn:"সাক্ষী", ta:"சாட்சி", te:"సాక్షి" },
+  "lbl_initial_here":   { en:"Initial here if you agree:", hi:"यदि आप सहमत हैं तो यहाँ आद्याक्षर लिखें:", mr:"तुम्ही सहमत असल्यास येथे आद्याक्षर लिहा:", gu:"જો તમે સંમત છો તો અહીં આદ્યાક્ષર લખો:", bn:"আপনি যদি সম্মত হন তবে এখানে প্রাথমিক অক্ষর লিখুন:", ta:"நீங்கள் ஒப்புக்கொண்டால் இங்கே முதலெழுத்து இடுக:", te:"మీరు అంగీకరిస్తే ఇక్కడ ఆద్యక్షరాలు రాయండి:" },
+  // Beta translation notice (top of vernacular versions)
+  "translation_notice": { en:"", hi:"यह दस्तावेज़ का अनुवाद किया गया है। मूल अंग्रेज़ी संस्करण कानूनी रूप से बाध्यकारी है। यदि कुछ अस्पष्ट हो तो कृपया अपने डॉक्टर से चर्चा करें।", mr:"हे दस्तऐवज भाषांतरित केले आहे. मूळ इंग्रजी आवृत्ती कायदेशीरदृष्ट्या बंधनकारक आहे. काही अस्पष्ट असल्यास कृपया तुमच्या डॉक्टरांशी चर्चा करा.", gu:"આ દસ્તાવેજનો અનુવાદ કરવામાં આવ્યો છે. મૂળ અંગ્રેજી સંસ્કરણ કાનૂની રીતે બંધનકર્તા છે. જો કંઈ અસ્પષ્ટ હોય તો કૃપા કરીને તમારા ડોક્ટર સાથે ચર્ચા કરો.", bn:"এই নথিটি অনূদিত হয়েছে। মূল ইংরেজি সংস্করণ আইনি বাধ্যতামূলক। যদি কিছু অস্পষ্ট হয় তবে দয়া করে আপনার ডাক্তারের সাথে আলোচনা করুন।", ta:"இந்த ஆவணம் மொழிபெயர்க்கப்பட்டுள்ளது. மூல ஆங்கில பதிப்பு சட்டப்பூர்வமாக கட்டுப்படுத்தும். ஏதேனும் தெளிவில்லாமல் இருந்தால் உங்கள் மருத்துவருடன் கலந்துரையாடவும்.", te:"ఈ పత్రం అనువదించబడింది. అసలు ఆంగ్ల వెర్షన్ చట్టబద్ధంగా కట్టుబడి ఉంటుంది. ఏదైనా అస్పష్టంగా ఉంటే దయచేసి మీ వైద్యుడితో చర్చించండి." },
+};
+
+// Tiny translate helper: tr(key, langCode) returns translated string with English fallback
+const tr = (key, lang) => {
+  const entry = CONSENT_I18N[key];
+  if (!entry) return "";
+  return entry[lang] || entry.en || "";
+};
+
+
 // ═══ ACCOUNT TYPES ═══
 const ACCOUNT_TYPES=[
   {id:"doctor",label:"Doctor",icon:"🩺",desc:"Practicing physician — derms, aesthetic doctors, cosmetologists"},
@@ -1891,6 +1970,17 @@ export default function App(){
   const[consentDoctorName,setConsentDoctorName]=useState("");
   const[consentDoctorReg,setConsentDoctorReg]=useState(""); // registration number
   const[consentGenerating,setConsentGenerating]=useState(false);
+  // Patient details (all optional — can be left blank for blank template)
+  const[consentPatientName,setConsentPatientName]=useState("");
+  const[consentPatientAge,setConsentPatientAge]=useState("");
+  const[consentPatientSex,setConsentPatientSex]=useState("");
+  const[consentPatientMobile,setConsentPatientMobile]=useState("");
+  const[consentPatientId,setConsentPatientId]=useState("");
+  const[consentPatientConcern,setConsentPatientConcern]=useState(""); // optional free-text — patient's specific concern / desired outcome
+  // Language: en, hi, mr, gu, bn, ta, te
+  const[consentLanguage,setConsentLanguage]=useState("en");
+  // Preview modal state
+  const[consentPreview,setConsentPreview]=useState(null); // {vernacularHtml?, englishHtml, procName, langCode}
   // Pre-fill clinic/doctor info from saved profile fields when entering consent page
   useEffect(()=>{
     if(pg!=="consent"||!prof)return;
@@ -2899,10 +2989,14 @@ export default function App(){
   // Builds a .doc file (HTML-based Word document) for the selected procedure
   // and triggers download. Rate-limited per user per day; admin can grant
   // bonus credits. Logs each generation to consentGenerationLog for audit.
+  // ═══ CONSENT TEMPLATE GENERATOR ═══
+  // Builds HTML content for the chosen procedure + language. When language ≠ English,
+  // builds BOTH the vernacular and English versions and shows both in the preview modal.
+  // Preview modal lets the user download as .doc or print to PDF.
   const generateConsent = async () => {
     if (!au || !prof) { sh("Please sign in"); return; }
 
-    // Get effective procedure name (custom or from catalog)
+    // Resolve procedure
     let procName = "";
     let procData = null;
     if (consentProc === "__custom__") {
@@ -2919,74 +3013,88 @@ export default function App(){
     if (!consentClinicName.trim()) { sh("Please enter clinic name"); return; }
     if (!consentDoctorName.trim()) { sh("Please enter doctor name"); return; }
 
-    // ─── Rate limit check ───
+    // Rate limit
     const todayKey = todayIST_YMD();
     const todaysCount = (prof.consentGenerations || {})[todayKey] || 0;
     const credits = prof.consentCredits || 0;
-
-    if (todaysCount >= 1) {
-      // Daily free used; need a credit
-      if (credits <= 0) {
-        if (!confirm(
-          "You've used your free consent generation for today.\n\n" +
-          "To generate more today, you can:\n" +
-          "1. Wait until tomorrow (resets at midnight IST)\n" +
-          "2. Contact admin to request bonus credits\n\n" +
-          "Click OK to email admin, or Cancel to wait."
-        )) return;
-        window.location.href = "mailto:drjpatil@gmail.com?subject=Consent credits request&body=Hi, I need additional consent template credits. My account: " + (au.email || au.uid);
-        return;
-      }
+    if (todaysCount >= 1 && credits <= 0) {
+      if (!confirm(
+        "You've used your free consent generation for today.\n\n" +
+        "Options:\n1. Wait until tomorrow (resets at midnight IST)\n2. Contact admin for bonus credits\n\n" +
+        "OK to email admin, Cancel to wait."
+      )) return;
+      window.location.href = "mailto:drjpatil@gmail.com?subject=Consent credits request&body=Hi, I need additional consent template credits. My account: " + (au.email || au.uid);
+      return;
     }
 
     setConsentGenerating(true);
 
     try {
-      // ─── Build document HTML ───
+      // Shared inputs
       const today = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
       const safe = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      const logoHtml = consentClinicLogo
-        ? `<img src="${consentClinicLogo}" style="max-height:60px;max-width:160px;display:block;" />`
-        : "";
+      const logoHtml = consentClinicLogo ? `<img src="${consentClinicLogo}" style="max-height:60px;max-width:160px;display:block;" />` : "";
 
-      const description = procData?.description ||
-        `The ${procName} procedure has been explained to me, including its purpose, technique, and expected outcomes.`;
+      const description = procData?.description || `The ${procName} procedure has been explained to me, including its purpose, technique, and expected outcomes.`;
       const commonRisks = procData?.commonRisks || ["Procedure-site discomfort, redness, or swelling", "Bruising or transient inflammation", "Variable individual response"];
       const seriousRisks = procData?.seriousRisks || ["Infection or delayed healing", "Allergic reaction (rare)", "Suboptimal aesthetic outcome requiring additional treatment"];
       const contraindications = procData?.contraindications || ["Pregnancy or breastfeeding", "Active infection at treatment site", "Known allergy to any product used", "Bleeding disorders or anticoagulant use", "Autoimmune disease (relative)"];
       const aftercare = procData?.aftercare || ["Follow all post-procedure instructions provided", "Avoid sun exposure as advised", "Contact clinic immediately if unexpected symptoms occur", "Attend all scheduled follow-up appointments"];
       const duration = procData?.duration || "Results, longevity, and number of sessions vary by individual and will be discussed at consultation.";
 
-      const css = `
-        body { font-family: 'Cambria', 'Georgia', serif; font-size: 11pt; line-height: 1.5; color: #222; margin: 0; padding: 18pt 18pt 18pt 18pt; }
-        h1 { font-size: 16pt; text-align: center; margin: 4pt 0; }
-        h2 { font-size: 12pt; margin: 14pt 0 6pt 0; padding-bottom: 3pt; border-bottom: 1px solid #888; }
-        h3 { font-size: 11pt; margin: 10pt 0 4pt 0; }
-        .clinic-header { display: table; width: 100%; margin-bottom: 8pt; }
-        .clinic-left { display: table-cell; vertical-align: middle; }
-        .clinic-right { display: table-cell; text-align: right; vertical-align: middle; font-size: 9pt; color: #555; }
-        .clinic-name { font-size: 14pt; font-weight: bold; }
-        .clinic-meta { font-size: 9pt; color: #555; }
-        .disclaimer { color: #c0392b; font-size: 9pt; font-style: italic; border: 1px solid #c0392b; padding: 8pt; margin-bottom: 14pt; background: #fff5f3; }
-        .field { margin: 4pt 0; }
-        .underline { display: inline-block; min-width: 200pt; border-bottom: 1px solid #555; height: 12pt; }
-        ul { margin: 4pt 0 6pt 24pt; padding: 0; }
-        li { margin: 2pt 0; }
-        .sig-row { display: table; width: 100%; margin-top: 20pt; }
-        .sig-cell { display: table-cell; width: 50%; padding: 10pt; vertical-align: top; font-size: 10pt; }
-        .sig-line { border-top: 1px solid #333; margin-top: 30pt; padding-top: 4pt; }
-        .small { font-size: 9pt; color: #555; }
-        .footer-disclaimer { color: #c0392b; font-size: 8pt; font-style: italic; text-align: center; margin-top: 30pt; padding-top: 6pt; border-top: 1px dashed #c0392b; }
-      `;
+      // Pre-fill patient fields if user entered them
+      const patientName = consentPatientName.trim();
+      const patientAge = consentPatientAge.trim();
+      const patientSex = consentPatientSex.trim();
+      const patientMobile = consentPatientMobile.trim();
+      const patientId = consentPatientId.trim();
+      const patientConcern = consentPatientConcern.trim();
+      const hasConcern = patientConcern.length > 0;
+      // Helper to render a field that's either filled or has an underline
+      const fld = (val, minWidth) => val ? `<strong>${safe(val)}</strong>` : `<span class="underline" style="min-width:${minWidth || 200}pt;"></span>`;
 
-      const html = `
+      // ═══ HTML BUILDER (parameterized by language) ═══
+      const buildHtml = (langCode) => {
+        const T_ = (key) => tr(key, langCode);
+        const isVern = langCode !== "en";
+        const langLabel = CONSENT_LANGUAGES.find(l => l.code === langCode)?.label || "English";
+        // Section numbering — if patient concern is present, section 6 is the concern
+        // and everything after shifts +1. Use sec(n) to print the number for the Nth
+        // base section (1-13 in the original numbering).
+        const concernShift = hasConcern ? 1 : 0;
+        const sec = (baseNum) => baseNum <= 5 ? baseNum : (baseNum + concernShift);
+
+        const css = `
+          body { font-family: 'Cambria', 'Georgia', serif; font-size: 11pt; line-height: 1.55; color: #222; margin: 0; padding: 18pt 18pt 18pt 18pt; }
+          h1 { font-size: 16pt; text-align: center; margin: 4pt 0; }
+          h2 { font-size: 12pt; margin: 14pt 0 6pt 0; padding-bottom: 3pt; border-bottom: 1px solid #888; }
+          h3 { font-size: 11pt; margin: 10pt 0 4pt 0; }
+          .clinic-header { display: table; width: 100%; margin-bottom: 8pt; }
+          .clinic-left { display: table-cell; vertical-align: middle; }
+          .clinic-right { display: table-cell; text-align: right; vertical-align: middle; font-size: 9pt; color: #555; }
+          .clinic-name { font-size: 14pt; font-weight: bold; }
+          .clinic-meta { font-size: 9pt; color: #555; }
+          .disclaimer { color: #c0392b; font-size: 9pt; font-style: italic; border: 1px solid #c0392b; padding: 8pt; margin-bottom: 14pt; background: #fff5f3; }
+          .translation-notice { color: #856404; font-size: 9pt; border: 1px solid #ffc107; padding: 8pt; margin-bottom: 14pt; background: #fff8e1; }
+          .field { margin: 4pt 0; }
+          .underline { display: inline-block; min-width: 200pt; border-bottom: 1px solid #555; height: 12pt; }
+          ul { margin: 4pt 0 6pt 24pt; padding: 0; }
+          li { margin: 2pt 0; }
+          .sig-row { display: table; width: 100%; margin-top: 20pt; }
+          .sig-cell { display: table-cell; width: 50%; padding: 10pt; vertical-align: top; font-size: 10pt; }
+          .sig-line { border-top: 1px solid #333; margin-top: 30pt; padding-top: 4pt; }
+          .small { font-size: 9pt; color: #555; }
+          .footer-disclaimer { color: #c0392b; font-size: 8pt; font-style: italic; text-align: center; margin-top: 30pt; padding-top: 6pt; border-top: 1px dashed #c0392b; }
+        `;
+
+        const translationNotice = isVern && T_("translation_notice")
+          ? `<div class="translation-notice"><strong>📝</strong> ${safe(T_("translation_notice"))}</div>`
+          : "";
+
+        return `
 <!DOCTYPE html>
-<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-<head>
-<meta charset="utf-8" />
-<title>Consent Form — ${safe(procName)}</title>
-<style>${css}</style>
-</head>
+<html lang="${langCode}" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8" /><title>Consent — ${safe(procName)}${isVern ? ` (${langLabel})` : ""}</title><style>${css}</style></head>
 <body>
 
 <div class="clinic-header">
@@ -2997,9 +3105,11 @@ export default function App(){
     ${consentClinicPhone ? `<div class="clinic-meta">Tel: ${safe(consentClinicPhone)}</div>` : ""}
   </div>
   <div class="clinic-right">
-    Date: <span class="underline" style="min-width:80pt;">&nbsp;${safe(today)}&nbsp;</span>
+    ${T_("lbl_date")}: <span class="underline" style="min-width:80pt;">&nbsp;${safe(today)}&nbsp;</span>
   </div>
 </div>
+
+${translationNotice}
 
 <div class="disclaimer">
   <strong>IMPORTANT — TEMPLATE FOR EDUCATIONAL REFERENCE.</strong>
@@ -3007,44 +3117,45 @@ export default function App(){
   Verify with a qualified medical-legal advisor before clinical use. This red notice can be deleted after your own review.
 </div>
 
-<h1>INFORMED CONSENT FOR ${safe(procName.toUpperCase())}</h1>
+<h1>${T_("title_main")} ${safe(procName.toUpperCase())}</h1>
 
-<h2>1. Patient Identification</h2>
-<div class="field">Name: <span class="underline"></span></div>
-<div class="field">Age: <span class="underline" style="min-width:60pt;"></span> &nbsp;&nbsp; Sex: <span class="underline" style="min-width:60pt;"></span> &nbsp;&nbsp; Patient ID: <span class="underline" style="min-width:80pt;"></span></div>
-<div class="field">Address: <span class="underline" style="min-width:380pt;"></span></div>
-<div class="field">Phone: <span class="underline" style="min-width:120pt;"></span> &nbsp;&nbsp; Email: <span class="underline" style="min-width:160pt;"></span></div>
-<div class="field">Relevant medical diagnosis: <span class="underline" style="min-width:280pt;"></span></div>
-<div class="field">Procedure to be performed: <strong>${safe(procName)}</strong></div>
-<div class="field">Area / site to be treated: <span class="underline" style="min-width:300pt;"></span></div>
+<h2>1. ${T_("h_patient_info")}</h2>
+<div class="field">${T_("lbl_name")}: ${fld(patientName, 280)}</div>
+<div class="field">${T_("lbl_age")}: ${fld(patientAge, 60)} &nbsp;&nbsp; ${T_("lbl_sex")}: ${fld(patientSex, 60)} &nbsp;&nbsp; ${T_("lbl_patient_id")}: ${fld(patientId, 80)}</div>
+<div class="field">${T_("lbl_address")}: <span class="underline" style="min-width:380pt;"></span></div>
+<div class="field">${T_("lbl_mobile")}: ${fld(patientMobile, 120)} &nbsp;&nbsp; ${T_("lbl_email")}: <span class="underline" style="min-width:160pt;"></span></div>
+<div class="field">${T_("lbl_diagnosis")}: <span class="underline" style="min-width:280pt;"></span></div>
+<div class="field">${T_("lbl_procedure")}: <strong>${safe(procName)}</strong></div>
+<div class="field">${T_("lbl_treatment_area")}: <span class="underline" style="min-width:300pt;"></span></div>
 
-<h2>2. Description of the Procedure</h2>
-<p>I have been informed, in the language I best understand, that:</p>
+<h2>2. ${T_("h_procedure_desc")}</h2>
+<p>${T_("informed_lang")}</p>
 <p>${safe(description)}</p>
-<p><strong>Expected results and timeline:</strong> ${safe(duration)}</p>
+<p><strong>${T_("lbl_expected")}:</strong> ${safe(duration)}</p>
 
-<h2>3. Risks, Side Effects, and Complications</h2>
-<p>I understand that the practice of medicine is not an exact science and that no guarantee, warranty, or assurance has been given to me about the outcome of this procedure.</p>
-
-<h3>Common, generally short-term risks:</h3>
+<h2>3. ${T_("h_risks")}</h2>
+<p>${T_("no_guarantee")}</p>
+<h3>${T_("common_risks")}</h3>
 <ul>${commonRisks.map(r => `<li>${safe(r)}</li>`).join("")}</ul>
-
-<h3>Less common but potentially serious risks:</h3>
+<h3>${T_("serious_risks")}</h3>
 <ul>${seriousRisks.map(r => `<li>${safe(r)}</li>`).join("")}</ul>
 
-<h2>4. Contraindications and Medical History Disclosure</h2>
-<p>I confirm that I have disclosed to my treating doctor any of the following that apply to me:</p>
+<h2>4. ${T_("h_contra")}</h2>
+<p>${T_("i_confirm_disclosed")}</p>
 <ul>${contraindications.map(c => `<li>${safe(c)}</li>`).join("")}</ul>
-<p>I have additionally disclosed: current medications (including blood thinners, NSAIDs, corticosteroids); allergies of any kind; history of keloids or hypertrophic scarring; history of herpes simplex / cold sores; pregnancy, lactation, or plan to conceive; any pacemaker or metal implants (if relevant to the procedure); and any other condition I believe my doctor should know.</p>
 
-<h2>5. Alternatives and Decision to Proceed</h2>
-<p>The treating doctor has explained available alternatives to this procedure, including the option of not proceeding. I have had adequate opportunity to ask questions, and I have decided to proceed with the procedure of my own free will.</p>
+<h2>5. ${T_("h_alternatives")}</h2>
+<p>${T_("alternatives_text")}</p>
 
-<h2>6. Photography, Documentation, and Academic Use</h2>
-<p>I consent to pre-, intra-, and post-procedure photographs being taken for clinical documentation. Such photographs may be used for academic, scientific, or teaching purposes, provided that my identity is not disclosed and reasonable confidentiality is maintained.</p>
-<p>Initial here if you agree: __________</p>
+${hasConcern ? `<h2>6. ${T_("h_patient_concern")}</h2>
+<p>${T_("patient_concern_intro")}</p>
+<div style="border-left: 3px solid #c8a84e; padding: 6pt 10pt; background: #fdf8eb; font-style: italic; margin: 6pt 0;">${safe(patientConcern)}</div>` : ""}
 
-<h2>7. Data Protection Notice (DPDP Act, 2023)</h2>
+<h2>${sec(6)}. ${T_("h_photo")}</h2>
+<p>${T_("photo_consent")}</p>
+<p>${T_("lbl_initial_here")} __________</p>
+
+<h2>${sec(7)}. ${T_("h_dpdp")}</h2>
 <p>For the purposes of the Digital Personal Data Protection Act, 2023, I acknowledge the following:</p>
 <ul>
   <li><strong>Data Fiduciary:</strong> ${safe(consentClinicName)}${consentClinicAddress ? `, ${safe(consentClinicAddress)}` : ""}.</li>
@@ -3055,91 +3166,87 @@ export default function App(){
   <li><strong>Grievance:</strong> Concerns regarding the processing of my personal data may be raised in writing to the data fiduciary above, who shall respond within a reasonable period.</li>
 </ul>
 
-<h2>8. Cost and Payment</h2>
+<h2>${sec(8)}. ${T_("h_cost")}</h2>
 <p>I have been informed about the cost of the procedure, the number of sessions or treatment packages (if applicable), and the schedule of payment. I agree to the same.</p>
 
-<h2>9. Post-Procedure Care</h2>
+<h2>${sec(9)}. ${T_("h_aftercare")}</h2>
 <p>I understand that strict adherence to pre- and post-procedure instructions is essential. The key aftercare instructions include:</p>
 <ul>${aftercare.map(a => `<li>${safe(a)}</li>`).join("")}</ul>
 
-<h2>10. Authorization and Consent</h2>
-<p>I, <span class="underline" style="min-width:260pt;"></span>, having read and understood the contents of this consent form (translated where necessary into the language I best understand), and having had the opportunity to ask all relevant questions, voluntarily authorize <strong>Dr. ${safe(consentDoctorName)}</strong>${consentDoctorReg ? ` (Reg. No.: ${safe(consentDoctorReg)})` : ""} and his/her designated medical and support staff to perform the procedure of <strong>${safe(procName)}</strong> on me.</p>
+<h2>${sec(10)}. ${T_("h_authorization")}</h2>
+<p>I, ${fld(patientName, 260)}, having read and understood the contents of this consent form (translated where necessary into the language I best understand), and having had the opportunity to ask all relevant questions, voluntarily authorize <strong>Dr. ${safe(consentDoctorName)}</strong>${consentDoctorReg ? ` (Reg. No.: ${safe(consentDoctorReg)})` : ""} and his/her designated medical and support staff to perform the procedure of <strong>${safe(procName)}</strong> on me.</p>
 <p>I authorize the treating doctor to administer any local, topical, or appropriate emergency treatment that may be required during the procedure for my safety.</p>
 <p>I acknowledge that no guarantee has been made about the result of this procedure, and I release the treating doctor, the clinic, and their staff from any liability arising from outcomes that are within the recognized scope of risks disclosed above, provided due care and skill have been exercised.</p>
 
-<h2>11. Right to Withdraw Consent</h2>
-<p>I understand that I may withdraw this consent at any time before the procedure begins by communicating my decision verbally or in writing to the treating doctor or clinic staff. Once the procedure has commenced, withdrawal may be limited by clinical safety considerations.</p>
+<h2>${sec(11)}. ${T_("h_withdraw")}</h2>
+<p>${T_("withdraw_text")}</p>
 
-<h2>12. Translation (if applicable)</h2>
-<div class="field">Was translation to the patient's preferred language required? &nbsp; YES / NO</div>
-<div class="field">Name of translator (if any): <span class="underline" style="min-width:260pt;"></span></div>
-<div class="field">Relationship to patient: <span class="underline" style="min-width:200pt;"></span></div>
+<h2>${sec(12)}. ${T_("h_translation")}</h2>
+<div class="field">${T_("lbl_translator")} &nbsp; ${T_("lbl_yes_no")}</div>
+<div class="field">${T_("lbl_translator_name")}: <span class="underline" style="min-width:260pt;"></span></div>
+<div class="field">${T_("lbl_relationship")}: <span class="underline" style="min-width:200pt;"></span></div>
 
-<h2>13. Signatures</h2>
+<h2>${sec(13)}. ${T_("h_signatures")}</h2>
 
 <div class="sig-row">
   <div class="sig-cell">
-    <div class="sig-line">Patient / Authorized Representative</div>
-    <div class="small">Name: ____________________________</div>
-    <div class="small">Date: ____________ &nbsp; Time: ____________</div>
-    <div class="small">(For minors: signature of parent/guardian above; relationship: __________)</div>
+    <div class="sig-line">${T_("lbl_patient_sig")}</div>
+    <div class="small">${T_("lbl_name")}: ${patientName ? safe(patientName) : "____________________________"}</div>
+    <div class="small">${T_("lbl_date")}: ____________ &nbsp; Time: ____________</div>
   </div>
   <div class="sig-cell">
-    <div class="sig-line">Treating Doctor</div>
-    <div class="small">Name: Dr. ${safe(consentDoctorName)}</div>
+    <div class="sig-line">${T_("lbl_doctor_sig")}</div>
+    <div class="small">${T_("lbl_name")}: Dr. ${safe(consentDoctorName)}</div>
     ${consentDoctorReg ? `<div class="small">Registration No.: ${safe(consentDoctorReg)}</div>` : ""}
-    <div class="small">Date: ____________ &nbsp; Time: ____________</div>
+    <div class="small">${T_("lbl_date")}: ____________ &nbsp; Time: ____________</div>
   </div>
 </div>
 
 <div class="sig-row">
   <div class="sig-cell">
-    <div class="sig-line">Witness 1</div>
-    <div class="small">Name: ____________________________</div>
-    <div class="small">Address / Relationship: ____________________________</div>
+    <div class="sig-line">${T_("lbl_witness")} 1</div>
+    <div class="small">${T_("lbl_name")}: ____________________________</div>
+    <div class="small">${T_("lbl_address")} / ${T_("lbl_relationship")}: ____________________________</div>
   </div>
   <div class="sig-cell">
-    <div class="sig-line">Witness 2 (optional)</div>
-    <div class="small">Name: ____________________________</div>
-    <div class="small">Address / Relationship: ____________________________</div>
+    <div class="sig-line">${T_("lbl_witness")} 2</div>
+    <div class="small">${T_("lbl_name")}: ____________________________</div>
+    <div class="small">${T_("lbl_address")} / ${T_("lbl_relationship")}: ____________________________</div>
   </div>
 </div>
 
 <div class="footer-disclaimer">
   This template was generated using SKINARIO's consent template tool as an educational starting point.
   It is NOT a substitute for legal advice. The treating practitioner is responsible for legal adequacy
-  and clinical specificity. SKINARIO and Absolute Institute disclaim liability for any clinical use of
-  this document without prior review by qualified counsel. — Generated ${safe(today)}.
+  and clinical specificity. — Generated ${safe(today)}.
 </div>
 
 </body>
-</html>
-`;
+</html>`;
+      };
 
-      // Trigger download as .doc (Word opens HTML-as-Word reliably)
-      const blob = new Blob(["\ufeff", html], { type: "application/msword" });
-      const filename = `consent_${procName.replace(/[^a-z0-9]+/gi, "_").toLowerCase().slice(0, 40)}_${todayKey}.doc`;
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      const englishHtml = buildHtml("en");
+      const vernacularHtml = consentLanguage !== "en" ? buildHtml(consentLanguage) : null;
 
-      // ─── Persist rate-limit state ───
+      // Open preview modal with the generated HTML
+      setConsentPreview({
+        englishHtml,
+        vernacularHtml,
+        langCode: consentLanguage,
+        procName,
+      });
+
+      // Persist rate-limit state
       const newGenerations = { ...(prof.consentGenerations || {}), [todayKey]: todaysCount + 1 };
       let newCredits = credits;
-      if (todaysCount >= 1) {
-        newCredits = Math.max(0, credits - 1); // used a credit
-      }
+      if (todaysCount >= 1) newCredits = Math.max(0, credits - 1);
       await fbSet("users", au.uid, {
         consentGenerations: newGenerations,
         consentCredits: newCredits,
       });
       setProf((p) => ({ ...p, consentGenerations: newGenerations, consentCredits: newCredits }));
 
-      // ─── Audit log ───
+      // Audit log
       try {
         const logId = `${au.uid}_${Date.now()}`;
         await fbSet("consentGenerationLog", logId, {
@@ -3149,6 +3256,7 @@ export default function App(){
           procedure: procName,
           category: consentCat || "(custom)",
           clinicName: consentClinicName,
+          language: consentLanguage,
           isCustomProcedure: consentProc === "__custom__",
           usedCredit: todaysCount >= 1,
           createdAt: Date.now(),
@@ -3157,7 +3265,7 @@ export default function App(){
         console.warn("consent log failed (non-fatal):", logErr);
       }
 
-      sh(`✅ Consent template generated. Saved as ${filename}`);
+      sh("✅ Consent template ready — preview below");
     } catch (err) {
       console.error("consent generation failed:", err);
       sh("❌ Generation failed: " + (err.message || "unknown error"));
@@ -3165,6 +3273,7 @@ export default function App(){
       setConsentGenerating(false);
     }
   };
+
 
   const submitAnswer=async(qid,qObj,idx)=>{
     if(!au)return;
@@ -7546,7 +7655,55 @@ export default function App(){
               {selectedProc.description}
             </div>}
 
-            <h3 style={{fontSize:"1rem",fontWeight:700,marginBottom:14,marginTop:6}}>2. Clinic information</h3>
+            <h3 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,marginTop:6}}>2. Patient details <span style={{fontSize:".74rem",color:T.mute,fontWeight:400}}>(optional)</span></h3>
+            <p style={{fontSize:".74rem",color:T.txt2,marginBottom:10,lineHeight:1.5}}>Pre-fill the patient's details here, or leave blank to print a generic template that the patient fills by hand.</p>
+
+            <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:10,marginBottom:10}} className="consent-grid">
+              <div>
+                <label style={{display:"block",fontSize:".7rem",color:T.mute,fontWeight:600,marginBottom:3,textTransform:"uppercase",letterSpacing:1}}>Patient name</label>
+                <input value={consentPatientName} onChange={e=>setConsentPatientName(e.target.value)} placeholder="e.g. Priya Sharma" style={{...T.inp,width:"100%",padding:"8px 10px",fontSize:".88rem"}}/>
+              </div>
+              <div>
+                <label style={{display:"block",fontSize:".7rem",color:T.mute,fontWeight:600,marginBottom:3,textTransform:"uppercase",letterSpacing:1}}>Age</label>
+                <input value={consentPatientAge} onChange={e=>setConsentPatientAge(e.target.value)} placeholder="e.g. 32" style={{...T.inp,width:"100%",padding:"8px 10px",fontSize:".88rem"}}/>
+              </div>
+              <div>
+                <label style={{display:"block",fontSize:".7rem",color:T.mute,fontWeight:600,marginBottom:3,textTransform:"uppercase",letterSpacing:1}}>Sex</label>
+                <select value={consentPatientSex} onChange={e=>setConsentPatientSex(e.target.value)} style={{...T.inp,width:"100%",padding:"8px 10px",fontSize:".88rem"}}>
+                  <option value="">—</option>
+                  <option value="Female">Female</option>
+                  <option value="Male">Male</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}} className="consent-grid">
+              <div>
+                <label style={{display:"block",fontSize:".7rem",color:T.mute,fontWeight:600,marginBottom:3,textTransform:"uppercase",letterSpacing:1}}>Mobile number</label>
+                <input value={consentPatientMobile} onChange={e=>setConsentPatientMobile(e.target.value)} placeholder="e.g. +91 98765 43210" style={{...T.inp,width:"100%",padding:"8px 10px",fontSize:".88rem"}}/>
+              </div>
+              <div>
+                <label style={{display:"block",fontSize:".7rem",color:T.mute,fontWeight:600,marginBottom:3,textTransform:"uppercase",letterSpacing:1}}>Patient ID (optional)</label>
+                <input value={consentPatientId} onChange={e=>setConsentPatientId(e.target.value)} placeholder="e.g. SC-2026-0123" style={{...T.inp,width:"100%",padding:"8px 10px",fontSize:".88rem"}}/>
+              </div>
+            </div>
+
+            <div style={{marginBottom:14}}>
+              <label style={{display:"block",fontSize:".7rem",color:T.mute,fontWeight:600,marginBottom:3,textTransform:"uppercase",letterSpacing:1}}>Patient's specific concern / expected outcome <span style={{textTransform:"none",letterSpacing:0,fontWeight:400,color:T.mute}}>(optional)</span></label>
+              <textarea value={consentPatientConcern} onChange={e=>setConsentPatientConcern(e.target.value)} rows={3} placeholder="e.g. Patient wants subtle softening of glabellar lines, prefers natural look, does not desire complete freeze. Has noticed asymmetry — wants left side addressed." style={{...T.inp,width:"100%",padding:"8px 10px",fontSize:".84rem",fontFamily:"inherit",lineHeight:1.5,resize:"vertical",boxSizing:"border-box"}}/>
+              <div style={{fontSize:".7rem",color:T.mute,marginTop:4,lineHeight:1.5}}>If filled, this text appears verbatim as a dedicated section in the consent form (helps document patient intent and scope). Leave blank for a generic template.</div>
+            </div>
+
+            <h3 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,marginTop:6}}>3. Language</h3>
+            <p style={{fontSize:".74rem",color:T.txt2,marginBottom:8,lineHeight:1.5}}>
+              Choose the language the patient is most comfortable with. Non-English versions are auto-generated alongside an English copy. Medical, procedure, and legal terms are kept in English to preserve clinical accuracy.
+            </p>
+            <select value={consentLanguage} onChange={e=>setConsentLanguage(e.target.value)} style={{...T.inp,width:"100%",padding:"9px 12px",marginBottom:14}}>
+              {CONSENT_LANGUAGES.map(l=><option key={l.code} value={l.code}>{l.label} {l.code!=="en"&&`(${l.nativeLabel})`}</option>)}
+            </select>
+
+            <h3 style={{fontSize:"1rem",fontWeight:700,marginBottom:14,marginTop:6}}>4. Clinic information</h3>
 
             <div style={{marginBottom:14}}>
               <label style={{display:"block",fontSize:".74rem",color:T.mute,fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Clinic name *</label>
@@ -7579,7 +7736,7 @@ export default function App(){
               </div>}
             </div>
 
-            <h3 style={{fontSize:"1rem",fontWeight:700,marginBottom:14,marginTop:6}}>3. Treating doctor</h3>
+            <h3 style={{fontSize:"1rem",fontWeight:700,marginBottom:14,marginTop:6}}>5. Treating doctor</h3>
 
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}} className="consent-grid">
               <div>
@@ -7612,11 +7769,11 @@ export default function App(){
               opacity:(consentGenerating||(dailyExhausted&&credits<=0))?.55:1,
               cursor:(consentGenerating||(dailyExhausted&&credits<=0))?"not-allowed":"pointer",
             }}>
-              {consentGenerating?"⏳ Generating...":dailyExhausted&&credits<=0?"Daily limit reached":"📄 Generate Consent Template"}
+              {consentGenerating?"⏳ Generating...":dailyExhausted&&credits<=0?"Daily limit reached":"📄 Generate & Preview"}
             </button>
 
             <div style={{fontSize:".7rem",color:T.mute,marginTop:10,lineHeight:1.5}}>
-              The file downloads as a .doc file you can open and edit in Microsoft Word or Google Docs.
+              You'll see a preview before downloading. From the preview you can save as <b>Word (.doc)</b> or <b>PDF</b> (via your browser's print dialog).
               {credits>0&&" Bonus credits will only be used after your daily free generation."}
             </div>
           </div>
@@ -7656,5 +7813,82 @@ export default function App(){
           setQuizzes(prev=>prev.map(q=>q.id===quizId?{...q,igImageUrl:url}:q));
         }catch(err){console.error("cache quiz image failed:",err)}
       }}/>}
+
+      {/* ═══ CONSENT PREVIEW MODAL ═══ */}
+      {consentPreview && (() => {
+        const isVern = consentPreview.langCode !== "en";
+        const langLabel = CONSENT_LANGUAGES.find(l => l.code === consentPreview.langCode)?.label || "English";
+        // Use the iframe srcdoc trick to render the HTML safely
+        const downloadAs = (html, kind, suffix) => {
+          const filename = `consent_${consentPreview.procName.replace(/[^a-z0-9]+/gi,"_").toLowerCase().slice(0,40)}_${suffix}_${todayIST_YMD()}.doc`;
+          const blob = new Blob(["\ufeff", html], { type: "application/msword" });
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+        };
+        const printAsPdf = (html) => {
+          // Open new window with HTML and trigger print dialog (user can Save as PDF)
+          const w = window.open("", "_blank");
+          if (!w) { sh("Pop-up blocked — please allow pop-ups for this site"); return; }
+          w.document.open();
+          w.document.write(html);
+          w.document.close();
+          // Give it a moment to render before printing
+          setTimeout(() => { try { w.focus(); w.print(); } catch {} }, 400);
+        };
+        return (
+          <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.75)", zIndex:10000, display:"flex", alignItems:"center", justifyContent:"center", padding:18 }} onClick={() => setConsentPreview(null)}>
+            <div style={{ background:"#fff", borderRadius:14, maxWidth:1100, width:"100%", height:"90vh", display:"flex", flexDirection:"column", overflow:"hidden" }} onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 20px", borderBottom:"1px solid "+T.border, gap:10 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+                  <h3 style={{ fontSize:"1.05rem", fontWeight:700, margin:0 }}>📋 Preview & Download</h3>
+                  <span style={{ fontSize:".74rem", color:T.mute }}>{consentPreview.procName}</span>
+                </div>
+                <button onClick={() => setConsentPreview(null)} style={{ background:"none", border:"none", fontSize:"1.4rem", cursor:"pointer", color:"#999", padding:"4px 8px" }}>✕</button>
+              </div>
+
+              {/* Body — two-pane if vernacular, single-pane if English-only */}
+              <div style={{ flex:1, display:"flex", overflow:"hidden", minHeight:0 }}>
+                {isVern && (
+                  <div style={{ flex:1, display:"flex", flexDirection:"column", borderRight:"1px solid "+T.border, minWidth:0 }}>
+                    <div style={{ padding:"10px 14px", background:"#fff8e1", borderBottom:"1px solid "+T.border, fontSize:".82rem", fontWeight:600, color:"#856404", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8 }}>
+                      <span>🌐 {langLabel} version</span>
+                      <span style={{ display:"flex", gap:6 }}>
+                        <button onClick={() => downloadAs(consentPreview.vernacularHtml, "word", langLabel.toLowerCase())} style={{ ...T.btnO, padding:"5px 12px", fontSize:".74rem" }}>⬇️ Word</button>
+                        <button onClick={() => printAsPdf(consentPreview.vernacularHtml)} style={{ ...T.btn, padding:"5px 12px", fontSize:".74rem" }}>🖨 PDF</button>
+                      </span>
+                    </div>
+                    <iframe title="Vernacular preview" srcDoc={consentPreview.vernacularHtml} style={{ flex:1, border:"none", width:"100%", background:"#fff" }}/>
+                  </div>
+                )}
+                <div style={{ flex:1, display:"flex", flexDirection:"column", minWidth:0 }}>
+                  <div style={{ padding:"10px 14px", background:T.tealBg+"66", borderBottom:"1px solid "+T.border, fontSize:".82rem", fontWeight:600, color:T.teal, display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8 }}>
+                    <span>📄 English version {isVern && <span style={{ fontWeight:400, color:T.mute, fontSize:".74rem" }}> · legally binding original</span>}</span>
+                    <span style={{ display:"flex", gap:6 }}>
+                      <button onClick={() => downloadAs(consentPreview.englishHtml, "word", "english")} style={{ ...T.btnO, padding:"5px 12px", fontSize:".74rem" }}>⬇️ Word</button>
+                      <button onClick={() => printAsPdf(consentPreview.englishHtml)} style={{ ...T.btn, padding:"5px 12px", fontSize:".74rem" }}>🖨 PDF</button>
+                    </span>
+                  </div>
+                  <iframe title="English preview" srcDoc={consentPreview.englishHtml} style={{ flex:1, border:"none", width:"100%", background:"#fff" }}/>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div style={{ padding:"10px 18px", borderTop:"1px solid "+T.border, background:"#faf9f5", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8 }}>
+                <div style={{ fontSize:".72rem", color:T.txt2, lineHeight:1.5 }}>
+                  <b>Tip:</b> "PDF" opens your browser's print dialog — choose <b>Save as PDF</b> as the destination.
+                  {isVern && <> Both versions can be printed for the patient's records.</>}
+                </div>
+                <button onClick={() => setConsentPreview(null)} style={{ ...T.btn, padding:"7px 16px", fontSize:".82rem" }}>Done</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>);
 }
