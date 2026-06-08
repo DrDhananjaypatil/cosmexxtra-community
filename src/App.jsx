@@ -1979,6 +1979,7 @@ export default function App(){
   const[consentPatientConcern,setConsentPatientConcern]=useState(""); // optional free-text — patient's specific concern / desired outcome
   // Language: en, hi, mr, gu, bn, ta, te
   const[consentLanguage,setConsentLanguage]=useState("en");
+  const[consentUseLetterhead,setConsentUseLetterhead]=useState(false); // if true, skip clinic header — leave space for printed letterhead
   // Preview modal state
   const[consentPreview,setConsentPreview]=useState(null); // {vernacularHtml?, englishHtml, procName, langCode}
   const[consentHistory,setConsentHistory]=useState([]); // current user's consent generation history (metadata only — no PHI)
@@ -3091,8 +3092,13 @@ export default function App(){
       // Helper to render a field that's either filled or has an underline
       const fld = (val, minWidth) => val ? `<strong>${safe(val)}</strong>` : `<span class="underline" style="min-width:${minWidth || 200}pt;"></span>`;
 
-      // ═══ HTML BUILDER (parameterized by language) ═══
-      const buildHtml = (langCode) => {
+      // ═══ HTML BUILDER (parameterized by language + render mode) ═══
+      // forDownload=false → preview (full red warnings, top + footer)
+      // forDownload=true  → downloaded file (no red warnings; small neutral footer)
+      // useLetterhead=true → skip clinic header block, add top spacer (~80mm)
+      //                     for doctor to print on their letterhead
+      const useLetterhead = !!consentUseLetterhead;
+      const buildHtml = (langCode, forDownload = false) => {
         const T_ = (key) => tr(key, langCode);
         const isVern = langCode !== "en";
         const langLabel = CONSENT_LANGUAGES.find(l => l.code === langCode)?.label || "English";
@@ -3102,8 +3108,13 @@ export default function App(){
         const concernShift = hasConcern ? 1 : 0;
         const sec = (baseNum) => baseNum <= 5 ? baseNum : (baseNum + concernShift);
 
+        // Margins: standard A4 doc has 25mm top/left/right, 20mm bottom.
+        // When letterhead toggle is on, increase top to 75mm so the doctor's
+        // pre-printed letterhead has room (typical letterhead height is 50-70mm).
+        const topMargin = useLetterhead ? "75mm" : "25mm";
         const css = `
-          body { font-family: 'Cambria', 'Georgia', serif; font-size: 11pt; line-height: 1.55; color: #222; margin: 0; padding: 18pt 18pt 18pt 18pt; }
+          @page { size: A4; margin: ${topMargin} 25mm 20mm 25mm; }
+          body { font-family: 'Cambria', 'Georgia', serif; font-size: 11pt; line-height: 1.55; color: #222; margin: 0; padding: 0; }
           h1 { font-size: 16pt; text-align: center; margin: 4pt 0; }
           h2 { font-size: 12pt; margin: 14pt 0 6pt 0; padding-bottom: 3pt; border-bottom: 1px solid #888; }
           h3 { font-size: 11pt; margin: 10pt 0 4pt 0; }
@@ -3112,6 +3123,7 @@ export default function App(){
           .clinic-right { display: table-cell; text-align: right; vertical-align: middle; font-size: 9pt; color: #555; }
           .clinic-name { font-size: 14pt; font-weight: bold; }
           .clinic-meta { font-size: 9pt; color: #555; }
+          .letterhead-spacer { height: 60mm; border-bottom: 1px dotted #ccc; margin-bottom: 10pt; }
           .disclaimer { color: #c0392b; font-size: 9pt; font-style: italic; border: 1px solid #c0392b; padding: 8pt; margin-bottom: 14pt; background: #fff5f3; }
           .translation-notice { color: #856404; font-size: 9pt; border: 1px solid #ffc107; padding: 8pt; margin-bottom: 14pt; background: #fff8e1; }
           .field { margin: 4pt 0; }
@@ -3123,6 +3135,7 @@ export default function App(){
           .sig-line { border-top: 1px solid #333; margin-top: 30pt; padding-top: 4pt; }
           .small { font-size: 9pt; color: #555; }
           .footer-disclaimer { color: #c0392b; font-size: 8pt; font-style: italic; text-align: center; margin-top: 30pt; padding-top: 6pt; border-top: 1px dashed #c0392b; }
+          .footer-neutral { color: #888; font-size: 7.5pt; text-align: center; margin-top: 24pt; padding-top: 4pt; border-top: 1px solid #e0e0e0; }
         `;
 
         const translationNotice = isVern && T_("translation_notice")
@@ -3135,7 +3148,9 @@ export default function App(){
 <head><meta charset="utf-8" /><title>Consent — ${safe(procName)}${isVern ? ` (${langLabel})` : ""}</title><style>${css}</style></head>
 <body>
 
-<div class="clinic-header">
+${useLetterhead
+  ? `<div class="letterhead-spacer">&nbsp;</div>`
+  : `<div class="clinic-header">
   <div class="clinic-left">
     ${logoHtml}
     <div class="clinic-name">${safe(consentClinicName)}</div>
@@ -3145,15 +3160,16 @@ export default function App(){
   <div class="clinic-right">
     ${T_("lbl_date")}: <span class="underline" style="min-width:80pt;">&nbsp;${safe(today)}&nbsp;</span>
   </div>
-</div>
+</div>`}
 
 ${translationNotice}
 
-<div class="disclaimer">
+${forDownload ? "" : `<div class="disclaimer">
   <strong>IMPORTANT — TEMPLATE FOR EDUCATIONAL REFERENCE.</strong>
   This document was generated by an AI-assisted template tool and has NOT been reviewed by legal counsel.
-  Verify with a qualified medical-legal advisor before clinical use. This red notice can be deleted after your own review.
-</div>
+  Verify with a qualified medical-legal advisor before clinical use. This red notice and the footer below are
+  shown only in this preview — the downloaded file does NOT include them, so the patient will not see them.
+</div>`}
 
 <h1>${T_("title_main")} ${safe(procName.toUpperCase())}</h1>
 
@@ -3253,23 +3269,33 @@ ${hasConcern ? `<h2>6. ${T_("h_patient_concern")}</h2>
   </div>
 </div>
 
-<div class="footer-disclaimer">
+${forDownload
+  ? `<div class="footer-neutral">Template generated using SKINARIO — reviewed by treating practitioner before use.</div>`
+  : `<div class="footer-disclaimer">
   This template was generated using SKINARIO's consent template tool as an educational starting point.
   It is NOT a substitute for legal advice. The treating practitioner is responsible for legal adequacy
-  and clinical specificity. — Generated ${safe(today)}.
-</div>
+  and clinical specificity. — Generated ${safe(today)}. <strong>(This red footer is preview-only and will NOT appear in the downloaded file.)</strong>
+</div>`}
 
 </body>
 </html>`;
       };
 
-      const englishHtml = buildHtml("en");
-      const vernacularHtml = consentLanguage !== "en" ? buildHtml(consentLanguage) : null;
+      // Preview HTML (red warnings visible) — what's shown in the modal
+      const englishHtmlPreview = buildHtml("en", false);
+      const vernacularHtmlPreview = consentLanguage !== "en" ? buildHtml(consentLanguage, false) : null;
+      // Download HTML (clean) — what gets saved to disk / printed
+      const englishHtmlDownload = buildHtml("en", true);
+      const vernacularHtmlDownload = consentLanguage !== "en" ? buildHtml(consentLanguage, true) : null;
 
-      // Open preview modal with the generated HTML
+      // Open preview modal — pass both versions:
+      //   *Preview is shown in iframe (with red warnings as a doctor reminder)
+      //   *Download uses the clean version (no red warnings, looks professional)
       setConsentPreview({
-        englishHtml,
-        vernacularHtml,
+        englishHtml: englishHtmlPreview,
+        vernacularHtml: vernacularHtmlPreview,
+        englishHtmlDownload: englishHtmlDownload,
+        vernacularHtmlDownload: vernacularHtmlDownload,
         langCode: consentLanguage,
         procName,
       });
@@ -7857,6 +7883,19 @@ ${hasConcern ? `<h2>6. ${T_("h_patient_concern")}</h2>
               </div>}
             </div>
 
+            {/* Letterhead toggle — when printing on pre-printed letterhead, skip header */}
+            <div style={{marginBottom:14,padding:"10px 14px",background:T.bg,borderRadius:8,border:"1px solid "+T.border}}>
+              <label style={{display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer"}}>
+                <input type="checkbox" checked={consentUseLetterhead} onChange={e=>setConsentUseLetterhead(e.target.checked)} style={{marginTop:3,flexShrink:0}}/>
+                <div>
+                  <div style={{fontSize:".84rem",fontWeight:600,color:T.txt}}>Print on my clinic letterhead</div>
+                  <div style={{fontSize:".72rem",color:T.txt2,marginTop:3,lineHeight:1.55}}>
+                    Tick this if your clinic uses pre-printed letterhead paper. The document will leave a blank area at the top (~6 cm) and skip the auto-generated clinic header, so your letterhead has room to show through.
+                  </div>
+                </div>
+              </label>
+            </div>
+
             <h3 style={{fontSize:"1rem",fontWeight:700,marginBottom:14,marginTop:6}}>5. Treating doctor</h3>
 
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}} className="consent-grid">
@@ -8015,8 +8054,8 @@ ${hasConcern ? `<h2>6. ${T_("h_patient_concern")}</h2>
                     <div style={{ padding:"10px 14px", background:"#fff8e1", borderBottom:"1px solid "+T.border, fontSize:".82rem", fontWeight:600, color:"#856404", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8 }}>
                       <span>🌐 {langLabel} version</span>
                       <span style={{ display:"flex", gap:6 }}>
-                        <button onClick={() => downloadAs(consentPreview.vernacularHtml, "word", langLabel.toLowerCase())} style={{ ...T.btnO, padding:"5px 12px", fontSize:".74rem" }}>⬇️ Word</button>
-                        <button onClick={() => printAsPdf(consentPreview.vernacularHtml)} style={{ ...T.btn, padding:"5px 12px", fontSize:".74rem" }}>🖨 PDF</button>
+                        <button onClick={() => downloadAs(consentPreview.vernacularHtmlDownload, "word", langLabel.toLowerCase())} style={{ ...T.btnO, padding:"5px 12px", fontSize:".74rem" }}>⬇️ Word</button>
+                        <button onClick={() => printAsPdf(consentPreview.vernacularHtmlDownload)} style={{ ...T.btn, padding:"5px 12px", fontSize:".74rem" }}>🖨 PDF</button>
                       </span>
                     </div>
                     <iframe title="Vernacular preview" srcDoc={consentPreview.vernacularHtml} style={{ flex:1, border:"none", width:"100%", background:"#fff" }}/>
@@ -8026,8 +8065,8 @@ ${hasConcern ? `<h2>6. ${T_("h_patient_concern")}</h2>
                   <div style={{ padding:"10px 14px", background:T.tealBg+"66", borderBottom:"1px solid "+T.border, fontSize:".82rem", fontWeight:600, color:T.teal, display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8 }}>
                     <span>📄 English version {isVern && <span style={{ fontWeight:400, color:T.mute, fontSize:".74rem" }}> · legally binding original</span>}</span>
                     <span style={{ display:"flex", gap:6 }}>
-                      <button onClick={() => downloadAs(consentPreview.englishHtml, "word", "english")} style={{ ...T.btnO, padding:"5px 12px", fontSize:".74rem" }}>⬇️ Word</button>
-                      <button onClick={() => printAsPdf(consentPreview.englishHtml)} style={{ ...T.btn, padding:"5px 12px", fontSize:".74rem" }}>🖨 PDF</button>
+                      <button onClick={() => downloadAs(consentPreview.englishHtmlDownload, "word", "english")} style={{ ...T.btnO, padding:"5px 12px", fontSize:".74rem" }}>⬇️ Word</button>
+                      <button onClick={() => printAsPdf(consentPreview.englishHtmlDownload)} style={{ ...T.btn, padding:"5px 12px", fontSize:".74rem" }}>🖨 PDF</button>
                     </span>
                   </div>
                   <iframe title="English preview" srcDoc={consentPreview.englishHtml} style={{ flex:1, border:"none", width:"100%", background:"#fff" }}/>
@@ -8037,8 +8076,8 @@ ${hasConcern ? `<h2>6. ${T_("h_patient_concern")}</h2>
               {/* Footer */}
               <div style={{ padding:"10px 18px", borderTop:"1px solid "+T.border, background:"#faf9f5", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:8 }}>
                 <div style={{ fontSize:".72rem", color:T.txt2, lineHeight:1.5 }}>
-                  <b>Tip:</b> "PDF" opens your browser's print dialog — choose <b>Save as PDF</b> as the destination.
-                  {isVern && <> Both versions can be printed for the patient's records.</>}
+                  <b>📥 Downloaded copy is clean</b> — the red warnings above appear in this preview only. The Word/PDF file the patient sees has NO red disclaimers, just a small neutral footer line.
+                  {isVern && <> Both language versions can be printed for the patient's records.</>}
                 </div>
                 <button onClick={() => setConsentPreview(null)} style={{ ...T.btn, padding:"7px 16px", fontSize:".82rem" }}>Done</button>
               </div>
