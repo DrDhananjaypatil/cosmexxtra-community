@@ -219,6 +219,219 @@ function todayIST_YMD(){
 }
 const TOPICS=["Botox & Neurotoxins","Dermal Fillers","Threads","PDRN & Polynucleotides","Peptides & Skin Boosters","Chemical Peels","Laser & Energy Devices","Hair Restoration","Body Contouring","Anti-Aging & Regenerative","Skincare Science","Pigmentation & Melasma","Acne & Scars","Practice Management"];
 
+// ═══ CONSENT TEMPLATE CATALOG ═══
+// Two-level structure: category → sub-procedures. Each sub-procedure carries
+// procedure-specific risk content. The legal framework (boilerplate clauses
+// around DPDP, governing law, dispute resolution) lives in CONSENT_BOILERPLATE.
+//
+// IMPORTANT: This is v1 generic content meant to be iterated after legal review.
+// Doctors must review with their own counsel before clinical use. The PDF
+// includes prominent disclaimers stating exactly this.
+const CONSENT_PROCEDURES = {
+  "Injectables": {
+    icon: "💉",
+    procedures: {
+      "Botulinum Toxin (Botox / Dysport / Xeomin)": {
+        description: "Intramuscular injection of botulinum toxin Type A for temporary reduction of muscle activity to soften dynamic wrinkles (forehead, glabella, crow's feet) or treat conditions such as masseter hypertrophy, hyperhidrosis, or migraine.",
+        commonRisks: ["Pain, redness, or bruising at injection site", "Headache or flu-like symptoms (usually within 24-48 hours)", "Temporary muscle weakness near injection site", "Asymmetry of result"],
+        seriousRisks: ["Eyelid or eyebrow ptosis (drooping) — typically resolves in 2-12 weeks", "Diplopia (double vision) — rare", "Difficulty swallowing or breathing — extremely rare, requires immediate medical attention", "Allergic reaction (anaphylaxis is extremely rare)"],
+        contraindications: ["Pregnancy or breastfeeding", "Neuromuscular disorders (myasthenia gravis, Lambert-Eaton syndrome, ALS)", "Active infection at injection site", "Known hypersensitivity to botulinum toxin or excipients"],
+        aftercare: ["Avoid lying down for 4 hours post-procedure", "Avoid strenuous exercise for 24 hours", "Avoid rubbing or massaging the treated area for 24 hours", "Avoid heat exposure (sauna, hot yoga) for 24 hours", "Results begin in 3-5 days; full effect by 14 days"],
+        duration: "Effects typically last 3-4 months. Touch-up may be needed at 2 weeks if asymmetry occurs.",
+      },
+      "Dermal Fillers (Hyaluronic Acid)": {
+        description: "Injection of hyaluronic acid-based dermal filler for soft tissue augmentation, including lip enhancement, cheek volumization, tear trough correction, or nasolabial fold reduction.",
+        commonRisks: ["Pain, redness, swelling, or bruising at injection site", "Temporary lumpiness or asymmetry", "Tenderness for 1-3 days"],
+        seriousRisks: ["Vascular occlusion leading to skin necrosis — requires immediate intervention with hyaluronidase", "Blindness (extremely rare but reported with periocular injection)", "Infection or abscess formation", "Granuloma or persistent nodule formation", "Tyndall effect (bluish discoloration)", "Migration of product"],
+        contraindications: ["Pregnancy or breastfeeding", "Active skin infection or inflammation at site", "Known hypersensitivity to hyaluronic acid or lidocaine", "Bleeding disorders or anticoagulant therapy (relative)", "Autoimmune disease (relative)"],
+        aftercare: ["Avoid strenuous exercise for 24-48 hours", "Avoid extreme heat or cold for 24 hours", "Avoid alcohol for 24 hours", "Avoid dental procedures for 2 weeks", "Mild swelling and bruising may persist 3-7 days"],
+        duration: "Results typically last 6-18 months depending on product and area treated. Hyaluronidase available for reversal if needed.",
+      },
+      "Biostimulators (Sculptra / Radiesse / Profhilo)": {
+        description: "Injection of collagen-stimulating biomaterials (poly-L-lactic acid, calcium hydroxylapatite, or stabilized hyaluronic acid) to gradually restore volume and stimulate the patient's own collagen.",
+        commonRisks: ["Injection-site pain, bruising, swelling", "Temporary palpable nodules", "Asymmetry"],
+        seriousRisks: ["Late-onset nodule formation (months after injection)", "Vascular occlusion (rare but possible)", "Granuloma formation", "Persistent firmness or lumps requiring dissolution attempts"],
+        contraindications: ["Pregnancy or breastfeeding", "Active skin infection at site", "Known hypersensitivity to product components", "Autoimmune disease", "Keloid tendency (relative)"],
+        aftercare: ["Massage the treated area as instructed (typically 5-5-5 rule)", "Avoid strenuous exercise for 24 hours", "Drink adequate water", "Results emerge gradually over 6-12 weeks"],
+        duration: "Results develop progressively over 8-12 weeks and last 12-24 months. Multiple sessions usually required.",
+      },
+      "Mesotherapy / Skin Boosters": {
+        description: "Superficial intradermal injections of vitamins, antioxidants, hyaluronic acid, or peptide formulations to improve skin texture, hydration, and quality.",
+        commonRisks: ["Injection-site redness, swelling, bruising", "Mild stinging during procedure", "Temporary papules"],
+        seriousRisks: ["Allergic reaction to injected substance", "Infection if sterility is compromised", "Skin discoloration (transient)", "Persistent nodules"],
+        contraindications: ["Pregnancy or breastfeeding", "Active skin infection", "Known hypersensitivity to any constituent", "Coagulopathy"],
+        aftercare: ["Avoid makeup for 12-24 hours", "Avoid heat, sauna, intense exercise for 24 hours", "Gentle skincare for 48 hours", "Series of treatments typically needed for best results"],
+        duration: "Effects build over a series of 3-6 sessions. Maintenance every 3-6 months.",
+      },
+    },
+  },
+  "Threads": {
+    icon: "🧵",
+    procedures: {
+      "PDO Mono Threads": {
+        description: "Insertion of polydioxanone (PDO) smooth threads under the skin to stimulate collagen production and improve skin quality and tightness.",
+        commonRisks: ["Pain, bruising, swelling at insertion sites", "Visible thread ends (typically resolve in days)", "Temporary asymmetry"],
+        seriousRisks: ["Thread extrusion or migration", "Infection at insertion sites", "Persistent dimpling or puckering", "Damage to underlying structures (vessels, nerves)", "Granuloma formation"],
+        contraindications: ["Pregnancy or breastfeeding", "Active skin infection or inflammation", "Coagulopathy or anticoagulant therapy", "Autoimmune disease", "Keloid tendency", "Body dysmorphic disorder"],
+        aftercare: ["Avoid facial movements like wide yawning, chewing tough food for 1-2 weeks", "Sleep on back with head elevated for 5-7 days", "No facials, massage, or dental work for 2 weeks", "Avoid strenuous exercise for 1 week"],
+        duration: "Threads dissolve over 6-8 months. Collagen stimulation effect lasts 12-18 months.",
+      },
+      "PDO Cog / Barbed Threads (Lifting)": {
+        description: "Insertion of barbed polydioxanone threads to mechanically lift sagging tissue in the mid-face, jawline, neck, or other areas.",
+        commonRisks: ["Pain, bruising, swelling at insertion and exit points", "Dimpling or visible thread tracks", "Asymmetry", "Numbness or altered sensation"],
+        seriousRisks: ["Thread breakage, migration, or extrusion", "Persistent dimpling requiring intervention", "Infection or abscess", "Nerve damage (motor or sensory)", "Vascular injury", "Inadequate lift or over-correction", "Skin necrosis (very rare)"],
+        contraindications: ["Pregnancy or breastfeeding", "Active skin infection", "Coagulopathy or anticoagulant therapy", "Autoimmune disease", "Keloid tendency", "Very thin skin", "Severe skin laxity not amenable to threads"],
+        aftercare: ["Avoid extreme facial movements (wide smile, yawning, chewing tough food) for 2-3 weeks", "Sleep on back, head elevated for 7-10 days", "No facials, massage, or dental procedures for 3 weeks", "Avoid strenuous exercise for 2 weeks", "Avoid pressure on treated areas"],
+        duration: "Initial lift visible immediately. Threads dissolve over 6-9 months. Collagen stimulation maintains result for 12-18 months.",
+      },
+    },
+  },
+  "Energy Devices": {
+    icon: "⚡",
+    procedures: {
+      "Q-Switched Nd:YAG Laser": {
+        description: "Application of Q-switched neodymium-doped yttrium aluminum garnet laser energy for pigmentation, tattoo removal, or skin rejuvenation (laser toning).",
+        commonRisks: ["Redness, mild swelling, warmth post-treatment", "Temporary darkening of pigmented lesions before clearing", "Mild discomfort during treatment"],
+        seriousRisks: ["Post-inflammatory hyperpigmentation (PIH) — especially in Indian skin types IV-VI", "Hypopigmentation (loss of pigment)", "Paradoxical worsening of pigmentation", "Blistering or scarring (rare with appropriate parameters)", "Whitish discoloration (frosting) if energy too high"],
+        contraindications: ["Pregnancy", "Active skin infection or open wounds in area", "Recent sun exposure or tanning", "Use of photosensitizing medications", "History of keloid or hypertrophic scarring (relative)", "Untreated melasma without proper protocol"],
+        aftercare: ["Strict broad-spectrum sunscreen SPF 50+ daily for at least 4 weeks", "Avoid sun exposure", "Gentle skincare; no actives (retinoids, AHAs) for 5-7 days", "Cool compresses for redness", "Multiple sessions required (typically 6-10 spaced 2-4 weeks apart)"],
+        duration: "Treatment series varies by indication. Maintenance sessions usually needed.",
+      },
+      "Fractional CO2 Laser Resurfacing": {
+        description: "Ablative fractional carbon dioxide laser treatment for skin resurfacing, scar revision, or photodamage. Creates microscopic columns of thermal injury to stimulate dermal remodeling.",
+        commonRisks: ["Significant redness, swelling lasting 5-14 days", "Pinpoint bleeding immediately post-procedure", "Peeling and crusting 3-7 days", "Itching during healing", "Acneiform eruptions during healing"],
+        seriousRisks: ["Post-inflammatory hyperpigmentation (significant risk in Indian skin types IV-VI)", "Hypopigmentation (potentially permanent)", "Prolonged erythema (months)", "Infection (bacterial, herpetic, fungal)", "Scarring or hypertrophic scar", "Ectropion if treated too close to eyelids", "Demarcation lines"],
+        contraindications: ["Pregnancy", "Active herpes infection (HSV prophylaxis required even with history)", "Active acne or skin infection", "Recent isotretinoin use (6-12 months washout recommended)", "Recent sun exposure or tan", "History of keloid scarring (relative, with caution)", "Connective tissue disease"],
+        aftercare: ["Strict aftercare regimen — gentle cleansing, occlusive moisturizer (per protocol)", "Antiviral prophylaxis if indicated", "Strict sun avoidance and SPF 50+ for 8-12 weeks minimum", "Avoid active skincare ingredients (retinoids, AHAs, BHAs) for 4 weeks", "Expect downtime of 7-14 days with social downtime"],
+        duration: "Significant results from a single treatment. May need 1-3 treatments. Final results emerge over 3-6 months.",
+      },
+      "Pico Laser": {
+        description: "Picosecond-domain laser treatment for pigmentation, tattoo removal, or skin rejuvenation. Delivers ultra-short pulses with photoacoustic effect.",
+        commonRisks: ["Mild redness, swelling post-treatment", "Pinpoint bleeding for tattoo removal", "Mild discomfort during treatment", "Temporary darkening of target lesions"],
+        seriousRisks: ["Post-inflammatory hyperpigmentation (lower risk than Q-switched but still possible in dark skin)", "Hypopigmentation", "Blistering at high settings", "Scarring (rare)", "Paradoxical pigmentation"],
+        contraindications: ["Pregnancy", "Active skin infection", "Recent sun exposure", "Use of photosensitizing medications", "Tanned skin"],
+        aftercare: ["SPF 50+ daily for 4 weeks minimum", "Avoid sun exposure", "Gentle skincare, avoid actives for 5 days", "Series of 4-8 sessions typically required"],
+        duration: "Multiple sessions required. Results visible over the treatment series.",
+      },
+      "IPL (Intense Pulsed Light)": {
+        description: "Broadband non-coherent light treatment for vascular lesions, pigmentation, photodamage, and hair reduction.",
+        commonRisks: ["Redness, mild swelling for 24-48 hours", "Temporary darkening of pigmented spots (peppering effect) before sloughing", "Mild discomfort during treatment"],
+        seriousRisks: ["Post-inflammatory hyperpigmentation (significant risk in Indian skin types IV-VI)", "Hypopigmentation", "Blistering or burns if energy is too high or skin is tanned", "Scarring", "Worsening of melasma if used inappropriately"],
+        contraindications: ["Pregnancy", "Skin type V-VI (caution; many practitioners avoid IPL)", "Recent tan or sun exposure", "Photosensitizing medications", "Active infection or open wounds", "Melasma (relative)"],
+        aftercare: ["Strict sun protection SPF 50+ for at least 4 weeks", "Avoid heat (sauna, hot tubs) for 48 hours", "Gentle skincare; no actives for 5 days", "Typically 4-6 sessions spaced 4 weeks apart"],
+        duration: "Maintenance sessions every 6-12 months may be needed.",
+      },
+      "Radiofrequency (Monopolar/Bipolar/Fractional RF)": {
+        description: "Application of radiofrequency energy to heat dermal tissue, stimulating collagen contraction and neocollagenesis for skin tightening or remodeling.",
+        commonRisks: ["Redness, warmth, mild swelling lasting hours to 1-2 days", "Mild discomfort during treatment"],
+        seriousRisks: ["Burns or blistering if energy excessive or coupling inadequate", "Fat atrophy in treatment area (rare)", "Persistent erythema", "Temporary numbness or dysesthesia", "Inadequate response (no improvement)"],
+        contraindications: ["Pregnancy", "Pacemaker or implanted electronic devices", "Metal implants in treatment area", "Active skin infection", "Recent fillers in treatment area (relative — wait 2 weeks)"],
+        aftercare: ["Cool compresses if needed", "Gentle skincare and SPF", "Normal activities can usually resume immediately", "Series of 3-6 sessions typically; results progressive"],
+        duration: "Results develop over 2-6 months. Maintenance every 12-18 months.",
+      },
+      "HIFU (High-Intensity Focused Ultrasound)": {
+        description: "Focused ultrasound delivered to specific depths in the dermis and subdermal tissue to create thermal coagulation points that stimulate tissue tightening over weeks to months.",
+        commonRisks: ["Discomfort during treatment (can be significant in bony areas)", "Mild redness or swelling for 24-48 hours", "Tenderness or aching for several days", "Temporary numbness"],
+        seriousRisks: ["Nerve injury (motor) — typically transient but rarely persistent", "Skin burns or linear erythema if depth/energy mis-set", "Inadequate response", "Bruising"],
+        contraindications: ["Pregnancy", "Active skin infection or open wounds", "Cystic acne in treatment area", "Implants (fillers, threads) in treatment area (relative)", "Metallic implants in face"],
+        aftercare: ["Normal activities resumed same day", "Mild tenderness may persist 1-2 weeks", "Gentle skincare", "Results develop over 2-3 months and continue improving up to 6 months"],
+        duration: "Results last 12-18 months. Single treatment typically; may repeat at 12 months.",
+      },
+    },
+  },
+  "Chemical Peels": {
+    icon: "🧪",
+    procedures: {
+      "Superficial Chemical Peel (Glycolic / Lactic / Mandelic / Salicylic)": {
+        description: "Application of superficial chemical peeling agent to exfoliate stratum corneum and improve skin texture, pigmentation, or mild acne.",
+        commonRisks: ["Stinging or burning during application", "Mild redness lasting hours to 1-2 days", "Light flaking 2-5 days post-peel", "Dryness"],
+        seriousRisks: ["Post-inflammatory hyperpigmentation (significant risk in Indian skin types IV-VI)", "Hypopigmentation", "Persistent erythema", "Contact dermatitis or allergic reaction", "Worsening of melasma if not done properly", "Crusting or scab formation"],
+        contraindications: ["Pregnancy (relative, depends on agent)", "Active skin infection (herpes, bacterial, fungal)", "Recent isotretinoin (6-month washout typical)", "Recent sun exposure or tan", "Open wounds or eczema in treatment area", "Use of retinoids or actives within 5-7 days"],
+        aftercare: ["Strict SPF 50+ daily for 4 weeks", "Gentle cleanser and bland moisturizer", "Avoid active ingredients (retinoids, AHAs, scrubs) for 5-7 days", "Do not pick or peel flaking skin", "Series of 4-6 peels spaced 2-4 weeks apart for best results"],
+        duration: "Cumulative effect over series. Maintenance every 1-3 months.",
+      },
+      "Medium-Depth Chemical Peel (TCA 15-35%)": {
+        description: "Application of trichloroacetic acid (TCA) peel reaching the papillary dermis, used for pigmentation, fine lines, photodamage, or superficial acne scars.",
+        commonRisks: ["Significant stinging or burning during procedure", "Frosting (whitening) during application", "Redness and swelling for 3-5 days", "Bronze appearance and peeling for 5-10 days", "Itching during healing"],
+        seriousRisks: ["Post-inflammatory hyperpigmentation (HIGH risk in Indian skin)", "Hypopigmentation (can be permanent)", "Scarring or textural changes", "Infection (bacterial, herpetic)", "Demarcation lines at treatment borders", "Prolonged erythema (weeks to months)"],
+        contraindications: ["Pregnancy", "Skin types V-VI (relative, requires very experienced practitioner)", "Recent isotretinoin (6-12 month washout)", "Active infection (herpes prophylaxis required)", "Recent sun exposure", "Keloid tendency", "Connective tissue disease"],
+        aftercare: ["Strict aftercare protocol — moisturization, gentle cleansing", "Antiviral prophylaxis if indicated", "Strict sun avoidance and SPF 50+ for 8-12 weeks", "Do NOT pick or peel skin manually", "Social downtime of 5-10 days expected", "Avoid active skincare for 4 weeks"],
+        duration: "Single treatment usually. May repeat at 6-12 months if needed.",
+      },
+    },
+  },
+  "Hair Restoration": {
+    icon: "💇",
+    procedures: {
+      "PRP for Hair Loss": {
+        description: "Injection of autologous platelet-rich plasma into the scalp to stimulate hair follicles and improve hair density.",
+        commonRisks: ["Injection-site pain, bruising, swelling", "Temporary scalp tenderness for 1-3 days", "Mild headache post-procedure"],
+        seriousRisks: ["Infection at injection sites (rare with sterile technique)", "Inadequate response (variable response rates documented in literature)", "Transient shedding 2-4 weeks post-procedure (typically resolves)", "Allergic reaction to anticoagulant used in tube"],
+        contraindications: ["Active scalp infection or inflammation", "Bleeding disorders or anticoagulant therapy", "Active scalp psoriasis or seborrheic dermatitis", "Pregnancy or breastfeeding (relative)", "Severe systemic illness", "Recent corticosteroid use systemically"],
+        aftercare: ["No hair wash for 24 hours", "Avoid strenuous exercise for 24 hours", "Avoid heat (sauna, hair dryers on high) for 48 hours", "Series of 3-6 sessions spaced 4 weeks apart", "Maintenance every 3-6 months"],
+        duration: "Response variable. Initial results in 3-4 months. Best assessed at 6 months. Maintenance ongoing.",
+      },
+      "GFC (Growth Factor Concentrate) for Hair": {
+        description: "Injection of growth factor concentrate derived from autologous blood into the scalp to promote hair growth.",
+        commonRisks: ["Injection-site pain, bruising, swelling", "Mild scalp tenderness for 1-3 days", "Mild headache"],
+        seriousRisks: ["Infection at injection sites", "Inadequate response", "Transient shedding", "Reaction to processing chemicals"],
+        contraindications: ["Active scalp infection", "Bleeding disorders or anticoagulants", "Active scalp dermatoses", "Pregnancy or breastfeeding (relative)", "Severe systemic illness"],
+        aftercare: ["No hair wash for 24 hours", "Avoid strenuous exercise for 24 hours", "Avoid heat for 48 hours", "Typically 4-6 sessions spaced 4 weeks apart"],
+        duration: "Results emerge in 3-6 months. Maintenance ongoing.",
+      },
+      "Hair Transplant (FUE)": {
+        description: "Surgical follicular unit extraction and transplantation to areas of hair loss.",
+        commonRisks: ["Pain and swelling for 3-7 days", "Crusting at donor and recipient sites", "Temporary shock loss of native hair (1-3 months)", "Numbness or tingling at sites for weeks to months", "Bruising"],
+        seriousRisks: ["Infection at donor or recipient sites", "Folliculitis", "Visible scarring at donor area (typically dot-like)", "Poor graft survival or low yield", "Unnatural appearance (hairline design issues, density issues)", "Cyst formation", "Persistent numbness"],
+        contraindications: ["Active scalp infection or scalp disease", "Bleeding disorders or anticoagulant therapy (relative)", "Inadequate donor area", "Unrealistic patient expectations", "Active alopecia areata or scarring alopecia (without specialist input)", "Significant medical comorbidities"],
+        aftercare: ["Detailed post-op instructions including head positioning, washing protocol, sleeping position", "Antibiotics and analgesics as prescribed", "Avoid alcohol, smoking for 1 week", "No strenuous activity or swimming for 2 weeks", "Final results visible at 12-18 months"],
+        duration: "Transplanted hair is permanent. Final density and appearance at 12-18 months.",
+      },
+    },
+  },
+  "Skin Surgery & Other": {
+    icon: "🩹",
+    procedures: {
+      "Cyst / Lipoma / Skin Tag Excision": {
+        description: "Minor surgical excision of benign skin lesions under local anesthesia.",
+        commonRisks: ["Pain at site, bruising, swelling", "Bleeding during or after procedure", "Temporary discomfort during healing"],
+        seriousRisks: ["Scarring (every excision leaves a scar; size and quality variable)", "Infection at surgical site", "Recurrence of lesion (especially with incomplete cyst excision)", "Hematoma formation", "Hyper- or hypopigmentation of scar", "Keloid or hypertrophic scar (especially in predisposed individuals)", "Nerve injury if near sensory nerve"],
+        contraindications: ["Active infection at site", "Bleeding disorders or anticoagulant therapy (relative)", "Keloid history (relative — informed consent essential)", "Pregnancy (relative — non-urgent excisions deferred)"],
+        aftercare: ["Wound care as instructed; keep dry for 24-48 hours", "Antibiotics if prescribed", "Suture removal as scheduled (typically 5-14 days depending on location)", "Sun protection of scar for 6-12 months", "Scar massage and silicone gel may be recommended"],
+        duration: "Healing 2-4 weeks. Scar maturation 6-18 months.",
+      },
+      "Cautery / Radiofrequency Lesion Removal": {
+        description: "Use of electrocautery or radiofrequency to remove DPN, syringoma, milia, skin tags, seborrheic keratosis, or similar benign lesions.",
+        commonRisks: ["Discomfort during procedure (despite topical anesthesia)", "Mild redness and crusting 5-10 days", "Pinpoint bleeding"],
+        seriousRisks: ["Post-inflammatory hyperpigmentation (HIGH risk in Indian skin types IV-VI)", "Hypopigmentation (can be permanent)", "Scarring or pitted/atrophic scars", "Infection", "Recurrence of lesions"],
+        contraindications: ["Active skin infection", "Pacemaker (for monopolar devices)", "Bleeding disorders", "Recent isotretinoin (relative)", "Keloid tendency"],
+        aftercare: ["Topical antibiotic ointment as instructed", "Strict sun protection SPF 50+ for 8-12 weeks", "Do not pick scabs", "Multiple sessions often needed for DPN/syringoma"],
+        duration: "Healing 1-2 weeks. Final pigmentation outcome at 3-6 months.",
+      },
+      "Microneedling / Dermaroller / Dermapen": {
+        description: "Mechanical creation of microscopic skin punctures to stimulate collagen production and improve scars, texture, or pigmentation.",
+        commonRisks: ["Redness and mild swelling for 24-72 hours", "Mild pinpoint bleeding during procedure", "Temporary tightness or sensitivity"],
+        seriousRisks: ["Post-inflammatory hyperpigmentation in dark skin", "Infection (HSV reactivation possible)", "Tram-track scarring with aggressive technique", "Worsening of melasma if done incorrectly", "Granuloma if topicals are pushed through skin inappropriately"],
+        contraindications: ["Active acne or skin infection", "Active herpes infection", "Pregnancy (relative for facial)", "Anticoagulant therapy (relative)", "Keloid tendency", "Use of isotretinoin (relative)"],
+        aftercare: ["Use only bland skincare for 48 hours", "SPF 50+ daily for 2 weeks minimum", "Avoid active ingredients (retinoids, AHAs) for 5-7 days", "Avoid heat, exercise, makeup for 24 hours", "Series of 3-6 sessions spaced 4 weeks apart"],
+        duration: "Cumulative effect. Maintenance every 6-12 months.",
+      },
+    },
+  },
+};
+
+const CONSENT_DISCLAIMER_TEXT = `IMPORTANT — TEMPLATE FOR EDUCATIONAL REFERENCE ONLY
+
+This document is a starting template based on common Indian aesthetic medicine consent practice. It is NOT a substitute for legal advice or a finished consent form. Before using this document with patients, the treating practitioner MUST:
+
+1. Review the content with a qualified medical lawyer familiar with Indian medical malpractice law and the Digital Personal Data Protection Act, 2023.
+2. Customize the content based on specific procedure protocols, individual patient circumstances, and current clinical guidelines.
+3. Verify compliance with applicable State Medical Council requirements and professional standards.
+4. Update language to reflect current case law and regulatory developments.
+
+This template is provided by SKINARIO as a community educational resource. Liability for clinical use rests entirely with the treating practitioner and their clinic. SKINARIO and its affiliates make no warranty as to the legal adequacy of this template for any specific use.`;
+
+
 // ═══ ACCOUNT TYPES ═══
 const ACCOUNT_TYPES=[
   {id:"doctor",label:"Doctor",icon:"🩺",desc:"Practicing physician — derms, aesthetic doctors, cosmetologists"},
@@ -1582,7 +1795,7 @@ export default function App(){
 
   // KNOWN_PAGES must match every page condition the app actually renders.
   // If you add a new page (`pg==="xyz"&&...` block), add "xyz" here too.
-  const KNOWN_PAGES=["home","me","quiz","library","forum","cases","rewards","submit","rank","events","videos","admin","profile","ad"];
+  const KNOWN_PAGES=["home","me","quiz","library","forum","cases","rewards","submit","rank","events","videos","admin","profile","ad","consent"];
   const sh=m=>setToast(m);const go=p=>{const safe=KNOWN_PAGES.includes(p)?p:"home";setPg(safe);setSelA(null);setSelV(null);setSelAd(null);setSelE(null);setSelU(null);setSelFP(null);setSelCs(null);setEdForm(null)};
   // ═══ VIEW PROFILE — open any user's profile page ═══
   const viewProfile=(uid)=>{
@@ -1667,6 +1880,29 @@ export default function App(){
   const[selE,setSelE]=useState(null);
   const[selFP,setSelFP]=useState(null); // selected forum post for detail view
   const[selCs,setSelCs]=useState(null); // selected clinical case for detail view
+  // ═══ CONSENT GENERATOR STATE ═══
+  const[consentCat,setConsentCat]=useState(""); // selected category
+  const[consentProc,setConsentProc]=useState(""); // selected sub-procedure (or "custom")
+  const[consentCustomProc,setConsentCustomProc]=useState(""); // free-text if "custom"
+  const[consentClinicName,setConsentClinicName]=useState("");
+  const[consentClinicAddress,setConsentClinicAddress]=useState("");
+  const[consentClinicPhone,setConsentClinicPhone]=useState("");
+  const[consentClinicLogo,setConsentClinicLogo]=useState(""); // data URL from file input
+  const[consentDoctorName,setConsentDoctorName]=useState("");
+  const[consentDoctorReg,setConsentDoctorReg]=useState(""); // registration number
+  const[consentGenerating,setConsentGenerating]=useState(false);
+  // Pre-fill clinic/doctor info from saved profile fields when entering consent page
+  useEffect(()=>{
+    if(pg!=="consent"||!prof)return;
+    if(prof.clinicName&&!consentClinicName)setConsentClinicName(prof.clinicName);
+    if(prof.clinicAddress&&!consentClinicAddress)setConsentClinicAddress(prof.clinicAddress);
+    if(prof.clinicPhone&&!consentClinicPhone)setConsentClinicPhone(prof.clinicPhone);
+    if(prof.doctorName&&!consentDoctorName)setConsentDoctorName(prof.doctorName);
+    else if(prof.name&&!consentDoctorName)setConsentDoctorName(prof.name);
+    if(prof.doctorRegNumber&&!consentDoctorReg)setConsentDoctorReg(prof.doctorRegNumber);
+    else if(prof.regNumber&&!consentDoctorReg)setConsentDoctorReg(prof.regNumber);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[pg,prof]);
   const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va)},[]);
 
   // Load current user's points-earning history from pointsActivity ledger.
@@ -2656,6 +2892,277 @@ export default function App(){
     }catch(err){
       console.error("recoverMyPointsFromLedger error:",err);
       sh("❌ Recovery failed: "+(err.message||"check console"));
+    }
+  };
+
+  // ═══ CONSENT TEMPLATE GENERATOR ═══
+  // Builds a .doc file (HTML-based Word document) for the selected procedure
+  // and triggers download. Rate-limited per user per day; admin can grant
+  // bonus credits. Logs each generation to consentGenerationLog for audit.
+  const generateConsent = async () => {
+    if (!au || !prof) { sh("Please sign in"); return; }
+
+    // Get effective procedure name (custom or from catalog)
+    let procName = "";
+    let procData = null;
+    if (consentProc === "__custom__") {
+      procName = consentCustomProc.trim();
+      if (!procName) { sh("Please enter the procedure name"); return; }
+    } else if (consentCat && consentProc && CONSENT_PROCEDURES[consentCat]?.procedures?.[consentProc]) {
+      procName = consentProc;
+      procData = CONSENT_PROCEDURES[consentCat].procedures[consentProc];
+    } else {
+      sh("Please select a procedure");
+      return;
+    }
+
+    if (!consentClinicName.trim()) { sh("Please enter clinic name"); return; }
+    if (!consentDoctorName.trim()) { sh("Please enter doctor name"); return; }
+
+    // ─── Rate limit check ───
+    const todayKey = todayIST_YMD();
+    const todaysCount = (prof.consentGenerations || {})[todayKey] || 0;
+    const credits = prof.consentCredits || 0;
+
+    if (todaysCount >= 1) {
+      // Daily free used; need a credit
+      if (credits <= 0) {
+        if (!confirm(
+          "You've used your free consent generation for today.\n\n" +
+          "To generate more today, you can:\n" +
+          "1. Wait until tomorrow (resets at midnight IST)\n" +
+          "2. Contact admin to request bonus credits\n\n" +
+          "Click OK to email admin, or Cancel to wait."
+        )) return;
+        window.location.href = "mailto:drjpatil@gmail.com?subject=Consent credits request&body=Hi, I need additional consent template credits. My account: " + (au.email || au.uid);
+        return;
+      }
+    }
+
+    setConsentGenerating(true);
+
+    try {
+      // ─── Build document HTML ───
+      const today = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+      const safe = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const logoHtml = consentClinicLogo
+        ? `<img src="${consentClinicLogo}" style="max-height:60px;max-width:160px;display:block;" />`
+        : "";
+
+      const description = procData?.description ||
+        `The ${procName} procedure has been explained to me, including its purpose, technique, and expected outcomes.`;
+      const commonRisks = procData?.commonRisks || ["Procedure-site discomfort, redness, or swelling", "Bruising or transient inflammation", "Variable individual response"];
+      const seriousRisks = procData?.seriousRisks || ["Infection or delayed healing", "Allergic reaction (rare)", "Suboptimal aesthetic outcome requiring additional treatment"];
+      const contraindications = procData?.contraindications || ["Pregnancy or breastfeeding", "Active infection at treatment site", "Known allergy to any product used", "Bleeding disorders or anticoagulant use", "Autoimmune disease (relative)"];
+      const aftercare = procData?.aftercare || ["Follow all post-procedure instructions provided", "Avoid sun exposure as advised", "Contact clinic immediately if unexpected symptoms occur", "Attend all scheduled follow-up appointments"];
+      const duration = procData?.duration || "Results, longevity, and number of sessions vary by individual and will be discussed at consultation.";
+
+      const css = `
+        body { font-family: 'Cambria', 'Georgia', serif; font-size: 11pt; line-height: 1.5; color: #222; margin: 0; padding: 18pt 18pt 18pt 18pt; }
+        h1 { font-size: 16pt; text-align: center; margin: 4pt 0; }
+        h2 { font-size: 12pt; margin: 14pt 0 6pt 0; padding-bottom: 3pt; border-bottom: 1px solid #888; }
+        h3 { font-size: 11pt; margin: 10pt 0 4pt 0; }
+        .clinic-header { display: table; width: 100%; margin-bottom: 8pt; }
+        .clinic-left { display: table-cell; vertical-align: middle; }
+        .clinic-right { display: table-cell; text-align: right; vertical-align: middle; font-size: 9pt; color: #555; }
+        .clinic-name { font-size: 14pt; font-weight: bold; }
+        .clinic-meta { font-size: 9pt; color: #555; }
+        .disclaimer { color: #c0392b; font-size: 9pt; font-style: italic; border: 1px solid #c0392b; padding: 8pt; margin-bottom: 14pt; background: #fff5f3; }
+        .field { margin: 4pt 0; }
+        .underline { display: inline-block; min-width: 200pt; border-bottom: 1px solid #555; height: 12pt; }
+        ul { margin: 4pt 0 6pt 24pt; padding: 0; }
+        li { margin: 2pt 0; }
+        .sig-row { display: table; width: 100%; margin-top: 20pt; }
+        .sig-cell { display: table-cell; width: 50%; padding: 10pt; vertical-align: top; font-size: 10pt; }
+        .sig-line { border-top: 1px solid #333; margin-top: 30pt; padding-top: 4pt; }
+        .small { font-size: 9pt; color: #555; }
+        .footer-disclaimer { color: #c0392b; font-size: 8pt; font-style: italic; text-align: center; margin-top: 30pt; padding-top: 6pt; border-top: 1px dashed #c0392b; }
+      `;
+
+      const html = `
+<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8" />
+<title>Consent Form — ${safe(procName)}</title>
+<style>${css}</style>
+</head>
+<body>
+
+<div class="clinic-header">
+  <div class="clinic-left">
+    ${logoHtml}
+    <div class="clinic-name">${safe(consentClinicName)}</div>
+    ${consentClinicAddress ? `<div class="clinic-meta">${safe(consentClinicAddress)}</div>` : ""}
+    ${consentClinicPhone ? `<div class="clinic-meta">Tel: ${safe(consentClinicPhone)}</div>` : ""}
+  </div>
+  <div class="clinic-right">
+    Date: <span class="underline" style="min-width:80pt;">&nbsp;${safe(today)}&nbsp;</span>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <strong>IMPORTANT — TEMPLATE FOR EDUCATIONAL REFERENCE.</strong>
+  This document was generated by an AI-assisted template tool and has NOT been reviewed by legal counsel.
+  Verify with a qualified medical-legal advisor before clinical use. This red notice can be deleted after your own review.
+</div>
+
+<h1>INFORMED CONSENT FOR ${safe(procName.toUpperCase())}</h1>
+
+<h2>1. Patient Identification</h2>
+<div class="field">Name: <span class="underline"></span></div>
+<div class="field">Age: <span class="underline" style="min-width:60pt;"></span> &nbsp;&nbsp; Sex: <span class="underline" style="min-width:60pt;"></span> &nbsp;&nbsp; Patient ID: <span class="underline" style="min-width:80pt;"></span></div>
+<div class="field">Address: <span class="underline" style="min-width:380pt;"></span></div>
+<div class="field">Phone: <span class="underline" style="min-width:120pt;"></span> &nbsp;&nbsp; Email: <span class="underline" style="min-width:160pt;"></span></div>
+<div class="field">Relevant medical diagnosis: <span class="underline" style="min-width:280pt;"></span></div>
+<div class="field">Procedure to be performed: <strong>${safe(procName)}</strong></div>
+<div class="field">Area / site to be treated: <span class="underline" style="min-width:300pt;"></span></div>
+
+<h2>2. Description of the Procedure</h2>
+<p>I have been informed, in the language I best understand, that:</p>
+<p>${safe(description)}</p>
+<p><strong>Expected results and timeline:</strong> ${safe(duration)}</p>
+
+<h2>3. Risks, Side Effects, and Complications</h2>
+<p>I understand that the practice of medicine is not an exact science and that no guarantee, warranty, or assurance has been given to me about the outcome of this procedure.</p>
+
+<h3>Common, generally short-term risks:</h3>
+<ul>${commonRisks.map(r => `<li>${safe(r)}</li>`).join("")}</ul>
+
+<h3>Less common but potentially serious risks:</h3>
+<ul>${seriousRisks.map(r => `<li>${safe(r)}</li>`).join("")}</ul>
+
+<h2>4. Contraindications and Medical History Disclosure</h2>
+<p>I confirm that I have disclosed to my treating doctor any of the following that apply to me:</p>
+<ul>${contraindications.map(c => `<li>${safe(c)}</li>`).join("")}</ul>
+<p>I have additionally disclosed: current medications (including blood thinners, NSAIDs, corticosteroids); allergies of any kind; history of keloids or hypertrophic scarring; history of herpes simplex / cold sores; pregnancy, lactation, or plan to conceive; any pacemaker or metal implants (if relevant to the procedure); and any other condition I believe my doctor should know.</p>
+
+<h2>5. Alternatives and Decision to Proceed</h2>
+<p>The treating doctor has explained available alternatives to this procedure, including the option of not proceeding. I have had adequate opportunity to ask questions, and I have decided to proceed with the procedure of my own free will.</p>
+
+<h2>6. Photography, Documentation, and Academic Use</h2>
+<p>I consent to pre-, intra-, and post-procedure photographs being taken for clinical documentation. Such photographs may be used for academic, scientific, or teaching purposes, provided that my identity is not disclosed and reasonable confidentiality is maintained.</p>
+<p>Initial here if you agree: __________</p>
+
+<h2>7. Data Protection Notice (DPDP Act, 2023)</h2>
+<p>For the purposes of the Digital Personal Data Protection Act, 2023, I acknowledge the following:</p>
+<ul>
+  <li><strong>Data Fiduciary:</strong> ${safe(consentClinicName)}${consentClinicAddress ? `, ${safe(consentClinicAddress)}` : ""}.</li>
+  <li><strong>Purpose:</strong> My personal data and clinical information (including identifiers, medical history, photographs, and treatment records) are being collected solely for the purposes of (a) providing medical care, (b) maintaining clinical records as required by applicable law and medical council regulations, and (c) communication regarding my treatment and follow-up.</li>
+  <li><strong>Retention:</strong> Records will be retained for the period required under applicable medical record-keeping rules, typically a minimum of three years from the date of last consultation, and longer where law or clinical prudence requires.</li>
+  <li><strong>Sharing:</strong> My data will not be shared with third parties except (i) where required by law, regulatory authority, or court order; (ii) where necessary for emergency medical care; or (iii) where I have provided separate written consent for a specific disclosure.</li>
+  <li><strong>My rights:</strong> I have the right to access my data, request correction of inaccuracies, and withdraw my consent for any non-essential use of my data (academic publication, anonymized teaching, etc.) at any time by writing to the data fiduciary at the address above.</li>
+  <li><strong>Grievance:</strong> Concerns regarding the processing of my personal data may be raised in writing to the data fiduciary above, who shall respond within a reasonable period.</li>
+</ul>
+
+<h2>8. Cost and Payment</h2>
+<p>I have been informed about the cost of the procedure, the number of sessions or treatment packages (if applicable), and the schedule of payment. I agree to the same.</p>
+
+<h2>9. Post-Procedure Care</h2>
+<p>I understand that strict adherence to pre- and post-procedure instructions is essential. The key aftercare instructions include:</p>
+<ul>${aftercare.map(a => `<li>${safe(a)}</li>`).join("")}</ul>
+
+<h2>10. Authorization and Consent</h2>
+<p>I, <span class="underline" style="min-width:260pt;"></span>, having read and understood the contents of this consent form (translated where necessary into the language I best understand), and having had the opportunity to ask all relevant questions, voluntarily authorize <strong>Dr. ${safe(consentDoctorName)}</strong>${consentDoctorReg ? ` (Reg. No.: ${safe(consentDoctorReg)})` : ""} and his/her designated medical and support staff to perform the procedure of <strong>${safe(procName)}</strong> on me.</p>
+<p>I authorize the treating doctor to administer any local, topical, or appropriate emergency treatment that may be required during the procedure for my safety.</p>
+<p>I acknowledge that no guarantee has been made about the result of this procedure, and I release the treating doctor, the clinic, and their staff from any liability arising from outcomes that are within the recognized scope of risks disclosed above, provided due care and skill have been exercised.</p>
+
+<h2>11. Right to Withdraw Consent</h2>
+<p>I understand that I may withdraw this consent at any time before the procedure begins by communicating my decision verbally or in writing to the treating doctor or clinic staff. Once the procedure has commenced, withdrawal may be limited by clinical safety considerations.</p>
+
+<h2>12. Translation (if applicable)</h2>
+<div class="field">Was translation to the patient's preferred language required? &nbsp; YES / NO</div>
+<div class="field">Name of translator (if any): <span class="underline" style="min-width:260pt;"></span></div>
+<div class="field">Relationship to patient: <span class="underline" style="min-width:200pt;"></span></div>
+
+<h2>13. Signatures</h2>
+
+<div class="sig-row">
+  <div class="sig-cell">
+    <div class="sig-line">Patient / Authorized Representative</div>
+    <div class="small">Name: ____________________________</div>
+    <div class="small">Date: ____________ &nbsp; Time: ____________</div>
+    <div class="small">(For minors: signature of parent/guardian above; relationship: __________)</div>
+  </div>
+  <div class="sig-cell">
+    <div class="sig-line">Treating Doctor</div>
+    <div class="small">Name: Dr. ${safe(consentDoctorName)}</div>
+    ${consentDoctorReg ? `<div class="small">Registration No.: ${safe(consentDoctorReg)}</div>` : ""}
+    <div class="small">Date: ____________ &nbsp; Time: ____________</div>
+  </div>
+</div>
+
+<div class="sig-row">
+  <div class="sig-cell">
+    <div class="sig-line">Witness 1</div>
+    <div class="small">Name: ____________________________</div>
+    <div class="small">Address / Relationship: ____________________________</div>
+  </div>
+  <div class="sig-cell">
+    <div class="sig-line">Witness 2 (optional)</div>
+    <div class="small">Name: ____________________________</div>
+    <div class="small">Address / Relationship: ____________________________</div>
+  </div>
+</div>
+
+<div class="footer-disclaimer">
+  This template was generated using SKINARIO's consent template tool as an educational starting point.
+  It is NOT a substitute for legal advice. The treating practitioner is responsible for legal adequacy
+  and clinical specificity. SKINARIO and Absolute Institute disclaim liability for any clinical use of
+  this document without prior review by qualified counsel. — Generated ${safe(today)}.
+</div>
+
+</body>
+</html>
+`;
+
+      // Trigger download as .doc (Word opens HTML-as-Word reliably)
+      const blob = new Blob(["\ufeff", html], { type: "application/msword" });
+      const filename = `consent_${procName.replace(/[^a-z0-9]+/gi, "_").toLowerCase().slice(0, 40)}_${todayKey}.doc`;
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+
+      // ─── Persist rate-limit state ───
+      const newGenerations = { ...(prof.consentGenerations || {}), [todayKey]: todaysCount + 1 };
+      let newCredits = credits;
+      if (todaysCount >= 1) {
+        newCredits = Math.max(0, credits - 1); // used a credit
+      }
+      await fbSet("users", au.uid, {
+        consentGenerations: newGenerations,
+        consentCredits: newCredits,
+      });
+      setProf((p) => ({ ...p, consentGenerations: newGenerations, consentCredits: newCredits }));
+
+      // ─── Audit log ───
+      try {
+        const logId = `${au.uid}_${Date.now()}`;
+        await fbSet("consentGenerationLog", logId, {
+          uid: au.uid,
+          email: au.email || "",
+          name: prof.name || "",
+          procedure: procName,
+          category: consentCat || "(custom)",
+          clinicName: consentClinicName,
+          isCustomProcedure: consentProc === "__custom__",
+          usedCredit: todaysCount >= 1,
+          createdAt: Date.now(),
+        });
+      } catch (logErr) {
+        console.warn("consent log failed (non-fatal):", logErr);
+      }
+
+      sh(`✅ Consent template generated. Saved as ${filename}`);
+    } catch (err) {
+      console.error("consent generation failed:", err);
+      sh("❌ Generation failed: " + (err.message || "unknown error"));
+    } finally {
+      setConsentGenerating(false);
     }
   };
 
@@ -5321,6 +5828,31 @@ export default function App(){
                   }} style={{...T.btnDanger,padding:"6px 14px",fontSize:".78rem"}}>Set new total</button>
                 </div>
               </div>
+
+              {/* ═══ CONSENT CREDIT GRANT (admin) ═══ */}
+              <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid "+T.border}}>
+                <div style={{fontSize:".82rem",fontWeight:600,color:T.teal,marginBottom:6}}>📋 Consent template credits</div>
+                <p style={{fontSize:".72rem",color:T.txt2,lineHeight:1.5,marginBottom:8}}>
+                  Current balance: <b>{u.consentCredits||0}</b> credits.
+                  Users get 1 free generation per day. Use credits for overflow / paid usage.
+                  Today's usage: {(u.consentGenerations||{})[todayIST_YMD()]||0}.
+                </p>
+                <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                  <input id={`cred-${u.id}`} type="number" placeholder="Add credits (e.g. 10)" style={{...T.inp,width:160,padding:"6px 10px",fontSize:".82rem"}}/>
+                  <button onClick={async()=>{
+                    const add=parseInt(document.getElementById(`cred-${u.id}`).value);
+                    if(isNaN(add)||add<=0){sh("Enter a positive number");return}
+                    if(!confirm(`Grant ${add} consent credits to ${u.name}? (Current: ${u.consentCredits||0})`))return;
+                    try{
+                      const newCredits=(u.consentCredits||0)+add;
+                      await fbSet("users",u.id,{consentCredits:newCredits});
+                      sh(`✅ +${add} credits → ${newCredits} total`);
+                      document.getElementById(`cred-${u.id}`).value="";
+                      await loadData();
+                    }catch(err){console.error("credit grant failed:",err);sh("❌ Grant failed")}
+                  }} style={{...T.btn,padding:"6px 14px",fontSize:".78rem"}}>Grant credits</button>
+                </div>
+              </div>
             </div>}
           </>}
         </div>);
@@ -5556,6 +6088,19 @@ export default function App(){
             </div>
           </div>
           <div style={{fontSize:".82rem",color:T.teal,fontWeight:600,whiteSpace:"nowrap"}}>Redeem rewards →</div>
+        </div>}
+
+        {/* ═══ CONSENT TEMPLATE GENERATOR — doctor-only quick link ═══ */}
+        {!editingProfile&&(prof?.accountType==="doctor"||isAdm)&&<div onClick={()=>go("consent")} style={{...T.card,padding:"12px 16px",marginBottom:12,borderLeft:"3px solid "+T.teal,background:"linear-gradient(135deg,"+T.tealBg+"55,#fff)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.07)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,minWidth:0}}>
+            <div style={{fontSize:"1.5rem"}}>📋</div>
+            <div>
+              <div style={{fontSize:".7rem",color:T.mute,letterSpacing:1,textTransform:"uppercase",fontWeight:600,marginBottom:2}}>Tools</div>
+              <div style={{fontSize:"1rem",fontWeight:700,color:T.teal,lineHeight:1.2}}>Consent Template Generator</div>
+              <div style={{fontSize:".68rem",color:T.mute,marginTop:2}}>Generate procedure-specific consent forms · 1 free per day</div>
+            </div>
+          </div>
+          <div style={{fontSize:".82rem",color:T.teal,fontWeight:600,whiteSpace:"nowrap"}}>Open →</div>
         </div>}
 
         {/* ═══ EDITABLE PROFILE SECTION ═══ */}
@@ -6908,6 +7453,177 @@ export default function App(){
           </div>})}
         </div>}
       </div>}
+
+      {/* ═══ CONSENT TEMPLATE GENERATOR PAGE ═══ */}
+      {pg==="consent"&&(()=>{
+        const isDoctor=prof?.accountType==="doctor"||ADMINS.includes(au?.email);
+        if(!au||!prof){
+          return(<div style={{maxWidth:560,margin:"40px auto",textAlign:"center",padding:"40px 24px",background:"#fff",borderRadius:14,border:"1px solid "+T.border}}>
+            <div style={{fontSize:"2.4rem",marginBottom:10}}>🔒</div>
+            <h3 style={{fontSize:"1.2rem",fontWeight:700,marginBottom:8}}>Sign in to use Consent Templates</h3>
+            <p style={{color:T.txt2,fontSize:".9rem",lineHeight:1.6,marginBottom:18}}>The consent template generator is available to registered SKINARIO doctors.</p>
+            <button onClick={()=>go("home")} style={{...T.btn,padding:"9px 20px",fontSize:".85rem"}}>Go to home</button>
+          </div>);
+        }
+        if(!isDoctor){
+          return(<div style={{maxWidth:620,margin:"40px auto",padding:"30px 24px",background:"#fff",borderRadius:14,border:"1px solid "+T.border}}>
+            <h3 style={{fontSize:"1.2rem",fontWeight:700,marginBottom:10}}>Available to doctors only</h3>
+            <p style={{color:T.txt2,fontSize:".9rem",lineHeight:1.65,marginBottom:14}}>The consent template generator is currently available only to verified doctor accounts. If you are a practicing physician, please update your account type in your profile or contact admin for verification.</p>
+            <button onClick={()=>go("me")} style={{...T.btnO,padding:"9px 20px",fontSize:".85rem"}}>Go to my profile</button>
+          </div>);
+        }
+
+        const todayKey=todayIST_YMD();
+        const todaysCount=(prof.consentGenerations||{})[todayKey]||0;
+        const credits=prof.consentCredits||0;
+        const dailyExhausted=todaysCount>=1;
+        const cats=Object.keys(CONSENT_PROCEDURES);
+        const proceduresForCat=consentCat?CONSENT_PROCEDURES[consentCat]?.procedures||{}:{};
+        const subProcedures=Object.keys(proceduresForCat);
+        const selectedProc=consentProc&&consentProc!=="__custom__"?proceduresForCat[consentProc]:null;
+
+        return(<div style={{maxWidth:880,margin:"0 auto"}}>
+          {/* Header */}
+          <div style={{...T.card,padding:22,background:"linear-gradient(135deg,#fff,"+T.tealBg+"55)",borderLeft:"3px solid "+T.teal,marginBottom:16}}>
+            <h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0,display:"flex",alignItems:"center",gap:8}}>📋 Consent Template Generator</h2>
+            <p style={{color:T.txt2,fontSize:".88rem",lineHeight:1.55,marginTop:8,marginBottom:0}}>
+              Generate a procedure-specific informed consent template as an editable Word document.
+              Fill in your clinic details once, choose a procedure, download. Customize and have reviewed by your legal counsel before clinical use.
+            </p>
+          </div>
+
+          {/* Status / rate-limit card */}
+          <div style={{...T.card,padding:16,marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+            <div>
+              <div style={{fontSize:".82rem",fontWeight:600,color:T.txt}}>Today's usage</div>
+              <div style={{fontSize:".76rem",color:T.txt2,marginTop:3}}>
+                {todaysCount>=1?"Daily free generation used. ":"1 free generation available today. "}
+                {credits>0&&<span style={{color:T.gold,fontWeight:600}}>+{credits} bonus credits available.</span>}
+              </div>
+            </div>
+            {dailyExhausted&&credits<=0&&<div style={{padding:"6px 12px",background:T.errBg,color:T.err,borderRadius:8,fontSize:".74rem",fontWeight:600}}>Daily limit reached — contact admin</div>}
+          </div>
+
+          {/* Disclaimer */}
+          <div style={{...T.card,padding:14,marginBottom:16,background:"#fff5f3",borderLeft:"3px solid "+T.err}}>
+            <div style={{fontSize:".8rem",color:T.err,fontWeight:700,marginBottom:6}}>⚠️ Educational Template — Not Legal Advice</div>
+            <p style={{fontSize:".76rem",color:T.txt2,lineHeight:1.55,margin:0}}>
+              This tool generates a starting template using general aesthetic medicine consent practice and current Indian regulatory requirements (including DPDP Act, 2023).
+              The generated document is <b>not a substitute for legal advice</b> and must be reviewed by a qualified medical-legal advisor before use with patients. The red disclaimer block at the top of the generated document is removable in Word after you complete your own review.
+            </p>
+          </div>
+
+          {/* Form */}
+          <div style={{...T.card,padding:22}}>
+            <h3 style={{fontSize:"1rem",fontWeight:700,marginBottom:14}}>1. Select the procedure</h3>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}} className="consent-grid">
+              <div>
+                <label style={{display:"block",fontSize:".74rem",color:T.mute,fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Category</label>
+                <select value={consentCat} onChange={e=>{setConsentCat(e.target.value);setConsentProc("");setConsentCustomProc("")}} style={{...T.inp,width:"100%",padding:"9px 12px"}}>
+                  <option value="">— Choose category —</option>
+                  {cats.map(c=><option key={c} value={c}>{CONSENT_PROCEDURES[c].icon||""} {c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{display:"block",fontSize:".74rem",color:T.mute,fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Sub-procedure</label>
+                <select value={consentProc} onChange={e=>{setConsentProc(e.target.value);if(e.target.value!=="__custom__")setConsentCustomProc("")}} disabled={!consentCat} style={{...T.inp,width:"100%",padding:"9px 12px",opacity:consentCat?1:.55}}>
+                  <option value="">— Choose procedure —</option>
+                  {subProcedures.map(p=><option key={p} value={p}>{p}</option>)}
+                  {consentCat&&<option value="__custom__">+ Other (enter manually)</option>}
+                </select>
+              </div>
+            </div>
+
+            {consentProc==="__custom__"&&<div style={{marginBottom:14}}>
+              <label style={{display:"block",fontSize:".74rem",color:T.mute,fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Custom procedure name</label>
+              <input value={consentCustomProc} onChange={e=>setConsentCustomProc(e.target.value)} placeholder="e.g. Laser Genesis" style={{...T.inp,width:"100%",padding:"9px 12px"}}/>
+              <div style={{fontSize:".72rem",color:T.mute,marginTop:4}}>For custom procedures, generic risk and aftercare wording is used. Review and edit carefully.</div>
+            </div>}
+
+            {selectedProc&&<div style={{padding:"10px 14px",background:T.tealBg+"55",borderRadius:8,marginBottom:14,fontSize:".78rem",color:T.txt2,lineHeight:1.55}}>
+              <div style={{fontWeight:600,color:T.teal,marginBottom:4}}>About this procedure:</div>
+              {selectedProc.description}
+            </div>}
+
+            <h3 style={{fontSize:"1rem",fontWeight:700,marginBottom:14,marginTop:6}}>2. Clinic information</h3>
+
+            <div style={{marginBottom:14}}>
+              <label style={{display:"block",fontSize:".74rem",color:T.mute,fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Clinic name *</label>
+              <input value={consentClinicName} onChange={e=>setConsentClinicName(e.target.value)} placeholder="e.g. Sunshine Aesthetic Clinic" style={{...T.inp,width:"100%",padding:"9px 12px"}}/>
+            </div>
+
+            <div style={{marginBottom:14}}>
+              <label style={{display:"block",fontSize:".74rem",color:T.mute,fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Clinic address</label>
+              <input value={consentClinicAddress} onChange={e=>setConsentClinicAddress(e.target.value)} placeholder="e.g. 12 MG Road, Pune 411001" style={{...T.inp,width:"100%",padding:"9px 12px"}}/>
+            </div>
+
+            <div style={{marginBottom:14}}>
+              <label style={{display:"block",fontSize:".74rem",color:T.mute,fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Clinic phone (optional)</label>
+              <input value={consentClinicPhone} onChange={e=>setConsentClinicPhone(e.target.value)} placeholder="e.g. +91 98765 43210" style={{...T.inp,width:"100%",padding:"9px 12px"}}/>
+            </div>
+
+            <div style={{marginBottom:14}}>
+              <label style={{display:"block",fontSize:".74rem",color:T.mute,fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Clinic logo (optional, PNG/JPG)</label>
+              <input type="file" accept="image/png,image/jpeg" onChange={e=>{
+                const f=e.target.files?.[0];
+                if(!f){setConsentClinicLogo("");return}
+                if(f.size>500000){sh("Logo too large — please use an image under 500 KB");return}
+                const r=new FileReader();
+                r.onload=()=>setConsentClinicLogo(r.result);
+                r.readAsDataURL(f);
+              }} style={{fontSize:".84rem"}}/>
+              {consentClinicLogo&&<div style={{marginTop:8}}>
+                <img src={consentClinicLogo} alt="Logo preview" style={{maxHeight:60,maxWidth:160,border:"1px solid "+T.border,borderRadius:4,padding:4}}/>
+                <button onClick={()=>setConsentClinicLogo("")} style={{...T.btnO,...T.btnSm,marginLeft:10}}>Remove logo</button>
+              </div>}
+            </div>
+
+            <h3 style={{fontSize:"1rem",fontWeight:700,marginBottom:14,marginTop:6}}>3. Treating doctor</h3>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}} className="consent-grid">
+              <div>
+                <label style={{display:"block",fontSize:".74rem",color:T.mute,fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Doctor name *</label>
+                <input value={consentDoctorName} onChange={e=>setConsentDoctorName(e.target.value)} placeholder="e.g. Dhananjay Patil" style={{...T.inp,width:"100%",padding:"9px 12px"}}/>
+              </div>
+              <div>
+                <label style={{display:"block",fontSize:".74rem",color:T.mute,fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Registration number</label>
+                <input value={consentDoctorReg} onChange={e=>setConsentDoctorReg(e.target.value)} placeholder="e.g. MMC-12345" style={{...T.inp,width:"100%",padding:"9px 12px"}}/>
+              </div>
+            </div>
+
+            <button onClick={()=>{
+              // Save clinic/doctor info to user profile for next time
+              fbSet("users",au.uid,{
+                clinicName:consentClinicName,
+                clinicAddress:consentClinicAddress,
+                clinicPhone:consentClinicPhone,
+                doctorName:consentDoctorName,
+                doctorRegNumber:consentDoctorReg,
+              }).catch(()=>{});
+              generateConsent();
+            }} disabled={consentGenerating||(dailyExhausted&&credits<=0)} style={{
+              ...T.btn,
+              width:"100%",
+              padding:"13px 24px",
+              fontSize:".95rem",
+              fontWeight:600,
+              marginTop:8,
+              opacity:(consentGenerating||(dailyExhausted&&credits<=0))?.55:1,
+              cursor:(consentGenerating||(dailyExhausted&&credits<=0))?"not-allowed":"pointer",
+            }}>
+              {consentGenerating?"⏳ Generating...":dailyExhausted&&credits<=0?"Daily limit reached":"📄 Generate Consent Template"}
+            </button>
+
+            <div style={{fontSize:".7rem",color:T.mute,marginTop:10,lineHeight:1.5}}>
+              The file downloads as a .doc file you can open and edit in Microsoft Word or Google Docs.
+              {credits>0&&" Bonus credits will only be used after your daily free generation."}
+            </div>
+          </div>
+
+          <style>{`@media(max-width:540px){.consent-grid{grid-template-columns:1fr !important}}`}</style>
+        </div>);
+      })()}
 
       <div style={{textAlign:"center",padding:"22px 0",borderTop:"1px solid "+T.border,marginTop:20}}>
         <Logo size={28}/><div style={{fontSize:".65rem",color:T.light,letterSpacing:2,textTransform:"uppercase",marginTop:6}}>SKINARIO · <span style={{color:T.gold,fontWeight:600}}>{BRAND.sub}</span></div>
