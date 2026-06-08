@@ -3041,16 +3041,27 @@ export default function App(){
     if (!consentDoctorName.trim()) { sh("Please enter doctor name"); return; }
 
     // Rate limit
+    // Admins bypass entirely (their own platform — no point limiting themselves)
+    // Doctors: 2 free per day, then credits
+    const isAdminUser = ADMINS.includes(au.email);
+    const DAILY_FREE_LIMIT = 2;
     const todayKey = todayIST_YMD();
     const todaysCount = (prof.consentGenerations || {})[todayKey] || 0;
     const credits = prof.consentCredits || 0;
-    if (todaysCount >= 1 && credits <= 0) {
-      if (!confirm(
-        "You've used your free consent generation for today.\n\n" +
-        "Options:\n1. Wait until tomorrow (resets at midnight IST)\n2. Contact admin for bonus credits\n\n" +
-        "OK to email admin, Cancel to wait."
-      )) return;
-      window.location.href = "mailto:drjpatil@gmail.com?subject=Consent credits request&body=Hi, I need additional consent template credits. My account: " + (au.email || au.uid);
+    if (!isAdminUser && todaysCount >= DAILY_FREE_LIMIT && credits <= 0) {
+      const userChoice = confirm(
+        "You've used your " + DAILY_FREE_LIMIT + " free consent generations for today.\n\n" +
+        "Two options to continue:\n" +
+        "1. Wait until tomorrow (limit resets at midnight IST)\n" +
+        "2. Request more credits — free during beta!\n\n" +
+        "Click OK to message Dr. Dhananjay Patil on WhatsApp, or Cancel to wait."
+      );
+      if (!userChoice) return;
+      // WhatsApp link with pre-filled message
+      const waMessage = encodeURIComponent(
+        "Hi Dr. Patil, I'd like more consent template credits on SKINARIO. My account: " + (au.email || au.uid)
+      );
+      window.open("https://wa.me/918390200008?text=" + waMessage, "_blank");
       return;
     }
 
@@ -3264,14 +3275,19 @@ ${hasConcern ? `<h2>6. ${T_("h_patient_concern")}</h2>
       });
 
       // Persist rate-limit state
-      const newGenerations = { ...(prof.consentGenerations || {}), [todayKey]: todaysCount + 1 };
+      // Admins: don't track usage or consume credits (unlimited access by design)
+      // Doctors: increment daily count; if over free limit, deduct one credit
+      let newGenerations = prof.consentGenerations || {};
       let newCredits = credits;
-      if (todaysCount >= 1) newCredits = Math.max(0, credits - 1);
-      await fbSet("users", au.uid, {
-        consentGenerations: newGenerations,
-        consentCredits: newCredits,
-      });
-      setProf((p) => ({ ...p, consentGenerations: newGenerations, consentCredits: newCredits }));
+      if (!isAdminUser) {
+        newGenerations = { ...(prof.consentGenerations || {}), [todayKey]: todaysCount + 1 };
+        if (todaysCount >= DAILY_FREE_LIMIT) newCredits = Math.max(0, credits - 1);
+        await fbSet("users", au.uid, {
+          consentGenerations: newGenerations,
+          consentCredits: newCredits,
+        });
+        setProf((p) => ({ ...p, consentGenerations: newGenerations, consentCredits: newCredits }));
+      }
 
       // Audit log
       try {
@@ -3285,7 +3301,8 @@ ${hasConcern ? `<h2>6. ${T_("h_patient_concern")}</h2>
           clinicName: consentClinicName,
           language: consentLanguage,
           isCustomProcedure: consentProc === "__custom__",
-          usedCredit: todaysCount >= 1,
+          usedCredit: !isAdminUser && todaysCount >= DAILY_FREE_LIMIT,
+          isAdminGeneration: isAdminUser,
           createdAt: Date.now(),
         });
       } catch (logErr) {
@@ -5972,7 +5989,7 @@ ${hasConcern ? `<h2>6. ${T_("h_patient_concern")}</h2>
                 <div style={{fontSize:".82rem",fontWeight:600,color:T.teal,marginBottom:6}}>📋 Consent template credits</div>
                 <p style={{fontSize:".72rem",color:T.txt2,lineHeight:1.5,marginBottom:8}}>
                   Current balance: <b>{u.consentCredits||0}</b> credits.
-                  Users get 1 free generation per day. Use credits for overflow / paid usage.
+                  Users get 2 free generations per day. Use credits for overflow / paid usage.
                   Today's usage: {(u.consentGenerations||{})[todayIST_YMD()]||0}.
                 </p>
                 <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
@@ -6235,7 +6252,7 @@ ${hasConcern ? `<h2>6. ${T_("h_patient_concern")}</h2>
             <div>
               <div style={{fontSize:".7rem",color:T.mute,letterSpacing:1,textTransform:"uppercase",fontWeight:600,marginBottom:2}}>Tools</div>
               <div style={{fontSize:"1rem",fontWeight:700,color:T.teal,lineHeight:1.2}}>Consent Template Generator</div>
-              <div style={{fontSize:".68rem",color:T.mute,marginTop:2}}>Generate procedure-specific consent forms · 1 free per day</div>
+              <div style={{fontSize:".68rem",color:T.mute,marginTop:2}}>Generate procedure-specific consent forms · 2 free per day</div>
             </div>
           </div>
           <div style={{fontSize:".82rem",color:T.teal,fontWeight:600,whiteSpace:"nowrap"}}>Open →</div>
@@ -7651,7 +7668,9 @@ ${hasConcern ? `<h2>6. ${T_("h_patient_concern")}</h2>
         const todayKey=todayIST_YMD();
         const todaysCount=(prof.consentGenerations||{})[todayKey]||0;
         const credits=prof.consentCredits||0;
-        const dailyExhausted=todaysCount>=1;
+        const DAILY_FREE=2; // free generations per day for non-admin doctors
+        const isAdminUser=ADMINS.includes(au?.email);
+        const dailyExhausted=!isAdminUser && todaysCount>=DAILY_FREE;
         const cats=Object.keys(CONSENT_PROCEDURES);
         const proceduresForCat=consentCat?CONSENT_PROCEDURES[consentCat]?.procedures||{}:{};
         const subProcedures=Object.keys(proceduresForCat);
@@ -7672,12 +7691,48 @@ ${hasConcern ? `<h2>6. ${T_("h_patient_concern")}</h2>
             <div>
               <div style={{fontSize:".82rem",fontWeight:600,color:T.txt}}>Today's usage</div>
               <div style={{fontSize:".76rem",color:T.txt2,marginTop:3}}>
-                {todaysCount>=1?"Daily free generation used. ":"1 free generation available today. "}
-                {credits>0&&<span style={{color:T.gold,fontWeight:600}}>+{credits} bonus credits available.</span>}
+                {isAdminUser
+                  ? <span style={{color:T.teal,fontWeight:600}}>⭐ Admin — unlimited generations</span>
+                  : <>
+                      {todaysCount>=DAILY_FREE
+                        ? `Used all ${DAILY_FREE} free generations today. `
+                        : `${DAILY_FREE-todaysCount} of ${DAILY_FREE} free generations remaining today. `}
+                      {credits>0&&<span style={{color:T.gold,fontWeight:600}}>+{credits} bonus credits available.</span>}
+                    </>}
               </div>
             </div>
-            {dailyExhausted&&credits<=0&&<div style={{padding:"6px 12px",background:T.errBg,color:T.err,borderRadius:8,fontSize:".74rem",fontWeight:600}}>Daily limit reached — contact admin</div>}
+            {dailyExhausted&&credits<=0&&<div style={{padding:"6px 12px",background:T.errBg,color:T.err,borderRadius:8,fontSize:".74rem",fontWeight:600}}>Daily limit reached</div>}
           </div>
+
+          {/* Pricing card — only visible to non-admin doctors */}
+          {!isAdminUser&&<div style={{...T.card,padding:18,marginBottom:16,background:"linear-gradient(135deg,#fff,"+T.goldBg+"55)",borderLeft:"3px solid "+T.gold,position:"relative",overflow:"hidden"}}>
+            {/* FREE-during-beta corner ribbon */}
+            <div style={{position:"absolute",top:14,right:-32,transform:"rotate(35deg)",background:"#1a7d42",color:"#fff",padding:"4px 36px",fontSize:".64rem",fontWeight:700,letterSpacing:1.2,boxShadow:"0 2px 6px rgba(0,0,0,0.15)"}}>FREE IN BETA</div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:".74rem",fontWeight:700,color:T.gold,letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>⭐ Unlimited Plan</div>
+                <div style={{fontSize:"1rem",fontWeight:700,marginBottom:4}}>Generate as many consent templates as you need</div>
+                <div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5}}>
+                  No daily limits · All procedures · All 7 languages · Word + PDF · DPDP-compliant
+                </div>
+              </div>
+              <div style={{textAlign:"right",paddingTop:16}}>
+                <div style={{fontSize:".82rem",color:T.mute,textDecoration:"line-through"}}>₹999/mo</div>
+                <div style={{fontSize:"1.4rem",fontWeight:800,color:T.mute,textDecoration:"line-through",lineHeight:1}}>₹299<span style={{fontSize:".74rem",fontWeight:500}}>/mo</span></div>
+                <div style={{fontSize:"1rem",fontWeight:800,color:"#1a7d42",marginTop:4,lineHeight:1}}>FREE</div>
+                <div style={{fontSize:".62rem",color:T.mute,fontWeight:600,marginTop:2}}>limited beta</div>
+              </div>
+            </div>
+            <button onClick={()=>{
+              const waMessage=encodeURIComponent("Hi Dr. Patil, please activate my free beta access to the Unlimited consent template plan on SKINARIO. My account: "+(au.email||au.uid));
+              window.open("https://wa.me/918390200008?text="+waMessage,"_blank");
+            }} style={{...T.btn,marginTop:14,padding:"11px 20px",fontSize:".88rem",fontWeight:600,width:"100%",background:"#1a7d42"}}>
+              💬 WhatsApp to activate (free during beta)
+            </button>
+            <div style={{fontSize:".68rem",color:T.mute,marginTop:8,textAlign:"center",lineHeight:1.55}}>
+              Pricing shown is post-beta target rate. During beta, message us and we'll activate your unlimited access at no charge while we build the payment gateway.
+            </div>
+          </div>}
 
           {/* Disclaimer */}
           <div style={{...T.card,padding:14,marginBottom:16,background:"#fff5f3",borderLeft:"3px solid "+T.err}}>
