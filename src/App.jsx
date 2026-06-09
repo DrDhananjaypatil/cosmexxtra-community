@@ -1924,6 +1924,7 @@ export default function App(){
   const[submitType,setSubmitType]=useState("");
   const[notifs,setNotifs]=useState([]);
   const[notifsOpen,setNotifsOpen]=useState(false);
+  const[moreOpen,setMoreOpen]=useState(false); // overflow nav dropdown
   const[mentionMatches,setMentionMatches]=useState([]);
   const[announceTitle,setAnnounceTitle]=useState("");
   const[newsTitle,setNewsTitle]=useState("");
@@ -2158,6 +2159,18 @@ export default function App(){
     setTimeout(()=>document.addEventListener("click",handler),0);
     return()=>document.removeEventListener("click",handler);
   },[notifsOpen]);
+
+  // Close "More" dropdown when clicking outside
+  useEffect(()=>{
+    if(!moreOpen)return;
+    const handler=(e)=>{
+      if(e.target.closest('[data-more-dropdown]'))return;
+      if(e.target.closest('[data-more-btn]'))return;
+      setMoreOpen(false);
+    };
+    setTimeout(()=>document.addEventListener("click",handler),0);
+    return()=>document.removeEventListener("click",handler);
+  },[moreOpen]);
 
   // ═══ DEEP-LINK: open shared article/video/forum/event/ad/quiz from URL ═══
   useEffect(()=>{
@@ -4121,21 +4134,74 @@ ${forDownload
     </div>);
 
   // ═══ MAIN NAV — added "Cases" section ═══
-  const navs=[{id:"home",ic:"🏠",l:"Home"},{id:"quiz",ic:"🧠",l:"Quiz"},{id:"library",ic:"📚",l:"Library"},{id:"videos",ic:"🎥",l:"Videos"},{id:"events",ic:"📅",l:"Events"},{id:"cases",ic:"🔬",l:"Cases"},{id:"forum",ic:"💬",l:"Forum"},{id:"rank",ic:"🏆",l:"Rank"},{id:"me",ic:"👤",l:"Me"},...(isAdm?[{id:"admin",ic:"⚙️",l:"Admin"}]:[])];
+  // ─── NAV CONFIG ───────────────────────────────────────────────────────────
+  // Primary (always visible): Home, Quiz, Forum, Cases, Me
+  // Overflow ("⋯ More" dropdown): Library, Videos, Events, Rank, Consent, Admin
+  const primaryNavs=[
+    {id:"home",ic:"🏠",l:"Home"},
+    {id:"quiz",ic:"🧠",l:"Quiz"},
+    {id:"forum",ic:"💬",l:"Forum"},
+    {id:"cases",ic:"🔬",l:"Cases"},
+    {id:"me",ic:"👤",l:"Me"},
+  ];
+  const overflowNavs=[
+    {id:"library",ic:"📚",l:"Library"},
+    {id:"videos",ic:"🎥",l:"Videos"},
+    {id:"events",ic:"📅",l:"Events"},
+    {id:"rank",ic:"🏆",l:"Rank"},
+    {id:"consent",ic:"📋",l:"Consent"},
+    ...(isAdm?[{id:"admin",ic:"⚙️",l:"Admin"}]:[]),
+  ];
+  // Check if current page is in overflow (so More button highlights)
+  const overflowActive=overflowNavs.some(n=>n.id===pg);
 
   return(
     <div style={{minHeight:"100vh",background:T.bg,fontFamily:"system-ui",color:T.txt}}>
+      <style>{`.nav-more-row:hover{background:#f5fafa}.nav-more-row:hover *{color:#0d6b6e}`}</style>
       <div style={{position:"sticky",top:0,zIndex:100,background:"#ffffffee",backdropFilter:"blur(16px)",borderBottom:"1px solid "+T.border,padding:"6px 24px"}}>
         <div style={{maxWidth:W,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          {/* Logo + wordmark */}
           <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={()=>go("home")}>
             <Logo size={36}/><div style={{fontSize:"1.15rem",fontWeight:300,color:T.txt,letterSpacing:4,fontFamily:"Georgia,serif"}}>SKINARIO</div>
           </div>
+
+          {/* Primary nav + overflow + notifications + avatar */}
           <div style={{display:"flex",alignItems:"center",gap:1}}>
-            {navs.map(n=><button key={n.id} onClick={()=>go(n.id)} style={{background:pg===n.id?T.tealBg:"none",border:"none",color:pg===n.id?T.teal:T.mute,padding:"5px 9px",borderRadius:9,cursor:"pointer",fontSize:".6rem",fontFamily:"inherit",fontWeight:pg===n.id?600:400,display:"flex",flexDirection:"column",alignItems:"center",gap:1,minWidth:40}}><span style={{fontSize:".85rem"}}>{n.ic}</span>{n.l}</button>)}
+            {/* Primary nav buttons — always visible */}
+            {primaryNavs.map(n=><button key={n.id} onClick={()=>go(n.id)} style={{background:pg===n.id?T.tealBg:"none",border:"none",color:pg===n.id?T.teal:T.mute,padding:"5px 9px",borderRadius:9,cursor:"pointer",fontSize:".6rem",fontFamily:"inherit",fontWeight:pg===n.id?600:400,display:"flex",flexDirection:"column",alignItems:"center",gap:1,minWidth:40}}>
+              <span style={{fontSize:".85rem"}}>{n.ic}</span>{n.l}
+            </button>)}
+
+            {/* ⋯ More — overflow nav dropdown */}
+            <div style={{position:"relative"}}>
+              <button data-more-btn onClick={()=>{setMoreOpen(o=>!o);setNotifsOpen(false)}} style={{background:moreOpen||overflowActive?T.tealBg:"none",border:"none",color:moreOpen||overflowActive?T.teal:T.mute,padding:"5px 9px",borderRadius:9,cursor:"pointer",fontSize:".6rem",fontFamily:"inherit",fontWeight:moreOpen||overflowActive?600:400,display:"flex",flexDirection:"column",alignItems:"center",gap:1,minWidth:40}}>
+                <span style={{fontSize:".95rem",lineHeight:1,letterSpacing:.5}}>☰</span>More
+              </button>
+              {moreOpen&&<div data-more-dropdown style={{position:"absolute",top:"calc(100% + 8px)",right:0,minWidth:160,background:"#fff",borderRadius:12,boxShadow:"0 8px 32px rgba(0,0,0,0.18)",border:"1px solid "+T.border,zIndex:500,overflow:"hidden",padding:"6px 0"}}>
+                {/* Profile row at top */}
+                <div onClick={()=>{go("me");setMoreOpen(false)}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",cursor:"pointer",borderBottom:"1px solid "+T.border,marginBottom:4}} className="nav-more-row">
+                  <div style={{width:32,height:32,borderRadius:"50%",overflow:"hidden",background:T.teal,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:700,fontSize:".88rem",flexShrink:0}}>
+                    {prof?.photo?<img src={prof.photo} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:uIni}
+                  </div>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontWeight:600,fontSize:".82rem",color:T.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{prof?.name||"My Profile"}</div>
+                    <div style={{fontSize:".68rem",color:T.mute}}>View profile →</div>
+                  </div>
+                </div>
+                {/* Overflow nav items */}
+                {overflowNavs.map(n=><button key={n.id} onClick={()=>{go(n.id);setMoreOpen(false)}} style={{width:"100%",background:pg===n.id?T.tealBg:"none",border:"none",borderLeft:pg===n.id?"3px solid "+T.teal:"3px solid transparent",color:pg===n.id?T.teal:T.txt,padding:"9px 16px",cursor:"pointer",fontSize:".84rem",fontFamily:"inherit",fontWeight:pg===n.id?600:400,display:"flex",alignItems:"center",gap:10,textAlign:"left"}}>
+                  <span style={{fontSize:"1rem",width:20,textAlign:"center"}}>{n.ic}</span>{n.l}
+                </button>)}
+                {/* Notification count in overflow */}
+                {(()=>{const unread=notifs.filter(n=>!n.read).length;return unread>0?<div onClick={()=>{setMoreOpen(false);setNotifsOpen(true)}} style={{padding:"9px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontSize:".84rem",color:T.err,fontWeight:600,borderTop:"1px solid "+T.border,marginTop:4}}>
+                  <span style={{width:20,textAlign:"center"}}>🔔</span>Notifications <span style={{marginLeft:"auto",background:"#dc3545",color:"#fff",borderRadius:10,padding:"1px 7px",fontSize:".7rem"}}>{unread>9?"9+":unread}</span>
+                </div>:null})()}
+              </div>}
+            </div>
 
             {/* 🔔 Notifications bell */}
-            {(()=>{const unread=notifs.filter(n=>!n.read).length;return(<div style={{position:"relative",marginLeft:6}}>
-              <button onClick={()=>setNotifsOpen(o=>!o)} style={{background:notifsOpen?T.tealBg:"none",border:"none",padding:"5px 9px",borderRadius:9,cursor:"pointer",fontSize:".85rem",position:"relative"}} title="Notifications">
+            {(()=>{const unread=notifs.filter(n=>!n.read).length;return(<div style={{position:"relative",marginLeft:4}}>
+              <button onClick={()=>{setNotifsOpen(o=>!o);setMoreOpen(false)}} style={{background:notifsOpen?T.tealBg:"none",border:"none",padding:"5px 9px",borderRadius:9,cursor:"pointer",fontSize:".85rem",position:"relative"}} title="Notifications">
                 🔔
                 {unread>0&&<span style={{position:"absolute",top:1,right:1,minWidth:16,height:16,borderRadius:8,background:"#dc3545",color:"#fff",fontSize:".58rem",fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px",border:"2px solid #fff"}}>{unread>9?"9+":unread}</span>}
               </button>
@@ -4330,7 +4396,7 @@ ${forDownload
           return(<div style={{...T.card,padding:18,marginBottom:14}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
               <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>💬 Featured Forum</h3>
-              <span onClick={()=>go("forum")} style={{fontSize:".78rem",color:T.teal,fontWeight:600,cursor:"pointer"}}>Browse all →</span>
+              <span onClick={(e)=>{e.stopPropagation();go("forum")}} style={{fontSize:".78rem",color:T.teal,fontWeight:600,cursor:"pointer"}}>Browse all →</span>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
               {eligible.map(p=>{
@@ -4357,6 +4423,31 @@ ${forDownload
               })}
             </div>
           </div>);
+        })()}
+
+        {/* ═══ CONSENT TEMPLATE PROMO BANNER ═══
+            Shown to doctors / unset accountType. Dismissed once clicked. */}
+        {(()=>{
+          const aType=prof?.accountType||"";
+          const canSeeConsent=isAdm||aType==="doctor"||aType===""||aType===undefined;
+          if(!canSeeConsent)return null;
+          return(
+            <div onClick={()=>go("consent")} style={{...T.card,padding:"12px 18px",marginBottom:14,background:"linear-gradient(135deg,"+T.tealBg+"88,"+T.goldBg+"44)",borderLeft:"3px solid "+T.teal,display:"flex",alignItems:"center",justifyContent:"space-between",gap:14,cursor:"pointer",flexWrap:"wrap"}} onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 4px 18px rgba(0,0,0,0.07)"}} onMouseLeave={e=>{e.currentTarget.style.boxShadow=""}}>
+              <div style={{display:"flex",alignItems:"center",gap:12,minWidth:0}}>
+                <div style={{fontSize:"1.6rem",flexShrink:0}}>📋</div>
+                <div style={{minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:3}}>
+                    <span style={{fontSize:".62rem",background:T.teal,color:"#fff",padding:"2px 8px",borderRadius:10,fontWeight:700,letterSpacing:.5}}>NEW</span>
+                    <div style={{fontSize:".92rem",fontWeight:700,color:T.teal}}>Consent Template Generator</div>
+                  </div>
+                  <div style={{fontSize:".76rem",color:T.txt2,lineHeight:1.5}}>
+                    Generate professional informed consent forms for 22+ procedures. Botox, fillers, threads, peels, lasers and more. Word + PDF · 7 languages · DPDP-compliant.
+                  </div>
+                </div>
+              </div>
+              <div style={{fontSize:".8rem",color:T.teal,fontWeight:700,whiteSpace:"nowrap",flexShrink:0}}>Try free →</div>
+            </div>
+          );
         })()}
 
         {/* ═══ FEATURED ARTICLES ═══
@@ -6272,7 +6363,13 @@ ${forDownload
         </div>}
 
         {/* ═══ CONSENT TEMPLATE GENERATOR — doctor-only quick link ═══ */}
-        {!editingProfile&&(prof?.accountType==="doctor"||isAdm)&&<div onClick={()=>go("consent")} style={{...T.card,padding:"12px 16px",marginBottom:12,borderLeft:"3px solid "+T.teal,background:"linear-gradient(135deg,"+T.tealBg+"55,#fff)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.07)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
+        {/* Consent tile: show to doctors + admins + accounts with no accountType set (older accounts).
+            Explicitly hide from institute/vendor/moderator accounts. */}
+        {!editingProfile&&(()=>{
+          const aType=prof?.accountType||"";
+          const showConsent=isAdm||aType==="doctor"||aType===""||aType===undefined;
+          if(!showConsent)return null;
+          return(<div onClick={()=>go("consent")} style={{...T.card,padding:"12px 16px",marginBottom:12,borderLeft:"3px solid "+T.teal,background:"linear-gradient(135deg,"+T.tealBg+"55,#fff)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.07)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
           <div style={{display:"flex",alignItems:"center",gap:12,minWidth:0}}>
             <div style={{fontSize:"1.5rem"}}>📋</div>
             <div>
@@ -6282,7 +6379,8 @@ ${forDownload
             </div>
           </div>
           <div style={{fontSize:".82rem",color:T.teal,fontWeight:600,whiteSpace:"nowrap"}}>Open →</div>
-        </div>}
+        </div>);
+        })()}
 
         {/* ═══ EDITABLE PROFILE SECTION ═══ */}
         {editingProfile?<div style={{...T.card,borderLeft:"3px solid "+T.gold,padding:22}}>
