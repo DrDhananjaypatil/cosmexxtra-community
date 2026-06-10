@@ -1043,9 +1043,7 @@ const AdminVideoField=({value,onChange})=>{
 // Used in article creation/editing. Stores as an array of block objects.
 // Block schema: {type:"text"|"heading"|"image", content?:string, url?:string, caption?:string}
 
-const BLOCK_UPLOAD_PATH = "article-blocks"; // Firebase Storage folder
-
-const BlockEditor = ({ blocks, onChange }) => {
+const BlockEditor = ({ blocks, onChange, uploadPath = "article-blocks" }) => {
   const [uploading, setUploading] = useState({});  // {blockIdx: true/false}
 
   const updateBlock = (idx, patch) => {
@@ -1077,7 +1075,7 @@ const BlockEditor = ({ blocks, onChange }) => {
     if (file.size > 5 * 1024 * 1024) { alert("Image must be under 5 MB"); return; }
     setUploading(u => ({ ...u, [idx]: true }));
     try {
-      const path = `${BLOCK_UPLOAD_PATH}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+      const path = `${uploadPath}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
       const sRef = ref(storage, path);
       await uploadBytes(sRef, file);
       const url = await getDownloadURL(sRef);
@@ -2056,7 +2054,8 @@ export default function App(){
   const[authMode,setAuthMode]=useState("signin");const[authEmail,setAuthEmail]=useState("");const[authPass,setAuthPass]=useState("");const[authName,setAuthName]=useState("");const[authBusy,setAuthBusy]=useState(false);const[authErr,setAuthErr]=useState("");
   const[pf,setPf]=useState({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});const[edForm,setEdForm]=useState(null);const[setupStep,setSetupStep]=useState(0);const[setupErr,setSetupErr]=useState("");
   // Forum/Cases new post state
-  const[newForum,setNewForum]=useState(false);const[fpT,setFpT]=useState("");const[fpB,setFpB]=useState("");const[fpC,setFpC]=useState(TOPICS[0]);const[fpImgs,setFpImgs]=useState([]);const[fpUp,setFpUp]=useState(false);
+  const[newForum,setNewForum]=useState(false);const[fpT,setFpT]=useState("");const[fpC,setFpC]=useState(TOPICS[0]);
+  const[fpBlocks,setFpBlocks]=useState([]); // block editor for forum post body (replaces fpB + fpImgs)
   const[newCase,setNewCase]=useState(false);const[ccT,setCcT]=useState("");const[ccB,setCcB]=useState("");const[ccC,setCcC]=useState(TOPICS[0]);const[ccImgs,setCcImgs]=useState([]);const[ccUp,setCcUp]=useState(false);const[ccDiag,setCcDiag]=useState("");const[ccHistory,setCcHistory]=useState("");const[ccTreatment,setCcTreatment]=useState("");const[ccOutcome,setCcOutcome]=useState("");
 
   // KNOWN_PAGES must match every page condition the app actually renders.
@@ -3660,7 +3659,15 @@ ${forDownload
   const deleteContent=async(type,id,name)=>{if(!confirm(`Delete "${name}"?`))return;await fbDel(type,id);sh("Deleted");loadData()};
 
   // ═══ FORUM POST ═══
-  const postForum=async()=>{if(!fpT.trim())return;await fbAdd("forum",{author:uName,ini:uIni,uid:au.uid,photo:uPhoto||"",title:fpT,cat:fpC,body:fpB,images:fpImgs,likedBy:[],likes:0,replies:0,date:ds(getIST())});setFpT("");setFpB("");setFpImgs([]);setNewForum(false);sh("Posted!");loadData()};
+  const postForum=async()=>{
+    if(!fpT.trim())return;
+    // Extract images from blocks for backward-compat (card preview, lightbox)
+    const images=fpBlocks.filter(b=>b.type==="image"&&b.url).map(b=>b.url);
+    // Build plain-text body for search/preview from text blocks
+    const body=fpBlocks.filter(b=>b.type==="text"||b.type==="heading").map(b=>b.content||"").join("\n\n");
+    await fbAdd("forum",{author:uName,ini:uIni,uid:au.uid,photo:uPhoto||"",title:fpT,cat:fpC,body,blocks:fpBlocks,images,likedBy:[],likes:0,replies:0,date:ds(getIST())});
+    setFpT("");setFpBlocks([]);setNewForum(false);sh("Posted!");loadData();
+  };
 
   // ═══ CLINICAL CASE POST ═══
   const postCase=async()=>{if(!ccT.trim()){sh("Title required");return}if(!ccImgs.length){sh("Add at least 1 image");return}await fbAdd("cases",{author:uName,ini:uIni,uid:au.uid,photo:uPhoto||"",title:ccT,cat:ccC,body:ccB,history:ccHistory,treatment:ccTreatment,outcome:ccOutcome,diagnosis:ccDiag,images:ccImgs,likedBy:[],likes:0,comments:[],date:ds(getIST())});setCcT("");setCcB("");setCcImgs([]);setCcDiag("");setCcHistory("");setCcTreatment("");setCcOutcome("");setNewCase(false);sh("Case posted!");loadData();await awardPoints("case_post")};
@@ -5762,10 +5769,13 @@ ${forDownload
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:500,textTransform:"uppercase",letterSpacing:1}}>Category</label>
             <select value={fpC} onChange={e=>setFpC(e.target.value)} style={{...T.inp,marginBottom:12}}>{TOPICS.map(t=><option key={t} value={t}>{t}</option>)}</select>
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:500,textTransform:"uppercase",letterSpacing:1}}>Your post</label>
-            <div style={{marginBottom:12}}><MarkdownEditor value={fpB} onChange={setFpB} placeholder="Share your question, insight, or experience..." rows={5}/></div>
-            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:500,textTransform:"uppercase",letterSpacing:1}}>Add images (optional)</label>
-            <div style={{marginBottom:14,padding:12,background:T.bg,borderRadius:10}}><ImgUpload images={fpImgs} setImages={setFpImgs} uploading={fpUp} setUploading={setFpUp}/></div>
-            <button onClick={postForum} style={T.btn}>Publish discussion</button>
+            <div style={{marginBottom:14}}>
+              <BlockEditor blocks={fpBlocks} onChange={setFpBlocks} uploadPath="forum-blocks"/>
+              <div style={{fontSize:".7rem",color:T.mute,marginTop:6,lineHeight:1.5}}>
+                Add paragraphs and drop clinical photos inline anywhere in your post.
+              </div>
+            </div>
+            <button onClick={postForum} disabled={!fpT.trim()} style={{...T.btn,opacity:fpT.trim()?1:.5}}>Publish discussion</button>
           </div>}
 
           {/* Category filter chips */}
@@ -5814,7 +5824,11 @@ ${forDownload
                       </div>
                     </div>
                     <h3 style={{fontSize:"1.3rem",fontWeight:700,lineHeight:1.35,marginBottom:10,color:T.txt}}>{p.title}</h3>
-                    {p.body&&<div style={{fontSize:".95rem",color:T.txt2,marginBottom:14}}><MarkdownView text={p.body}/></div>}
+                    {/* Render blocks (new posts) or plain body (old posts) */}
+                    {p.blocks?.length>0
+                      ? <div style={{marginBottom:14}}><BlockRenderer blocks={p.blocks} style={{fontSize:".95rem",color:T.txt}}/></div>
+                      : p.body&&<div style={{fontSize:".95rem",color:T.txt2,marginBottom:14}}><MarkdownView text={p.body}/></div>
+                    }
                     <div style={{display:"flex",alignItems:"center",gap:12,paddingTop:12,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
                       <LikeBtn liked={(p.likedBy||[]).includes(au?.uid)} count={p.likes||0} onToggle={()=>toggleLike("forum",p.id,p,setForumPosts)}/>
                       <span style={{fontSize:".78rem",color:T.mute,display:"flex",alignItems:"center",gap:4}}>💬 {p.comments?.length||0} {p.comments?.length===1?"reply":"replies"}</span>
