@@ -4535,23 +4535,57 @@ ${forDownload
               <p style={{color:T.txt2,fontSize:".9rem",marginTop:3,fontStyle:"italic",letterSpacing:.3}}>Learn. Discuss. Lead the field.</p>
             </div>
           </div>
-          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}><button onClick={()=>go("quiz")} style={T.btn}>🧠 Today's quiz</button><button onClick={()=>go("events")} style={T.btnO}>📅 Events</button><button onClick={()=>go("cases")} style={T.btnO}>🔬 Clinical cases</button><button onClick={()=>go("forum")} style={T.btnO}>💬 Forum</button></div>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+            <button onClick={()=>go("quiz")} style={T.btn}>🧠 Today's quiz</button>
+            <button onClick={()=>go("events")} style={T.btnO}>📅 Events</button>
+            <button onClick={()=>go("cases")} style={T.btnO}>🔬 Clinical cases</button>
+            <button onClick={()=>go("forum")} style={T.btnO}>💬 Forum</button>
+            {(()=>{const aType=prof?.accountType||"";const showConsent=isAdm||aType==="doctor"||aType===""||aType===undefined;return showConsent?<button onClick={()=>go("consent")} style={{...T.btnO,borderColor:T.teal,color:T.teal}}>📋 Generate consent</button>:null;})()}
+          </div>
         </div>
 
         <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:8,margin:"16px 0"}}>
-          {[
-            ["🧠",totA,"Quizzes",()=>go("quiz"),false],
-            ["✅",acc+"%","Accuracy",()=>go("rank"),false],
-            ["🏆",spendablePoints,"Redeem",()=>go("rewards"),true],
-            ["🔬",cases.length,"Cases",()=>go("cases"),false],
-            ["💬",forumPosts.length,"Forum",()=>go("forum"),false],
-            ["🎥",videos.length,"Videos",()=>go("videos"),false]
-          ].map(([i,v,l,onClick,highlight])=>
-            <div key={l} onClick={onClick} style={{...T.card,textAlign:"center",padding:"12px 4px",marginBottom:0,cursor:"pointer",transition:"transform .12s, box-shadow .12s",borderLeft:highlight?"3px solid "+T.gold:undefined,background:highlight?"linear-gradient(135deg,"+T.goldBg+"55,#fff)":"#fff",boxShadow:"0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow=highlight?"0 6px 16px rgba(200,168,78,0.22)":"0 6px 16px rgba(0,0,0,0.08)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)"}}>
-              <div style={{fontSize:"1rem"}}>{i}</div>
-              <div style={{fontSize:"1.2rem",fontWeight:700,color:highlight?T.gold:T.teal}}>{v}</div>
-              <div style={{fontSize:".55rem",color:highlight?T.gold:T.mute,textTransform:"uppercase",marginTop:2,fontWeight:highlight?700:400,letterSpacing:highlight?1:0}}>{l}{highlight?" →":""}</div>
-            </div>)}
+          {/* Quiz + Accuracy — split pill tile */}
+          <div onClick={()=>go("quiz")} style={{...T.card,padding:0,marginBottom:0,cursor:"pointer",overflow:"hidden",gridColumn:"span 2",transition:"transform .12s,box-shadow .12s",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 16px rgba(0,0,0,0.08)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04)"}}>
+            <div style={{display:"flex",height:"100%"}}>
+              {/* Left half: quiz count */}
+              <div style={{flex:1,textAlign:"center",padding:"12px 6px",borderRight:"1px solid "+T.border,background:"#f0fbfa"}}>
+                <div style={{fontSize:".9rem",marginBottom:2}}>🧠</div>
+                <div style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{totA}</div>
+                <div style={{fontSize:".52rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Quizzes</div>
+              </div>
+              {/* Right half: accuracy */}
+              <div style={{flex:1,textAlign:"center",padding:"12px 6px"}}>
+                <div style={{fontSize:".9rem",marginBottom:2}}>✅</div>
+                <div style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{acc}%</div>
+                <div style={{fontSize:".52rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Accuracy</div>
+              </div>
+            </div>
+          </div>
+          {/* Redeem — highlight gold */}
+          <div onClick={()=>go("rewards")} style={{...T.card,textAlign:"center",padding:"12px 4px",marginBottom:0,cursor:"pointer",transition:"transform .12s,box-shadow .12s",borderLeft:"3px solid "+T.gold,background:"linear-gradient(135deg,"+T.goldBg+"55,#fff)",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 16px rgba(200,168,78,0.22)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04)"}}>
+            <div style={{fontSize:"1rem"}}>🏆</div>
+            <div style={{fontSize:"1.2rem",fontWeight:700,color:T.gold}}>{spendablePoints}</div>
+            <div style={{fontSize:".52rem",color:T.gold,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>Redeem →</div>
+          </div>
+          {/* Articles */}
+          <div onClick={()=>go("library")} style={{...T.card,textAlign:"center",padding:"12px 4px",marginBottom:0,cursor:"pointer",transition:"transform .12s,box-shadow .12s",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 16px rgba(0,0,0,0.08)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04)"}}>
+            <div style={{fontSize:"1rem"}}>📰</div>
+            <div style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{articles.length}</div>
+            <div style={{fontSize:".52rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Articles</div>
+          </div>
+          {/* Cases */}
+          <div onClick={()=>go("cases")} style={{...T.card,textAlign:"center",padding:"12px 4px",marginBottom:0,cursor:"pointer",transition:"transform .12s,box-shadow .12s",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 16px rgba(0,0,0,0.08)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04)"}}>
+            <div style={{fontSize:"1rem"}}>🔬</div>
+            <div style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{cases.length}</div>
+            <div style={{fontSize:".52rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Cases</div>
+          </div>
+          {/* Forum */}
+          <div onClick={()=>go("forum")} style={{...T.card,textAlign:"center",padding:"12px 4px",marginBottom:0,cursor:"pointer",transition:"transform .12s,box-shadow .12s",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 16px rgba(0,0,0,0.08)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04)"}}>
+            <div style={{fontSize:"1rem"}}>💬</div>
+            <div style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{forumPosts.length}</div>
+            <div style={{fontSize:".52rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Forum</div>
+          </div>
         </div>
 
         {/* ═══ QUICK-ACCESS NEWS BUTTONS ═══
