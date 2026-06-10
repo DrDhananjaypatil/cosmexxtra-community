@@ -6581,25 +6581,30 @@ ${forDownload
             <button onClick={()=>{setEditingProfile(false);setEditErr("")}} style={T.btnO}>Cancel</button>
           </div>
         </div>:<>
-          {/* Read-only profile card with Edit button */}
-          <div style={{...T.card,textAlign:"center",padding:28,position:"relative"}}>
-            <button onClick={()=>{
-              setEditPf({
-                name:prof?.name||"",mobile:prof?.mobile||"",accountType:prof?.accountType||"",country:prof?.country||"India",
-                degree:prof?.degree||"",council:prof?.council||"",internationalCouncil:prof?.internationalCouncil||"",
-                regNumber:prof?.regNumber||"",clinic:prof?.clinic||"",address:prof?.address||"",city:prof?.city||"",region:prof?.region||"",
-                visibility:prof?.visibility||"public",companyName:prof?.companyName||"",brandCategory:prof?.brandCategory||"",
-                contactPerson:prof?.contactPerson||"",website:prof?.website||"",instituteName:prof?.instituteName||"",
-                instituteType:prof?.instituteType||"",directorName:prof?.directorName||"",bio:prof?.bio||""
-              });
-              setEditingProfile(true);
-              setEditErr("");
-            }} style={{...T.btnO,...T.btnSm,position:"absolute",top:14,right:14}}>✏️ Edit</button>
-            {uPhoto?<img src={uPhoto} style={{width:76,height:76,borderRadius:"50%",border:"3px solid "+T.teal,display:"block",margin:"0 auto 12px"}}/>:<div style={{...T.av(76,T.tealBg,T.teal),border:"3px solid "+T.teal,margin:"0 auto 12px",fontSize:"1.6rem"}}>{uIni}</div>}
-            <div style={{fontSize:"1.4rem",fontWeight:700}}>{uName}</div>
-            <div style={{color:T.txt2,fontSize:".88rem",marginTop:3}}>{prof?.degree||prof?.companyName||prof?.instituteName||"—"}</div>
-            <div style={{color:T.mute,fontSize:".8rem",marginTop:2}}>{au?.email}</div>
-            {prof?.accountType&&<div style={{marginTop:8}}><span style={T.tag(T.tealBg,T.teal)}>{ACCOUNT_TYPES.find(t=>t.id===prof.accountType)?.icon} {ACCOUNT_TYPES.find(t=>t.id===prof.accountType)?.label}</span></div>}
+        <div style={{...T.card,padding:22,position:"relative"}}>
+            {/* Top row: Edit button aligned right */}
+            <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
+              <button onClick={()=>{
+                setEditPf({
+                  name:prof?.name||"",mobile:prof?.mobile||"",accountType:prof?.accountType||"",country:prof?.country||"India",
+                  degree:prof?.degree||"",council:prof?.council||"",internationalCouncil:prof?.internationalCouncil||"",
+                  regNumber:prof?.regNumber||"",clinic:prof?.clinic||"",address:prof?.address||"",city:prof?.city||"",region:prof?.region||"",
+                  visibility:prof?.visibility||"public",companyName:prof?.companyName||"",brandCategory:prof?.brandCategory||"",
+                  contactPerson:prof?.contactPerson||"",website:prof?.website||"",instituteName:prof?.instituteName||"",
+                  instituteType:prof?.instituteType||"",directorName:prof?.directorName||"",bio:prof?.bio||""
+                });
+                setEditingProfile(true);
+                setEditErr("");
+              }} style={{...T.btnO,...T.btnSm}}>✏️ Edit</button>
+            </div>
+            {/* Profile photo + info centered */}
+            <div style={{textAlign:"center"}}>
+              {uPhoto?<img src={uPhoto} style={{width:76,height:76,borderRadius:"50%",border:"3px solid "+T.teal,display:"block",margin:"0 auto 12px"}}/>:<div style={{...T.av(76,T.tealBg,T.teal),border:"3px solid "+T.teal,margin:"0 auto 12px",fontSize:"1.6rem"}}>{uIni}</div>}
+              <div style={{fontSize:"1.4rem",fontWeight:700}}>{uName}</div>
+              <div style={{color:T.txt2,fontSize:".88rem",marginTop:3}}>{prof?.degree||prof?.companyName||prof?.instituteName||"—"}</div>
+              <div style={{color:T.mute,fontSize:".8rem",marginTop:2}}>{au?.email}</div>
+              {prof?.accountType&&<div style={{marginTop:8}}><span style={T.tag(T.tealBg,T.teal)}>{ACCOUNT_TYPES.find(t=>t.id===prof.accountType)?.icon} {ACCOUNT_TYPES.find(t=>t.id===prof.accountType)?.label}</span></div>}
+            </div>
           </div>
         </>}
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,margin:"12px 0"}}>
