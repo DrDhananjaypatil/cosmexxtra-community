@@ -105,7 +105,7 @@ const SUBMISSION_TYPES={
       {key:"authorAffiliation",label:"Author affiliation",required:false,placeholder:"e.g. Absolute Institute of Aesthetic Medicine, Pune"},
       {key:"date",label:"Publication date",required:false,type:"date"},
       {key:"abstract",label:"Abstract / Summary (optional — boxed italic intro)",required:false,type:"textarea",rows:3,placeholder:"2-3 sentence summary of the article"},
-      {key:"body",label:"Article body",required:true,type:"textarea",rows:10,placeholder:"Full article text. Use double line breaks between paragraphs."},
+      {key:"blocks",label:"Article body",required:true,type:"blocks"},
       {key:"refs",label:"References (optional)",required:false,type:"textarea",rows:3,placeholder:"List references — one per line"},
       {key:"authorBio",label:"Author bio (optional — shown at end of article)",required:false,type:"textarea",rows:2,placeholder:"Short bio about you"},
     ],
@@ -1038,6 +1038,190 @@ const AdminVideoField=({value,onChange})=>{
   </div>)
 };
 
+// ═══ BLOCK EDITOR ═══
+// A content editor where each "block" is either text, a heading, or an image.
+// Used in article creation/editing. Stores as an array of block objects.
+// Block schema: {type:"text"|"heading"|"image", content?:string, url?:string, caption?:string}
+
+const BLOCK_UPLOAD_PATH = "article-blocks"; // Firebase Storage folder
+
+const BlockEditor = ({ blocks, onChange }) => {
+  const [uploading, setUploading] = useState({});  // {blockIdx: true/false}
+
+  const updateBlock = (idx, patch) => {
+    const next = blocks.map((b, i) => i === idx ? { ...b, ...patch } : b);
+    onChange(next);
+  };
+  const addBlock = (afterIdx, type) => {
+    const newBlock = type === "image"
+      ? { type: "image", url: "", caption: "" }
+      : type === "heading"
+      ? { type: "heading", content: "" }
+      : { type: "text", content: "" };
+    const next = [...blocks];
+    next.splice(afterIdx + 1, 0, newBlock);
+    onChange(next);
+  };
+  const removeBlock = (idx) => {
+    onChange(blocks.filter((_, i) => i !== idx));
+  };
+  const moveBlock = (idx, dir) => {
+    const next = [...blocks];
+    const swapIdx = idx + dir;
+    if (swapIdx < 0 || swapIdx >= next.length) return;
+    [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+    onChange(next);
+  };
+  const uploadImage = async (idx, file) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { alert("Image must be under 5 MB"); return; }
+    setUploading(u => ({ ...u, [idx]: true }));
+    try {
+      const path = `${BLOCK_UPLOAD_PATH}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+      const sRef = ref(storage, path);
+      await uploadBytes(sRef, file);
+      const url = await getDownloadURL(sRef);
+      updateBlock(idx, { url });
+    } catch (e) {
+      console.error("block image upload failed:", e);
+      alert("Upload failed — check your connection and try again.");
+    } finally {
+      setUploading(u => ({ ...u, [idx]: false }));
+    }
+  };
+
+  const btnBase = {
+    padding: "3px 9px", fontSize: ".7rem", fontFamily: "inherit",
+    border: "1px solid " + T.border, borderRadius: 5, cursor: "pointer",
+    background: "#fff", color: T.txt, fontWeight: 600,
+  };
+  const AddBlockBar = ({ afterIdx }) => (
+    <div style={{ display: "flex", gap: 6, justifyContent: "center", padding: "6px 0", opacity: 0.7 }}
+      onMouseEnter={e => e.currentTarget.style.opacity = "1"}
+      onMouseLeave={e => e.currentTarget.style.opacity = "0.7"}>
+      <button type="button" onClick={() => addBlock(afterIdx, "text")} style={{ ...btnBase, color: T.teal, borderColor: T.teal }}>+ Paragraph</button>
+      <button type="button" onClick={() => addBlock(afterIdx, "heading")} style={{ ...btnBase, color: T.gold, borderColor: T.gold }}>+ Heading</button>
+      <button type="button" onClick={() => addBlock(afterIdx, "image")} style={{ ...btnBase, color: "#7a3e9a", borderColor: "#7a3e9a" }}>📷 Image</button>
+    </div>
+  );
+
+  return (
+    <div style={{ border: "1px solid " + T.border, borderRadius: 10, overflow: "hidden" }}>
+      {/* Toolbar hint */}
+      <div style={{ padding: "8px 14px", background: T.bg, borderBottom: "1px solid " + T.border, fontSize: ".7rem", color: T.mute }}>
+        📝 Block editor — add paragraphs, headings, and images in any order. Use ↑↓ to reorder.
+      </div>
+
+      {blocks.length === 0 && (
+        <div style={{ padding: "24px", textAlign: "center", color: T.mute, fontSize: ".84rem" }}>
+          No content yet. Add your first block below.
+        </div>
+      )}
+
+      {/* Add bar before first block */}
+      <AddBlockBar afterIdx={-1} />
+
+      {blocks.map((block, idx) => (
+        <div key={idx}>
+          {/* Block wrapper */}
+          <div style={{ position: "relative", padding: "10px 14px 10px 42px", borderTop: "1px solid " + T.border, background: "#fff" }}>
+            {/* Left: block type indicator */}
+            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 36, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, background: block.type === "image" ? "#f4eeff" : block.type === "heading" ? "#fffbea" : "#f0fbfa", borderRight: "1px solid " + T.border }}>
+              <span style={{ fontSize: ".85rem" }}>{block.type === "image" ? "🖼" : block.type === "heading" ? "H" : "¶"}</span>
+            </div>
+
+            {/* Right: controls */}
+            <div style={{ position: "absolute", top: 8, right: 10, display: "flex", gap: 3 }}>
+              <button type="button" onClick={() => moveBlock(idx, -1)} disabled={idx === 0} style={{ ...btnBase, padding: "2px 6px", opacity: idx === 0 ? 0.3 : 1 }}>↑</button>
+              <button type="button" onClick={() => moveBlock(idx, 1)} disabled={idx === blocks.length - 1} style={{ ...btnBase, padding: "2px 6px", opacity: idx === blocks.length - 1 ? 0.3 : 1 }}>↓</button>
+              <button type="button" onClick={() => removeBlock(idx)} style={{ ...btnBase, padding: "2px 6px", color: T.err, borderColor: T.err }}>✕</button>
+            </div>
+
+            {/* Content area */}
+            {block.type === "text" && (
+              <textarea
+                value={block.content || ""}
+                onChange={e => updateBlock(idx, { content: e.target.value })}
+                placeholder="Write paragraph text here... Supports **bold**, *italic*, and — lists."
+                rows={4}
+                style={{ width: "100%", border: "none", outline: "none", resize: "vertical", fontFamily: "Georgia, serif", fontSize: "1rem", lineHeight: 1.65, color: T.txt, background: "transparent", paddingRight: 70, boxSizing: "border-box" }}
+              />
+            )}
+            {block.type === "heading" && (
+              <input
+                value={block.content || ""}
+                onChange={e => updateBlock(idx, { content: e.target.value })}
+                placeholder="Section heading..."
+                style={{ width: "100%", border: "none", outline: "none", fontFamily: "Georgia, serif", fontSize: "1.2rem", fontWeight: 700, color: T.txt, background: "transparent", paddingRight: 70, boxSizing: "border-box" }}
+              />
+            )}
+            {block.type === "image" && (
+              <div style={{ paddingRight: 70 }}>
+                {block.url ? (
+                  <div style={{ marginBottom: 8 }}>
+                    <img src={block.url} alt={block.caption || ""} style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 6, display: "block", objectFit: "contain" }} />
+                    <button type="button" onClick={() => updateBlock(idx, { url: "" })} style={{ ...btnBase, marginTop: 6, fontSize: ".68rem", color: T.err }}>Remove image</button>
+                  </div>
+                ) : (
+                  <div style={{ marginBottom: 8 }}>
+                    <label style={{ display: "inline-block", padding: "8px 16px", background: "#f4eeff", border: "1px dashed #7a3e9a", borderRadius: 6, cursor: "pointer", fontSize: ".82rem", color: "#7a3e9a", fontWeight: 600 }}>
+                      {uploading[idx] ? "⏳ Uploading..." : "📷 Click to upload image"}
+                      <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(idx, f); }} disabled={uploading[idx]} />
+                    </label>
+                  </div>
+                )}
+                <input
+                  value={block.caption || ""}
+                  onChange={e => updateBlock(idx, { caption: e.target.value })}
+                  placeholder="Caption (optional — e.g. Fig 1: Post-inflammatory hyperpigmentation of the axilla)"
+                  style={{ width: "100%", border: "none", borderBottom: "1px solid " + T.border, outline: "none", fontSize: ".82rem", color: T.txt2, fontStyle: "italic", background: "transparent", padding: "4px 0", boxSizing: "border-box" }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Add bar after each block */}
+          <AddBlockBar afterIdx={idx} />
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ═══ BLOCK RENDERER ═══
+// Renders an article's blocks array in the detail view.
+// Each block type renders with appropriate styling for the editorial layout.
+const BlockRenderer = ({ blocks, style = {} }) => {
+  if (!blocks || blocks.length === 0) return null;
+  return (
+    <div style={{ lineHeight: 1.65, wordBreak: "break-word", ...style }}>
+      {blocks.map((block, idx) => {
+        if (block.type === "heading") {
+          return (
+            <h2 key={idx} style={{ fontSize: "1.25rem", fontWeight: 700, color: T.txt, marginTop: idx === 0 ? 0 : 28, marginBottom: 12, fontFamily: "Georgia, 'Times New Roman', serif" }}>
+              {block.content}
+            </h2>
+          );
+        }
+        if (block.type === "image") {
+          return (
+            <figure key={idx} style={{ margin: "24px 0", textAlign: "center" }}>
+              <img src={block.url} alt={block.caption || ""} style={{ maxWidth: "100%", borderRadius: 8, boxShadow: "0 2px 12px rgba(0,0,0,0.10)", display: "inline-block" }} />
+              {block.caption && (
+                <figcaption style={{ fontSize: ".82rem", color: T.txt2, fontStyle: "italic", marginTop: 8, lineHeight: 1.5 }}>
+                  {block.caption}
+                </figcaption>
+              )}
+            </figure>
+          );
+        }
+        // Default: text block — render with MarkdownView for bold/italic/lists
+        return <MarkdownView key={idx} text={block.content || ""} style={{ fontSize: "1.05rem", color: T.txt, fontFamily: "Georgia, 'Times New Roman', serif", marginBottom: 16 }} />;
+      })}
+    </div>
+  );
+};
+
 // ═══ ADMIN FORM (moved outside App to fix cursor focus bug) ═══
 const AdminForm=({type,fields,edForm,setEdForm,onSave})=>{
   const d=edForm?.data||{};
@@ -1048,6 +1232,7 @@ const AdminForm=({type,fields,edForm,setEdForm,onSave})=>{
       <label style={{display:"block",fontSize:".75rem",color:T.teal,marginBottom:4}}>{l}</label>
       {tp==="textarea"?<textarea value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.txa}/>
       :tp==="markdown"?<MarkdownEditor value={d[k]||""} onChange={v=>set(k,v)} placeholder="" rows={6}/>
+      :tp==="blocks"?<BlockEditor blocks={Array.isArray(d[k])?d[k]:[]} onChange={v=>set(k,v)}/>
       :tp==="select"?<select value={d[k]||""} onChange={e=>set(k,e.target.value)} style={T.inp}>{(opts||TOPICS).map(t=><option key={t} value={t}>{t}</option>)}{!opts&&<option value="General">General</option>}</select>
       :tp==="check"?<label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}><input type="checkbox" checked={!!d[k]} onChange={e=>set(k,e.target.checked)}/> {l}</label>
       :tp==="image"?<AdminImgField value={d[k]} onChange={url=>set(k,url)}/>
@@ -1311,6 +1496,8 @@ function SubmissionForm({ typeKey, cfg, T, storage, ref, uploadBytes, getDownloa
             </label>
             {field.type === "textarea" ? (
               <textarea value={val} onChange={e => setField(field.key, e.target.value)} placeholder={field.placeholder || ""} rows={field.rows || 3} style={{...T.txa, fontSize: ".88rem", lineHeight: 1.55}}/>
+            ) : field.type === "blocks" ? (
+              <BlockEditor blocks={Array.isArray(formData[field.key]) ? formData[field.key] : []} onChange={v => setField(field.key, v)}/>
             ) : field.type === "select" ? (
               <select value={val} onChange={e => setField(field.key, e.target.value)} style={T.inp}>
                 <option value="">— select —</option>
@@ -4916,8 +5103,11 @@ ${forDownload
               <p style={{fontSize:".92rem",color:T.txt2,lineHeight:1.75,fontFamily:"Georgia, serif",fontStyle:"italic",margin:0}}>{selA.abstract}</p>
             </div>}
 
-            {/* Article body */}
-            <MarkdownView text={selA.body} style={{fontSize:"1.05rem",color:T.txt,fontFamily:"Georgia, 'Times New Roman', serif"}}/>
+            {/* Article body — new articles use blocks[], old ones use body string */}
+            {selA.blocks && selA.blocks.length > 0
+              ? <BlockRenderer blocks={selA.blocks} style={{fontSize:"1.05rem",color:T.txt,fontFamily:"Georgia, 'Times New Roman', serif"}}/>
+              : <MarkdownView text={selA.body} style={{fontSize:"1.05rem",color:T.txt,fontFamily:"Georgia, 'Times New Roman', serif"}}/>
+            }
 
             {/* References */}
             {selA.refs&&<div style={{marginTop:32,paddingTop:18,borderTop:"1px solid "+T.border}}>
@@ -7036,7 +7226,7 @@ ${forDownload
         {aTab==="quiz"&&<div style={T.card}>{edForm?.type==="quizzes"?<AdminForm type="Quiz sponsor" edForm={edForm} setEdForm={setEdForm} fields={[["sponsored","Mark as sponsored quiz","check"],["sponsor","Sponsor name (e.g. 'Sun Pharma')"],["sponsorLogo","Sponsor logo","image"],["sponsorUrl","Sponsor URL (optional — makes name clickable)"]]} onSave={()=>saveContent("quizzes")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{quizzes.length} questions</span><button onClick={genQuiz} style={T.btn}>🤖 Generate today</button></div>
           {quizzes.map(q=><div key={q.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border,gap:10}}><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,fontSize:".88rem"}}>{q.cat} — {q.diff} {q.sponsored&&<span style={{...T.tag(T.goldBg,T.goldD),marginLeft:6}}>📢 {q.sponsor||"Sponsored"}</span>}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(q.date)} · {Object.keys(q.answers||{}).length} answers · ❤️ {q.likes||0}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>{setSelD(q.date);go("quiz")}} style={{...T.btnO,...T.btnSm}}>View</button><button onClick={()=>setIgPost({item:q,type:"quiz"})} style={{...T.btnO,...T.btnSm}} title="Generate Instagram post">📸 IG</button><button onClick={()=>setEdForm({type:"quizzes",data:{...q},editing:true})} style={{...T.btnO,...T.btnSm}}>📢 Sponsor</button><button onClick={()=>deleteContent("quizzes",q.id,q.cat)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
-        {aTab==="articles"&&<div style={T.card}>{edForm?.type==="articles"?<AdminForm type="Article" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["subtitle","Subtitle / Tagline (italic, shown below title — optional)"],["cat","Category","select"],["author","Author name (e.g. 'Dr. Dhananjay Patil, MD')"],["authorPhoto","Author profile photo","image"],["authorAffiliation","Author affiliation (e.g. 'Absolute Institute of Aesthetic Medicine, Pune')"],["date","Publication date","date"],["cover","Cover image","image"],["abstract","Abstract / Summary (italic boxed quote — optional)","textarea"],["body","Article body","markdown"],["refs","References (optional)","textarea"],["authorBio","Author bio (shown at end of article — optional)","textarea"],["sponsored","Sponsored content (paid editorial)","check"],["sponsor","Sponsored by — brand name (e.g. 'Sun Pharma') — only if Sponsored is checked"],["sponsorLogo","Sponsor logo","image"],["sponsorUrl","Sponsor website URL (optional — makes sponsor name clickable)"],["feat","Featured","check"]]} onSave={()=>saveContent("articles")}/>
+        {aTab==="articles"&&<div style={T.card}>{edForm?.type==="articles"?<AdminForm type="Article" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["subtitle","Subtitle / Tagline (italic, shown below title — optional)"],["cat","Category","select"],["author","Author name (e.g. 'Dr. Dhananjay Patil, MD')"],["authorPhoto","Author profile photo","image"],["authorAffiliation","Author affiliation (e.g. 'Absolute Institute of Aesthetic Medicine, Pune')"],["date","Publication date","date"],["cover","Cover image","image"],["abstract","Abstract / Summary (italic boxed quote — optional)","textarea"],["blocks","Article body (block editor — add paragraphs, headings, images)","blocks"],["refs","References (optional)","textarea"],["authorBio","Author bio (shown at end of article — optional)","textarea"],["sponsored","Sponsored content (paid editorial)","check"],["sponsor","Sponsored by — brand name (e.g. 'Sun Pharma') — only if Sponsored is checked"],["sponsorLogo","Sponsor logo","image"],["sponsorUrl","Sponsor website URL (optional — makes sponsor name clickable)"],["feat","Featured","check"]]} onSave={()=>saveContent("articles")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{articles.length}</span><button onClick={()=>setEdForm({type:"articles",data:{date:today,author:uName,cat:TOPICS[0]},editing:false})} style={T.btn}>+ New</button></div>
           {articles.map(a=><div key={a.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div style={{display:"flex",gap:10,alignItems:"center"}}>{a.cover&&<img src={a.cover} style={{width:50,height:36,objectFit:"cover",borderRadius:6}}/>}<div><div style={{fontWeight:500,fontSize:".88rem"}}>{a.title}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(a.date)}</div></div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setIgPost({item:a,type:"article"})} style={{...T.btnO,...T.btnSm}} title="Generate Instagram post">📸 IG</button><button onClick={()=>setEdForm({type:"articles",data:{...a},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("articles",a.id,a.title)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
         {aTab==="resources"&&<div style={T.card}>{edForm?.type==="resources"?<AdminForm type="Resource" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["url","Download URL"],["pages","Pages"],["size","Size"],["icon","Emoji (fallback)"],["thumb","Thumbnail image","image"],["free","Free","check"]]} onSave={()=>saveContent("resources")}/>
