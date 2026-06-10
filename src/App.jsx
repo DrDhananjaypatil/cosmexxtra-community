@@ -3364,7 +3364,13 @@ ${forDownload
     if(!au)return;
     const ok=idx===qObj.ci;
     const answers={...(qObj.answers||{}),[au.uid]:idx};
-    await fbSet("quizzes",qid,{answers});
+    const writeOk=await fbSet("quizzes",qid,{answers});
+    if(!writeOk){
+      // Write failed — Firestore rules or network issue.
+      // Don't award points or update streak since the answer wasn't persisted.
+      sh("❌ Could not save your answer. Check your connection and try again.");
+      return;
+    }
     // ═══ SAME-DAY POINTS RULE ═══
     // Points are only awarded if the user answers ON THE DAY the quiz was published.
     // Back-answering old quizzes is allowed (educational value), but no points.
