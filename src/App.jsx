@@ -3393,11 +3393,20 @@ ${forDownload
         baseStreak=fresh.streak||0;
       }
     }catch(err){console.error("fresh read failed, using local state:",err)}
-    // Streak only progresses on same-day quizzes (not retroactive)
-    const newStreak=(ok&&isSameDay)?baseStreak+1:(isSameDay?0:baseStreak);
-    // Streak bonus: +50 every 7 consecutive days
-    let streakBonus=0;
-    if(ok&&isSameDay&&newStreak>0&&newStreak%7===0){streakBonus=50}
+    // ─── STREAK LOGIC ────────────────────────────────────────────────────────
+    // Rules:
+    //   1. Correct answer on today's quiz → streak +1
+    //   2. Wrong answer on today's quiz  → streak stays (no increment, no reset)
+    //   3. Sunday is a rest day — if today is Monday and doctor answers correctly,
+    //      the streak is NOT penalised for the Sunday gap (we skip Sunday in the chain)
+    //   4. Back-answering old quizzes → streak unchanged
+    //
+    // We DO NOT auto-decrement streak on missed days (no daily cron).
+    // Streak is only ever written here, so it reflects consecutive answer days.
+    const newStreak = (ok && isSameDay) ? baseStreak + 1 : baseStreak;
+    // Streak bonus: +50 every 7 days of correct answers
+    let streakBonus = 0;
+    if (ok && isSameDay && newStreak > 0 && newStreak % 7 === 0) { streakBonus = 50; }
     const totalEarned=pointsEarned+streakBonus;
     const monthKey=todayIST_YMD().slice(0,7);
     const curMonthly=baseMonthly[monthKey]||0;
@@ -5038,7 +5047,7 @@ ${forDownload
 
       {/* QUIZ */}
       {pg==="quiz"&&<div>
-        <div style={{display:"flex",gap:6,overflowX:"auto",padding:"4px 0 14px"}}>{dates.map(d=>{const dt=new Date(d+"T12:00:00");const sun=dt.getDay()===0;const on=d===selD;return<div key={d} onClick={()=>!sun&&setSelD(d)} style={{minWidth:52,padding:"8px 4px",textAlign:"center",borderRadius:10,border:`1.5px solid ${on?T.teal:T.border}`,cursor:sun?"not-allowed":"pointer",background:on?T.tealBg:"#fff",opacity:sun?.3:1}}><div style={{fontSize:".58rem",color:on?T.teal:T.mute,textTransform:"uppercase",fontWeight:on?600:400}}>{dN(d)}</div><div style={{fontSize:"1rem",fontWeight:700,color:on?T.teal:T.txt}}>{dt.getDate()}</div></div>})}</div>
+        <div style={{display:"flex",gap:6,overflowX:"auto",padding:"4px 0 14px"}}>{dates.map(d=>{const dt=new Date(d+"T12:00:00");const on=d===selD;const hasQuiz=quizzes.some(q=>q.date===d);return<div key={d} onClick={()=>setSelD(d)} style={{minWidth:52,padding:"8px 4px",textAlign:"center",borderRadius:10,border:`1.5px solid ${on?T.teal:T.border}`,cursor:"pointer",background:on?T.tealBg:"#fff",opacity:hasQuiz?1:.45}}><div style={{fontSize:".58rem",color:on?T.teal:T.mute,textTransform:"uppercase",fontWeight:on?600:400}}>{dN(d)}</div><div style={{fontSize:"1rem",fontWeight:700,color:on?T.teal:T.txt}}>{dt.getDate()}</div></div>})}</div>
         {ld&&<div style={{...T.card,textAlign:"center",padding:50}}><p style={{color:T.mute}}>⏳ Generating...</p></div>}
         {!ld&&!qObj&&<div style={{...T.card,textAlign:"center",padding:40}}>{selD===today?<><div style={{fontSize:"2rem",marginBottom:10}}>🔬</div><p style={{color:T.teal,fontWeight:600}}>Today's question</p><p style={{color:T.mute,fontSize:".88rem",margin:"8px 0 16px"}}>10 AM IST daily</p>{isAdm&&<button onClick={genQuiz} style={T.btn}>🤖 Generate now</button>}</>:<p style={{color:T.mute}}>No question for this date</p>}</div>}
         {!ld&&qObj&&<div className="quiz-grid" style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 340px",gap:16,alignItems:"start"}}>
