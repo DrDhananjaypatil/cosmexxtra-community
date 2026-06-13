@@ -4544,7 +4544,7 @@ ${forDownload
           </div>
         </div>
 
-        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:8,margin:"16px 0"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(8,1fr)",gap:8,margin:"16px 0"}}>
           {/* Quiz + Accuracy — single column, stacked top/bottom */}
           <div onClick={()=>go("quiz")} style={{...T.card,padding:0,marginBottom:0,cursor:"pointer",overflow:"hidden",transition:"transform .12s,box-shadow .12s",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 16px rgba(0,0,0,0.08)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04)"}}>
             {/* Top: quiz count */}
@@ -4567,7 +4567,7 @@ ${forDownload
             <div style={{fontSize:".52rem",color:T.gold,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>Redeem →</div>
           </div>
           {/* Articles */}
-          {[["📰",articles.length,"Articles",()=>go("library")],["🔬",cases.length,"Cases",()=>go("cases")],["💬",forumPosts.length,"Forum",()=>go("forum")],["🎥",videos.length,"Videos",()=>go("videos")]].map(([ic,ct,lb,fn])=>
+          {[["📰",articles.length,"Articles",()=>go("home")],["🔬",cases.length,"Cases",()=>go("cases")],["💬",forumPosts.length,"Forum",()=>go("forum")],["🎥",videos.length,"Videos",()=>go("videos")],["📚",resources.length,"Library",()=>go("library")]].map(([ic,ct,lb,fn])=>
             <div key={lb} onClick={fn} style={{...T.card,textAlign:"center",padding:"12px 4px",marginBottom:0,cursor:"pointer",transition:"transform .12s,box-shadow .12s",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 16px rgba(0,0,0,0.08)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04)"}}>
               <div style={{fontSize:"1rem"}}>{ic}</div>
               <div style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{ct}</div>
