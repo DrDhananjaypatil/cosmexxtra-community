@@ -215,12 +215,23 @@ const ACTION_POINTS={
   forum_upvoted:     {points:1,  cap:0,  label:"Comment upvoted"},
   profile_complete:  {points:5,  cap:0,  label:"Profile completion (one-time)"},
   invite_success:    {points:5,  cap:0,  label:"Successful invite"},
+  referral_bonus:    {points:100,cap:0,  label:"Referral bonus"},  // awarded when YOUR referred friend answers their first quiz
 };
 
 // Returns today's IST date as YYYY-MM-DD — used as the key for daily-cap tracking
 function todayIST_YMD(){
   const ist=new Date(Date.now()+5.5*60*60*1000);
   return ist.toISOString().split("T")[0];
+}
+// Generates a stable, readable referral code from the user's name + a short hash of their uid.
+// Format: NAME-XXXX (e.g. "DHANANJAY-7K2P"). Uppercase, no spaces, safe for URLs.
+function genReferralCode(name,uid){
+  const namePart=(name||"USER").replace(/^Dr\.?\s*/i,"").trim().split(/\s+/)[0].toUpperCase().replace(/[^A-Z]/g,"").slice(0,8)||"USER";
+  // Short deterministic hash from uid so the code is stable across re-generation
+  let hash=0;
+  for(let i=0;i<uid.length;i++){hash=((hash<<5)-hash+uid.charCodeAt(i))|0}
+  const hashPart=Math.abs(hash).toString(36).toUpperCase().slice(0,4).padStart(4,"0");
+  return `${namePart}-${hashPart}`;
 }
 const TOPICS=["Botox & Neurotoxins","Dermal Fillers","Threads","PDRN & Polynucleotides","Peptides & Skin Boosters","Chemical Peels","Laser & Energy Devices","Hair Restoration","Body Contouring","Anti-Aging & Regenerative","Skincare Science","Pigmentation & Melasma","Acne & Scars","Practice Management"];
 
@@ -2176,6 +2187,58 @@ export default function App(){
   const[consentPreview,setConsentPreview]=useState(null); // {vernacularHtml?, englishHtml, procName, langCode}
   const[consentHistory,setConsentHistory]=useState([]); // current user's consent generation history (metadata only — no PHI)
   const[allConsents,setAllConsents]=useState([]); // admin view: ALL consent generations across all users
+  const[refCopied,setRefCopied]=useState(false); // brief "Copied!" feedback for referral link
+
+  // ═══ REFERRAL PAYOUT CHECK ═══
+  // Each user pays THEMSELVES the referral bonus for friends they've referred
+  // (Firestore rules don't allow writing another user's points field directly,
+  // so the payout happens from the REFERRER's own session, not the referred user's).
+  // Runs once when profile + allUsers are both loaded. Finds anyone who:
+  //   1. Was referred by me (referredBy === my referralCode)
+  //   2. Has qualified (referralBonusPaid===true, set when they answered their first quiz)
+  //   3. Hasn't been counted yet (no matching doc in my referralsPaidFor array)
+  const checkReferralPayouts=useCallback(async()=>{
+    if(!au?.uid||!prof?.referralCode||!allUsers.length)return;
+    const alreadyPaidFor=prof.referralsPaidFor||[]; // array of referred uids already paid out
+    const qualifiedReferrals=allUsers.filter(u=>
+      u.referredBy===prof.referralCode &&
+      u.referralBonusPaid &&
+      u.id!==au.uid &&
+      !alreadyPaidFor.includes(u.id)
+    );
+    if(qualifiedReferrals.length===0)return;
+    try{
+      const fresh=await fbGet("users",au.uid);
+      const basePoints=fresh?.points||prof.points||0;
+      const basePaidFor=fresh?.referralsPaidFor||[];
+      const newPaidFor=[...basePaidFor];
+      let totalBonus=0;
+      for(const ref of qualifiedReferrals){
+        if(newPaidFor.includes(ref.id))continue; // race-condition guard
+        newPaidFor.push(ref.id);
+        totalBonus+=100;
+        // Audit log entry (referred user's uid in the doc id keeps it unique)
+        await fbSet("referrals",`${au.uid}_${ref.id}`,{
+          referrerUid:au.uid,referrerName:prof.name||"",
+          referredUid:ref.id,referredName:ref.name||"",
+          referralCode:prof.referralCode,bonusPaid:true,paidAt:Date.now(),
+        }).catch(()=>{});
+        // Points ledger entry for "earning history"
+        await fbSet("pointsActivity",`${au.uid}_referral_${ref.id}`,{
+          uid:au.uid,date:todayIST_YMD(),action:"referral_bonus",
+          label:`Referral bonus — ${ref.name||"a doctor"} joined and answered their first quiz`,
+          pointsEarned:100,createdAt:Date.now(),
+        }).catch(()=>{});
+      }
+      if(totalBonus>0){
+        await fbSet("users",au.uid,{points:basePoints+totalBonus,referralsPaidFor:newPaidFor});
+        setProf(p=>({...p,points:basePoints+totalBonus,referralsPaidFor:newPaidFor}));
+        sh(`🎉 +${totalBonus} pts — ${qualifiedReferrals.length} of your referrals just qualified!`);
+      }
+    }catch(e){console.error("referral payout check failed:",e)}
+  },[au?.uid,prof?.referralCode,prof?.referralsPaidFor,prof?.points,prof?.name,allUsers]);
+  useEffect(()=>{checkReferralPayouts()},[checkReferralPayouts]);
+
   // Load my consent history when entering consent page
   const loadMyConsentHistory=useCallback(async()=>{
     if(!au?.uid)return;
@@ -2227,7 +2290,14 @@ export default function App(){
     }catch(err){console.error("loadMyLedger error:",err);setMyLedger([])}
   },[au]);
 
-  useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){setProf(p);setScr("main");loadData()}else{setPf({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:au?.displayName||"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});setSetupStep(0);setSetupErr("");setScr("setup")}}else{setAu(null);setProf(null);setScr("landing")}});return()=>unsub()},[loadData]);
+  useEffect(()=>{const unsub=onAuthStateChanged(auth,async u=>{if(u){setAu(u);let p=await fbGet("users",u.uid);if(!p){const l=localStorage.getItem("sk_p_"+u.uid);if(l)p=JSON.parse(l)}if(p){
+    // Backfill referral code for existing users created before this feature shipped
+    if(!p.referralCode){
+      const code=genReferralCode(p.name||"USER",u.uid);
+      try{await fbSet("users",u.uid,{referralCode:code});p={...p,referralCode:code}}catch(e){console.warn("referral code backfill failed:",e)}
+    }
+    setProf(p);setScr("main");loadData()
+  }else{setPf({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:au?.displayName||"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});setSetupStep(0);setSetupErr("");setScr("setup")}}else{setAu(null);setProf(null);setScr("landing")}});return()=>unsub()},[loadData]);
 
   // Load the current user's points ledger once authenticated
   useEffect(()=>{if(au?.uid)loadMyLedger()},[au,loadMyLedger]);
@@ -2462,6 +2532,11 @@ export default function App(){
 
     const initials=(pf.name||"D").replace(/^Dr\.?\s*/i,"").split(" ").map(w=>w[0]||"").join("").toUpperCase().slice(0,2)||"D";
     const isInternational=pf.country!=="India";
+    // ═══ REFERRAL: generate this user's own unique code + capture who referred them ═══
+    const myReferralCode=genReferralCode(pf.name||"USER",au.uid);
+    const urlParams=new URLSearchParams(window.location.search);
+    let refCodeFromUrl=(urlParams.get("ref")||"").trim().toUpperCase();
+    if(refCodeFromUrl===myReferralCode)refCodeFromUrl=""; // block self-referral
     const p={
       name:pf.name.trim(),
       email:au.email,
@@ -2478,6 +2553,9 @@ export default function App(){
       joined:ds(getIST()),
       initials,
       totalCorrect:0,totalAnswered:0,streak:0,points:0,
+      referralCode:myReferralCode,
+      referredBy:refCodeFromUrl||"",
+      referralBonusPaid:false, // flips true once referrer is paid (after this user's first correct quiz)
       // Type-specific
       ...(pf.accountType==="doctor"?{
         degree:pf.degree,
@@ -3647,6 +3725,16 @@ ${forDownload
         // Refresh this user's ledger in local state
         loadMyLedger();
       }catch(err){console.error("ledger log error:",err)}
+    }
+    // ═══ REFERRAL: mark THIS user as having completed their qualifying first quiz ═══
+    // (Points go to the REFERRER, but Firestore rules don't allow writing another
+    // user's doc — so we just flag readiness here; the referrer's own client pays
+    // itself the bonus next time they load their profile. See checkReferralPayouts().)
+    if(ok&&prof.referredBy&&!prof.referralBonusPaid&&baseCorrect===0){
+      try{
+        await fbSet("users",au.uid,{referralBonusPaid:true,referralQualifiedAt:Date.now()});
+        setProf(p=>({...p,referralBonusPaid:true,referralQualifiedAt:Date.now()}));
+      }catch(refErr){console.error("referral qualification flag failed:",refErr)}
     }
     if(ok){
       if(!isSameDay){sh(`🎉 Correct! (No points — this quiz was from ${qObj.date}; only today's quiz earns points)`)}
@@ -6639,6 +6727,38 @@ ${forDownload
           </div>
           <div style={{fontSize:".82rem",color:T.teal,fontWeight:600,whiteSpace:"nowrap"}}>Open →</div>
         </div>);
+        })()}
+
+        {/* ═══ REFERRAL CARD ═══
+            Every user gets a unique code. Sharing it earns 100 pts when the
+            referred friend signs up AND answers their first quiz correctly. */}
+        {!editingProfile&&prof?.referralCode&&(()=>{
+          const referralLink=`${SITE_URL}/?ref=${prof.referralCode}`;
+          const myReferralCount=(prof.referralsPaidFor||[]).length;
+          const copyLink=()=>{
+            navigator.clipboard.writeText(referralLink).then(()=>{
+              setRefCopied(true);
+              setTimeout(()=>setRefCopied(false),2000);
+            }).catch(()=>sh("Could not copy — please copy manually"));
+          };
+          return(<div style={{...T.card,padding:"16px",marginBottom:12,borderLeft:"3px solid "+T.gold,background:"linear-gradient(135deg,"+T.goldBg+"40,#fff)"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+              <div style={{fontSize:"1.4rem"}}>🎁</div>
+              <div>
+                <div style={{fontSize:"1rem",fontWeight:700,color:T.txt,lineHeight:1.2}}>Refer a friend, earn 100 points</div>
+                <div style={{fontSize:".72rem",color:T.mute,marginTop:2}}>You earn 100 pts once your friend signs up and answers their first quiz</div>
+              </div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+              <div style={{flex:1,minWidth:180,padding:"9px 12px",background:"#fff",border:"1px solid "+T.border,borderRadius:8,fontSize:".82rem",color:T.txt2,fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{referralLink}</div>
+              <button onClick={copyLink} style={{...T.btn,padding:"9px 16px",fontSize:".82rem",background:refCopied?"#1a7d42":T.gold,whiteSpace:"nowrap"}}>{refCopied?"✓ Copied!":"📋 Copy link"}</button>
+              <button onClick={()=>{
+                const waMsg=encodeURIComponent(`Join me on SKINARIO — a community platform for aesthetic medicine doctors in India. Daily quizzes, clinical cases, forum discussions, and more.\n\n${referralLink}`);
+                window.open(`https://wa.me/?text=${waMsg}`,"_blank");
+              }} style={{...T.btnO,padding:"9px 14px",fontSize:".82rem",whiteSpace:"nowrap"}}>💬 WhatsApp</button>
+            </div>
+            {myReferralCount>0&&<div style={{marginTop:10,fontSize:".76rem",color:T.gold,fontWeight:600}}>🎉 {myReferralCount} successful {myReferralCount===1?"referral":"referrals"} · +{myReferralCount*100} pts earned</div>}
+          </div>);
         })()}
 
         {/* ═══ EDITABLE PROFILE SECTION ═══ */}
