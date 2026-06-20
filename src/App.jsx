@@ -199,17 +199,22 @@ function getTier(points){
 // ═══ ACTION-BASED POINTS SPEC (per locked spec) ═══
 // Each action has: points awarded, daily cap (0 = no cap), human label
 const ACTION_POINTS={
-  forum_comment:    {points:1, cap:5, label:"Forum comment",   minChars:20},
-  case_post:        {points:3, cap:6, label:"Case post"},
-  share_unique:     {points:1, cap:5, label:"Sharing content"},
-  // Below are placeholders for future sessions — DO NOT remove
-  qa_answer:        {points:1, cap:5, label:"Q&A answer"},
-  qa_marked_best:   {points:1, cap:0, label:"Q&A marked best"},
-  case_reply:       {points:1, cap:5, label:"Case reply marked helpful"},
-  forum_upvoted:    {points:1, cap:0, label:"Comment upvoted"},
-  article_publish:  {points:5, cap:0, label:"Article published"},
-  profile_complete: {points:5, cap:0, label:"Profile completion (one-time)"},
-  invite_success:   {points:5, cap:0, label:"Successful invite"},
+  // ── Community contributions (high value — real content effort) ──
+  forum_post:        {points:50, cap:0,  label:"Forum post created"},      // new forum discussion
+  case_post:         {points:50, cap:0,  label:"Clinical case posted"},     // new clinical case
+  article_publish:   {points:50, cap:0,  label:"Article submitted"},        // article submission for review
+  video_submit:      {points:10, cap:0,  label:"Video submitted"},           // video/masterclass submission
+  resource_submit:   {points:10, cap:0,  label:"Resource uploaded"},         // library resource upload
+  // ── Engagement (lower value, daily-capped to prevent farming) ──
+  forum_comment:     {points:5,  cap:5,  label:"Forum comment",   minChars:20},
+  share_unique:      {points:1,  cap:5,  label:"Sharing content"},
+  // ── Future placeholders ──
+  qa_answer:         {points:1,  cap:5,  label:"Q&A answer"},
+  qa_marked_best:    {points:1,  cap:0,  label:"Q&A marked best"},
+  case_reply:        {points:1,  cap:5,  label:"Case reply marked helpful"},
+  forum_upvoted:     {points:1,  cap:0,  label:"Comment upvoted"},
+  profile_complete:  {points:5,  cap:0,  label:"Profile completion (one-time)"},
+  invite_success:    {points:5,  cap:0,  label:"Successful invite"},
 };
 
 // Returns today's IST date as YYYY-MM-DD — used as the key for daily-cap tracking
@@ -2811,6 +2816,15 @@ export default function App(){
         date:ds(getIST()),
       });
       sh(`📨 ${cfg.label} submitted! You'll hear from admin once reviewed.`);
+      // Award points based on submission type
+      const pointMap={
+        article:"article_publish",
+        video:"video_submit",
+        resource:"resource_submit",
+      };
+      if(pointMap[typeKey]){
+        await awardPoints(pointMap[typeKey]);
+      }
       loadData();
       return{ok:true};
     }catch(err){
@@ -3667,6 +3681,7 @@ ${forDownload
     const body=fpBlocks.filter(b=>b.type==="text"||b.type==="heading").map(b=>b.content||"").join("\n\n");
     await fbAdd("forum",{author:uName,ini:uIni,uid:au.uid,photo:uPhoto||"",title:fpT,cat:fpC,body,blocks:fpBlocks,images,likedBy:[],likes:0,replies:0,date:ds(getIST())});
     setFpT("");setFpBlocks([]);setNewForum(false);sh("Posted!");loadData();
+    await awardPoints("forum_post");
   };
 
   // ═══ CLINICAL CASE POST ═══
@@ -4567,12 +4582,18 @@ ${forDownload
             <div style={{fontSize:".52rem",color:T.gold,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>Redeem →</div>
           </div>
           {/* Articles */}
-          {[["📰",articles.length,"Articles",()=>go("home")],["🔬",cases.length,"Cases",()=>go("cases")],["💬",forumPosts.length,"Forum",()=>go("forum")],["🎥",videos.length,"Videos",()=>go("videos")],["📚",resources.length,"Library",()=>go("library")]].map(([ic,ct,lb,fn])=>
+          {[["📰",articles.length,"Articles",()=>{go("home");setTimeout(()=>document.getElementById("featured-articles")?.scrollIntoView({behavior:"smooth",block:"start"}),200);}],["🔬",cases.length,"Cases",()=>go("cases")],["💬",forumPosts.length,"Forum",()=>go("forum")],["🎥",videos.length,"Videos",()=>go("videos")],["📚",resources.length,"Library",()=>go("library")]].map(([ic,ct,lb,fn])=>
             <div key={lb} onClick={fn} style={{...T.card,textAlign:"center",padding:"12px 4px",marginBottom:0,cursor:"pointer",transition:"transform .12s,box-shadow .12s",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 16px rgba(0,0,0,0.08)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04)"}}>
               <div style={{fontSize:"1rem"}}>{ic}</div>
               <div style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{ct}</div>
               <div style={{fontSize:".52rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>{lb}</div>
             </div>)}
+          {/* Submit Content — earn points by contributing */}
+          <div onClick={()=>go("me")} style={{...T.card,textAlign:"center",padding:"12px 4px",marginBottom:0,cursor:"pointer",transition:"transform .12s,box-shadow .12s",background:"linear-gradient(135deg,"+T.tealBg+"88,#fff)",borderLeft:"2px solid "+T.teal,boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 16px rgba(13,107,110,0.15)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04)"}}>
+            <div style={{fontSize:"1rem"}}>✍️</div>
+            <div style={{fontSize:".72rem",fontWeight:700,color:T.teal,lineHeight:1.2,marginTop:2}}>Submit</div>
+            <div style={{fontSize:".52rem",color:T.teal,textTransform:"uppercase",letterSpacing:.5,marginTop:2}}>Content</div>
+          </div>
         </div>
 
         {/* ═══ QUICK-ACCESS NEWS BUTTONS ═══
@@ -4693,7 +4714,7 @@ ${forDownload
           if(eligible.length<2)return null;
           return(<div style={{...T.card,padding:18,marginBottom:14}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
-              <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>📰 Featured Articles</h3>
+              <h3 id="featured-articles" style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>📰 Featured Articles</h3>
               <span onClick={()=>go("library")} style={{fontSize:".78rem",color:T.teal,fontWeight:600,cursor:"pointer"}}>Explore all →</span>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
@@ -5925,30 +5946,28 @@ ${forDownload
           <div onClick={()=>setShowPoints(!showPoints)} style={{padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",gap:10}}>
             <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0,flex:1}}>
               <span style={{fontSize:".95rem",fontWeight:600,whiteSpace:"nowrap"}}>💯 How points work</span>
-              {!showPoints&&<span style={{fontSize:".72rem",color:T.mute,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>10pt easy · 20pt mod · 30pt hard · +50 streak</span>}
+              {!showPoints&&<span style={{fontSize:".72rem",color:T.mute,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>10–30pt quiz · +50 streak · 50pt case/article/forum · 10pt video/library</span>}
             </div>
             <span style={{fontSize:".85rem",color:T.mute,transition:"transform .2s",transform:showPoints?"rotate(180deg)":"rotate(0deg)",display:"inline-block"}}>▾</span>
           </div>
           {showPoints&&<div style={{padding:"4px 16px 16px",borderTop:"1px solid "+T.border}}>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginTop:14}}>
-              <div style={{padding:"10px 12px",background:T.bg,borderRadius:8}}>
-                <div style={{fontSize:"1.1rem",fontWeight:700,color:T.gold,marginBottom:2}}>10 pts</div>
-                <div style={{fontSize:".74rem",color:T.txt2}}>Easy question</div>
-              </div>
-              <div style={{padding:"10px 12px",background:T.bg,borderRadius:8}}>
-                <div style={{fontSize:"1.1rem",fontWeight:700,color:T.gold,marginBottom:2}}>20 pts</div>
-                <div style={{fontSize:".74rem",color:T.txt2}}>Moderate question</div>
-              </div>
-              <div style={{padding:"10px 12px",background:T.bg,borderRadius:8}}>
-                <div style={{fontSize:"1.1rem",fontWeight:700,color:T.gold,marginBottom:2}}>30 pts</div>
-                <div style={{fontSize:".74rem",color:T.txt2}}>Hard question</div>
-              </div>
-              <div style={{padding:"10px 12px",background:T.goldBg,borderRadius:8,border:"1px solid "+T.gold+"55"}}>
-                <div style={{fontSize:"1.1rem",fontWeight:700,color:T.goldD,marginBottom:2}}>+50 pts</div>
-                <div style={{fontSize:".74rem",color:T.txt2}}>Every 7-day streak</div>
-              </div>
+            <p style={{fontSize:".74rem",color:T.mute,fontWeight:600,textTransform:"uppercase",letterSpacing:1,margin:"14px 0 8px"}}>Daily Quiz</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,marginBottom:14}}>
+              {[["10 pts","Easy question"],["20 pts","Moderate question"],["30 pts","Hard question"],["+50 pts","Every 7-day streak"]].map(([v,l])=>
+                <div key={l} style={{padding:"10px 12px",background:T.bg,borderRadius:8}}>
+                  <div style={{fontSize:"1.1rem",fontWeight:700,color:T.gold,marginBottom:2}}>{v}</div>
+                  <div style={{fontSize:".74rem",color:T.txt2}}>{l}</div>
+                </div>)}
             </div>
-            <p style={{fontSize:".75rem",color:T.txt2,lineHeight:1.55,marginTop:12,marginBottom:0}}>Points come from answering daily quizzes correctly. Harder questions are worth more. Maintain a daily streak for bonus points every week.</p>
+            <p style={{fontSize:".74rem",color:T.mute,fontWeight:600,textTransform:"uppercase",letterSpacing:1,margin:"14px 0 8px"}}>Content Contribution</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,marginBottom:14}}>
+              {[["50 pts","Clinical case posted"],["50 pts","Article submitted"],["50 pts","Forum discussion"],["10 pts","Video submitted"],["10 pts","Resource uploaded"]].map(([v,l])=>
+                <div key={l} style={{padding:"10px 12px",background:T.tealBg+"55",borderRadius:8,border:"1px solid "+T.teal+"33"}}>
+                  <div style={{fontSize:"1.1rem",fontWeight:700,color:T.teal,marginBottom:2}}>{v}</div>
+                  <div style={{fontSize:".74rem",color:T.txt2}}>{l}</div>
+                </div>)}
+            </div>
+            <p style={{fontSize:".75rem",color:T.txt2,lineHeight:1.55,marginBottom:0}}>Answer daily quizzes to earn quiz points. Contribute clinical cases, articles, videos, and forum discussions to earn content points. Streak bonuses fire every 7 consecutive correct answers.</p>
           </div>}
         </div>
 
