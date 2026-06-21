@@ -7321,7 +7321,7 @@ ${forDownload
         </h3>
         <div style={{position:"sticky",top:0,zIndex:30,background:T.bg,padding:"10px 0",marginBottom:16,marginInline:-12,paddingInline:12,borderBottom:"1px solid "+T.border}}>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["vendors","🏢 Vendors"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["consents","📋 Consents"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null);window.scrollTo({top:0,behavior:"smooth"})}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
+          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["vendors","🏢 Vendors"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["consents","📋 Consents"],["referrals","🎁 Referrals"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null);window.scrollTo({top:0,behavior:"smooth"})}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
           </div>
         </div>
         {aTab==="stats"&&<><div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length],["Events",events.length],["Ads",ads.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>
@@ -8128,6 +8128,113 @@ ${forDownload
             </div>
           }
         </div>}
+
+        {/* ═══ ADMIN: REFERRALS TAB ═══
+            Built entirely from allUsers (already loaded) — no extra Firestore reads.
+            Shows every user with their referral code, who they referred, and payout status. */}
+        {aTab==="referrals"&&(()=>{
+          // Build referral pairs: for each user with referredBy set, find the referrer
+          const referralPairs=allUsers
+            .filter(u=>u.referredBy)
+            .map(u=>{
+              const referrer=allUsers.find(r=>r.referralCode===u.referredBy);
+              return{
+                referredId:u.id,referredName:u.name||"(unnamed)",referredEmail:u.email||"",
+                referredJoined:u.joined||"",qualified:!!u.referralBonusPaid,
+                referrerId:referrer?.id||null,referrerName:referrer?.name||"(code not found — possibly old/invalid)",
+                referrerPaid:referrer?(referrer.referralsPaidFor||[]).includes(u.id):false,
+                code:u.referredBy,
+              };
+            })
+            .sort((a,b)=>(b.referredJoined||"").localeCompare(a.referredJoined||""));
+
+          // Leaderboard: top referrers by successful (paid) referral count
+          const referrerCounts={};
+          allUsers.forEach(u=>{
+            const paidCount=(u.referralsPaidFor||[]).length;
+            if(paidCount>0)referrerCounts[u.id]={name:u.name||"(unnamed)",email:u.email||"",count:paidCount,code:u.referralCode||""};
+          });
+          const topReferrers=Object.values(referrerCounts).sort((a,b)=>b.count-a.count);
+
+          const totalReferred=referralPairs.length;
+          const totalQualified=referralPairs.filter(p=>p.qualified).length;
+          const totalPaidOut=topReferrers.reduce((s,r)=>s+r.count,0)*100;
+
+          return(<div>
+            {/* Summary stats */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:16}}>
+              <div style={{...T.card,textAlign:"center",padding:16,marginBottom:0}}>
+                <div style={{fontSize:"1.6rem",fontWeight:700,color:T.teal}}>{totalReferred}</div>
+                <div style={{fontSize:".72rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Total referred signups</div>
+              </div>
+              <div style={{...T.card,textAlign:"center",padding:16,marginBottom:0}}>
+                <div style={{fontSize:"1.6rem",fontWeight:700,color:"#1a7d42"}}>{totalQualified}</div>
+                <div style={{fontSize:".72rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Qualified (answered 1st quiz)</div>
+              </div>
+              <div style={{...T.card,textAlign:"center",padding:16,marginBottom:0}}>
+                <div style={{fontSize:"1.6rem",fontWeight:700,color:T.gold}}>{totalPaidOut}</div>
+                <div style={{fontSize:".72rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Total points paid out</div>
+              </div>
+              <div style={{...T.card,textAlign:"center",padding:16,marginBottom:0}}>
+                <div style={{fontSize:"1.6rem",fontWeight:700,color:T.txt}}>{topReferrers.length}</div>
+                <div style={{fontSize:".72rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Active referrers</div>
+              </div>
+            </div>
+
+            {/* Top referrers leaderboard */}
+            {topReferrers.length>0&&<div style={{...T.card,marginBottom:16}}>
+              <h3 style={{fontSize:"1rem",fontWeight:700,marginBottom:12}}>🏆 Top Referrers</h3>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {topReferrers.slice(0,10).map((r,i)=>(
+                  <div key={r.email} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",background:i<3?T.goldBg+"40":T.bg,borderRadius:8,border:i<3?"1px solid "+T.gold+"44":"none"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+                      <span style={{fontSize:".82rem",fontWeight:700,color:i===0?T.gold:T.mute,width:20}}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":`#${i+1}`}</span>
+                      <div style={{minWidth:0}}>
+                        <div style={{fontSize:".84rem",fontWeight:600,color:T.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name}</div>
+                        <div style={{fontSize:".68rem",color:T.mute}}>{r.email} · code: {r.code}</div>
+                      </div>
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontSize:".92rem",fontWeight:700,color:T.teal}}>{r.count} referral{r.count!==1?"s":""}</div>
+                      <div style={{fontSize:".68rem",color:T.gold}}>+{r.count*100} pts</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>}
+
+            {/* Full referral ledger */}
+            <div style={T.card}>
+              <h3 style={{fontSize:"1rem",fontWeight:700,marginBottom:12}}>📋 Referral Ledger — who invited whom</h3>
+              {referralPairs.length===0?
+                <div style={{padding:"30px 12px",textAlign:"center",color:T.mute,fontSize:".84rem"}}>No referrals yet.</div>
+              :
+                <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:560,overflowY:"auto"}}>
+                  {referralPairs.map(p=>(
+                    <div key={p.referredId} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",background:T.bg,borderRadius:8,gap:10,flexWrap:"wrap"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0,flex:1}}>
+                        <div style={{minWidth:0}}>
+                          <div style={{fontSize:".82rem",color:T.txt}}>
+                            <b>{p.referrerName}</b> <span style={{color:T.mute}}>invited</span> <b>{p.referredName}</b>
+                          </div>
+                          <div style={{fontSize:".68rem",color:T.mute,marginTop:2}}>{p.referredEmail} · joined {p.referredJoined} · code: {p.code}</div>
+                        </div>
+                      </div>
+                      <div style={{display:"flex",gap:6,flexShrink:0}}>
+                        <span style={{fontSize:".68rem",fontWeight:600,padding:"3px 9px",borderRadius:6,background:p.qualified?"#e8f5e9":"#fff3cd",color:p.qualified?"#1a7d42":"#856404"}}>
+                          {p.qualified?"✓ Qualified":"⏳ Pending 1st quiz"}
+                        </span>
+                        {p.qualified&&<span style={{fontSize:".68rem",fontWeight:600,padding:"3px 9px",borderRadius:6,background:p.referrerPaid?T.tealBg:"#f8d7da",color:p.referrerPaid?T.teal:"#721c24"}}>
+                          {p.referrerPaid?"💰 Paid":"⚠️ Not yet paid"}
+                        </span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              }
+            </div>
+          </div>);
+        })()}
 
         {aTab==="users"&&<div style={T.card}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
