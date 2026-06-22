@@ -864,24 +864,33 @@ function renderMarkdownToHtml(src){
   if(!src)return "";
   // 1. Escape HTML first
   let html=escapeHtml(src);
-  // 2. Process line-by-line for block-level (headers, lists)
+  // 2. Process line-by-line for block-level (headers, lists, blockquotes)
   const lines=html.split(/\r?\n/);
   const out=[];
-  let inUl=false, inOl=false;
+  let inUl=false, inOl=false, inBq=false;
   const closeLists=()=>{
     if(inUl){out.push("</ul>");inUl=false}
     if(inOl){out.push("</ol>");inOl=false}
   };
+  const closeBq=()=>{if(inBq){out.push("</blockquote>");inBq=false}};
   for(let raw of lines){
     const line=raw;
     // Header (## )
     if(/^##\s+/.test(line)){
-      closeLists();
+      closeLists();closeBq();
       out.push("<h3 style=\"font-size:1.05rem;font-weight:700;margin:14px 0 6px;line-height:1.3\">"+line.replace(/^##\s+/,"")+"</h3>");
+      continue;
+    }
+    // Blockquote (> )
+    if(/^&gt;\s+/.test(line)){
+      closeLists();
+      if(!inBq){out.push("<blockquote style=\"margin:8px 0;padding:8px 14px;border-left:3px solid #c8a84e;background:#fdf6e3;color:#785f1e;font-style:italic;border-radius:0 6px 6px 0\">");inBq=true}
+      out.push(line.replace(/^&gt;\s+/,"")+"<br/>");
       continue;
     }
     // Bullet (- )
     if(/^-\s+/.test(line)){
+      closeBq();
       if(inOl){out.push("</ol>");inOl=false}
       if(!inUl){out.push("<ul style=\"margin:6px 0;padding-left:22px\">");inUl=true}
       out.push("<li style=\"margin:2px 0\">"+line.replace(/^-\s+/,"")+"</li>");
@@ -889,24 +898,31 @@ function renderMarkdownToHtml(src){
     }
     // Numbered (1. )
     if(/^\d+\.\s+/.test(line)){
+      closeBq();
       if(inUl){out.push("</ul>");inUl=false}
       if(!inOl){out.push("<ol style=\"margin:6px 0;padding-left:22px\">");inOl=true}
       out.push("<li style=\"margin:2px 0\">"+line.replace(/^\d+\.\s+/,"")+"</li>");
       continue;
     }
-    // Blank line — close lists, add a break for paragraph spacing
-    if(line.trim()===""){closeLists();out.push("<br/>");continue}
-    // Regular line — close lists if open
-    closeLists();
+    // Blank line — close everything, paragraph spacing
+    if(line.trim()===""){closeLists();closeBq();out.push("<br/>");continue}
+    // Regular line
+    closeLists();closeBq();
     out.push(line+"<br/>");
   }
-  closeLists();
+  closeLists();closeBq();
   let joined=out.join("");
-  // 3. Inline formatting: bold **...** and italic *...*
-  // Bold first (** is more specific than *)
+  // 3. Inline formatting (order matters — most specific first)
   joined=joined.replace(/\*\*([^*\n]+?)\*\*/g,"<b>$1</b>");
-  // Italic — be careful not to match across words like " * " by itself
   joined=joined.replace(/(^|[\s>(])\*([^*\n]+?)\*(?=[\s.,;:!?)<]|$)/g,"$1<i>$2</i>");
+  // Highlight ==text== → yellow mark
+  joined=joined.replace(/==([^=\n]+?)==/g,"<mark style=\"background:#fff176;padding:1px 3px;border-radius:3px\">$1</mark>");
+  // Underline __text__
+  joined=joined.replace(/__([^_\n]+?)__/g,"<u>$1</u>");
+  // Strikethrough ~~text~~
+  joined=joined.replace(/~~([^~\n]+?)~~/g,"<s>$1</s>");
+  // Inline code `text`
+  joined=joined.replace(/`([^`\n]+?)`/g,"<code style=\"background:#f0f0f0;padding:1px 5px;border-radius:4px;font-family:monospace;font-size:.9em\">$1</code>");
   return joined;
 }
 
@@ -952,9 +968,15 @@ const MarkdownEditor=({value,onChange,placeholder,rows=4,style={}})=>{
     <div style={{display:"flex",gap:4,marginBottom:6,flexWrap:"wrap",alignItems:"center"}}>
       <button type="button" onClick={()=>wrap("**","**")} title="Bold (Ctrl+B)" style={{...btnStyle,fontWeight:900}}>B</button>
       <button type="button" onClick={()=>wrap("*","*")} title="Italic (Ctrl+I)" style={{...btnStyle,fontStyle:"italic"}}>I</button>
-      <button type="button" onClick={()=>prefix("## ")} title="Header" style={btnStyle}>H</button>
+      <button type="button" onClick={()=>wrap("__","__")} title="Underline" style={{...btnStyle,textDecoration:"underline"}}>U</button>
+      <button type="button" onClick={()=>wrap("~~","~~")} title="Strikethrough" style={{...btnStyle,textDecoration:"line-through"}}>S</button>
+      <button type="button" onClick={()=>wrap("==","==")} title="Highlight" style={{...btnStyle,background:"#fff176",border:"1px solid #f9a825"}}>H</button>
+      <button type="button" onClick={()=>wrap("`","`")} title="Inline code" style={{...btnStyle,fontFamily:"monospace",background:"#f0f0f0"}}>`code`</button>
+      <div style={{width:1,height:18,background:T.border,margin:"0 2px"}}/>
+      <button type="button" onClick={()=>prefix("## ")} title="Heading" style={btnStyle}>H2</button>
       <button type="button" onClick={()=>prefix("- ")} title="Bullet list" style={btnStyle}>• List</button>
       <button type="button" onClick={()=>prefix("1. ")} title="Numbered list" style={btnStyle}>1. List</button>
+      <button type="button" onClick={()=>prefix("> ")} title="Blockquote / callout" style={{...btnStyle,borderLeft:"3px solid #c8a84e",color:"#785f1e"}}>❝ Quote</button>
       <div style={{flex:1}}/>
       <button type="button" onClick={()=>setPreview(!preview)} title="Toggle preview" style={{...btnStyle,background:preview?T.tealBg:"#fff",color:preview?T.teal:T.txt,fontWeight:preview?700:600}}>{preview?"✏️ Edit":"👁 Preview"}</button>
     </div>
@@ -1052,6 +1074,28 @@ const AdminVideoField=({value,onChange})=>{
     <button onClick={()=>fileRef.current?.click()} disabled={busy} style={{...T.btnO,...T.btnSm,opacity:busy?.5:1}}>{busy?`⏳ Uploading ${progress}%...`:value&&isDirectVideo?"🔄 Replace video":"📤 Upload video file (.mp4)"}</button>
     <p style={{fontSize:".68rem",color:T.mute,marginTop:6,lineHeight:1.5}}>For premium content. ⚠️ Large videos increase hosting costs — prefer YouTube/Vimeo embed for free content.</p>
   </div>)
+};
+
+// ═══ BLOCK FORMATTING TOOLBAR ═══
+// Mini toolbar used inside each text block of the BlockEditor.
+// onWrap(before, after) — wraps selected text with markdown syntax
+// onPrefix(prefix) — inserts prefix at start of current line
+const BlockFmtBar=({onWrap,onPrefix})=>{
+  const b={padding:"3px 7px",fontSize:".7rem",fontWeight:600,background:"#fff",border:"1px solid "+T.border,borderRadius:4,cursor:"pointer",fontFamily:"inherit",color:T.txt,lineHeight:1,marginBottom:0};
+  return(
+    <div style={{display:"flex",gap:3,flexWrap:"wrap",alignItems:"center",padding:"4px 0",borderBottom:"1px dashed "+T.border,marginBottom:4}}>
+      <button type="button" onClick={()=>onWrap("**","**")} title="Bold (Ctrl+B)" style={{...b,fontWeight:900}}>B</button>
+      <button type="button" onClick={()=>onWrap("*","*")} title="Italic (Ctrl+I)" style={{...b,fontStyle:"italic"}}>I</button>
+      <button type="button" onClick={()=>onWrap("__","__")} title="Underline" style={{...b,textDecoration:"underline"}}>U</button>
+      <button type="button" onClick={()=>onWrap("~~","~~")} title="Strikethrough" style={{...b,textDecoration:"line-through"}}>S</button>
+      <button type="button" onClick={()=>onWrap("==","==")} title="Highlight in yellow" style={{...b,background:"#fff176",border:"1px solid #f9a825",padding:"3px 8px"}}>H</button>
+      <button type="button" onClick={()=>onWrap("`","`")} title="Inline code" style={{...b,fontFamily:"monospace",background:"#f0f0f0",fontSize:".68rem"}}>code</button>
+      <div style={{width:1,height:14,background:T.border,margin:"0 1px"}}/>
+      <button type="button" onClick={()=>onPrefix("- ")} title="Bullet list" style={b}>• List</button>
+      <button type="button" onClick={()=>onPrefix("1. ")} title="Numbered list" style={b}>1.</button>
+      <button type="button" onClick={()=>onPrefix("> ")} title="Blockquote / callout" style={{...b,borderLeft:"2px solid #c8a84e",color:"#785f1e"}}>❝</button>
+    </div>
+  );
 };
 
 // ═══ BLOCK EDITOR ═══
@@ -1153,13 +1197,50 @@ const BlockEditor = ({ blocks, onChange, uploadPath = "article-blocks" }) => {
 
             {/* Content area */}
             {block.type === "text" && (
-              <textarea
-                value={block.content || ""}
-                onChange={e => updateBlock(idx, { content: e.target.value })}
-                placeholder="Write paragraph text here... Supports **bold**, *italic*, and — lists."
-                rows={4}
-                style={{ width: "100%", border: "none", outline: "none", resize: "vertical", fontFamily: "Georgia, serif", fontSize: "1rem", lineHeight: 1.65, color: T.txt, background: "transparent", paddingRight: 70, boxSizing: "border-box" }}
-              />
+              <div style={{paddingRight:70}}>
+                {/* Mini formatting toolbar */}
+                <BlockFmtBar
+                  onWrap={(b,a)=>{
+                    const ta=document.getElementById(`block-ta-${idx}`);
+                    if(!ta)return;
+                    const s=ta.selectionStart,e=ta.selectionEnd;
+                    const sel=(block.content||"").substring(s,e);
+                    const next=(block.content||"").substring(0,s)+b+sel+a+(block.content||"").substring(e);
+                    updateBlock(idx,{content:next});
+                    setTimeout(()=>{ta.focus();const p=s+b.length+sel.length;ta.setSelectionRange(p,p)},0);
+                  }}
+                  onPrefix={(p)=>{
+                    const ta=document.getElementById(`block-ta-${idx}`);
+                    if(!ta)return;
+                    const s=ta.selectionStart;
+                    const before=(block.content||"").substring(0,s);
+                    const lineStart=before.lastIndexOf("\n")+1;
+                    const next=(block.content||"").substring(0,lineStart)+p+(block.content||"").substring(lineStart);
+                    updateBlock(idx,{content:next});
+                    setTimeout(()=>{ta.focus();const pos=s+p.length;ta.setSelectionRange(pos,pos)},0);
+                  }}
+                />
+                <textarea
+                  id={`block-ta-${idx}`}
+                  value={block.content || ""}
+                  onChange={e => updateBlock(idx, { content: e.target.value })}
+                  onKeyDown={e=>{
+                    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="b"){e.preventDefault();
+                      const ta=e.target;const s=ta.selectionStart,en=ta.selectionEnd;const sel=(block.content||"").substring(s,en);
+                      const next=(block.content||"").substring(0,s)+"**"+sel+"**"+(block.content||"").substring(en);
+                      updateBlock(idx,{content:next});setTimeout(()=>{ta.focus();const p=s+2+sel.length;ta.setSelectionRange(p,p)},0);
+                    }
+                    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="i"){e.preventDefault();
+                      const ta=e.target;const s=ta.selectionStart,en=ta.selectionEnd;const sel=(block.content||"").substring(s,en);
+                      const next=(block.content||"").substring(0,s)+"*"+sel+"*"+(block.content||"").substring(en);
+                      updateBlock(idx,{content:next});setTimeout(()=>{ta.focus();const p=s+1+sel.length;ta.setSelectionRange(p,p)},0);
+                    }
+                  }}
+                  placeholder="Write paragraph text here..."
+                  rows={4}
+                  style={{ width: "100%", border: "none", outline: "none", resize: "vertical", fontFamily: "Georgia, serif", fontSize: "1rem", lineHeight: 1.65, color: T.txt, background: "transparent", boxSizing: "border-box", marginTop:4 }}
+                />
+              </div>
             )}
             {block.type === "heading" && (
               <input
