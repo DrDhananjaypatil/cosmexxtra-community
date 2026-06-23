@@ -529,10 +529,13 @@ const tr = (key, lang) => {
 
 // ═══ ACCOUNT TYPES ═══
 const ACCOUNT_TYPES=[
-  {id:"doctor",label:"Doctor",icon:"🩺",desc:"Practicing physician — derms, aesthetic doctors, cosmetologists"},
-  {id:"institute",label:"Institute",icon:"🏛️",desc:"Medical college, aesthetic academy, training center, hospital"},
-  {id:"pharma",label:"Pharma / Brand",icon:"🏢",desc:"Pharmaceutical, device, or skincare company"}
+  {id:"doctor",   label:"Doctor",          icon:"🩺", desc:"Practicing physician — dermatologists, aesthetic doctors, cosmetologists"},
+  {id:"brand",    label:"Brand / Pharma",  icon:"💊", desc:"Pharmaceutical, injectable, or skincare brand — Allergan, Galderma, Sun Pharma, etc."},
+  {id:"vendor",   label:"Vendor / Distributor", icon:"🏭", desc:"Equipment, machines, consumables, or product distributors for aesthetic clinics"},
+  {id:"institute",label:"Institute",        icon:"🏛️", desc:"Medical college, aesthetic academy, training center, or hospital"},
 ];
+// Backward compat: old accounts with accountType="pharma" treated as "brand" in UI
+const normalizeAccountType=(t)=>t==="pharma"?"brand":t;
 
 // ═══ MEDICAL DEGREES (alphabetized) ═══
 const DEGREES=["MBBS","BAMS","BHMS","BDS","BUMS","MD - Dermatology","MD - General Medicine","MS - Surgery","DDV (Diploma in Dermatology)","DNB - Dermatology","Diploma in Aesthetic Medicine","Diploma in Cosmetology","Fellowship in Aesthetic Medicine","Fellowship in Cosmetology","Other"];
@@ -579,6 +582,7 @@ const INSTITUTE_TYPES=["Medical College","Aesthetic Academy / Training Center","
 
 // ═══ PHARMA / BRAND CATEGORIES ═══
 const BRAND_CATEGORIES=["Pharmaceutical","Aesthetic Devices","Cosmeceuticals / Skincare","Injectables (Toxin/Filler)","Threads","Energy Devices (Laser/RF/HIFU)","Distributor / Retailer","Other"];
+const VENDOR_CATEGORIES=["Laser & Energy Devices","RF / HIFU Devices","Microneedling & DermaPen","Cryotherapy Equipment","Consumables & Disposables","Skincare & Post-procedure Products","Clinic Management Software","Medical Furniture & Equipment","Distribution / Import-Export","Training Equipment","Other"];
 const getIST=()=>new Date(new Date().toLocaleString("en-US",{timeZone:"Asia/Kolkata"}));
 const ds=d=>d.toISOString().split("T")[0];
 const fD=s=>{try{return new Date(s+"T12:00:00").toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}catch{return s}};
@@ -2149,7 +2153,7 @@ export default function App(){
   const[selD,setSelD]=useState(ds(getIST()));const[selA,setSelA]=useState(null);const[selV,setSelV]=useState(null);const[selU,setSelU]=useState(null);const[toast,setToast]=useState(null);const[cmt,setCmt]=useState("");const[ld,setLd]=useState(false);const[aTab,setATab]=useState("stats");
   const[profileReturnPg,setProfileReturnPg]=useState("home"); // where to go when "Back" clicked on profile page
   const[authMode,setAuthMode]=useState("signin");const[authEmail,setAuthEmail]=useState("");const[authPass,setAuthPass]=useState("");const[authName,setAuthName]=useState("");const[authBusy,setAuthBusy]=useState(false);const[authErr,setAuthErr]=useState("");
-  const[pf,setPf]=useState({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});const[edForm,setEdForm]=useState(null);const[setupStep,setSetupStep]=useState(0);const[setupErr,setSetupErr]=useState("");
+  const[pf,setPf]=useState({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",vendorCategory:"",gstNumber:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});const[edForm,setEdForm]=useState(null);const[setupStep,setSetupStep]=useState(0);const[setupErr,setSetupErr]=useState("");
   // Forum/Cases new post state
   const[newForum,setNewForum]=useState(false);const[fpT,setFpT]=useState("");const[fpC,setFpC]=useState(TOPICS[0]);
   const[fpBlocks,setFpBlocks]=useState([]); // block editor for forum post body (replaces fpB + fpImgs)
@@ -2559,7 +2563,9 @@ export default function App(){
   const isAdm=prof&&ADMINS.includes(au?.email);const isPd=prof?.paid;const today=ds(getIST());const hr=getIST().getHours();
   const uName=prof?.name||au?.displayName||"Doctor";const uIni=(uName.replace(/^Dr\.?\s*/i,"").split(" ").map(w=>w[0]).join("").toUpperCase()||"D").slice(0,2);const uPhoto=au?.photoURL;
   // ═══ PHARMA = sponsor only, can't post clinical content ═══
-  const isPharma=prof?.accountType==="pharma";
+  const isPharma=prof?.accountType==="pharma"||prof?.accountType==="brand";
+  const isVendor=prof?.accountType==="vendor";
+  const isVendorOrBrand=isPharma||isVendor;
   const myAns=quizzes.reduce((a,q)=>{if(q.answers?.[au?.uid]!==undefined)a.push({correct:q.answers[au.uid]===q.ci});return a},[]);
   const totA=myAns.length;const corr=myAns.filter(a=>a.correct).length;const acc=totA?Math.round(corr/totA*100):0;
 
@@ -2588,9 +2594,14 @@ export default function App(){
       if(!pf.regNumber?.trim()){setSetupErr("Registration number is required");return}
       if(!pf.clinic?.trim()){setSetupErr("Clinic name is required");return}
     }
-    if(pf.accountType==="pharma"){
+    if(pf.accountType==="pharma"||pf.accountType==="brand"){
       if(!pf.companyName?.trim()){setSetupErr("Company name is required");return}
       if(!pf.brandCategory){setSetupErr("Pick a brand category");return}
+      if(!pf.contactPerson?.trim()){setSetupErr("Contact person is required");return}
+    }
+    if(pf.accountType==="vendor"){
+      if(!pf.companyName?.trim()){setSetupErr("Company name is required");return}
+      if(!pf.vendorCategory){setSetupErr("Pick a vendor category");return}
       if(!pf.contactPerson?.trim()){setSetupErr("Contact person is required");return}
     }
     if(pf.accountType==="institute"){
@@ -2646,7 +2657,8 @@ export default function App(){
         // India-specific OR international-specific council
         ...(pf.country==="India"?{council:pf.council}:{internationalCouncil:pf.internationalCouncil.trim(),city:pf.city.trim(),region:pf.region?.trim()||""})
       }:{}),
-      ...(pf.accountType==="pharma"?{companyName:pf.companyName.trim(),brandCategory:pf.brandCategory,contactPerson:pf.contactPerson.trim(),website:pf.website?.trim()||"",address:pf.address?.trim()||""}:{}),
+      ...(pf.accountType==="pharma"||pf.accountType==="brand"?{companyName:pf.companyName.trim(),brandCategory:pf.brandCategory,contactPerson:pf.contactPerson.trim(),website:pf.website?.trim()||"",address:pf.address?.trim()||""}:{}),
+      ...(pf.accountType==="vendor"?{companyName:pf.companyName.trim(),vendorCategory:pf.vendorCategory,contactPerson:pf.contactPerson.trim(),gstNumber:pf.gstNumber?.trim()||"",website:pf.website?.trim()||"",address:pf.address?.trim()||""}:{}),
       ...(pf.accountType==="institute"?{instituteName:pf.instituteName.trim(),instituteType:pf.instituteType,directorName:pf.directorName.trim(),address:pf.address?.trim()||"",website:pf.website?.trim()||""}:{})
     };
     await fbSet("users",au.uid,p);
@@ -4451,15 +4463,15 @@ ${forDownload
             </>}
           </>}
 
-          {/* ═══ PHARMA-SPECIFIC FIELDS ═══ */}
-          {pf.accountType==="pharma"&&<>
+          {/* ═══ BRAND / PHARMA FIELDS ═══ */}
+          {(pf.accountType==="brand"||pf.accountType==="pharma")&&<>
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Country <span style={{color:T.err}}>*</span></label>
             <select value={pf.country} onChange={e=>setPf(p=>({...p,country:e.target.value}))} style={{...T.inp,marginBottom:12}}>
               {COUNTRIES.map(c=><option key={c} value={c}>{c}</option>)}
             </select>
 
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Company / Brand Name <span style={{color:T.err}}>*</span></label>
-            <input value={pf.companyName} onChange={e=>setPf(p=>({...p,companyName:e.target.value}))} placeholder="e.g. Sun Pharma Aesthetics" style={{...T.inp,marginBottom:12}}/>
+            <input value={pf.companyName} onChange={e=>setPf(p=>({...p,companyName:e.target.value}))} placeholder="e.g. Sun Pharma Aesthetics, Galderma India" style={{...T.inp,marginBottom:12}}/>
 
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Brand Category <span style={{color:T.err}}>*</span></label>
             <select value={pf.brandCategory} onChange={e=>setPf(p=>({...p,brandCategory:e.target.value}))} style={{...T.inp,marginBottom:12}}>
@@ -4474,6 +4486,34 @@ ${forDownload
 
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Address (optional)</label>
             <input value={pf.address} onChange={e=>setPf(p=>({...p,address:e.target.value}))} placeholder="City, State" style={{...T.inp,marginBottom:12}}/>
+          </>}
+
+          {/* ═══ VENDOR / DISTRIBUTOR FIELDS ═══ */}
+          {pf.accountType==="vendor"&&<>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Country <span style={{color:T.err}}>*</span></label>
+            <select value={pf.country} onChange={e=>setPf(p=>({...p,country:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+              {COUNTRIES.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Company Name <span style={{color:T.err}}>*</span></label>
+            <input value={pf.companyName} onChange={e=>setPf(p=>({...p,companyName:e.target.value}))} placeholder="e.g. Cynosure India, MedTech Distributors" style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Vendor Category <span style={{color:T.err}}>*</span></label>
+            <select value={pf.vendorCategory} onChange={e=>setPf(p=>({...p,vendorCategory:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+              <option value="">— Select —</option>{VENDOR_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Contact Person Name <span style={{color:T.err}}>*</span></label>
+            <input value={pf.contactPerson} onChange={e=>setPf(p=>({...p,contactPerson:e.target.value}))} placeholder="Your name / partnership contact" style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>GST Number (optional)</label>
+            <input value={pf.gstNumber} onChange={e=>setPf(p=>({...p,gstNumber:e.target.value.toUpperCase()}))} placeholder="e.g. 27AABCU9603R1ZX" style={{...T.inp,marginBottom:12,fontFamily:"monospace"}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Website (optional)</label>
+            <input value={pf.website} onChange={e=>setPf(p=>({...p,website:e.target.value}))} placeholder="https://yourcompany.com" style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Address (City, State)</label>
+            <input value={pf.address} onChange={e=>setPf(p=>({...p,address:e.target.value}))} placeholder="e.g. Mumbai, Maharashtra" style={{...T.inp,marginBottom:12}}/>
           </>}
 
           {/* ═══ INSTITUTE-SPECIFIC FIELDS ═══ */}
@@ -4541,6 +4581,7 @@ ${forDownload
     {id:"library",ic:"📚",l:"Library"},
     {id:"videos",ic:"🎥",l:"Videos"},
     {id:"events",ic:"📅",l:"Events"},
+    {id:"vendors",ic:"🏭",l:"Vendors"},
     {id:"rank",ic:"🏆",l:"Rank"},
     {id:"consent",ic:"📋",l:"Consent"},
     ...(isAdm?[{id:"admin",ic:"⚙️",l:"Admin"}]:[]),
@@ -5533,6 +5574,118 @@ ${forDownload
       </div>}
 
       {/* VIDEOS */}
+      {/* ═══ VENDOR DIRECTORY PAGE ═══
+          Public-facing directory of approved brands and vendors.
+          Doctors can browse by category, see company profiles, visit websites. */}
+      {pg==="vendors"&&(()=>{
+        const [vendorFilter,setVendorFilter]=useState("all");
+        const [vendorSearch,setVendorSearch]=useState("");
+        const [selVendor,setSelVendor]=useState(null);
+
+        // Approved vendor/brand users + those with approved vendorApplications
+        const approvedVendorUids=new Set(vendorApplications.filter(a=>a.status==="approved").map(a=>a.uid));
+        const vendorUsers=allUsers.filter(u=>{
+          const aType=u.accountType||"";
+          return (aType==="vendor"||aType==="brand"||aType==="pharma")&&(u.verified||approvedVendorUids.has(u.id));
+        });
+
+        const categories=["all",...new Set(vendorUsers.map(u=>u.vendorCategory||u.brandCategory||"Other").filter(Boolean))];
+
+        const filtered=vendorUsers.filter(u=>{
+          const cat=u.vendorCategory||u.brandCategory||"";
+          const matchCat=vendorFilter==="all"||cat===vendorFilter;
+          const matchSearch=!vendorSearch||(u.companyName||u.name||"").toLowerCase().includes(vendorSearch.toLowerCase());
+          return matchCat&&matchSearch;
+        });
+
+        if(selVendor){
+          const va=vendorApplications.find(a=>a.uid===selVendor.id);
+          const vRewards=rewards.filter(r=>r.vendorId===selVendor.id&&r.active!==false);
+          return(<div>
+            <button onClick={()=>setSelVendor(null)} style={{...T.btnO,...T.btnSm,marginBottom:16}}>← Back to vendors</button>
+            <div style={{...T.card,padding:24,marginBottom:14}}>
+              <div style={{display:"flex",alignItems:"flex-start",gap:18,flexWrap:"wrap",marginBottom:16}}>
+                {selVendor.photo?<img src={selVendor.photo} alt="" style={{width:72,height:72,borderRadius:10,objectFit:"cover",border:"1px solid "+T.border}}/>
+                :<div style={{width:72,height:72,borderRadius:10,background:T.tealBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.8rem"}}>🏭</div>}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:"1.3rem",fontWeight:700,color:T.txt,marginBottom:4}}>{selVendor.companyName||selVendor.name}</div>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+                    <span style={{fontSize:".72rem",padding:"2px 10px",borderRadius:10,background:T.tealBg,color:T.teal,fontWeight:600}}>
+                      {selVendor.accountType==="vendor"?"🏭 Vendor":"💊 Brand / Pharma"}
+                    </span>
+                    {(selVendor.vendorCategory||selVendor.brandCategory)&&<span style={{fontSize:".72rem",padding:"2px 10px",borderRadius:10,background:T.bg,color:T.txt2}}>{selVendor.vendorCategory||selVendor.brandCategory}</span>}
+                    {selVendor.country&&<span style={{fontSize:".72rem",padding:"2px 10px",borderRadius:10,background:T.bg,color:T.txt2}}>📍 {selVendor.country}</span>}
+                  </div>
+                  {selVendor.address&&<div style={{fontSize:".82rem",color:T.txt2,marginBottom:4}}>📍 {selVendor.address}</div>}
+                  {selVendor.website&&<a href={selVendor.website} target="_blank" rel="noopener noreferrer" style={{fontSize:".82rem",color:T.teal,textDecoration:"none"}}>🌐 {selVendor.website.replace(/^https?:\/\//,"")}</a>}
+                </div>
+              </div>
+              {va?.offerings&&<div style={{padding:"12px 14px",background:T.bg,borderRadius:8,fontSize:".88rem",color:T.txt,lineHeight:1.6,marginBottom:12}}>
+                <div style={{fontSize:".68rem",fontWeight:600,color:T.mute,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>About</div>
+                {va.offerings}
+              </div>}
+              <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:8}}>
+                {selVendor.contactPerson&&<div style={{fontSize:".82rem",color:T.txt2}}>👤 {selVendor.contactPerson}</div>}
+                {selVendor.email&&<a href={`mailto:${selVendor.email}`} style={{fontSize:".82rem",color:T.teal,textDecoration:"none"}}>✉️ {selVendor.email}</a>}
+              </div>
+            </div>
+            {vRewards.length>0&&<div style={T.card}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>🎁 Rewards offered by this partner</h4>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10}}>
+                {vRewards.map(r=><div key={r.id} style={{padding:14,background:T.bg,borderRadius:8,border:"1px solid "+T.border}}>
+                  {r.image&&<img src={r.image} alt="" style={{width:"100%",height:100,objectFit:"cover",borderRadius:6,marginBottom:8}}/>}
+                  <div style={{fontSize:".88rem",fontWeight:600,marginBottom:4}}>{r.title}</div>
+                  <div style={{fontSize:".72rem",color:T.mute,marginBottom:8,lineHeight:1.5}}>{r.description?.slice(0,100)}</div>
+                  <div style={{fontSize:".78rem",fontWeight:700,color:T.gold}}>{r.pointCost} pts to redeem</div>
+                </div>)}
+              </div>
+            </div>}
+          </div>);
+        }
+
+        return(<div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:10}}>
+            <h3 style={{fontSize:"1.15rem",fontWeight:700,margin:0}}>🏭 Vendor & Brand Directory</h3>
+            <div style={{fontSize:".78rem",color:T.mute}}>{filtered.length} partner{filtered.length!==1?"s":""}</div>
+          </div>
+
+          {/* Search + filter */}
+          <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+            <input value={vendorSearch} onChange={e=>setVendorSearch(e.target.value)} placeholder="Search by company name..." style={{...T.inp,flex:1,minWidth:180}}/>
+            <select value={vendorFilter} onChange={e=>setVendorFilter(e.target.value)} style={{...T.inp,minWidth:160}}>
+              {categories.map(c=><option key={c} value={c}>{c==="all"?"All categories":c}</option>)}
+            </select>
+          </div>
+
+          {filtered.length===0?<div style={{...T.card,padding:"40px 20px",textAlign:"center",color:T.mute}}>
+            No vendors found matching your search.
+          </div>:
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:14}}>
+            {filtered.map(u=>{
+              const va=vendorApplications.find(a=>a.uid===u.id);
+              const vRewardCount=rewards.filter(r=>r.vendorId===u.id&&r.active!==false).length;
+              return(<div key={u.id} onClick={()=>setSelVendor(u)} style={{...T.card,cursor:"pointer",transition:"transform .12s,box-shadow .12s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 18px rgba(0,0,0,0.09)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
+                <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
+                  {u.photo?<img src={u.photo} alt="" style={{width:44,height:44,borderRadius:8,objectFit:"cover",border:"1px solid "+T.border,flexShrink:0}}/>
+                  :<div style={{width:44,height:44,borderRadius:8,background:T.tealBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.2rem",flexShrink:0}}>{u.accountType==="vendor"?"🏭":"💊"}</div>}
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:".92rem",fontWeight:700,color:T.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.companyName||u.name}</div>
+                    <div style={{fontSize:".7rem",color:T.mute}}>{u.vendorCategory||u.brandCategory||""}</div>
+                  </div>
+                </div>
+                {va?.offerings&&<p style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5,margin:"0 0 8px",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{va.offerings}</p>}
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:8}}>
+                  <span style={{fontSize:".68rem",padding:"2px 8px",borderRadius:8,background:u.accountType==="vendor"?T.tealBg:T.goldBg,color:u.accountType==="vendor"?T.teal:T.gold,fontWeight:600}}>
+                    {u.accountType==="vendor"?"Vendor":"Brand"}
+                  </span>
+                  {vRewardCount>0&&<span style={{fontSize:".68rem",color:T.mute}}>🎁 {vRewardCount} reward{vRewardCount!==1?"s":""}</span>}
+                </div>
+              </div>);
+            })}
+          </div>}
+        </div>);
+      })()}
+
       {pg==="videos"&&!selV&&(()=>{
         const q=videoSearch.trim().toLowerCase();
         const filtered=videos.filter(v=>{
@@ -6357,12 +6510,25 @@ ${forDownload
             </div>}
 
             {/* Pharma-specific details */}
-            {u.accountType==="pharma"&&<div style={{...T.card,marginBottom:14}}>
-              <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:14}}>🏢 Company Details</h4>
+            {(u.accountType==="pharma"||u.accountType==="brand")&&<div style={{...T.card,marginBottom:14}}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:14}}>💊 Brand / Pharma Details</h4>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:14}}>
                 {u.companyName&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Company</div><div style={{fontSize:".88rem",color:T.txt}}>{u.companyName}</div></div>}
                 {u.brandCategory&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Category</div><div style={{fontSize:".88rem",color:T.txt}}>{u.brandCategory}</div></div>}
                 {u.contactPerson&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Contact</div><div style={{fontSize:".88rem",color:T.txt}}>{u.contactPerson}</div></div>}
+                {u.country&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Country</div><div style={{fontSize:".88rem",color:T.txt}}>{u.country}</div></div>}
+                {u.website&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Website</div><a href={u.website} target="_blank" rel="noopener noreferrer" style={{fontSize:".88rem",color:T.teal,textDecoration:"none"}}>{u.website.replace(/^https?:\/\//,"")} →</a></div>}
+              </div>
+            </div>}
+
+            {/* Vendor-specific details */}
+            {u.accountType==="vendor"&&<div style={{...T.card,marginBottom:14}}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:14}}>🏭 Vendor Details</h4>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:14}}>
+                {u.companyName&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Company</div><div style={{fontSize:".88rem",color:T.txt}}>{u.companyName}</div></div>}
+                {u.vendorCategory&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Category</div><div style={{fontSize:".88rem",color:T.txt}}>{u.vendorCategory}</div></div>}
+                {u.contactPerson&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Contact</div><div style={{fontSize:".88rem",color:T.txt}}>{u.contactPerson}</div></div>}
+                {u.gstNumber&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>GST</div><div style={{fontSize:".88rem",color:T.txt,fontFamily:"monospace"}}>{u.gstNumber}</div></div>}
                 {u.country&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Country</div><div style={{fontSize:".88rem",color:T.txt}}>{u.country}</div></div>}
                 {u.website&&<div><div style={{fontSize:".68rem",color:T.mute,letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,marginBottom:3}}>Website</div><a href={u.website} target="_blank" rel="noopener noreferrer" style={{fontSize:".88rem",color:T.teal,textDecoration:"none"}}>{u.website.replace(/^https?:\/\//,"")} →</a></div>}
               </div>
@@ -6909,7 +7075,7 @@ ${forDownload
           </>}
 
           {/* Pharma fields */}
-          {editPf.accountType==="pharma"&&<>
+          {(editPf.accountType==="pharma"||editPf.accountType==="brand")&&<>
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Country</label>
             <select value={editPf.country} onChange={e=>setEditPf(p=>({...p,country:e.target.value}))} style={{...T.inp,marginBottom:12}}>
               {COUNTRIES.map(c=><option key={c} value={c}>{c}</option>)}
@@ -6931,6 +7097,34 @@ ${forDownload
 
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Address (optional)</label>
             <input value={editPf.address} onChange={e=>setEditPf(p=>({...p,address:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
+          </>}
+
+          {/* Vendor fields */}
+          {editPf.accountType==="vendor"&&<>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Country</label>
+            <select value={editPf.country} onChange={e=>setEditPf(p=>({...p,country:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+              {COUNTRIES.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Company name <span style={{color:T.err}}>*</span></label>
+            <input value={editPf.companyName||""} onChange={e=>setEditPf(p=>({...p,companyName:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Vendor category <span style={{color:T.err}}>*</span></label>
+            <select value={editPf.vendorCategory||""} onChange={e=>setEditPf(p=>({...p,vendorCategory:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+              <option value="">— Select —</option>{VENDOR_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Contact person <span style={{color:T.err}}>*</span></label>
+            <input value={editPf.contactPerson||""} onChange={e=>setEditPf(p=>({...p,contactPerson:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>GST Number (optional)</label>
+            <input value={editPf.gstNumber||""} onChange={e=>setEditPf(p=>({...p,gstNumber:e.target.value.toUpperCase()}))} placeholder="e.g. 27AABCU9603R1ZX" style={{...T.inp,marginBottom:12,fontFamily:"monospace"}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Website (optional)</label>
+            <input value={editPf.website||""} onChange={e=>setEditPf(p=>({...p,website:e.target.value}))} placeholder="https://" style={{...T.inp,marginBottom:12}}/>
+
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Address (City, State)</label>
+            <input value={editPf.address||""} onChange={e=>setEditPf(p=>({...p,address:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
           </>}
 
           {/* Institute fields */}
@@ -6991,9 +7185,14 @@ ${forDownload
                 if(!e.regNumber?.trim()){setEditErr("Registration number required");return}
                 if(!e.clinic?.trim()){setEditErr("Clinic required");return}
               }
-              if(e.accountType==="pharma"){
+              if(e.accountType==="pharma"||e.accountType==="brand"){
                 if(!e.companyName?.trim()){setEditErr("Company name required");return}
                 if(!e.brandCategory){setEditErr("Brand category required");return}
+                if(!e.contactPerson?.trim()){setEditErr("Contact person required");return}
+              }
+              if(e.accountType==="vendor"){
+                if(!e.companyName?.trim()){setEditErr("Company name required");return}
+                if(!e.vendorCategory){setEditErr("Vendor category required");return}
                 if(!e.contactPerson?.trim()){setEditErr("Contact person required");return}
               }
               if(e.accountType==="institute"){
@@ -7018,7 +7217,8 @@ ${forDownload
                   address:e.address?.trim()||"",
                   ...(e.country==="India"?{council:e.council,internationalCouncil:"",city:"",region:""}:{internationalCouncil:e.internationalCouncil.trim(),city:e.city.trim(),region:e.region?.trim()||"",council:""})
                 }:{}),
-                ...(e.accountType==="pharma"?{companyName:e.companyName.trim(),brandCategory:e.brandCategory,contactPerson:e.contactPerson.trim(),website:e.website?.trim()||"",address:e.address?.trim()||""}:{}),
+                ...(e.accountType==="pharma"||e.accountType==="brand"?{companyName:e.companyName.trim(),brandCategory:e.brandCategory,contactPerson:e.contactPerson.trim(),website:e.website?.trim()||"",address:e.address?.trim()||""}:{}),
+                ...(e.accountType==="vendor"?{companyName:e.companyName.trim(),vendorCategory:e.vendorCategory,contactPerson:e.contactPerson.trim(),gstNumber:e.gstNumber?.trim()||"",website:e.website?.trim()||"",address:e.address?.trim()||""}:{}),
                 ...(e.accountType==="institute"?{instituteName:e.instituteName.trim(),instituteType:e.instituteType,directorName:e.directorName.trim(),address:e.address?.trim()||"",website:e.website?.trim()||""}:{})
               };
               await fbSet("users",au.uid,updated);
@@ -7041,6 +7241,7 @@ ${forDownload
                   degree:prof?.degree||"",council:prof?.council||"",internationalCouncil:prof?.internationalCouncil||"",
                   regNumber:prof?.regNumber||"",clinic:prof?.clinic||"",address:prof?.address||"",city:prof?.city||"",region:prof?.region||"",
                   visibility:prof?.visibility||"public",companyName:prof?.companyName||"",brandCategory:prof?.brandCategory||"",
+                  vendorCategory:prof?.vendorCategory||"",gstNumber:prof?.gstNumber||"",
                   contactPerson:prof?.contactPerson||"",website:prof?.website||"",instituteName:prof?.instituteName||"",
                   instituteType:prof?.instituteType||"",directorName:prof?.directorName||"",bio:prof?.bio||""
                 });
@@ -7152,7 +7353,7 @@ ${forDownload
         })()}
 
         {/* ═══ VENDOR REWARD PARTNER SECTION (only for vendor accounts) ═══ */}
-        {prof?.accountType==="vendor"&&(()=>{
+        {(prof?.accountType==="vendor"||prof?.accountType==="brand"||prof?.accountType==="pharma")&&(()=>{
           // Find this vendor's application
           const myApp=vendorApplications.find(a=>a.uid===au?.uid);
           const status=myApp?.status||"none"; // none | pending | approved | rejected
