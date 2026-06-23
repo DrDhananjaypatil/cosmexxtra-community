@@ -6232,7 +6232,7 @@ ${forDownload
                   <div style={{display:"flex",alignItems:"center",gap:10,fontSize:".7rem",color:T.mute,flexShrink:0}}>
                     <span>❤️ {p.likes||0}</span>
                     <span>💬 {replyCount}</span>
-                    {(p.views||0)>0&&<span>👁️ {p.views}</span>}
+                    <span>👁️ {p.views||0}</span>
                   </div>
                 </div>
               </div>
