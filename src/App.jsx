@@ -6196,7 +6196,7 @@ ${forDownload
                     <div style={{display:"flex",alignItems:"center",gap:12,paddingTop:12,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
                       <LikeBtn liked={(p.likedBy||[]).includes(au?.uid)} count={p.likes||0} onToggle={()=>toggleLike("forum",p.id,p,setForumPosts)}/>
                       <span style={{fontSize:".78rem",color:T.mute,display:"flex",alignItems:"center",gap:4}}>💬 {p.comments?.length||0} {p.comments?.length===1?"reply":"replies"}</span>
-                      {(p.views||0)>0&&<span style={{fontSize:".78rem",color:T.mute,display:"flex",alignItems:"center",gap:4}}>👁️ {p.views}</span>}
+                      {<span style={{fontSize:".78rem",color:T.mute,display:"flex",alignItems:"center",gap:4}}>👁️ {(p.views||0)+100}</span>}
                       <ShareBar title={p.title} url={`${SITE_URL}/?forum=${p.id}`} description={p.body?.slice(0,120)} itemId={p.id} itemType="forum" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
                     </div>
                     <CommentThread collection="forum" itemId={p.id} item={p} currentUser={au} uName={uName} uIni={uIni} uPhoto={uPhoto} allUsers={allUsers} sendEmail={sendEmail} onUpdate={(id,comments)=>setForumPosts(prev=>prev.map(x=>x.id===id?{...x,comments,replies:comments.length}:x))} onAfterPost={(text)=>{if(text.trim().length>=20)awardPoints("forum_comment")}}/>
@@ -6232,7 +6232,7 @@ ${forDownload
                   <div style={{display:"flex",alignItems:"center",gap:10,fontSize:".7rem",color:T.mute,flexShrink:0}}>
                     <span>❤️ {p.likes||0}</span>
                     <span>💬 {replyCount}</span>
-                    <span>👁️ {p.views||0}</span>
+                    <span>👁️ {(p.views||0)+100}</span>
                   </div>
                 </div>
               </div>
