@@ -2151,6 +2151,10 @@ export default function App(){
   const[welcomeSeen,setWelcomeSeen]=useState(()=>localStorage.getItem("sk_welcome")==="1");
   const[quizzes,setQuizzes]=useState([]);const[articles,setArticles]=useState([]);const[resources,setResources]=useState([]);const[videos,setVideos]=useState([]);const[forumPosts,setForumPosts]=useState([]);const[cases,setCases]=useState([]);const[allUsers,setAllUsers]=useState([]);
   const[selD,setSelD]=useState(ds(getIST()));const[selA,setSelA]=useState(null);const[selV,setSelV]=useState(null);const[selU,setSelU]=useState(null);const[toast,setToast]=useState(null);const[cmt,setCmt]=useState("");const[ld,setLd]=useState(false);const[aTab,setATab]=useState("stats");
+  // Vendor directory page states (must be top-level — hooks can't be inside IIFE)
+  const[vendorFilter,setVendorFilter]=useState("all");
+  const[vendorSearch,setVendorSearch]=useState("");
+  const[selVendor,setSelVendor]=useState(null);
   const[profileReturnPg,setProfileReturnPg]=useState("home"); // where to go when "Back" clicked on profile page
   const[authMode,setAuthMode]=useState("signin");const[authEmail,setAuthEmail]=useState("");const[authPass,setAuthPass]=useState("");const[authName,setAuthName]=useState("");const[authBusy,setAuthBusy]=useState(false);const[authErr,setAuthErr]=useState("");
   const[pf,setPf]=useState({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",vendorCategory:"",gstNumber:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});const[edForm,setEdForm]=useState(null);const[setupStep,setSetupStep]=useState(0);const[setupErr,setSetupErr]=useState("");
@@ -5611,15 +5615,13 @@ ${forDownload
           Public-facing directory of approved brands and vendors.
           Doctors can browse by category, see company profiles, visit websites. */}
       {pg==="vendors"&&(()=>{
-        const [vendorFilter,setVendorFilter]=useState("all");
-        const [vendorSearch,setVendorSearch]=useState("");
-        const [selVendor,setSelVendor]=useState(null);
-
-        // Approved vendor/brand users + those with approved vendorApplications
+        // Show ALL vendor/brand/pharma accounts (not just verified/approved)
+        // so the page is useful even before formal vendor onboarding completes.
+        // Admin can hide specific vendors via the Vendors admin tab if needed.
         const approvedVendorUids=new Set(vendorApplications.filter(a=>a.status==="approved").map(a=>a.uid));
         const vendorUsers=allUsers.filter(u=>{
-          const aType=u.accountType||"";
-          return (aType==="vendor"||aType==="brand"||aType==="pharma")&&(u.verified||approvedVendorUids.has(u.id));
+          const aType=normalizeAccountType(u.accountType||"");
+          return aType==="vendor"||aType==="brand"||aType==="pharma";
         });
 
         const categories=["all",...new Set(vendorUsers.map(u=>u.vendorCategory||u.brandCategory||"Other").filter(Boolean))];
@@ -5713,8 +5715,20 @@ ${forDownload
             </select>
           </div>
 
-          {filtered.length===0?<div style={{...T.card,padding:"40px 20px",textAlign:"center",color:T.mute}}>
-            No vendors found matching your search.
+          {filtered.length===0?<div style={{...T.card,padding:"48px 28px",textAlign:"center"}}>
+            <div style={{fontSize:"2.5rem",marginBottom:14}}>🏭</div>
+            <div style={{fontSize:"1.1rem",fontWeight:700,color:T.txt,marginBottom:8}}>Vendor & Brand directory coming soon</div>
+            <div style={{fontSize:".88rem",color:T.txt2,lineHeight:1.65,maxWidth:440,margin:"0 auto 20px"}}>
+              We're onboarding aesthetic device companies, pharma brands, and product distributors to SKINARIO. 
+              Registered vendors will appear here with their product catalog and exclusive doctor offers.
+            </div>
+            <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+              <button onClick={()=>go("me")} style={T.btn}>Are you a vendor? Register here →</button>
+              <a href="https://wa.me/918390200008?text=Hi%2C%20I%27m%20interested%20in%20listing%20my%20company%20on%20SKINARIO%20as%20a%20vendor%2Fbrand." target="_blank" rel="noopener noreferrer" style={{...T.btnO,textDecoration:"none",display:"inline-flex",alignItems:"center",gap:6}}>💬 WhatsApp us</a>
+            </div>
+            {isAdm&&<div style={{marginTop:20,padding:"10px 14px",background:T.tealBg,borderRadius:8,fontSize:".78rem",color:T.teal}}>
+              Admin: vendor accounts show here once they sign up with account type "Vendor" or "Brand/Pharma". No approval needed for directory listing.
+            </div>}
           </div>:
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:14}}>
             {filtered.map(u=>{
