@@ -2198,9 +2198,20 @@ export default function App(){
   const[newsFeedsLoading,setNewsFeedsLoading]=useState(false);
   const[rewards,setRewards]=useState([]);
   const[redemptions,setRedemptions]=useState([]);
-  const[vendorApplications,setVendorApplications]=useState([]); // vendor proposals + approved partners
+  const[vendorApplications,setVendorApplications]=useState([]);
+  const[products,setProducts]=useState([]); // vendor product/equipment listings
+  const[sponsorPlacements,setSponsorPlacements]=useState([]); // Phase 4 sponsored home placements // vendor proposals + approved partners
   const[vrImage,setVrImage]=useState(""); // vendor reward proposal: uploaded image URL
   const[vrUploading,setVrUploading]=useState(false);
+  // Phase 3: product listings
+  const[prodForm,setProdForm]=useState({name:"",description:"",priceRange:"",category:"",specs:"",enquiryEmail:""});
+  const[prodImages,setProdImages]=useState([]); // uploaded product image URLs
+  const[prodUploading,setProdUploading]=useState(false);
+  const[showProdForm,setShowProdForm]=useState(false);
+  const[selProduct,setSelProduct]=useState(null); // product detail view
+  // Phase 4: sponsor placements
+  const[spForm,setSpForm]=useState({title:"",tagline:"",logo:"",website:"",placementType:"home_banner",budget:""});
+  const[spUploading,setSpUploading]=useState(false);
   const[myLedger,setMyLedger]=useState([]); // current user's points-earning history
   const[igPost,setIgPost]=useState(null); // {item, type} when admin opens IG post generator
   const[profileLedger,setProfileLedger]=useState([]); // viewed user's ledger (admin only)
@@ -2361,7 +2372,7 @@ export default function App(){
     if(!consentDoctorReg)setConsentDoctorReg(prof.doctorRegNumber||prof.regNumber||"");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[pg,prof]);
-  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va)},[]);
+  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp)},[]);
 
   // Load current user's points-earning history from pointsActivity ledger.
   // Uses where(uid) so the list query satisfies security rules (can't list others' docs).
@@ -4806,6 +4817,25 @@ ${forDownload
           </div>
         </div>
 
+        {/* ═══ PHASE 4: SPONSORED HOME SPOTLIGHT BANNER ═══
+            Shows the first active home_banner placement. Clearly labelled "Sponsored". */}
+        {(()=>{
+          const activeBanner=sponsorPlacements.find(sp=>sp.status==="active"&&sp.placementType==="home_banner");
+          if(!activeBanner)return null;
+          return(<a href={activeBanner.website||"#"} target="_blank" rel="noopener noreferrer" style={{display:"flex",alignItems:"center",gap:14,padding:"12px 16px",background:"linear-gradient(135deg,"+T.goldBg+",#fff)",border:"1px solid #e8d9a0",borderRadius:12,marginBottom:14,textDecoration:"none",cursor:"pointer",boxShadow:"0 2px 8px rgba(200,168,78,0.15)"}}>
+            {activeBanner.logo&&<img src={activeBanner.logo} alt={activeBanner.vendorName} style={{height:44,maxWidth:100,objectFit:"contain",borderRadius:6,flexShrink:0}}/>}
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                <span style={{fontSize:".55rem",background:"rgba(200,168,78,0.3)",color:"#856404",padding:"1px 6px",borderRadius:4,fontWeight:700,letterSpacing:.8,textTransform:"uppercase"}}>Sponsored</span>
+                <span style={{fontSize:".82rem",fontWeight:700,color:T.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{activeBanner.title}</span>
+              </div>
+              {activeBanner.tagline&&<div style={{fontSize:".76rem",color:T.txt2,lineHeight:1.4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{activeBanner.tagline}</div>}
+              <div style={{fontSize:".68rem",color:T.mute,marginTop:2}}>by {activeBanner.vendorName}</div>
+            </div>
+            <div style={{fontSize:".72rem",color:T.gold,fontWeight:600,flexShrink:0}}>Learn more →</div>
+          </a>);
+        })()}
+
         {/* ═══ QUICK-ACCESS NEWS BUTTONS ═══
             Each button smooth-scrolls to its corresponding section below.
             Section IDs: sk-trials, sk-industry, sk-research, sk-fda */}
@@ -5629,7 +5659,7 @@ ${forDownload
                 {selVendor.email&&<a href={`mailto:${selVendor.email}`} style={{fontSize:".82rem",color:T.teal,textDecoration:"none"}}>✉️ {selVendor.email}</a>}
               </div>
             </div>
-            {vRewards.length>0&&<div style={T.card}>
+            {vRewards.length>0&&<div style={{...T.card,marginBottom:14}}>
               <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>🎁 Rewards offered by this partner</h4>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10}}>
                 {vRewards.map(r=><div key={r.id} style={{padding:14,background:T.bg,borderRadius:8,border:"1px solid "+T.border}}>
@@ -5640,6 +5670,29 @@ ${forDownload
                 </div>)}
               </div>
             </div>}
+
+            {/* Phase 3: Products */}
+            {(()=>{
+              const vProducts=products.filter(p=>p.vendorId===selVendor.id&&p.active!==false);
+              if(vProducts.length===0)return null;
+              return(<div style={T.card}>
+                <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>🛍️ Products & Equipment</h4>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:12}}>
+                  {vProducts.map(p=><div key={p.id} style={{border:"1px solid "+T.border,borderRadius:8,overflow:"hidden",cursor:"pointer",transition:"box-shadow .12s"}} onClick={()=>setSelProduct(p)} onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"} onMouseLeave={e=>e.currentTarget.style.boxShadow=""}>
+                    {p.images?.[0]?<img src={p.images[0]} alt={p.name} style={{width:"100%",height:140,objectFit:"cover"}}/>:<div style={{width:"100%",height:100,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2rem"}}>🛍️</div>}
+                    <div style={{padding:12}}>
+                      <div style={{fontSize:".88rem",fontWeight:700,marginBottom:4}}>{p.name}</div>
+                      {p.category&&<div style={{fontSize:".68rem",color:T.mute,marginBottom:6}}>{p.category}</div>}
+                      <div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden",marginBottom:8}}>{p.description}</div>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                        {p.priceRange&&<div style={{fontSize:".78rem",fontWeight:600,color:T.teal}}>{p.priceRange}</div>}
+                        <button onClick={async(e)=>{e.stopPropagation();const msg=encodeURIComponent(`Hi, I'm interested in ${p.name} from SKINARIO. Please share more details.`);window.open(`mailto:${p.enquiryEmail||p.vendorEmail}?subject=Enquiry: ${p.name}&body=${msg}`,"_blank");await fbSet("products",p.id,{enquiries:(p.enquiries||0)+1});sh("📧 Enquiry email opened!");}} style={{...T.btn,padding:"5px 12px",fontSize:".72rem"}}>Enquire →</button>
+                      </div>
+                    </div>
+                  </div>)}
+                </div>
+              </div>);
+            })()}
           </div>);
         }
 
@@ -7521,6 +7574,183 @@ ${forDownload
           </div>);
         })()}
 
+        {/* ═══ PHASE 3: PRODUCT CATALOG (vendor/brand Me page) ═══ */}
+        {(prof?.accountType==="vendor"||prof?.accountType==="brand"||prof?.accountType==="pharma")&&!editingProfile&&(()=>{
+          const myProducts=products.filter(p=>p.vendorId===au?.uid);
+          const uploadProductImage=async(file)=>{
+            if(!file)return;
+            if(file.size>5*1024*1024){sh("Image must be under 5MB");return}
+            setProdUploading(true);
+            try{
+              const path=`products/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;
+              const sRef=ref(storage,path);
+              await uploadBytes(sRef,file);
+              const url=await getDownloadURL(sRef);
+              setProdImages(prev=>[...prev,url]);
+              sh("✓ Image uploaded");
+            }catch(e){sh("Upload failed")}
+            setProdUploading(false);
+          };
+          return(<div style={{...T.card,marginBottom:14}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,margin:0}}>🛍️ Product / Equipment Catalog</h4>
+              <button onClick={()=>setShowProdForm(f=>!f)} style={{...T.btnO,...T.btnSm}}>{showProdForm?"Cancel":"+ Add product"}</button>
+            </div>
+
+            {/* Add product form */}
+            {showProdForm&&<div style={{padding:14,background:T.bg,borderRadius:10,marginBottom:14,display:"flex",flexDirection:"column",gap:10}}>
+              <input value={prodForm.name} onChange={e=>setProdForm(p=>({...p,name:e.target.value}))} placeholder="Product / Equipment name *" style={T.inp}/>
+              <select value={prodForm.category} onChange={e=>setProdForm(p=>({...p,category:e.target.value}))} style={T.inp}>
+                <option value="">— Category —</option>
+                {VENDOR_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+              <textarea value={prodForm.description} onChange={e=>setProdForm(p=>({...p,description:e.target.value}))} placeholder="Product description — what it does, key benefits, clinical applications *" style={T.txa} rows={3}/>
+              <input value={prodForm.priceRange} onChange={e=>setProdForm(p=>({...p,priceRange:e.target.value}))} placeholder="Price range (e.g. '₹2L–₹5L', 'Contact for quote')" style={T.inp}/>
+              <input value={prodForm.specs} onChange={e=>setProdForm(p=>({...p,specs:e.target.value}))} placeholder="Key specs (e.g. wavelength, power, certifications)" style={T.inp}/>
+              <input value={prodForm.enquiryEmail} onChange={e=>setProdForm(p=>({...p,enquiryEmail:e.target.value}))} placeholder="Enquiry email (defaults to your login email)" style={T.inp}/>
+
+              {/* Images */}
+              <div>
+                <label style={{fontSize:".78rem",color:T.txt2,fontWeight:600,display:"block",marginBottom:6}}>Product images (up to 5)</label>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
+                  {prodImages.map((url,i)=><div key={i} style={{position:"relative"}}>
+                    <img src={url} alt="" style={{width:70,height:70,objectFit:"cover",borderRadius:6,border:"1px solid "+T.border}}/>
+                    <button type="button" onClick={()=>setProdImages(p=>p.filter((_,j)=>j!==i))} style={{position:"absolute",top:-6,right:-6,width:18,height:18,borderRadius:"50%",border:"none",background:T.err,color:"#fff",cursor:"pointer",fontSize:".6rem",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+                  </div>)}
+                </div>
+                {prodImages.length<5&&<input type="file" accept="image/*" disabled={prodUploading} onChange={e=>{const f=e.target.files?.[0];if(f)uploadProductImage(f);e.target.value=""}} style={{fontSize:".82rem"}}/>}
+                {prodUploading&&<div style={{fontSize:".72rem",color:T.mute,marginTop:4}}>⏳ Uploading...</div>}
+              </div>
+
+              <p style={{fontSize:".72rem",color:T.mute,lineHeight:1.5,margin:0}}>Products go live immediately and appear in the Vendors directory for doctors to browse. You can remove them anytime.</p>
+              <button onClick={async()=>{
+                if(!prodForm.name.trim()){sh("Product name required");return}
+                if(!prodForm.description.trim()){sh("Description required");return}
+                const va=vendorApplications.find(a=>a.uid===au?.uid);
+                try{
+                  await fbAdd("products",{
+                    vendorId:au.uid,
+                    vendorName:va?.companyName||prof?.companyName||prof?.name||"",
+                    vendorEmail:au.email,
+                    vendorCategory:prof?.vendorCategory||prof?.brandCategory||"",
+                    name:prodForm.name.trim(),
+                    category:prodForm.category,
+                    description:prodForm.description.trim(),
+                    priceRange:prodForm.priceRange.trim(),
+                    specs:prodForm.specs.trim(),
+                    enquiryEmail:prodForm.enquiryEmail.trim()||au.email,
+                    images:prodImages,
+                    enquiries:0,
+                    active:true,
+                    createdAt:Date.now(),
+                    date:ds(getIST()),
+                  });
+                  sh("✅ Product listed!");
+                  setProdForm({name:"",description:"",priceRange:"",category:"",specs:"",enquiryEmail:""});
+                  setProdImages([]);
+                  setShowProdForm(false);
+                  loadData();
+                }catch(e){console.error(e);sh("Failed to save product")}
+              }} style={{...T.btn,padding:"9px 18px"}}>Publish product →</button>
+            </div>}
+
+            {/* My products list */}
+            {myProducts.length===0&&!showProdForm&&<div style={{padding:"20px 0",textAlign:"center",color:T.mute,fontSize:".82rem"}}>No products listed yet. Add your first product above.</div>}
+            {myProducts.map(p=><div key={p.id} style={{display:"flex",gap:12,padding:"10px 0",borderTop:"1px solid "+T.border,alignItems:"flex-start"}}>
+              {p.images?.[0]&&<img src={p.images[0]} alt="" style={{width:56,height:56,objectFit:"cover",borderRadius:6,border:"1px solid "+T.border,flexShrink:0}}/>}
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:".88rem",fontWeight:600,marginBottom:2}}>{p.name}</div>
+                <div style={{fontSize:".72rem",color:T.mute,marginBottom:4}}>{p.category} {p.priceRange&&`· ${p.priceRange}`} · {p.enquiries||0} enquiries</div>
+                <div style={{fontSize:".75rem",color:T.txt2,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.description}</div>
+              </div>
+              <button onClick={async()=>{if(!window.confirm("Remove this product?"))return;await fbSet("products",p.id,{active:false});sh("Product removed");loadData()}} style={{...T.btnO,...T.btnSm,color:T.err,borderColor:T.err,flexShrink:0}}>✕</button>
+            </div>)}
+          </div>);
+        })()}
+
+        {/* ═══ PHASE 4: SPONSORED PLACEMENT REQUEST (vendor/brand Me page) ═══ */}
+        {(prof?.accountType==="vendor"||prof?.accountType==="brand"||prof?.accountType==="pharma")&&!editingProfile&&(()=>{
+          const myPlacements=sponsorPlacements.filter(p=>p.vendorId===au?.uid);
+          return(<div style={{...T.card,marginBottom:14}}>
+            <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:8}}>📢 Sponsored Placements</h4>
+            <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.6,marginBottom:12}}>
+              Get featured on SKINARIO's home page, articles, or quiz section. Placement is manually reviewed and invoiced — no payment integration needed upfront.
+            </p>
+
+            {/* Placement request form */}
+            <details style={{marginBottom:14,padding:"10px 12px",background:T.bg,borderRadius:8}}>
+              <summary style={{cursor:"pointer",fontSize:".88rem",fontWeight:600}}>+ Request a placement</summary>
+              <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:10}}>
+                <select value={spForm.placementType} onChange={e=>setSpForm(p=>({...p,placementType:e.target.value}))} style={T.inp}>
+                  <option value="home_banner">🏠 Home spotlight banner</option>
+                  <option value="article_sidebar">📰 Article sidebar / in-article</option>
+                  <option value="quiz_sponsor">🧠 Quiz sponsor label</option>
+                  <option value="vendor_featured">🏭 Featured vendor (top of directory)</option>
+                </select>
+                <input value={spForm.title} onChange={e=>setSpForm(p=>({...p,title:e.target.value}))} placeholder="Ad title / headline *" style={T.inp}/>
+                <input value={spForm.tagline} onChange={e=>setSpForm(p=>({...p,tagline:e.target.value}))} placeholder="Tagline / short description" style={T.inp}/>
+                <input value={spForm.website} onChange={e=>setSpForm(p=>({...p,website:e.target.value}))} placeholder="Landing page URL (doctors click to this)" style={T.inp}/>
+                <input value={spForm.budget} onChange={e=>setSpForm(p=>({...p,budget:e.target.value}))} placeholder="Approximate budget / duration (e.g. '₹5000/month', '2 weeks')" style={T.inp}/>
+                <div>
+                  <label style={{fontSize:".78rem",color:T.txt2,fontWeight:600,display:"block",marginBottom:6}}>Logo / banner image *</label>
+                  {spForm.logo&&<img src={spForm.logo} alt="" style={{maxHeight:60,maxWidth:180,borderRadius:6,marginBottom:8,display:"block"}}/>}
+                  <input type="file" accept="image/*" disabled={spUploading} onChange={async(e)=>{
+                    const f=e.target.files?.[0];if(!f)return;
+                    setSpUploading(true);
+                    try{
+                      const path=`sponsor-placements/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;
+                      const sRef=ref(storage,path);await uploadBytes(sRef,f);
+                      const url=await getDownloadURL(sRef);
+                      setSpForm(p=>({...p,logo:url}));sh("✓ Uploaded");
+                    }catch(e){sh("Upload failed")}
+                    setSpUploading(false);e.target.value="";
+                  }} style={{fontSize:".82rem"}}/>
+                  {spUploading&&<div style={{fontSize:".72rem",color:T.mute,marginTop:4}}>⏳ Uploading...</div>}
+                </div>
+                <p style={{fontSize:".72rem",color:T.mute,lineHeight:1.5,margin:0}}>Admin will review your request, confirm placement details, and share an invoice. Your ad goes live after payment confirmation.</p>
+                <button onClick={async()=>{
+                  if(!spForm.title.trim()){sh("Title required");return}
+                  if(!spForm.logo){sh("Logo/image required");return}
+                  const va=vendorApplications.find(a=>a.uid===au?.uid);
+                  try{
+                    await fbAdd("sponsorPlacements",{
+                      vendorId:au.uid,
+                      vendorName:va?.companyName||prof?.companyName||prof?.name||"",
+                      vendorEmail:au.email,
+                      placementType:spForm.placementType,
+                      title:spForm.title.trim(),
+                      tagline:spForm.tagline.trim(),
+                      logo:spForm.logo,
+                      website:spForm.website.trim(),
+                      budget:spForm.budget.trim(),
+                      status:"pending", // pending → approved → active → expired
+                      createdAt:Date.now(),
+                    });
+                    sh("📨 Placement request submitted! Admin will contact you shortly.");
+                    setSpForm({title:"",tagline:"",logo:"",website:"",placementType:"home_banner",budget:""});
+                    loadData();
+                  }catch(e){console.error(e);sh("Submission failed")}
+                }} style={{...T.btn,padding:"9px 18px"}}>Submit request →</button>
+              </div>
+            </details>
+
+            {/* My placements */}
+            {myPlacements.length>0&&<div>
+              <div style={{fontSize:".78rem",fontWeight:700,marginBottom:8,color:T.txt2}}>My placements</div>
+              {myPlacements.map(sp=><div key={sp.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:T.bg,borderRadius:6,marginBottom:6,flexWrap:"wrap"}}>
+                {sp.logo&&<img src={sp.logo} alt="" style={{height:32,maxWidth:80,objectFit:"contain",borderRadius:4}}/>}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:".85rem",fontWeight:600}}>{sp.title}</div>
+                  <div style={{fontSize:".7rem",color:T.mute}}>{sp.placementType.replace("_"," ")} · {fD(sp.createdAt)}</div>
+                </div>
+                <span style={{...T.tag(sp.status==="active"?T.tealBg:sp.status==="approved"?T.goldBg:T.warnBg,sp.status==="active"?T.teal:sp.status==="approved"?T.gold:T.warn),fontSize:".68rem",fontWeight:700}}>
+                  {sp.status==="active"?"🟢 Live":sp.status==="approved"?"✓ Approved":"⏳ Pending"}
+                </span>
+              </div>)}
+            </div>}
+          </div>);
+        })()}
+
         {/* ═══ EMAIL PREFERENCES ═══ */}
         {!editingProfile&&(()=>{
           const prefs=prof?.emailPreferences||{welcome:true,submissions:true,replies:true,weeklyDigest:true};
@@ -8048,6 +8278,60 @@ ${forDownload
               </>}
             </>);
           })()}
+
+          {/* ─── PHASE 3: ALL PRODUCT LISTINGS ─── */}
+          <div style={{...T.card,marginTop:16}}>
+            <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:12}}>🛍️ Product Listings ({products.filter(p=>p.active!==false).length} active)</h4>
+            {products.filter(p=>p.active!==false).length===0?<p style={{color:T.mute,fontSize:".82rem"}}>No products listed yet.</p>:
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {products.filter(p=>p.active!==false).map(p=>(
+                <div key={p.id} style={{display:"flex",gap:12,alignItems:"center",padding:"10px 12px",background:T.bg,borderRadius:8,flexWrap:"wrap"}}>
+                  {p.images?.[0]&&<img src={p.images[0]} alt="" style={{width:48,height:48,objectFit:"cover",borderRadius:6,border:"1px solid "+T.border,flexShrink:0}}/>}
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:".88rem",fontWeight:600}}>{p.name}</div>
+                    <div style={{fontSize:".72rem",color:T.mute}}>{p.vendorName} · {p.category} {p.priceRange&&`· ${p.priceRange}`} · {p.enquiries||0} enquiries</div>
+                  </div>
+                  <button onClick={async()=>{if(!window.confirm("Remove this listing?"))return;await fbSet("products",p.id,{active:false});loadData();sh("Removed")}} style={{...T.btnDanger,...T.btnSm}}>Remove</button>
+                </div>
+              ))}
+            </div>}
+          </div>
+
+          {/* ─── PHASE 4: SPONSOR PLACEMENTS ─── */}
+          <div style={{...T.card,marginTop:16}}>
+            <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6}}>📢 Sponsor Placements</h4>
+            <p style={{fontSize:".78rem",color:T.txt2,marginBottom:14,lineHeight:1.55}}>
+              Approve a placement to make it live. "Home banner" placements appear at the top of the home feed. Only one home banner shows at a time (first active one wins).
+            </p>
+            {sponsorPlacements.length===0?<p style={{color:T.mute,fontSize:".82rem"}}>No placement requests yet.</p>:
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {sponsorPlacements.map(sp=>(
+                <div key={sp.id} style={{padding:"12px 14px",borderRadius:10,border:"1px solid "+T.border,background:sp.status==="active"?T.tealBg+"33":T.bg}}>
+                  <div style={{display:"flex",gap:12,alignItems:"flex-start",flexWrap:"wrap"}}>
+                    {sp.logo&&<img src={sp.logo} alt="" style={{height:40,maxWidth:90,objectFit:"contain",borderRadius:4,flexShrink:0}}/>}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+                        <span style={{fontSize:".88rem",fontWeight:700}}>{sp.title}</span>
+                        <span style={{...T.tag(sp.status==="active"?T.tealBg:sp.status==="approved"?T.goldBg:T.warnBg,sp.status==="active"?T.teal:sp.status==="approved"?T.gold:T.warn),fontSize:".68rem"}}>{sp.status}</span>
+                        <span style={{fontSize:".72rem",color:T.mute,background:T.bg,padding:"1px 7px",borderRadius:6}}>{sp.placementType.replace("_"," ")}</span>
+                      </div>
+                      <div style={{fontSize:".78rem",color:T.txt2,marginBottom:4}}>{sp.vendorName} · {sp.tagline}</div>
+                      {sp.budget&&<div style={{fontSize:".72rem",color:T.mute}}>Budget: {sp.budget}</div>}
+                      {sp.website&&<a href={sp.website} target="_blank" rel="noopener noreferrer" style={{fontSize:".72rem",color:T.teal}}>{sp.website.replace(/^https?:\/\//,"")}</a>}
+                    </div>
+                    <div style={{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap"}}>
+                      {sp.status==="pending"&&<>
+                        <button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"approved",approvedAt:Date.now(),approvedBy:au.email});loadData();sh("Approved — not live yet");}} style={{...T.btnO,...T.btnSm}}>Approve</button>
+                        <button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"rejected"});loadData();sh("Rejected")}} style={{...T.btnDanger,...T.btnSm}}>Reject</button>
+                      </>}
+                      {sp.status==="approved"&&<button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"active",activatedAt:Date.now()});loadData();sh("🟢 Now live!");}} style={{...T.btn,...T.btnSm}}>▶ Make Live</button>}
+                      {sp.status==="active"&&<button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"expired",expiredAt:Date.now()});loadData();sh("Deactivated")}} style={{...T.btnO,...T.btnSm}}>⏹ Deactivate</button>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>}
+          </div>
         </div>}
 
         {aTab==="roles"&&<div>
