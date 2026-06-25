@@ -2200,7 +2200,8 @@ export default function App(){
   const[redemptions,setRedemptions]=useState([]);
   const[vendorApplications,setVendorApplications]=useState([]);
   const[products,setProducts]=useState([]); // vendor product/equipment listings
-  const[sponsorPlacements,setSponsorPlacements]=useState([]); // Phase 4 sponsored home placements // vendor proposals + approved partners
+  const[productEnquiries,setProductEnquiries]=useState([]); // enquiry ledger for Phase 3
+  const[sponsorPlacements,setSponsorPlacements]=useState([]); // Phase 4 sponsored home placements
   const[vrImage,setVrImage]=useState(""); // vendor reward proposal: uploaded image URL
   const[vrUploading,setVrUploading]=useState(false);
   // Phase 3: product listings
@@ -2208,7 +2209,9 @@ export default function App(){
   const[prodImages,setProdImages]=useState([]); // uploaded product image URLs
   const[prodUploading,setProdUploading]=useState(false);
   const[showProdForm,setShowProdForm]=useState(false);
-  const[selProduct,setSelProduct]=useState(null); // product detail view
+  const[selProduct,setSelProduct]=useState(null);
+  const[enquiryModal,setEnquiryModal]=useState(null); // {product} — open enquiry form
+  const[enquiryMsg,setEnquiryMsg]=useState(""); // product detail view
   // Phase 4: sponsor placements
   const[spForm,setSpForm]=useState({title:"",tagline:"",logo:"",website:"",placementType:"home_banner",budget:""});
   const[spUploading,setSpUploading]=useState(false);
@@ -2372,7 +2375,7 @@ export default function App(){
     if(!consentDoctorReg)setConsentDoctorReg(prof.doctorRegNumber||prof.regNumber||"");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[pg,prof]);
-  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp)},[]);
+  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe)},[]);
 
   // Load current user's points-earning history from pointsActivity ledger.
   // Uses where(uid) so the list query satisfies security rules (can't list others' docs).
@@ -5686,7 +5689,7 @@ ${forDownload
                       <div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden",marginBottom:8}}>{p.description}</div>
                       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                         {p.priceRange&&<div style={{fontSize:".78rem",fontWeight:600,color:T.teal}}>{p.priceRange}</div>}
-                        <button onClick={async(e)=>{e.stopPropagation();const msg=encodeURIComponent(`Hi, I'm interested in ${p.name} from SKINARIO. Please share more details.`);window.open(`mailto:${p.enquiryEmail||p.vendorEmail}?subject=Enquiry: ${p.name}&body=${msg}`,"_blank");await fbSet("products",p.id,{enquiries:(p.enquiries||0)+1});sh("📧 Enquiry email opened!");}} style={{...T.btn,padding:"5px 12px",fontSize:".72rem"}}>Enquire →</button>
+                        <button onClick={async(e)=>{e.stopPropagation();setEnquiryMsg("");setEnquiryModal(p);}} style={{...T.btn,padding:"5px 12px",fontSize:".72rem"}}>Enquire →</button>
                       </div>
                     </div>
                   </div>)}
@@ -7662,6 +7665,32 @@ ${forDownload
                 <div style={{fontSize:".88rem",fontWeight:600,marginBottom:2}}>{p.name}</div>
                 <div style={{fontSize:".72rem",color:T.mute,marginBottom:4}}>{p.category} {p.priceRange&&`· ${p.priceRange}`} · {p.enquiries||0} enquiries</div>
                 <div style={{fontSize:".75rem",color:T.txt2,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.description}</div>
+                {/* Enquiries for this product */}
+                {(()=>{
+                  const pEnqs=productEnquiries.filter(e=>e.productId===p.id);
+                  if(pEnqs.length===0)return null;
+                  return(<div style={{marginTop:8}}>
+                    <div style={{fontSize:".68rem",fontWeight:700,color:T.mute,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>
+                      Enquiries ({pEnqs.filter(e=>e.status==="fulfilled").length}/{pEnqs.length} fulfilled)
+                    </div>
+                    {pEnqs.slice(0,3).map(e=><div key={e.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:e.status==="fulfilled"?T.tealBg+"44":T.bg,borderRadius:6,marginBottom:4,flexWrap:"wrap"}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:".76rem",fontWeight:600,color:T.txt}}>{e.doctorName}</div>
+                        <div style={{fontSize:".68rem",color:T.mute}}>{e.doctorEmail} · {fD(e.date)}</div>
+                        {e.message&&<div style={{fontSize:".72rem",color:T.txt2,marginTop:3,fontStyle:"italic",display:"-webkit-box",WebkitLineClamp:1,WebkitBoxOrient:"vertical",overflow:"hidden"}}>"{e.message}"</div>}
+                      </div>
+                      <button onClick={async()=>{
+                        const newStatus=e.status==="fulfilled"?"new":"fulfilled";
+                        await fbSet("productEnquiries",e.id,{status:newStatus,updatedAt:Date.now()});
+                        sh(newStatus==="fulfilled"?"✓ Marked fulfilled":"Marked open");
+                        loadData();
+                      }} style={{...T.btnO,...T.btnSm,fontSize:".65rem",padding:"2px 8px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal,flexShrink:0}}>
+                        {e.status==="fulfilled"?"✓ Fulfilled":"Mark fulfilled"}
+                      </button>
+                    </div>)}
+                    {pEnqs.length>3&&<div style={{fontSize:".7rem",color:T.mute,fontStyle:"italic"}}>+{pEnqs.length-3} more — see full list in admin</div>}
+                  </div>);
+                })()}
               </div>
               <button onClick={async()=>{if(!window.confirm("Remove this product?"))return;await fbSet("products",p.id,{active:false});sh("Product removed");loadData()}} style={{...T.btnO,...T.btnSm,color:T.err,borderColor:T.err,flexShrink:0}}>✕</button>
             </div>)}
@@ -8284,16 +8313,64 @@ ${forDownload
             <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:12}}>🛍️ Product Listings ({products.filter(p=>p.active!==false).length} active)</h4>
             {products.filter(p=>p.active!==false).length===0?<p style={{color:T.mute,fontSize:".82rem"}}>No products listed yet.</p>:
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {products.filter(p=>p.active!==false).map(p=>(
-                <div key={p.id} style={{display:"flex",gap:12,alignItems:"center",padding:"10px 12px",background:T.bg,borderRadius:8,flexWrap:"wrap"}}>
+              {products.filter(p=>p.active!==false).map(p=>{
+                const pEnqs=productEnquiries.filter(e=>e.productId===p.id);
+                const fulfilled=pEnqs.filter(e=>e.status==="fulfilled").length;
+                return(<div key={p.id} style={{display:"flex",gap:12,alignItems:"center",padding:"10px 12px",background:T.bg,borderRadius:8,flexWrap:"wrap"}}>
                   {p.images?.[0]&&<img src={p.images[0]} alt="" style={{width:48,height:48,objectFit:"cover",borderRadius:6,border:"1px solid "+T.border,flexShrink:0}}/>}
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:".88rem",fontWeight:600}}>{p.name}</div>
-                    <div style={{fontSize:".72rem",color:T.mute}}>{p.vendorName} · {p.category} {p.priceRange&&`· ${p.priceRange}`} · {p.enquiries||0} enquiries</div>
+                    <div style={{fontSize:".72rem",color:T.mute}}>{p.vendorName} · {p.category} {p.priceRange&&`· ${p.priceRange}`}</div>
+                    <div style={{fontSize:".72rem",color:T.teal,marginTop:2}}>📧 {pEnqs.length} enquiries · ✓ {fulfilled} fulfilled</div>
                   </div>
                   <button onClick={async()=>{if(!window.confirm("Remove this listing?"))return;await fbSet("products",p.id,{active:false});loadData();sh("Removed")}} style={{...T.btnDanger,...T.btnSm}}>Remove</button>
+                </div>);
+              })}
+            </div>}
+          </div>
+
+          {/* ─── ENQUIRY LEDGER ─── */}
+          <div style={{...T.card,marginTop:16}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
+              <h4 style={{fontSize:"1rem",fontWeight:700,margin:0}}>📋 Product Enquiry Ledger</h4>
+              <div style={{display:"flex",gap:10,fontSize:".78rem"}}>
+                <span style={{color:T.teal,fontWeight:600}}>{productEnquiries.length} total</span>
+                <span style={{color:"#1a7d42",fontWeight:600}}>✓ {productEnquiries.filter(e=>e.status==="fulfilled").length} fulfilled</span>
+                <span style={{color:T.warn,fontWeight:600}}>⏳ {productEnquiries.filter(e=>e.status!=="fulfilled").length} open</span>
+              </div>
+            </div>
+            {productEnquiries.length===0?<p style={{color:T.mute,fontSize:".82rem"}}>No enquiries yet.</p>:
+            <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:560,overflowY:"auto"}}>
+              {productEnquiries.map(e=><div key={e.id} style={{padding:"10px 14px",borderRadius:8,border:"1px solid "+T.border,background:e.status==="fulfilled"?"#f0faf5":T.bg}}>
+                <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+                      <span style={{fontSize:".85rem",fontWeight:700,color:T.txt}}>{e.doctorName}</span>
+                      <span style={{fontSize:".72rem",color:T.mute}}>enquired about</span>
+                      <span style={{fontSize:".82rem",fontWeight:600,color:T.teal}}>{e.productName}</span>
+                    </div>
+                    <div style={{fontSize:".72rem",color:T.mute,marginBottom:6}}>
+                      {e.doctorEmail} {e.doctorClinic&&`· ${e.doctorClinic}`} · {e.vendorName} · {fD(e.date)}
+                    </div>
+                    {e.message&&<div style={{fontSize:".78rem",color:T.txt2,padding:"6px 10px",background:"#fff",borderRadius:6,borderLeft:"2px solid "+T.border,fontStyle:"italic",lineHeight:1.5}}>
+                      "{e.message}"
+                    </div>}
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:5,flexShrink:0,alignItems:"flex-end"}}>
+                    <span style={{fontSize:".68rem",fontWeight:700,padding:"2px 8px",borderRadius:6,background:e.status==="fulfilled"?"#e8f5e9":"#fff8e1",color:e.status==="fulfilled"?"#1a7d42":"#856404"}}>
+                      {e.status==="fulfilled"?"✓ Fulfilled":"⏳ Open"}
+                    </span>
+                    <button onClick={async()=>{
+                      const newStatus=e.status==="fulfilled"?"new":"fulfilled";
+                      await fbSet("productEnquiries",e.id,{status:newStatus,updatedAt:Date.now()});
+                      sh(newStatus==="fulfilled"?"✓ Marked fulfilled":"Reopened");
+                      loadData();
+                    }} style={{...T.btnO,...T.btnSm,fontSize:".68rem",padding:"2px 9px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal}}>
+                      {e.status==="fulfilled"?"Reopen":"Mark fulfilled"}
+                    </button>
+                  </div>
                 </div>
-              ))}
+              </div>)}
             </div>}
           </div>
 
@@ -9163,6 +9240,68 @@ ${forDownload
           setQuizzes(prev=>prev.map(q=>q.id===quizId?{...q,igImageUrl:url}:q));
         }catch(err){console.error("cache quiz image failed:",err)}
       }}/>}
+
+      {/* ═══ PRODUCT ENQUIRY MODAL ═══ */}
+      {enquiryModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:1100,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setEnquiryModal(null)}>
+        <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:480,padding:24,boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}} onClick={e=>e.stopPropagation()}>
+          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:16,gap:12}}>
+            <div>
+              <div style={{fontSize:"1rem",fontWeight:700,marginBottom:4}}>📧 Enquire about {enquiryModal.name}</div>
+              <div style={{fontSize:".78rem",color:T.mute}}>by {enquiryModal.vendorName}</div>
+            </div>
+            <button onClick={()=>setEnquiryModal(null)} style={{...T.btnO,...T.btnSm,flexShrink:0}}>✕</button>
+          </div>
+
+          {enquiryModal.images?.[0]&&<img src={enquiryModal.images[0]} alt="" style={{width:"100%",height:140,objectFit:"cover",borderRadius:8,marginBottom:14}}/>}
+
+          <div style={{padding:"10px 12px",background:T.bg,borderRadius:8,fontSize:".82rem",color:T.txt2,lineHeight:1.5,marginBottom:14}}>
+            <b>Your contact info</b> (name + email) will be shared with the vendor so they can respond.<br/>
+            <span style={{fontFamily:"monospace",fontSize:".78rem"}}>{uName} · {au?.email}</span>
+          </div>
+
+          <label style={{display:"block",fontSize:".74rem",color:T.teal,fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>Your message *</label>
+          <textarea
+            value={enquiryMsg}
+            onChange={e=>setEnquiryMsg(e.target.value)}
+            placeholder={`Hi, I'm interested in ${enquiryModal.name}. Please share pricing, availability, and demo options for my clinic.`}
+            rows={4}
+            style={{...T.txa,marginBottom:14,fontSize:".88rem"}}
+          />
+
+          <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+            <button onClick={()=>setEnquiryModal(null)} style={{...T.btnO,padding:"9px 16px"}}>Cancel</button>
+            <button onClick={async()=>{
+              if(!enquiryMsg.trim()){sh("Please write a message");return}
+              try{
+                // Log enquiry to Firestore
+                await fbAdd("productEnquiries",{
+                  productId:enquiryModal.id,
+                  productName:enquiryModal.name,
+                  vendorId:enquiryModal.vendorId,
+                  vendorName:enquiryModal.vendorName,
+                  vendorEmail:enquiryModal.enquiryEmail||enquiryModal.vendorEmail,
+                  doctorUid:au.uid,
+                  doctorName:uName,
+                  doctorEmail:au.email,
+                  message:enquiryMsg.trim(),
+                  status:"new", // new → contacted → fulfilled
+                  createdAt:Date.now(),
+                  date:ds(getIST()),
+                });
+                // Increment product enquiry counter
+                await fbSet("products",enquiryModal.id,{enquiries:(enquiryModal.enquiries||0)+1});
+                // Open email to vendor with pre-filled message
+                const mailBody=encodeURIComponent(`${enquiryMsg.trim()}\n\n— ${uName}\n${au.email}\n\n(Sent via SKINARIO platform)`);
+                window.open(`mailto:${enquiryModal.enquiryEmail||enquiryModal.vendorEmail}?subject=SKINARIO Enquiry: ${enquiryModal.name}&body=${mailBody}`,"_blank");
+                sh("📧 Enquiry logged and email opened!");
+                setEnquiryModal(null);
+                setEnquiryMsg("");
+                loadData();
+              }catch(err){console.error(err);sh("Failed to log enquiry")}
+            }} style={{...T.btn,padding:"9px 18px"}}>Send enquiry →</button>
+          </div>
+        </div>
+      </div>}
 
       {/* ═══ CONSENT PREVIEW MODAL ═══ */}
       {consentPreview && (() => {
