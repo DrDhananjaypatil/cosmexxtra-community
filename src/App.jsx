@@ -2165,7 +2165,7 @@ export default function App(){
 
   // KNOWN_PAGES must match every page condition the app actually renders.
   // If you add a new page (`pg==="xyz"&&...` block), add "xyz" here too.
-  const KNOWN_PAGES=["home","me","quiz","library","forum","cases","rewards","submit","rank","events","videos","admin","profile","ad","consent"];
+  const KNOWN_PAGES=["home","me","quiz","library","forum","cases","rewards","submit","rank","events","videos","admin","profile","ad","consent","vendors"];
   const sh=m=>setToast(m);const go=p=>{const safe=KNOWN_PAGES.includes(p)?p:"home";setPg(safe);setSelA(null);setSelV(null);setSelAd(null);setSelE(null);setSelU(null);setSelFP(null);setSelCs(null);setEdForm(null)};
   // ═══ VIEW PROFILE — open any user's profile page ═══
   const viewProfile=(uid)=>{
