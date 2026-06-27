@@ -2155,6 +2155,8 @@ export default function App(){
   const[vendorFilter,setVendorFilter]=useState("all");
   const[vendorSearch,setVendorSearch]=useState("");
   const[selVendor,setSelVendor]=useState(null);
+  const[adminUserSearch,setAdminUserSearch]=useState(""); // admin users tab search
+  const[adminUserFilter,setAdminUserFilter]=useState("all"); // all/doctor/brand/vendor/institute/flagged/premium
   const[profileReturnPg,setProfileReturnPg]=useState("home"); // where to go when "Back" clicked on profile page
   const[authMode,setAuthMode]=useState("signin");const[authEmail,setAuthEmail]=useState("");const[authPass,setAuthPass]=useState("");const[authName,setAuthName]=useState("");const[authBusy,setAuthBusy]=useState(false);const[authErr,setAuthErr]=useState("");
   const[pf,setPf]=useState({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",vendorCategory:"",gstNumber:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});const[edForm,setEdForm]=useState(null);const[setupStep,setSetupStep]=useState(0);const[setupErr,setSetupErr]=useState("");
@@ -8894,27 +8896,71 @@ ${forDownload
         })()}
 
         {aTab==="users"&&<div style={T.card}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-            <p style={{color:T.mute,fontSize:".82rem",margin:0}}>{allUsers.length} users · click to view profile</p>
-            <p style={{color:T.mute,fontSize:".75rem",margin:0}}>🚩 {allUsers.filter(u=>u.regFlagged).length} flagged · ✓ {allUsers.filter(u=>u.verified).length} verified</p>
+          {/* Header */}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
+            <p style={{color:T.mute,fontSize:".82rem",margin:0}}>{allUsers.length} total · 🚩 {allUsers.filter(u=>u.regFlagged).length} flagged · ✓ {allUsers.filter(u=>u.verified).length} verified</p>
           </div>
-          {allUsers.map(u=>{const a2=u.totalAnswered?Math.round(u.totalCorrect/u.totalAnswered*100):0;const acc=ACCOUNT_TYPES.find(t=>t.id===u.accountType);return<div key={u.id} onClick={()=>viewProfile(u.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 8px",borderBottom:"1px solid "+T.border,cursor:"pointer",borderRadius:6,...(u.regFlagged?{background:T.errBg+"55"}:{})}}>
-            {u.photo?<img src={u.photo} style={{width:34,height:34,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(34,T.tealBg,T.teal)}>{u.initials||"?"}</div>}
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:".88rem",fontWeight:500,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                {u.name||"Unnamed"}
-                {u.verified&&<span title="Verified" style={{color:"#1d9bf0"}}>✓</span>}
-                {ADMINS.includes(u.email)&&<span style={T.tag(T.tealBg,T.teal)}>Admin</span>}
-                {u.regFlagged&&<span style={T.tag(T.errBg,T.err)}>🚩</span>}
-                {acc&&<span style={T.tag(T.bg,T.mute)}>{acc.icon} {acc.label}</span>}
-              </div>
-              <div style={{fontSize:".7rem",color:T.mute}}>{u.email} · {u.country||"—"}</div>
-            </div>
-            <div style={{textAlign:"right",fontSize:".72rem"}}>
-              {u.accountType==="doctor"&&<div style={{color:T.teal,fontWeight:600}}>{u.points||0} pts · {a2}%</div>}
-              <div style={{color:T.mute}}>{u.paid?"⭐ Premium":"Free"}</div>
-            </div>
-          </div>})}
+
+          {/* Search + filter row */}
+          <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+            <input
+              value={adminUserSearch}
+              onChange={e=>setAdminUserSearch(e.target.value)}
+              placeholder="Search by name, email, clinic, city..."
+              style={{...T.inp,flex:1,minWidth:200}}
+            />
+            <select value={adminUserFilter} onChange={e=>setAdminUserFilter(e.target.value)} style={{...T.inp,minWidth:140}}>
+              <option value="all">All types</option>
+              <option value="doctor">🩺 Doctors</option>
+              <option value="brand">💊 Brand / Pharma</option>
+              <option value="pharma">💊 Pharma (old)</option>
+              <option value="vendor">🏭 Vendors</option>
+              <option value="institute">🏛️ Institutes</option>
+              <option value="flagged">🚩 Flagged</option>
+              <option value="premium">⭐ Premium</option>
+              <option value="verified">✓ Verified</option>
+            </select>
+            {(adminUserSearch||adminUserFilter!=="all")&&<button onClick={()=>{setAdminUserSearch("");setAdminUserFilter("all")}} style={{...T.btnO,...T.btnSm,whiteSpace:"nowrap"}}>✕ Clear</button>}
+          </div>
+
+          {/* Filtered results */}
+          {(()=>{
+            const q=adminUserSearch.toLowerCase();
+            const filtered=allUsers.filter(u=>{
+              const matchSearch=!q||(u.name||"").toLowerCase().includes(q)||(u.email||"").toLowerCase().includes(q)||(u.clinic||"").toLowerCase().includes(q)||(u.city||"").toLowerCase().includes(q)||(u.companyName||"").toLowerCase().includes(q)||(u.regNumber||"").toLowerCase().includes(q);
+              const matchFilter=adminUserFilter==="all"
+                ||adminUserFilter==="flagged"?u.regFlagged
+                :adminUserFilter==="premium"?u.paid
+                :adminUserFilter==="verified"?u.verified
+                :(u.accountType||"")===(adminUserFilter);
+              return matchSearch&&matchFilter;
+            });
+            if(filtered.length===0)return<div style={{padding:"30px 0",textAlign:"center",color:T.mute,fontSize:".84rem"}}>No users match "{adminUserSearch}"</div>;
+            return(<>
+              <div style={{fontSize:".72rem",color:T.mute,marginBottom:8}}>{filtered.length} result{filtered.length!==1?"s":""}{adminUserSearch&&` for "${adminUserSearch}"`}</div>
+              {filtered.map(u=>{
+                const a2=u.totalAnswered?Math.round(u.totalCorrect/u.totalAnswered*100):0;
+                const acc=ACCOUNT_TYPES.find(t=>t.id===u.accountType);
+                return<div key={u.id} onClick={()=>viewProfile(u.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 8px",borderBottom:"1px solid "+T.border,cursor:"pointer",borderRadius:6,...(u.regFlagged?{background:T.errBg+"55"}:{})}}>
+                  {u.photo?<img src={u.photo} style={{width:34,height:34,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(34,T.tealBg,T.teal)}>{u.initials||"?"}</div>}
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:".88rem",fontWeight:500,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                      {u.name||"Unnamed"}
+                      {u.verified&&<span title="Verified" style={{color:"#1d9bf0"}}>✓</span>}
+                      {ADMINS.includes(u.email)&&<span style={T.tag(T.tealBg,T.teal)}>Admin</span>}
+                      {u.regFlagged&&<span style={T.tag(T.errBg,T.err)}>🚩</span>}
+                      {acc&&<span style={T.tag(T.bg,T.mute)}>{acc.icon} {acc.label}</span>}
+                    </div>
+                    <div style={{fontSize:".7rem",color:T.mute}}>{u.email} · {u.clinic||u.companyName||u.instituteName||""}{(u.city||u.country)?` · ${u.city||u.country}`:""}  · joined {u.joined||""}</div>
+                  </div>
+                  <div style={{textAlign:"right",fontSize:".72rem",flexShrink:0}}>
+                    {u.accountType==="doctor"&&<div style={{color:T.teal,fontWeight:600}}>{u.points||0} pts · {a2}%</div>}
+                    <div style={{color:T.mute}}>{u.paid?"⭐ Premium":"Free"}</div>
+                  </div>
+                </div>;
+              })}
+            </>);
+          })()}
         </div>}
       </div>}
 
