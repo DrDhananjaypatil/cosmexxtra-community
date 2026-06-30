@@ -434,6 +434,99 @@ const CONSENT_PROCEDURES = {
       },
     },
   },
+  "Pigmentation & Specialized Topicals": {
+    icon: "🎨",
+    procedures: {
+      "Tranexamic Acid for Melasma (Topical / Oral / Microinjection)": {
+        description: "Use of tranexamic acid — topically, orally, or via intradermal microinjection — for management of melasma and stubborn pigmentation by reducing melanocyte activity and vascular contribution.",
+        commonRisks: ["Mild stinging or irritation at application/injection site", "Transient redness", "GI upset if used orally (nausea, mild cramping)"],
+        seriousRisks: ["Thromboembolic risk with oral use (DVT, PE) — contraindicated in clotting disorder history", "Hypopigmentation if overused", "Recurrence of melasma after stopping (common — melasma is chronic and relapsing)", "Allergic reaction (rare)"],
+        contraindications: ["Personal or family history of thromboembolic disease (oral form — absolute)", "Pregnancy or breastfeeding", "Active use of hormonal contraceptives (relative — discuss with prescriber for oral form)", "Known hypersensitivity to tranexamic acid", "Renal impairment (oral form — dose adjustment needed)"],
+        aftercare: ["Strict sun protection SPF 50+ daily — non-negotiable for melasma management", "Avoid heat exposure (sauna, hot yoga) which can trigger flares", "Use as directed; do not exceed prescribed duration for oral form", "Combine with broad-spectrum sunscreen and physical blockers (hat, umbrella)", "Melasma is a chronic condition — expect relapses and need for maintenance"],
+        duration: "Visible improvement over 6-12 weeks. Melasma frequently recurs; ongoing maintenance and strict photoprotection required indefinitely.",
+      },
+      "Skin Lightening / Brightening Peels (Kojic Acid, Arbutin, Cysteamine-based)": {
+        description: "Application of tyrosinase-inhibiting or melanin-suppressing topical/peel formulations (kojic acid, arbutin, cysteamine, niacinamide combinations) for pigmentation, melasma, or post-inflammatory hyperpigmentation.",
+        commonRisks: ["Mild stinging, redness, or peeling", "Dryness and sensitivity during treatment course", "Temporary purging or breakout"],
+        seriousRisks: ["Contact dermatitis or allergic reaction", "Paradoxical hyperpigmentation if skin barrier is compromised", "Hypopigmentation with overuse", "Photosensitivity reaction if sun protection is inadequate"],
+        contraindications: ["Active dermatitis or compromised skin barrier", "Known hypersensitivity to any active ingredient", "Pregnancy or breastfeeding (relative — verify ingredient safety)", "Recent aggressive resurfacing procedures (relative — wait for barrier recovery)"],
+        aftercare: ["Strict daily SPF 50+ — essential to prevent rebound pigmentation", "Introduce actives gradually to assess tolerance", "Avoid combining with other active exfoliants without guidance", "Maintenance and sun avoidance needed to sustain results"],
+        duration: "Visible lightening over 6-12 weeks of consistent use. Results require ongoing maintenance and sun protection to sustain.",
+      },
+    },
+  },
+  "Fat Reduction & Skin Quality": {
+    icon: "💧",
+    procedures: {
+      "Carboxytherapy": {
+        description: "Subcutaneous injection of medical-grade carbon dioxide gas to improve localized fat reduction, cellulite appearance, skin elasticity, dark circles, or stretch marks via increased local blood flow and tissue oxygenation.",
+        commonRisks: ["Crackling sensation under skin during and briefly after injection (subcutaneous emphysema — expected, resolves in hours)", "Bruising and mild swelling at injection sites", "Mild burning or pressure sensation during gas infusion"],
+        seriousRisks: ["Gas embolism (extremely rare with correct technique and equipment)", "Infection at injection site", "Skin necrosis (very rare, associated with excessive volume/pressure or vascular compromise)", "Persistent bruising or hematoma"],
+        contraindications: ["Pregnancy or breastfeeding", "Severe cardiovascular or respiratory disease", "Active infection at treatment site", "Bleeding disorders or anticoagulant therapy (relative)", "Gangrene or severe peripheral vascular disease"],
+        aftercare: ["Mild bruising and crackling sensation normal for 24-48 hours", "Avoid vigorous massage of treated area for 24 hours", "Stay hydrated", "Series of sessions (6-10, weekly) typically required for cellulite/fat indications"],
+        duration: "Series of weekly sessions over 6-10 weeks. Results are gradual; maintenance sessions may be needed.",
+      },
+      "Fat Dissolving Injections / Injectable Lipolysis (Deoxycholic Acid)": {
+        description: "Injection of deoxycholic acid or similar lipolytic agents into subcutaneous fat (commonly submental/double chin, but also used off-label on other body areas) to permanently destroy fat cells at the injection site.",
+        commonRisks: ["Significant swelling, bruising, and tenderness — often more pronounced than other injectables (expected, can last 1-2 weeks)", "Numbness or altered sensation at site", "Redness and warmth post-injection"],
+        seriousRisks: ["Nerve injury — marginal mandibular nerve palsy with submental use (causes asymmetric smile, usually temporary)", "Skin necrosis or ulceration if injected too superficially or into wrong plane", "Dysphagia (difficulty swallowing) if submental swelling is severe", "Fibrosis or irregular contour if technique is imprecise", "Alopecia at injection site (rare, reported with off-label scalp/body use)"],
+        contraindications: ["Pregnancy or breastfeeding", "Infection at injection site", "Bleeding disorders or anticoagulant therapy", "Known hypersensitivity to deoxycholic acid", "Significant skin laxity (may worsen with fat reduction — needs careful patient selection)"],
+        aftercare: ["Expect significant swelling for 3-7 days, may persist up to 2 weeks", "Cold compress in first 24-48 hours as tolerated", "Avoid massaging the area for 1 week", "Multiple sessions (typically 2-4, spaced 4-6 weeks apart) usually required", "Avoid alcohol and strenuous exercise for 48 hours"],
+        duration: "Fat cell destruction is permanent at the injection site. Full results visible at 12 weeks after final session. 2-4 sessions typically required.",
+      },
+      "Cryolipolysis (Fat Freezing)": {
+        description: "Non-invasive application of controlled cooling to subcutaneous fat to selectively destroy fat cells through crystallization (apoptosis), commonly used for flank, abdomen, thigh, or submental fat reduction.",
+        commonRisks: ["Intense cold sensation, pulling, or pinching during initial minutes of treatment", "Redness, bruising, swelling at treated site", "Temporary numbness lasting days to weeks", "Cramping or aching post-procedure"],
+        seriousRisks: ["Paradoxical adipose hyperplasia (PAH) — rare but documented increase in fat volume at treated site, may require surgical correction", "Late-onset pain (rare, can occur days after treatment)", "Frostbite or skin injury with device malfunction or improper application", "Hyperpigmentation (more relevant in darker skin types — requires careful protocol selection)"],
+        contraindications: ["Cryoglobulinemia, cold urticaria, or paroxysmal cold hemoglobinuria (absolute)", "Raynaud's disease (relative)", "Pregnancy", "Significant skin laxity at treatment area (poor candidate)", "Recent surgery at treatment site"],
+        aftercare: ["Numbness and firmness at treated area normal for several weeks", "Light massage of area immediately post-treatment may improve results (per protocol)", "Maintain hydration and activity to support natural fat clearance", "Results are gradual — final outcome assessed at 12 weeks"],
+        duration: "Visible results begin at 3 weeks, continue improving up to 12-16 weeks as the body clears destroyed fat cells. Single or multiple sessions per area depending on goals.",
+      },
+    },
+  },
+  "Hair, Pigment & Permanent Makeup": {
+    icon: "💉",
+    procedures: {
+      "PRP / PRF for Skin Rejuvenation (Vampire Facial)": {
+        description: "Preparation of platelet-rich plasma (PRP) or platelet-rich fibrin (PRF) from the patient's own blood, applied topically and/or via microneedling or injection to stimulate collagen, improve skin texture, and address fine lines (popularly known as the 'vampire facial').",
+        commonRisks: ["Bruising and swelling at injection/needling sites", "Pain during blood draw and procedure", "Redness lasting 24-72 hours", "Mild crusting if combined with microneedling"],
+        seriousRisks: ["Infection at injection site (rare with proper sterile technique)", "Granuloma formation (rare)", "Inadequate or no visible improvement (variable response)", "Allergic reaction to anticoagulant used in blood processing (rare)"],
+        contraindications: ["Active skin infection at treatment site", "Blood disorders (thrombocytopenia, hemoglobin abnormalities)", "Anticoagulant therapy (relative — discuss timing)", "Pregnancy or breastfeeding (relative — limited safety data)", "Active malignancy (relative — oncologist clearance advised)", "Sepsis or active systemic infection"],
+        aftercare: ["Avoid makeup for 12-24 hours", "Avoid sun exposure and use SPF 50+", "Avoid blood-thinning medications/supplements for 3-5 days before and after (per protocol)", "Series of 3-4 sessions spaced 4-6 weeks apart typically recommended"],
+        duration: "Gradual improvement over 4-8 weeks per session. Maintenance every 6-12 months.",
+      },
+      "Microblading / Permanent Makeup (Eyebrows, Lips, Eyeliner)": {
+        description: "Semi-permanent tattooing technique using fine needles to deposit pigment into the superficial dermis, creating hair-like strokes (microblading) or defined color (ombre brows, lip blush, eyeliner) to enhance facial features.",
+        commonRisks: ["Pain or discomfort during procedure (despite topical anesthesia)", "Redness, swelling, and tenderness for 3-7 days", "Scabbing and flaking during healing (expected)", "Initial color appears darker/bolder than final healed result"],
+        seriousRisks: ["Infection at treatment site if aftercare is not followed", "Allergic reaction to pigment (patch test recommended)", "Unsatisfactory color, shape, or symmetry requiring correction sessions", "Pigment migration or blurring over time", "Scarring (rare with proper technique)", "Keloid formation in predisposed individuals", "MRI artifact/interference (theoretical, rare with modern pigments)"],
+        contraindications: ["Pregnancy or breastfeeding", "Active skin infection, eczema, or psoriasis at treatment site", "Keloid tendency (relative — informed consent essential)", "Diabetes (relative — slower healing, needs glycemic control)", "Use of blood thinners (relative — increased bruising/bleeding)", "Isotretinoin use within 6 months", "Active cold sores at lip treatment site (absolute for lip blush — risk of HSV flare)", "Known allergy to pigments or anesthetic"],
+        aftercare: ["Keep area dry for 7-10 days; no swimming, sauna, or excessive sweating", "Apply only the aftercare ointment provided — no other products", "Do not pick or scratch scabs — allows pigment to settle improperly", "Avoid sun exposure; use SPF once healed to prevent premature fading", "Touch-up session typically needed at 4-6 weeks for color correction and density", "Color fades 30-50% during healing — this is normal, final result assessed at touch-up"],
+        duration: "Initial healing 7-14 days; full healed result assessed at 4-6 week touch-up. Pigment typically lasts 1-3 years depending on skin type, lifestyle, and aftercare, then fades and requires refresh.",
+      },
+    },
+  },
+  "Incretin-Based Weight Management Therapy": {
+    icon: "💊",
+    requiresMedicalDeclaration: true, // triggers the BMI/medical declaration section in the generator
+    procedures: {
+      "Semaglutide (GLP-1 Receptor Agonist)": {
+        description: "Subcutaneous injection of semaglutide, a GLP-1 (glucagon-like peptide-1) receptor agonist, used for chronic weight management by reducing appetite and slowing gastric emptying. Originally developed for type 2 diabetes management; widely used off-label/on-label for weight management depending on formulation and regulatory approval status in the prescribing region.",
+        commonRisks: ["Nausea (most common, especially during dose escalation)", "Vomiting, diarrhea, or constipation", "Abdominal pain or bloating", "Injection site reaction (redness, itching)", "Fatigue", "Headache", "Decreased appetite (expected therapeutic effect, but can become excessive)"],
+        seriousRisks: ["Acute pancreatitis (rare but serious — discontinue immediately if severe abdominal pain occurs)", "Gallbladder disease (cholelithiasis, cholecystitis) — increased risk with rapid weight loss", "Risk of thyroid C-cell tumors (seen in rodent studies — contraindicated with personal/family history of medullary thyroid carcinoma or MEN2 syndrome)", "Acute kidney injury (usually secondary to dehydration from GI side effects)", "Diabetic retinopathy complications in patients with pre-existing diabetic eye disease", "Hypoglycemia if combined with insulin or sulfonylureas", "Severe gastroparesis or bowel obstruction (rare)", "Aspiration risk under anesthesia due to delayed gastric emptying — inform all treating doctors/anesthetists if surgery is planned"],
+        contraindications: ["Personal or family history of medullary thyroid carcinoma (MTC) — ABSOLUTE", "Multiple Endocrine Neoplasia syndrome type 2 (MEN2) — ABSOLUTE", "Pregnancy or planning pregnancy (discontinue at least 2 months before attempting conception)", "Breastfeeding", "History of pancreatitis (relative — careful risk-benefit discussion required)", "Severe gastroparesis or active GI disease", "Known hypersensitivity to semaglutide or excipients", "Type 1 diabetes (not indicated; risk of diabetic ketoacidosis if substituted for insulin)", "Active eating disorder (relative — requires specialist evaluation)"],
+        aftercare: ["Follow prescribed dose-escalation schedule exactly — do not self-adjust dose", "Report severe, persistent abdominal pain immediately (possible pancreatitis)", "Stay hydrated, especially if experiencing GI side effects", "Regular follow-up for weight, GI tolerance, and side-effect monitoring as scheduled", "Inform any treating doctor or anesthetist that you are on this medication before any procedure or surgery", "Do not combine with other weight-loss medications without medical supervision", "Report any signs of gallbladder issues (right upper abdominal pain, especially after fatty meals)"],
+        duration: "Typically a long-term/ongoing therapy with periodic medical review. Weight regain is common after discontinuation without lifestyle changes. Treatment duration and tapering should be guided by the prescribing physician.",
+      },
+      "Tirzepatide (Dual GLP-1/GIP Receptor Agonist)": {
+        description: "Subcutaneous injection of tirzepatide, a dual GLP-1/GIP (glucose-dependent insulinotropic polypeptide) receptor agonist, used for chronic weight management and type 2 diabetes. The dual mechanism may produce greater weight reduction than GLP-1-only agents in some patients, but carries a similar risk profile with some distinctions.",
+        commonRisks: ["Nausea (most common, especially during dose escalation)", "Vomiting, diarrhea, or constipation", "Abdominal pain or bloating", "Injection site reaction", "Fatigue", "Decreased appetite (expected therapeutic effect)", "Mild hair thinning (reported, mechanism unclear — typically related to rapid weight loss, not the drug directly)"],
+        seriousRisks: ["Acute pancreatitis (rare but serious)", "Gallbladder disease — increased risk with rapid weight loss", "Risk of thyroid C-cell tumors (seen in rodent studies — same class warning as GLP-1 agonists; contraindicated with personal/family MTC or MEN2 history)", "Acute kidney injury (usually secondary to GI-related dehydration)", "Hypoglycemia if combined with insulin or sulfonylureas", "Severe gastroparesis (rare)", "Aspiration risk under anesthesia due to delayed gastric emptying — inform all treating doctors/anesthetists if surgery is planned", "Diabetic retinopathy complications in patients with pre-existing diabetic eye disease"],
+        contraindications: ["Personal or family history of medullary thyroid carcinoma (MTC) — ABSOLUTE", "Multiple Endocrine Neoplasia syndrome type 2 (MEN2) — ABSOLUTE", "Pregnancy or planning pregnancy (discontinue at least 2 months before attempting conception)", "Breastfeeding", "History of pancreatitis (relative)", "Severe gastroparesis or active GI disease", "Known hypersensitivity to tirzepatide or excipients", "Type 1 diabetes (not indicated)", "Active eating disorder (relative — requires specialist evaluation)"],
+        aftercare: ["Follow prescribed dose-escalation schedule exactly — do not self-adjust dose", "Report severe, persistent abdominal pain immediately (possible pancreatitis)", "Stay hydrated, especially if experiencing GI side effects", "Regular follow-up for weight, glycemic control, and side-effect monitoring as scheduled", "Inform any treating doctor or anesthetist that you are on this medication before any procedure or surgery", "Adequate protein intake and resistance exercise recommended to preserve lean muscle mass during rapid weight loss", "Report any signs of gallbladder issues (right upper abdominal pain, especially after fatty meals)"],
+        duration: "Typically a long-term/ongoing therapy with periodic medical review. Weight regain is common after discontinuation without sustained lifestyle changes. Treatment duration and tapering should be guided by the prescribing physician.",
+      },
+    },
+  },
 };
 
 const CONSENT_DISCLAIMER_TEXT = `IMPORTANT — TEMPLATE FOR EDUCATIONAL REFERENCE ONLY
@@ -2270,6 +2363,14 @@ export default function App(){
   // ═══ CONSENT GENERATOR STATE ═══
   const[consentCat,setConsentCat]=useState(""); // selected category
   const[consentProc,setConsentProc]=useState(""); // selected sub-procedure (or "custom")
+  // Medical declaration fields — only used/shown when procedure.requiresMedicalDeclaration is true (e.g. GLP-1/incretin therapy)
+  const[medDeclBMI,setMedDeclBMI]=useState("");
+  const[medDeclComorbidity,setMedDeclComorbidity]=useState(""); // free text: comorbidities justifying BMI 27-29.9 eligibility
+  const[medDeclMTCHistory,setMedDeclMTCHistory]=useState(false); // doctor confirms screened — NO personal/family MTC/MEN2 history
+  const[medDeclPancreatitisHistory,setMedDeclPancreatitisHistory]=useState(false);
+  const[medDeclOffLabel,setMedDeclOffLabel]=useState(false); // doctor confirms off-label use discussed if applicable
+  const[medDeclBaselineLabs,setMedDeclBaselineLabs]=useState(""); // free text: which baseline labs ordered
+  const[medDeclMonitoringPlan,setMedDeclMonitoringPlan]=useState(""); // free text: follow-up schedule
   const[consentCustomProc,setConsentCustomProc]=useState(""); // free-text if "custom"
   const[consentClinicName,setConsentClinicName]=useState("");
   const[consentClinicAddress,setConsentClinicAddress]=useState("");
@@ -3445,6 +3546,16 @@ export default function App(){
     if (!consentClinicName.trim()) { sh("Please enter clinic name"); return; }
     if (!consentDoctorName.trim()) { sh("Please enter doctor name"); return; }
 
+    // ═══ MEDICAL DECLARATION GUARD ═══
+    // Block generation for incretin/GLP-1 therapy unless BMI + both screening
+    // confirmations are filled in. This is clinical safety gating, not just a UI nicety.
+    const requiresMedDecl = consentCat && CONSENT_PROCEDURES[consentCat]?.requiresMedicalDeclaration;
+    if (requiresMedDecl) {
+      if (!medDeclBMI.trim()) { sh("Please enter patient BMI in the Medical Declaration section"); return; }
+      if (!medDeclMTCHistory) { sh("Please confirm MTC/MEN2 screening in the Medical Declaration section"); return; }
+      if (!medDeclPancreatitisHistory) { sh("Please confirm pancreatitis/GI screening in the Medical Declaration section"); return; }
+    }
+
     // Rate limit
     // Admins bypass entirely (their own platform — no point limiting themselves)
     // Doctors: 2 free per day, then credits
@@ -3507,10 +3618,18 @@ export default function App(){
         const isVern = langCode !== "en";
         const langLabel = CONSENT_LANGUAGES.find(l => l.code === langCode)?.label || "English";
         // Section numbering — if patient concern is present, section 6 is the concern
-        // and everything after shifts +1. Use sec(n) to print the number for the Nth
-        // base section (1-13 in the original numbering).
+        // and everything after shifts +1. If this procedure requires a medical declaration
+        // (e.g. GLP-1/incretin therapy), an extra section is inserted after contraindications
+        // (section 4) and everything after shifts +1 again. Use sec(n) to print the number
+        // for the Nth base section (1-13 in the original numbering).
         const concernShift = hasConcern ? 1 : 0;
-        const sec = (baseNum) => baseNum <= 5 ? baseNum : (baseNum + concernShift);
+        const medDeclShift = requiresMedDecl ? 1 : 0;
+        const sec = (baseNum) => {
+          let n = baseNum;
+          if (baseNum > 4) n += medDeclShift;   // medical declaration sits right after section 4
+          if (baseNum > 5) n += concernShift;    // concern sits after section 5 (now possibly shifted)
+          return n;
+        };
 
         // Margins: standard A4 doc has 25mm top/left/right, 20mm bottom.
         // When letterhead toggle is on, increase top to 75mm so the doctor's
@@ -3577,7 +3696,7 @@ ${forDownload ? "" : `<div class="disclaimer">
 
 <h1>${T_("title_main")} ${safe(procName.toUpperCase())}</h1>
 
-<h2>1. ${T_("h_patient_info")}</h2>
+<h2>${sec(1)}. ${T_("h_patient_info")}</h2>
 <div class="field">${T_("lbl_name")}: ${fld(patientName, 280)}</div>
 <div class="field">${T_("lbl_age")}: ${fld(patientAge, 60)} &nbsp;&nbsp; ${T_("lbl_sex")}: ${fld(patientSex, 60)} &nbsp;&nbsp; ${T_("lbl_patient_id")}: ${fld(patientId, 80)}</div>
 <div class="field">${T_("lbl_address")}: <span class="underline" style="min-width:380pt;"></span></div>
@@ -3586,26 +3705,42 @@ ${forDownload ? "" : `<div class="disclaimer">
 <div class="field">${T_("lbl_procedure")}: <strong>${safe(procName)}</strong></div>
 <div class="field">${T_("lbl_treatment_area")}: <span class="underline" style="min-width:300pt;"></span></div>
 
-<h2>2. ${T_("h_procedure_desc")}</h2>
+<h2>${sec(2)}. ${T_("h_procedure_desc")}</h2>
 <p>${T_("informed_lang")}</p>
 <p>${safe(description)}</p>
 <p><strong>${T_("lbl_expected")}:</strong> ${safe(duration)}</p>
 
-<h2>3. ${T_("h_risks")}</h2>
+<h2>${sec(3)}. ${T_("h_risks")}</h2>
 <p>${T_("no_guarantee")}</p>
 <h3>${T_("common_risks")}</h3>
 <ul>${commonRisks.map(r => `<li>${safe(r)}</li>`).join("")}</ul>
 <h3>${T_("serious_risks")}</h3>
 <ul>${seriousRisks.map(r => `<li>${safe(r)}</li>`).join("")}</ul>
 
-<h2>4. ${T_("h_contra")}</h2>
+<h2>${sec(4)}. ${T_("h_contra")}</h2>
 <p>${T_("i_confirm_disclosed")}</p>
 <ul>${contraindications.map(c => `<li>${safe(c)}</li>`).join("")}</ul>
 
-<h2>5. ${T_("h_alternatives")}</h2>
+${requiresMedDecl ? `<h2>${sec(4)+1}. Physician Medical Declaration</h2>
+<p>This procedure (incretin-based weight management therapy) requires documented clinical screening by the treating physician beyond standard aesthetic consent.</p>
+<div style="border-left: 3px solid #c8a84e; padding: 8pt 12pt; background: #fdf8eb; margin: 8pt 0;">
+<div class="field"><strong>Patient BMI:</strong> ${safe(medDeclBMI)} kg/m²</div>
+${medDeclComorbidity.trim() ? `<div class="field"><strong>Comorbidities supporting eligibility (BMI 27&ndash;29.9):</strong> ${safe(medDeclComorbidity)}</div>` : ""}
+${medDeclBaselineLabs.trim() ? `<div class="field"><strong>Baseline labs ordered:</strong> ${safe(medDeclBaselineLabs)}</div>` : ""}
+${medDeclMonitoringPlan.trim() ? `<div class="field"><strong>Monitoring / follow-up plan:</strong> ${safe(medDeclMonitoringPlan)}</div>` : ""}
+</div>
+<p><strong>Physician confirms:</strong></p>
+<ul>
+<li>Patient screened — ${medDeclMTCHistory ? "<strong>NO</strong>" : "NOT CONFIRMED —"} personal or family history of Medullary Thyroid Carcinoma (MTC) or MEN2 syndrome.</li>
+<li>Patient screened — ${medDeclPancreatitisHistory ? "<strong>NO</strong>" : "NOT CONFIRMED —"} contraindicating history of pancreatitis, gallbladder disease, or severe GI conditions; risk-benefit discussed.</li>
+${medDeclOffLabel ? `<li>This use has been explained to the patient as <strong>off-label / outside locally approved indications</strong>, and the patient has confirmed understanding.</li>` : ""}
+</ul>
+<p style="font-size:9pt;color:#785f1e;font-style:italic;">This declaration forms part of the patient's clinical record and supplements (does not replace) the physician's own case notes.</p>` : ""}
+
+<h2>${sec(5)}. ${T_("h_alternatives")}</h2>
 <p>${T_("alternatives_text")}</p>
 
-${hasConcern ? `<h2>6. ${T_("h_patient_concern")}</h2>
+${hasConcern ? `<h2>${sec(5)+1}. ${T_("h_patient_concern")}</h2>
 <p>${T_("patient_concern_intro")}</p>
 <div style="border-left: 3px solid #c8a84e; padding: 6pt 10pt; background: #fdf8eb; font-style: italic; margin: 6pt 0;">${safe(patientConcern)}</div>` : ""}
 
@@ -9068,7 +9203,7 @@ ${forDownload
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}} className="consent-grid">
               <div>
                 <label style={{display:"block",fontSize:".74rem",color:T.mute,fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Category</label>
-                <select value={consentCat} onChange={e=>{setConsentCat(e.target.value);setConsentProc("");setConsentCustomProc("")}} style={{...T.inp,width:"100%",padding:"9px 12px"}}>
+                <select value={consentCat} onChange={e=>{setConsentCat(e.target.value);setConsentProc("");setConsentCustomProc("");setMedDeclBMI("");setMedDeclComorbidity("");setMedDeclMTCHistory(false);setMedDeclPancreatitisHistory(false);setMedDeclOffLabel(false);setMedDeclBaselineLabs("");setMedDeclMonitoringPlan("")}} style={{...T.inp,width:"100%",padding:"9px 12px"}}>
                   <option value="">— Choose category —</option>
                   {cats.map(c=><option key={c} value={c}>{CONSENT_PROCEDURES[c].icon||""} {c}</option>)}
                 </select>
@@ -9092,6 +9227,60 @@ ${forDownload
             {selectedProc&&<div style={{padding:"10px 14px",background:T.tealBg+"55",borderRadius:8,marginBottom:14,fontSize:".78rem",color:T.txt2,lineHeight:1.55}}>
               <div style={{fontWeight:600,color:T.teal,marginBottom:4}}>About this procedure:</div>
               {selectedProc.description}
+            </div>}
+
+            {/* ═══ MEDICAL DECLARATION — only for procedures flagged requiresMedicalDeclaration ═══
+                Currently used for GLP-1/Incretin weight management therapy. Captures the
+                doctor's own screening declaration (BMI, contraindication checks, monitoring plan)
+                which gets woven into the generated consent document as a Physician Declaration section. */}
+            {consentCat&&CONSENT_PROCEDURES[consentCat]?.requiresMedicalDeclaration&&<div style={{padding:16,background:"#fff8e1",border:"1px solid #f0d896",borderRadius:10,marginBottom:16}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                <span style={{fontSize:"1.1rem"}}>⚕️</span>
+                <h4 style={{fontSize:".92rem",fontWeight:700,margin:0,color:"#856404"}}>Physician Medical Declaration — required for incretin therapy</h4>
+              </div>
+              <p style={{fontSize:".76rem",color:"#856404",lineHeight:1.55,marginBottom:14}}>
+                GLP-1/incretin-based weight management requires documented clinical screening beyond standard aesthetic consent. Fill this in honestly — it becomes part of the patient's consent record and your clinical documentation.
+              </p>
+
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}} className="consent-grid">
+                <div>
+                  <label style={{display:"block",fontSize:".7rem",color:"#785f1e",fontWeight:600,marginBottom:3,textTransform:"uppercase",letterSpacing:1}}>Patient BMI (kg/m²) <span style={{color:T.err}}>*</span></label>
+                  <input value={medDeclBMI} onChange={e=>setMedDeclBMI(e.target.value)} placeholder="e.g. 31.2" style={{...T.inp,width:"100%",padding:"8px 10px",fontSize:".88rem"}}/>
+                </div>
+                <div>
+                  <label style={{display:"block",fontSize:".7rem",color:"#785f1e",fontWeight:600,marginBottom:3,textTransform:"uppercase",letterSpacing:1}}>Comorbidities (if BMI 27–29.9)</label>
+                  <input value={medDeclComorbidity} onChange={e=>setMedDeclComorbidity(e.target.value)} placeholder="e.g. T2DM, hypertension, dyslipidemia, OSA" style={{...T.inp,width:"100%",padding:"8px 10px",fontSize:".88rem"}}/>
+                </div>
+              </div>
+
+              <div style={{marginBottom:12}}>
+                <label style={{display:"block",fontSize:".7rem",color:"#785f1e",fontWeight:600,marginBottom:3,textTransform:"uppercase",letterSpacing:1}}>Baseline labs ordered</label>
+                <input value={medDeclBaselineLabs} onChange={e=>setMedDeclBaselineLabs(e.target.value)} placeholder="e.g. HbA1c, LFT, RFT, lipid profile, TSH, pregnancy test" style={{...T.inp,width:"100%",padding:"8px 10px",fontSize:".88rem"}}/>
+              </div>
+
+              <div style={{marginBottom:14}}>
+                <label style={{display:"block",fontSize:".7rem",color:"#785f1e",fontWeight:600,marginBottom:3,textTransform:"uppercase",letterSpacing:1}}>Monitoring / follow-up plan</label>
+                <input value={medDeclMonitoringPlan} onChange={e=>setMedDeclMonitoringPlan(e.target.value)} placeholder="e.g. Follow-up at 4 weeks, then monthly; repeat labs at 3 months" style={{...T.inp,width:"100%",padding:"8px 10px",fontSize:".88rem"}}/>
+              </div>
+
+              <div style={{display:"flex",flexDirection:"column",gap:8,padding:"10px 12px",background:"#fffdf5",borderRadius:8,border:"1px solid #f0d896"}}>
+                <label style={{display:"flex",alignItems:"flex-start",gap:8,cursor:"pointer"}}>
+                  <input type="checkbox" checked={medDeclMTCHistory} onChange={e=>setMedDeclMTCHistory(e.target.checked)} style={{marginTop:2}}/>
+                  <span style={{fontSize:".78rem",color:"#5c4404",lineHeight:1.5}}>I confirm the patient has been screened and has <b>no personal or family history of Medullary Thyroid Carcinoma (MTC) or MEN2 syndrome</b> (absolute contraindication).</span>
+                </label>
+                <label style={{display:"flex",alignItems:"flex-start",gap:8,cursor:"pointer"}}>
+                  <input type="checkbox" checked={medDeclPancreatitisHistory} onChange={e=>setMedDeclPancreatitisHistory(e.target.checked)} style={{marginTop:2}}/>
+                  <span style={{fontSize:".78rem",color:"#5c4404",lineHeight:1.5}}>I confirm the patient has been screened for <b>history of pancreatitis, gallbladder disease, and severe GI conditions</b>, and risk-benefit has been discussed.</span>
+                </label>
+                <label style={{display:"flex",alignItems:"flex-start",gap:8,cursor:"pointer"}}>
+                  <input type="checkbox" checked={medDeclOffLabel} onChange={e=>setMedDeclOffLabel(e.target.checked)} style={{marginTop:2}}/>
+                  <span style={{fontSize:".78rem",color:"#5c4404",lineHeight:1.5}}>I confirm that <b>if this use is off-label</b> (e.g. weight management in a non-diabetic patient, or use outside locally approved indications), this has been explicitly explained to and understood by the patient.</span>
+                </label>
+              </div>
+
+              {(!medDeclBMI||!medDeclMTCHistory||!medDeclPancreatitisHistory)&&<div style={{marginTop:10,fontSize:".72rem",color:"#b00020",fontWeight:600}}>
+                ⚠️ BMI and both screening confirmations are required to generate this consent.
+              </div>}
             </div>}
 
             <h3 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,marginTop:6}}>2. Patient details <span style={{fontSize:".74rem",color:T.mute,fontWeight:400}}>(optional)</span></h3>
