@@ -178,6 +178,32 @@ function templateReply({ name, replierName, contentType, contentTitle, snippet }
   return { subject: `${replierName} replied to your ${contentType}`, preview, html: wrapEmail({ preview, content }) };
 }
 
+function templateProductEnquiry({ vendorName, productName, doctorName, doctorEmail, message }) {
+  const firstWord = (vendorName || "").split(" ")[0] || "Team";
+  const preview = `${doctorName} enquired about "${productName}" on SKINARIO.`;
+
+  const content = `
+    <div style="font-size:13px;color:${C.gold};letter-spacing:3px;text-transform:uppercase;font-weight:600;margin-bottom:18px;font-family:Arial,sans-serif;">New Product Enquiry</div>
+    <h1 style="font-size:26px;font-weight:400;color:${C.burgundy};margin:0 0 22px;font-family:Georgia,serif;line-height:1.25;">A doctor is interested in ${productName}</h1>
+    <p style="margin:0 0 18px;color:${C.text};">Hi ${firstWord},</p>
+    <p style="margin:0 0 18px;color:${C.text};"><b style="color:${C.burgundy};">${doctorName}</b> has enquired about your product <b style="color:${C.burgundy};">"${productName}"</b> listed on SKINARIO.</p>
+    <div style="padding:18px 22px;background:${C.cream};border-left:3px solid ${C.gold};border-radius:0 8px 8px 0;margin:24px 0;">
+      <div style="font-size:12px;color:${C.gold};letter-spacing:2px;text-transform:uppercase;font-weight:700;margin-bottom:8px;font-family:Arial,sans-serif;">Their message</div>
+      <div style="color:${C.text};font-size:14px;font-style:italic;line-height:1.7;">"${(message || "").slice(0, 400)}"</div>
+    </div>
+    <div style="padding:14px 18px;background:#fff;border:1px solid ${C.border};border-radius:8px;margin:20px 0;">
+      <div style="font-size:13px;color:${C.text};margin-bottom:4px;"><b>Doctor:</b> ${doctorName}</div>
+      <div style="font-size:13px;color:${C.text};"><b>Email:</b> <a href="mailto:${doctorEmail}" style="color:${C.burgundy};">${doctorEmail}</a></div>
+    </div>
+    <p style="margin:18px 0;color:${C.text};">Reply directly to this doctor's email above to follow up — quick responses convert better.</p>
+    <div style="text-align:center;margin:30px 0;">
+      <a href="mailto:${doctorEmail}" style="display:inline-block;background:${C.burgundy};color:${C.creamDark};text-decoration:none;padding:14px 32px;border-radius:999px;font-size:14px;letter-spacing:1.5px;font-weight:700;font-family:Arial,sans-serif;">REPLY TO ${doctorName.toUpperCase()} →</a>
+    </div>
+    <p style="margin:24px 0 0;color:${C.textMute};font-size:13px;">You can also view and manage all your enquiries from your SKINARIO dashboard.</p>
+  `;
+  return { subject: `New enquiry: ${doctorName} is interested in ${productName}`, preview, html: wrapEmail({ preview, content }) };
+}
+
 // ═══ TEMPLATE DISPATCHER ═══
 function buildEmail(type, data) {
   switch (type) {
@@ -185,6 +211,7 @@ function buildEmail(type, data) {
     case "submission_approved": return templateSubmissionApproved(data);
     case "submission_rejected": return templateSubmissionRejected(data);
     case "reply": return templateReply(data);
+    case "product_enquiry": return templateProductEnquiry(data);
     default: throw new Error(`Unknown email type: ${type}`);
   }
 }

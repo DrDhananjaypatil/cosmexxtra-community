@@ -675,7 +675,7 @@ const INSTITUTE_TYPES=["Medical College","Aesthetic Academy / Training Center","
 
 // ═══ PHARMA / BRAND CATEGORIES ═══
 const BRAND_CATEGORIES=["Pharmaceutical","Aesthetic Devices","Cosmeceuticals / Skincare","Injectables (Toxin/Filler)","Threads","Energy Devices (Laser/RF/HIFU)","Distributor / Retailer","Other"];
-const VENDOR_CATEGORIES=["Laser & Energy Devices","RF / HIFU Devices","Microneedling & DermaPen","Cryotherapy Equipment","Consumables & Disposables","Skincare & Post-procedure Products","Clinic Management Software","Medical Furniture & Equipment","Distribution / Import-Export","Training Equipment","Other"];
+const VENDOR_CATEGORIES=["Dermal Fillers","Botox / Neurotoxin Injectables","PDRN / Polynucleotides & Skin Boosters","Threads (PDO/PLA/PCL)","Chemical Peels","PRP / PRF Kits & Centrifuges","Laser & Energy Devices","RF / HIFU Devices","Microneedling & DermaPen","Cryotherapy Equipment","Consumables & Disposables","Skincare & Post-procedure Products","Clinic Management Software","Medical Furniture & Equipment","Distribution / Import-Export","Training Equipment","Other"];
 const getIST=()=>new Date(new Date().toLocaleString("en-US",{timeZone:"Asia/Kolkata"}));
 const ds=d=>d.toISOString().split("T")[0];
 const fD=s=>{try{return new Date(s+"T12:00:00").toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}catch{return s}};
@@ -2249,6 +2249,7 @@ export default function App(){
   const[vendorSearch,setVendorSearch]=useState("");
   const[selVendor,setSelVendor]=useState(null);
   const[adminUserSearch,setAdminUserSearch]=useState(""); // admin users tab search
+  const[expandedEnquiryCompany,setExpandedEnquiryCompany]=useState(null); // admin: which vendor's enquiries are expanded
   const[adminUserFilter,setAdminUserFilter]=useState("all"); // all/doctor/brand/vendor/institute/flagged/premium
   const[profileReturnPg,setProfileReturnPg]=useState("home"); // where to go when "Back" clicked on profile page
   const[authMode,setAuthMode]=useState("signin");const[authEmail,setAuthEmail]=useState("");const[authPass,setAuthPass]=useState("");const[authName,setAuthName]=useState("");const[authBusy,setAuthBusy]=useState(false);const[authErr,setAuthErr]=useState("");
@@ -4832,6 +4833,7 @@ ${forDownload
                     else if(n.linkType==="forum"){go("forum")}
                     else if(n.linkType==="event"){const e=events.find(x=>x.id===n.linkId);if(e){setSelE(e);go("events")}}
                     else if(n.linkType==="quiz"){go("quiz")}
+                    else if(n.linkType==="enquiry"){go("home")}
                     setNotifsOpen(false);
                   }} style={{padding:"12px 14px",borderBottom:"1px solid "+T.border,cursor:"pointer",background:n.read?"#fff":(n.type==="announcement"?"#fdf6e3":"#fef9ef"),borderLeft:n.type==="announcement"?"3px solid "+T.gold:"none",display:"flex",gap:10,alignItems:"flex-start"}}>
                     {n.type==="announcement"?<div style={{...T.av(36,T.goldBg,T.goldD),flexShrink:0,fontSize:"1.1rem"}}>📣</div>:n.fromPhoto?<img src={n.fromPhoto} style={{width:36,height:36,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(36,T.tealBg,T.teal),flexShrink:0}}>{n.fromIni}</div>}
@@ -4903,6 +4905,154 @@ ${forDownload
             window.scrollTo(0,0);
           }} style={{...T.btn,padding:"10px 18px",fontSize:".85rem",background:"linear-gradient(135deg,"+T.gold+","+T.goldD+")"}}>Complete now →</button>
         </div>}
+
+        {/* ═══ BUSINESS DASHBOARD — Vendor / Brand / Pharma / Institute ═══
+            Shows business-relevant metrics above the regular feed. Doctor content
+            (articles, forum, etc.) still renders below for these account types too. */}
+        {(()=>{
+          const aType=normalizeAccountType(prof?.accountType||"");
+          if(aType!=="vendor"&&aType!=="brand"&&aType!=="institute")return null;
+          const isBiz=aType==="vendor"||aType==="brand";
+
+          if(isBiz){
+            // ─── VENDOR / BRAND DASHBOARD ───
+            const myProducts=products.filter(p=>p.vendorId===au?.uid&&p.active!==false);
+            const myEnquiries=productEnquiries.filter(e=>e.vendorId===au?.uid);
+            const openEnquiries=myEnquiries.filter(e=>e.status!=="fulfilled");
+            const recentEnquiries=[...myEnquiries].sort((a,b)=>(b.createdAt?.seconds||b.createdAt||0)-(a.createdAt?.seconds||a.createdAt||0)).slice(0,5);
+            const myRedemptions=redemptions.filter(rd=>{const r=rewards.find(x=>x.id===rd.rewardId);return r?.vendorId===au?.uid});
+            const myRewards=rewards.filter(r=>r.vendorId===au?.uid);
+            const myPlacements=sponsorPlacements.filter(sp=>sp.vendorId===au?.uid);
+            const va=vendorApplications.find(a=>a.uid===au?.uid);
+            const topProduct=[...myProducts].sort((a,b)=>(b.enquiries||0)-(a.enquiries||0))[0];
+
+            return(<div style={{...T.card,padding:24,marginBottom:16,background:"linear-gradient(135deg,#fff,"+T.tealBg+"33)",borderLeft:"3px solid "+T.teal}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18,flexWrap:"wrap",gap:10}}>
+                <div>
+                  <div style={{fontSize:".7rem",color:T.teal,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>Business Dashboard</div>
+                  <h2 style={{fontSize:"1.3rem",fontWeight:700,margin:0}}>{prof?.companyName||uName} 👋</h2>
+                </div>
+                {va?.status==="approved"||prof?.verified?<span style={{...T.tag(T.tealBg,T.teal),fontSize:".74rem"}}>✓ Verified Partner</span>
+                  :<span style={{...T.tag(T.goldBg,T.gold),fontSize:".74rem"}}>⏳ Pending Verification</span>}
+              </div>
+
+              {/* Key metrics row */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:18}}>
+                <div onClick={()=>go("me")} style={{padding:"14px 12px",background:"#fff",borderRadius:10,textAlign:"center",cursor:"pointer",border:"1px solid "+T.border}}>
+                  <div style={{fontSize:"1.5rem",fontWeight:700,color:T.teal}}>{myProducts.length}</div>
+                  <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Products listed</div>
+                </div>
+                <div onClick={()=>go("me")} style={{padding:"14px 12px",background:openEnquiries.length>0?"#fff8e1":"#fff",borderRadius:10,textAlign:"center",cursor:"pointer",border:openEnquiries.length>0?"1px solid #f0d896":"1px solid "+T.border}}>
+                  <div style={{fontSize:"1.5rem",fontWeight:700,color:openEnquiries.length>0?"#856404":T.teal}}>{openEnquiries.length}</div>
+                  <div style={{fontSize:".68rem",color:openEnquiries.length>0?"#856404":T.mute,textTransform:"uppercase",letterSpacing:.5,fontWeight:openEnquiries.length>0?700:400}}>Open enquiries</div>
+                </div>
+                <div style={{padding:"14px 12px",background:"#fff",borderRadius:10,textAlign:"center",border:"1px solid "+T.border}}>
+                  <div style={{fontSize:"1.5rem",fontWeight:700,color:T.teal}}>{myEnquiries.length}</div>
+                  <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Total enquiries</div>
+                </div>
+                <div style={{padding:"14px 12px",background:"#fff",borderRadius:10,textAlign:"center",border:"1px solid "+T.border}}>
+                  <div style={{fontSize:"1.5rem",fontWeight:700,color:T.gold}}>{myRedemptions.length}</div>
+                  <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Reward redemptions</div>
+                </div>
+                <div style={{padding:"14px 12px",background:"#fff",borderRadius:10,textAlign:"center",border:"1px solid "+T.border}}>
+                  <div style={{fontSize:"1.5rem",fontWeight:700,color:T.txt}}>{myRewards.length}</div>
+                  <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Active rewards</div>
+                </div>
+              </div>
+
+              {/* Recent enquiries — most time-sensitive content */}
+              {recentEnquiries.length>0&&<div style={{marginBottom:18}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                  <div style={{fontSize:".85rem",fontWeight:700,color:T.txt}}>📨 Recent enquiries</div>
+                  <span onClick={()=>go("me")} style={{fontSize:".74rem",color:T.teal,cursor:"pointer",fontWeight:600}}>Manage all →</span>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {recentEnquiries.map(e=><div key={e.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 12px",background:"#fff",borderRadius:8,border:"1px solid "+T.border,gap:10,flexWrap:"wrap"}}>
+                    <div style={{minWidth:0,flex:1}}>
+                      <span style={{fontSize:".82rem",fontWeight:600,color:T.txt}}>{e.doctorName}</span>
+                      <span style={{fontSize:".76rem",color:T.mute}}> → {e.productName}</span>
+                    </div>
+                    <span style={{fontSize:".68rem",fontWeight:700,padding:"2px 8px",borderRadius:6,background:e.status==="fulfilled"?"#e8f5e9":"#fff3cd",color:e.status==="fulfilled"?"#1a7d42":"#856404",flexShrink:0}}>
+                      {e.status==="fulfilled"?"✓ Fulfilled":"⏳ Open"}
+                    </span>
+                  </div>)}
+                </div>
+              </div>}
+
+              {/* Top performer + sponsor status */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginBottom:18}}>
+                {topProduct&&<div style={{padding:"12px 14px",background:"#fff",borderRadius:10,border:"1px solid "+T.border}}>
+                  <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:6}}>🏆 Top performing product</div>
+                  <div style={{fontSize:".88rem",fontWeight:700,color:T.txt}}>{topProduct.name}</div>
+                  <div style={{fontSize:".74rem",color:T.teal,marginTop:2}}>{topProduct.enquiries||0} enquiries generated</div>
+                </div>}
+                {myPlacements.length>0&&<div style={{padding:"12px 14px",background:"#fff",borderRadius:10,border:"1px solid "+T.border}}>
+                  <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:6}}>📢 Sponsored placements</div>
+                  <div style={{fontSize:".88rem",fontWeight:700,color:T.txt}}>{myPlacements.filter(p=>p.status==="active").length} live · {myPlacements.filter(p=>p.status==="pending").length} pending</div>
+                </div>}
+              </div>
+
+              {/* Quick actions */}
+              <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                <button onClick={()=>go("me")} style={T.btn}>+ Add product</button>
+                <button onClick={()=>go("me")} style={T.btnO}>🎁 Propose reward</button>
+                <button onClick={()=>go("me")} style={T.btnO}>📢 Request placement</button>
+                <button onClick={()=>go("vendors")} style={T.btnO}>👁 View public profile</button>
+              </div>
+            </div>);
+          }
+
+          // ─── INSTITUTE DASHBOARD ───
+          const myArticles=articles.filter(a=>a.authorEmail===au?.email||a.author===prof?.name);
+          const myVideos=videos.filter(v=>v.uploaderEmail===au?.email||v.uploader===prof?.name);
+          const myEvents=events.filter(e=>e.organizerEmail===au?.email||e.organizer===prof?.name);
+          const mySubmissions=submissions.filter(s=>s.uid===au?.uid);
+          const pendingSubmissions=mySubmissions.filter(s=>s.status==="pending");
+          const totalContentViews=[...myArticles,...myVideos].reduce((sum,c)=>sum+(c.views||0),0);
+          const totalContentLikes=[...myArticles,...myVideos].reduce((sum,c)=>sum+(c.likes||0),0);
+
+          return(<div style={{...T.card,padding:24,marginBottom:16,background:"linear-gradient(135deg,#fff,"+T.goldBg+"33)",borderLeft:"3px solid "+T.gold}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18,flexWrap:"wrap",gap:10}}>
+              <div>
+                <div style={{fontSize:".7rem",color:T.goldD||T.gold,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>Institute Dashboard</div>
+                <h2 style={{fontSize:"1.3rem",fontWeight:700,margin:0}}>{prof?.instituteName||uName} 👋</h2>
+              </div>
+              {prof?.verified?<span style={{...T.tag(T.tealBg,T.teal),fontSize:".74rem"}}>✓ Verified</span>:<span style={{...T.tag(T.goldBg,T.gold),fontSize:".74rem"}}>⏳ Pending Verification</span>}
+            </div>
+
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:18}}>
+              <div style={{padding:"14px 12px",background:"#fff",borderRadius:10,textAlign:"center",border:"1px solid "+T.border}}>
+                <div style={{fontSize:"1.5rem",fontWeight:700,color:T.gold}}>{myArticles.length}</div>
+                <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Articles published</div>
+              </div>
+              <div style={{padding:"14px 12px",background:"#fff",borderRadius:10,textAlign:"center",border:"1px solid "+T.border}}>
+                <div style={{fontSize:"1.5rem",fontWeight:700,color:T.gold}}>{myVideos.length}</div>
+                <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Videos published</div>
+              </div>
+              <div style={{padding:"14px 12px",background:"#fff",borderRadius:10,textAlign:"center",border:"1px solid "+T.border}}>
+                <div style={{fontSize:"1.5rem",fontWeight:700,color:T.gold}}>{myEvents.length}</div>
+                <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Events listed</div>
+              </div>
+              <div style={{padding:"14px 12px",background:pendingSubmissions.length>0?"#fff8e1":"#fff",borderRadius:10,textAlign:"center",border:pendingSubmissions.length>0?"1px solid #f0d896":"1px solid "+T.border}}>
+                <div style={{fontSize:"1.5rem",fontWeight:700,color:pendingSubmissions.length>0?"#856404":T.gold}}>{pendingSubmissions.length}</div>
+                <div style={{fontSize:".68rem",color:pendingSubmissions.length>0?"#856404":T.mute,textTransform:"uppercase",letterSpacing:.5}}>Pending review</div>
+              </div>
+              <div style={{padding:"14px 12px",background:"#fff",borderRadius:10,textAlign:"center",border:"1px solid "+T.border}}>
+                <div style={{fontSize:"1.5rem",fontWeight:700,color:T.txt}}>{totalContentViews}</div>
+                <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Total views</div>
+              </div>
+              <div style={{padding:"14px 12px",background:"#fff",borderRadius:10,textAlign:"center",border:"1px solid "+T.border}}>
+                <div style={{fontSize:"1.5rem",fontWeight:700,color:T.txt}}>{totalContentLikes}</div>
+                <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Total likes</div>
+              </div>
+            </div>
+
+            <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+              <button onClick={()=>go("submit")} style={T.btn}>+ Submit content</button>
+              <button onClick={()=>go("events")} style={T.btnO}>📅 View events</button>
+            </div>
+          </div>);
+        })()}
 
         <div style={{...T.card,borderLeft:"3px solid "+T.gold,padding:24}}>
           <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:14,flexWrap:"wrap"}}>
@@ -8480,7 +8630,7 @@ ${forDownload
             </div>}
           </div>
 
-          {/* ─── ENQUIRY LEDGER ─── */}
+          {/* ─── ENQUIRY LEDGER — grouped by company ─── */}
           <div style={{...T.card,marginTop:16}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
               <h4 style={{fontSize:"1rem",fontWeight:700,margin:0}}>📋 Product Enquiry Ledger</h4>
@@ -8490,39 +8640,70 @@ ${forDownload
                 <span style={{color:T.warn,fontWeight:600}}>⏳ {productEnquiries.filter(e=>e.status!=="fulfilled").length} open</span>
               </div>
             </div>
-            {productEnquiries.length===0?<p style={{color:T.mute,fontSize:".82rem"}}>No enquiries yet.</p>:
-            <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:560,overflowY:"auto"}}>
-              {productEnquiries.map(e=><div key={e.id} style={{padding:"10px 14px",borderRadius:8,border:"1px solid "+T.border,background:e.status==="fulfilled"?"#f0faf5":T.bg}}>
-                <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
-                      <span style={{fontSize:".85rem",fontWeight:700,color:T.txt}}>{e.doctorName}</span>
-                      <span style={{fontSize:".72rem",color:T.mute}}>enquired about</span>
-                      <span style={{fontSize:".82rem",fontWeight:600,color:T.teal}}>{e.productName}</span>
+            {productEnquiries.length===0?<p style={{color:T.mute,fontSize:".82rem"}}>No enquiries yet.</p>:(()=>{
+              // Group enquiries by vendorId
+              const byCompany={};
+              productEnquiries.forEach(e=>{
+                const key=e.vendorId||"unknown";
+                if(!byCompany[key])byCompany[key]={vendorName:e.vendorName||"(unknown company)",vendorId:key,enquiries:[]};
+                byCompany[key].enquiries.push(e);
+              });
+              const companies=Object.values(byCompany).sort((a,b)=>b.enquiries.length-a.enquiries.length);
+              return(<div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {companies.map(c=>{
+                  const openCount=c.enquiries.filter(e=>e.status!=="fulfilled").length;
+                  const fulfilledCount=c.enquiries.length-openCount;
+                  const isOpen=expandedEnquiryCompany===c.vendorId;
+                  return(<div key={c.vendorId} style={{border:"1px solid "+T.border,borderRadius:10,overflow:"hidden"}}>
+                    {/* Company header row — click to expand */}
+                    <div onClick={()=>setExpandedEnquiryCompany(isOpen?null:c.vendorId)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",background:isOpen?T.tealBg+"55":T.bg,cursor:"pointer",gap:10,flexWrap:"wrap"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        <span style={{fontSize:".85rem",color:T.mute,transition:"transform .15s",display:"inline-block",transform:isOpen?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
+                        <span style={{fontSize:".92rem",fontWeight:700,color:T.txt}}>{c.vendorName}</span>
+                      </div>
+                      <div style={{display:"flex",gap:10,fontSize:".74rem",flexShrink:0}}>
+                        <span style={{color:T.teal,fontWeight:600}}>{c.enquiries.length} total</span>
+                        {openCount>0&&<span style={{color:T.warn,fontWeight:600}}>⏳ {openCount} open</span>}
+                        {fulfilledCount>0&&<span style={{color:"#1a7d42",fontWeight:600}}>✓ {fulfilledCount} fulfilled</span>}
+                      </div>
                     </div>
-                    <div style={{fontSize:".72rem",color:T.mute,marginBottom:6}}>
-                      {e.doctorEmail} {e.doctorClinic&&`· ${e.doctorClinic}`} · {e.vendorName} · {fD(e.date)}
-                    </div>
-                    {e.message&&<div style={{fontSize:".78rem",color:T.txt2,padding:"6px 10px",background:"#fff",borderRadius:6,borderLeft:"2px solid "+T.border,fontStyle:"italic",lineHeight:1.5}}>
-                      "{e.message}"
+                    {/* Expanded enquiry list for this company */}
+                    {isOpen&&<div style={{padding:"8px 12px",display:"flex",flexDirection:"column",gap:6}}>
+                      {c.enquiries.map(e=><div key={e.id} style={{padding:"10px 14px",borderRadius:8,border:"1px solid "+T.border,background:e.status==="fulfilled"?"#f0faf5":"#fff"}}>
+                        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+                              <span style={{fontSize:".85rem",fontWeight:700,color:T.txt}}>{e.doctorName}</span>
+                              <span style={{fontSize:".72rem",color:T.mute}}>enquired about</span>
+                              <span style={{fontSize:".82rem",fontWeight:600,color:T.teal}}>{e.productName}</span>
+                            </div>
+                            <div style={{fontSize:".72rem",color:T.mute,marginBottom:6}}>
+                              {e.doctorEmail} {e.doctorClinic&&`· ${e.doctorClinic}`} · {fD(e.date)}
+                            </div>
+                            {e.message&&<div style={{fontSize:".78rem",color:T.txt2,padding:"6px 10px",background:"#fafafa",borderRadius:6,borderLeft:"2px solid "+T.border,fontStyle:"italic",lineHeight:1.5}}>
+                              "{e.message}"
+                            </div>}
+                          </div>
+                          <div style={{display:"flex",flexDirection:"column",gap:5,flexShrink:0,alignItems:"flex-end"}}>
+                            <span style={{fontSize:".68rem",fontWeight:700,padding:"2px 8px",borderRadius:6,background:e.status==="fulfilled"?"#e8f5e9":"#fff8e1",color:e.status==="fulfilled"?"#1a7d42":"#856404"}}>
+                              {e.status==="fulfilled"?"✓ Fulfilled":"⏳ Open"}
+                            </span>
+                            <button onClick={async()=>{
+                              const newStatus=e.status==="fulfilled"?"new":"fulfilled";
+                              await fbSet("productEnquiries",e.id,{status:newStatus,updatedAt:Date.now()});
+                              sh(newStatus==="fulfilled"?"✓ Marked fulfilled":"Reopened");
+                              loadData();
+                            }} style={{...T.btnO,...T.btnSm,fontSize:".68rem",padding:"2px 9px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal}}>
+                              {e.status==="fulfilled"?"Reopen":"Mark fulfilled"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>)}
                     </div>}
-                  </div>
-                  <div style={{display:"flex",flexDirection:"column",gap:5,flexShrink:0,alignItems:"flex-end"}}>
-                    <span style={{fontSize:".68rem",fontWeight:700,padding:"2px 8px",borderRadius:6,background:e.status==="fulfilled"?"#e8f5e9":"#fff8e1",color:e.status==="fulfilled"?"#1a7d42":"#856404"}}>
-                      {e.status==="fulfilled"?"✓ Fulfilled":"⏳ Open"}
-                    </span>
-                    <button onClick={async()=>{
-                      const newStatus=e.status==="fulfilled"?"new":"fulfilled";
-                      await fbSet("productEnquiries",e.id,{status:newStatus,updatedAt:Date.now()});
-                      sh(newStatus==="fulfilled"?"✓ Marked fulfilled":"Reopened");
-                      loadData();
-                    }} style={{...T.btnO,...T.btnSm,fontSize:".68rem",padding:"2px 9px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal}}>
-                      {e.status==="fulfilled"?"Reopen":"Mark fulfilled"}
-                    </button>
-                  </div>
-                </div>
-              </div>)}
-            </div>}
+                  </div>);
+                })}
+              </div>);
+            })()}
           </div>
 
           {/* ─── PHASE 4: SPONSOR PLACEMENTS ─── */}
@@ -9539,6 +9720,35 @@ ${forDownload
                 });
                 // Increment product enquiry counter
                 await fbSet("products",enquiryModal.id,{enquiries:(enquiryModal.enquiries||0)+1});
+                // Notify the vendor in-app
+                await createNotif({
+                  toUid:enquiryModal.vendorId,
+                  fromUid:au.uid,
+                  fromName:uName,
+                  fromIni:uIni,
+                  fromPhoto:uPhoto||"",
+                  type:"enquiry",
+                  text:`enquired about "${enquiryModal.name}"`,
+                  linkType:"enquiry",
+                  linkId:enquiryModal.id,
+                  linkLabel:enquiryModal.name,
+                });
+                // Email the vendor (fire-and-forget, non-blocking — best effort only)
+                fetch("/api/send-email",{
+                  method:"POST",
+                  headers:{"Content-Type":"application/json"},
+                  body:JSON.stringify({
+                    type:"product_enquiry",
+                    to:enquiryModal.enquiryEmail||enquiryModal.vendorEmail,
+                    data:{
+                      vendorName:enquiryModal.vendorName,
+                      productName:enquiryModal.name,
+                      doctorName:uName,
+                      doctorEmail:au.email,
+                      message:enquiryMsg.trim(),
+                    },
+                  }),
+                }).catch(()=>{}); // silent fail — in-app notif + mailto are the reliable channels
                 // Open email to vendor with pre-filled message
                 const mailBody=encodeURIComponent(`${enquiryMsg.trim()}\n\n— ${uName}\n${au.email}\n\n(Sent via SKINARIO platform)`);
                 window.open(`mailto:${enquiryModal.enquiryEmail||enquiryModal.vendorEmail}?subject=SKINARIO Enquiry: ${enquiryModal.name}&body=${mailBody}`,"_blank");
