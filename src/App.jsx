@@ -2263,6 +2263,16 @@ export default function App(){
   // If you add a new page (`pg==="xyz"&&...` block), add "xyz" here too.
   const KNOWN_PAGES=["home","me","quiz","library","forum","cases","rewards","submit","rank","events","videos","admin","profile","ad","consent","vendors"];
   const sh=m=>setToast(m);const go=p=>{const safe=KNOWN_PAGES.includes(p)?p:"home";setPg(safe);setSelA(null);setSelV(null);setSelAd(null);setSelE(null);setSelU(null);setSelFP(null);setSelCs(null);setEdForm(null)};
+  // Navigate to Me page and open a specific vendor section
+  const goVendor=(section)=>{
+    go("me");
+    if(section==="products"){setShowProdForm(true);setVendorScrollTo("products")}
+    else setVendorScrollTo(section);
+    setTimeout(()=>{
+      const el=document.getElementById(`vendor-section-${section}`);
+      if(el)el.scrollIntoView({behavior:"smooth",block:"start"});
+    },300);
+  };
   // ═══ VIEW PROFILE — open any user's profile page ═══
   const viewProfile=(uid)=>{
     if(!uid)return;
@@ -2309,6 +2319,7 @@ export default function App(){
   const[prodImages,setProdImages]=useState([]); // uploaded product image URLs
   const[prodUploading,setProdUploading]=useState(false);
   const[showProdForm,setShowProdForm]=useState(false);
+  const[vendorScrollTo,setVendorScrollTo]=useState(null); // "products"|"rewards"|"placement"|"enquiries" — scroll Me page to that section
   const[selProduct,setSelProduct]=useState(null);
   const[enquiryModal,setEnquiryModal]=useState(null); // {product} — open enquiry form
   const[enquiryMsg,setEnquiryMsg]=useState(""); // product detail view
@@ -4964,7 +4975,7 @@ ${forDownload
               {recentEnquiries.length>0&&<div style={{marginBottom:18}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
                   <div style={{fontSize:".85rem",fontWeight:700,color:T.txt}}>📨 Recent enquiries</div>
-                  <span onClick={()=>go("me")} style={{fontSize:".74rem",color:T.teal,cursor:"pointer",fontWeight:600}}>Manage all →</span>
+                  <span onClick={()=>goVendor("enquiries")} style={{fontSize:".74rem",color:T.teal,cursor:"pointer",fontWeight:600}}>Manage all →</span>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
                   {recentEnquiries.map(e=><div key={e.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 12px",background:"#fff",borderRadius:8,border:"1px solid "+T.border,gap:10,flexWrap:"wrap"}}>
@@ -4994,10 +5005,11 @@ ${forDownload
 
               {/* Quick actions */}
               <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-                <button onClick={()=>go("me")} style={T.btn}>+ Add product</button>
-                <button onClick={()=>go("me")} style={T.btnO}>🎁 Propose reward</button>
-                <button onClick={()=>go("me")} style={T.btnO}>📢 Request placement</button>
-                <button onClick={()=>go("vendors")} style={T.btnO}>👁 View public profile</button>
+                <button onClick={()=>goVendor("products")} style={T.btn}>+ Add product</button>
+                <button onClick={()=>goVendor("rewards")} style={T.btnO}>🎁 Propose reward</button>
+                <button onClick={()=>goVendor("placement")} style={T.btnO}>📢 Request placement</button>
+                <button onClick={()=>goVendor("enquiries")} style={T.btnO}>📨 View enquiries</button>
+                <button onClick={()=>go("vendors")} style={T.btnO}>👁 Public profile</button>
               </div>
             </div>);
           }
@@ -7770,7 +7782,7 @@ ${forDownload
           }
 
           // Approved — show propose form + their rewards
-          return(<div style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.teal}}>
+          return(<div id="vendor-section-rewards" style={{...T.card,padding:18,marginBottom:14,borderLeft:"3px solid "+T.teal}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
               <h4 style={{fontSize:".95rem",fontWeight:700,display:"flex",alignItems:"center",gap:8,margin:0}}>✓ Reward Partner · <span style={{color:T.teal}}>{myApp.companyName}</span></h4>
               <span style={{fontSize:".7rem",color:T.mute}}>{myRewards.length} active · {myRedemptions.length} redemptions</span>
@@ -7878,7 +7890,7 @@ ${forDownload
           </div>);
         })()}
 
-        {/* ═══ PHASE 3: PRODUCT CATALOG (vendor/brand Me page) ═══ */}
+          {/* ═══ PHASE 3: PRODUCT CATALOG (vendor/brand Me page) ═══ */}
         {(prof?.accountType==="vendor"||prof?.accountType==="brand"||prof?.accountType==="pharma")&&!editingProfile&&(()=>{
           const myProducts=products.filter(p=>p.vendorId===au?.uid);
           const uploadProductImage=async(file)=>{
@@ -7895,7 +7907,7 @@ ${forDownload
             }catch(e){sh("Upload failed")}
             setProdUploading(false);
           };
-          return(<div style={{...T.card,marginBottom:14}}>
+          return(<div id="vendor-section-products" style={{...T.card,marginBottom:14}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
               <h4 style={{fontSize:".95rem",fontWeight:700,margin:0}}>🛍️ Product / Equipment Catalog</h4>
               <button onClick={()=>setShowProdForm(f=>!f)} style={{...T.btnO,...T.btnSm}}>{showProdForm?"Cancel":"+ Add product"}</button>
@@ -7998,10 +8010,62 @@ ${forDownload
           </div>);
         })()}
 
+        {/* ═══ ENQUIRY LEDGER — vendor Me page ═══ */}
+        {(prof?.accountType==="vendor"||prof?.accountType==="brand"||prof?.accountType==="pharma")&&!editingProfile&&(()=>{
+          const myEnqs=productEnquiries.filter(e=>e.vendorId===au?.uid).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+          if(myEnqs.length===0)return null;
+          const open=myEnqs.filter(e=>e.status!=="fulfilled");
+          return(<div id="vendor-section-enquiries" style={{...T.card,marginBottom:14}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,margin:0}}>📨 Product Enquiries</h4>
+              <div style={{display:"flex",gap:8,fontSize:".74rem"}}>
+                <span style={{color:T.teal,fontWeight:600}}>{myEnqs.length} total</span>
+                {open.length>0&&<span style={{color:"#856404",fontWeight:700,background:"#fff8e1",padding:"1px 8px",borderRadius:6}}>⏳ {open.length} open</span>}
+                <span style={{color:"#1a7d42",fontWeight:600}}>✓ {myEnqs.length-open.length} done</span>
+              </div>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {myEnqs.map(e=><div key={e.id} style={{padding:"10px 12px",borderRadius:8,border:"1px solid "+T.border,background:e.status==="fulfilled"?"#f0faf5":"#fff"}}>
+                <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3,flexWrap:"wrap"}}>
+                      <span style={{fontSize:".85rem",fontWeight:700,color:T.txt}}>{e.doctorName}</span>
+                      <span style={{fontSize:".72rem",color:T.mute}}>→</span>
+                      <span style={{fontSize:".82rem",fontWeight:600,color:T.teal}}>{e.productName}</span>
+                    </div>
+                    <div style={{fontSize:".71rem",color:T.mute,marginBottom:e.message?6:0}}>
+                      {e.doctorEmail} {e.doctorClinic&&`· ${e.doctorClinic}`} · {fD(e.date||"")}
+                    </div>
+                    {e.message&&<div style={{fontSize:".78rem",color:T.txt2,padding:"6px 10px",background:T.bg,borderRadius:6,borderLeft:"2px solid "+T.border,fontStyle:"italic",lineHeight:1.5,marginTop:4}}>
+                      "{e.message}"
+                    </div>}
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:5,flexShrink:0,alignItems:"flex-end"}}>
+                    <span style={{fontSize:".68rem",fontWeight:700,padding:"2px 8px",borderRadius:6,background:e.status==="fulfilled"?"#e8f5e9":"#fff3cd",color:e.status==="fulfilled"?"#1a7d42":"#856404"}}>
+                      {e.status==="fulfilled"?"✓ Fulfilled":"⏳ Open"}
+                    </span>
+                    <div style={{display:"flex",gap:5}}>
+                      <a href={`mailto:${e.doctorEmail}?subject=Re: Your enquiry about ${e.productName}`} style={{...T.btnO,...T.btnSm,fontSize:".65rem",padding:"2px 8px",textDecoration:"none",display:"inline-block"}}>📧 Reply</a>
+                      <button onClick={async()=>{
+                        const newStatus=e.status==="fulfilled"?"new":"fulfilled";
+                        await fbSet("productEnquiries",e.id,{status:newStatus,updatedAt:Date.now()});
+                        sh(newStatus==="fulfilled"?"✓ Marked fulfilled":"Reopened");
+                        loadData();
+                      }} style={{...T.btnO,...T.btnSm,fontSize:".65rem",padding:"2px 8px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal}}>
+                        {e.status==="fulfilled"?"Reopen":"✓ Done"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>)}
+            </div>
+          </div>);
+        })()}
+
         {/* ═══ PHASE 4: SPONSORED PLACEMENT REQUEST (vendor/brand Me page) ═══ */}
         {(prof?.accountType==="vendor"||prof?.accountType==="brand"||prof?.accountType==="pharma")&&!editingProfile&&(()=>{
           const myPlacements=sponsorPlacements.filter(p=>p.vendorId===au?.uid);
-          return(<div style={{...T.card,marginBottom:14}}>
+          return(<div id="vendor-section-placement" style={{...T.card,marginBottom:14}}>
             <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:8}}>📢 Sponsored Placements</h4>
             <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.6,marginBottom:12}}>
               Get featured on SKINARIO's home page, articles, or quiz section. Placement is manually reviewed and invoiced — no payment integration needed upfront.
