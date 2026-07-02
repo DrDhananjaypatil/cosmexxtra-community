@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, updateProfile } from "firebase/auth";
 import { getFirestore, doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, addDoc, deleteDoc, serverTimestamp, where } from "firebase/firestore";
@@ -2263,6 +2263,60 @@ export default function App(){
   // If you add a new page (`pg==="xyz"&&...` block), add "xyz" here too.
   const KNOWN_PAGES=["home","me","quiz","library","forum","cases","rewards","submit","rank","events","videos","admin","profile","ad","consent","vendors"];
   const sh=m=>setToast(m);const go=p=>{const safe=KNOWN_PAGES.includes(p)?p:"home";setPg(safe);setSelA(null);setSelV(null);setSelAd(null);setSelE(null);setSelU(null);setSelFP(null);setSelCs(null);setEdForm(null)};
+
+  // ─── FOLLOW SYSTEM ────────────────────────────────────────────────────────
+  // followedUids: set of UIDs the current user follows
+  const followedUids=useMemo(()=>new Set(follows.filter(f=>f.followerId===au?.uid).map(f=>f.followedId)),[follows,au?.uid]);
+  // myFollowerCount: how many follow ME
+  const myFollowerCount=useMemo(()=>follows.filter(f=>f.followedId===au?.uid).length,[follows,au?.uid]);
+  // myFollowingCount: how many I follow
+  const myFollowingCount=useMemo(()=>followedUids.size,[followedUids]);
+
+  const toggleFollow=async(targetUser)=>{
+    if(!au?.uid)return;
+    if(targetUser.id===au.uid){sh("You can't follow yourself");return}
+    const followId=`${au.uid}_${targetUser.id}`;
+    const alreadyFollowing=followedUids.has(targetUser.id);
+    if(alreadyFollowing){
+      // Unfollow — delete the doc
+      try{
+        await deleteDoc(doc(db,"follows",followId));
+        setFollows(p=>p.filter(f=>f.id!==followId));
+        sh(`Unfollowed ${targetUser.name||"user"}`);
+      }catch(e){console.error("unfollow failed:",e);sh("Could not unfollow — try again")}
+    } else {
+      // Follow — create the doc
+      const followDoc={
+        id:followId,
+        followerId:au.uid,
+        followerName:prof?.name||uName,
+        followerPhoto:uPhoto||"",
+        followedId:targetUser.id,
+        followedName:targetUser.name||"",
+        followedPhoto:targetUser.photo||"",
+        createdAt:Date.now(),
+      };
+      try{
+        await fbSet("follows",followId,followDoc);
+        setFollows(p=>[...p.filter(f=>f.id!==followId),followDoc]);
+        sh(`Following ${targetUser.name||"user"} ✓`);
+        // Notify the followed user
+        await createNotif({toUid:targetUser.id,fromUid:au.uid,fromName:uName,fromIni:uIni,fromPhoto:uPhoto||"",type:"follow",text:"started following you",linkType:"profile",linkId:au.uid,linkLabel:uName});
+      }catch(e){console.error("follow failed:",e);sh("Could not follow — try again")}
+    }
+  };
+
+  // ─── FOLLOW BUTTON COMPONENT ───────────────────────────────────────────────
+  // Inline component — shows Follow/Following for any user
+  const FollowBtn=({user,size="sm"})=>{
+    if(!au?.uid||!user?.id||user.id===au.uid)return null;
+    const isFollowing=followedUids.has(user.id);
+    const pad=size==="sm"?"3px 10px":"6px 18px";
+    const fs=size==="sm"?".72rem":".84rem";
+    return(<button onClick={e=>{e.stopPropagation();toggleFollow(user)}} style={{...(isFollowing?T.btnO:T.btn),padding:pad,fontSize:fs,fontWeight:600,borderRadius:20,whiteSpace:"nowrap",flexShrink:0}}>
+      {isFollowing?"✓ Following":"+ Follow"}
+    </button>);
+  };
   // Navigate to Me page and open a specific vendor section
   const goVendor=(section)=>{
     go("me");
@@ -2310,7 +2364,8 @@ export default function App(){
   const[redemptions,setRedemptions]=useState([]);
   const[vendorApplications,setVendorApplications]=useState([]);
   const[products,setProducts]=useState([]); // vendor product/equipment listings
-  const[productEnquiries,setProductEnquiries]=useState([]); // enquiry ledger for Phase 3
+  const[productEnquiries,setProductEnquiries]=useState([]);
+  const[follows,setFollows]=useState([]); // all follows where follower=au.uid or followed=au.uid // enquiry ledger for Phase 3
   const[sponsorPlacements,setSponsorPlacements]=useState([]); // Phase 4 sponsored home placements
   const[vrImage,setVrImage]=useState(""); // vendor reward proposal: uploaded image URL
   const[vrUploading,setVrUploading]=useState(false);
@@ -2494,7 +2549,7 @@ export default function App(){
     if(!consentDoctorReg)setConsentDoctorReg(prof.doctorRegNumber||prof.regNumber||"");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[pg,prof]);
-  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe)},[]);
+  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl)},[]);
 
   // Load current user's points-earning history from pointsActivity ledger.
   // Uses where(uid) so the list query satisfies security rules (can't list others' docs).
@@ -4845,6 +4900,7 @@ ${forDownload
                     else if(n.linkType==="event"){const e=events.find(x=>x.id===n.linkId);if(e){setSelE(e);go("events")}}
                     else if(n.linkType==="quiz"){go("quiz")}
                     else if(n.linkType==="enquiry"){go("home")}
+                    else if(n.linkType==="follow"){if(n.linkId)viewProfile(n.linkId)}
                     setNotifsOpen(false);
                   }} style={{padding:"12px 14px",borderBottom:"1px solid "+T.border,cursor:"pointer",background:n.read?"#fff":(n.type==="announcement"?"#fdf6e3":"#fef9ef"),borderLeft:n.type==="announcement"?"3px solid "+T.gold:"none",display:"flex",gap:10,alignItems:"flex-start"}}>
                     {n.type==="announcement"?<div style={{...T.av(36,T.goldBg,T.goldD),flexShrink:0,fontSize:"1.1rem"}}>📣</div>:n.fromPhoto?<img src={n.fromPhoto} style={{width:36,height:36,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(36,T.tealBg,T.teal),flexShrink:0}}>{n.fromIni}</div>}
@@ -5075,6 +5131,15 @@ ${forDownload
                 {prof?.accountType==="doctor"&&(()=>{const t=getTier(prof?.points||0);if(t.id==="beginner")return null;return<span style={{padding:"3px 9px",borderRadius:12,fontSize:".7rem",fontWeight:700,letterSpacing:.5,background:t.bg,color:t.color,whiteSpace:"nowrap"}}>{t.label}</span>;})()}
               </div>
               <p style={{color:T.txt2,fontSize:".9rem",marginTop:3,fontStyle:"italic",letterSpacing:.3}}>Learn. Discuss. Lead the field.</p>
+              {/* Followers / Following — Instagram style */}
+              <div style={{display:"flex",gap:16,marginTop:6}}>
+                <span style={{fontSize:".82rem",color:T.txt,cursor:"pointer"}} onClick={()=>go("me")}>
+                  <b style={{fontWeight:700,color:T.txt}}>{myFollowerCount}</b> <span style={{color:T.mute}}>Followers</span>
+                </span>
+                <span style={{fontSize:".82rem",color:T.txt,cursor:"pointer"}} onClick={()=>go("me")}>
+                  <b style={{fontWeight:700,color:T.txt}}>{myFollowingCount}</b> <span style={{color:T.mute}}>Following</span>
+                </span>
+              </div>
             </div>
           </div>
           <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
@@ -5181,6 +5246,10 @@ ${forDownload
           const eligible=recent.sort((a,b)=>{
             // Manual featured posts always rank first
             if((b.feat?1:0)!==(a.feat?1:0))return (b.feat?1:0)-(a.feat?1:0);
+            // Followed users' posts rank second
+            const aFollowed=followedUids.has(a.uid)?1:0;
+            const bFollowed=followedUids.has(b.uid)?1:0;
+            if(bFollowed!==aFollowed)return bFollowed-aFollowed;
             // Then by engagement score descending
             const sDiff=scoreOf(b)-scoreOf(a);
             if(sDiff!==0)return sDiff;
@@ -6547,7 +6616,10 @@ ${forDownload
                     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
                       {p.photo?<img src={p.photo} onClick={()=>viewProfile(p.uid)} style={{width:42,height:42,borderRadius:"50%",border:"2px solid "+T.tealBg,cursor:"pointer"}}/>:<div onClick={()=>viewProfile(p.uid)} style={{...T.av(42,T.tealBg,T.teal),border:"2px solid "+T.tealBg,cursor:"pointer"}}>{p.ini||"?"}</div>}
                       <div style={{flex:1}}>
-                        <b onClick={()=>viewProfile(p.uid)} style={{fontSize:".92rem",color:T.txt,cursor:"pointer"}}>{p.author}</b>
+                        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                          <b onClick={()=>viewProfile(p.uid)} style={{fontSize:".92rem",color:T.txt,cursor:"pointer"}}>{p.author}</b>
+                          {p.uid&&p.uid!==au?.uid&&<FollowBtn user={allUsers.find(u=>u.id===p.uid)||{id:p.uid,name:p.author}} size="sm"/>}
+                        </div>
                         <div style={{fontSize:".72rem",color:T.mute,display:"flex",alignItems:"center",gap:6}}>
                           <span>{fD(p.date)}</span>
                           <span>·</span>
@@ -6716,10 +6788,10 @@ ${forDownload
           </div>}
 
           {leaderboard.map((u,i)=>{const uAcc=u.totalAnswered?Math.round(u.totalCorrect/u.totalAnswered*100):0;const isMe=u.id===au?.uid;
-            return<div key={u.id} onClick={()=>viewProfile(u.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:10,marginBottom:6,background:isMe?T.tealBg:"#fff",border:`1px solid ${isMe?T.teal:T.border}`,cursor:"pointer"}}>
-              <div style={{width:28,textAlign:"center",fontWeight:700,fontSize:i<3?"1.2rem":".9rem",color:i<3?["#d4a017","#888","#a0703a"][i]:T.txt2}}>{i<3?["🥇","🥈","🥉"][i]:`#${i+1}`}</div>
-              {u.photo?<img src={u.photo} style={{width:34,height:34,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(34,isMe?T.teal:T.tealBg,isMe?"#fff":T.teal)}>{u.initials||"?"}</div>}
-              <div style={{flex:1,minWidth:0}}>
+            return<div key={u.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:10,marginBottom:6,background:isMe?T.tealBg:"#fff",border:`1px solid ${isMe?T.teal:T.border}`}}>
+              <div onClick={()=>viewProfile(u.id)} style={{width:28,textAlign:"center",fontWeight:700,fontSize:i<3?"1.2rem":".9rem",color:i<3?["#d4a017","#888","#a0703a"][i]:T.txt2,cursor:"pointer"}}>{i<3?["🥇","🥈","🥉"][i]:`#${i+1}`}</div>
+              {u.photo?<img onClick={()=>viewProfile(u.id)} src={u.photo} style={{width:34,height:34,borderRadius:"50%",objectFit:"cover",cursor:"pointer"}}/>:<div onClick={()=>viewProfile(u.id)} style={{...T.av(34,isMe?T.teal:T.tealBg,isMe?"#fff":T.teal),cursor:"pointer"}}>{u.initials||"?"}</div>}
+              <div onClick={()=>viewProfile(u.id)} style={{flex:1,minWidth:0,cursor:"pointer"}}>
                 <div style={{fontWeight:600,fontSize:".86rem",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.name}{isMe?" (You)":""}</div>
                 <div style={{fontSize:".68rem",color:T.mute,display:"flex",gap:5,flexWrap:"wrap"}}>
                   <span>{uAcc}%</span><span>·</span><span>{u.totalAnswered||0}Q</span>
@@ -6730,6 +6802,7 @@ ${forDownload
                 <div style={{fontWeight:700,color:T.teal,fontSize:"1rem",lineHeight:1}}>{u.points||0}</div>
                 <div style={{fontSize:".58rem",color:T.mute,letterSpacing:.5,textTransform:"uppercase"}}>pts</div>
               </div>
+              {!isMe&&<FollowBtn user={u} size="sm"/>}
             </div>})}
         </div>
 
@@ -6847,8 +6920,18 @@ ${forDownload
                   {u.companyName&&<div style={{fontSize:".88rem",color:T.txt2,fontStyle:"italic"}}>{u.brandCategory}</div>}
                   {u.instituteName&&<div style={{fontSize:".88rem",color:T.txt2,fontStyle:"italic"}}>{u.instituteType}</div>}
                   <div style={{fontSize:".75rem",color:T.mute,marginTop:6}}>Joined {fD(u.joined)}</div>
+                  {/* Follower / Following counts */}
+                  <div style={{display:"flex",gap:16,marginTop:8}}>
+                    <span style={{fontSize:".84rem",color:T.txt}}>
+                      <b style={{fontWeight:700}}>{follows.filter(f=>f.followedId===u.id).length}</b> <span style={{color:T.mute}}>Followers</span>
+                    </span>
+                    <span style={{fontSize:".84rem",color:T.txt}}>
+                      <b style={{fontWeight:700}}>{follows.filter(f=>f.followerId===u.id).length}</b> <span style={{color:T.mute}}>Following</span>
+                    </span>
+                  </div>
                 </div>
                 {isMe&&<button onClick={()=>{go("me")}} style={{...T.btnO,padding:"8px 16px",fontSize:".82rem"}}>✏️ Edit profile</button>}
+                {!isMe&&<FollowBtn user={u} size="lg"/>}
               </div>
             </div>
           </div>
