@@ -7307,7 +7307,311 @@ ${forDownload
         })()}
       </div>}
 
-      {pg==="me"&&<div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 340px",gap:18,alignItems:"start"}} className="me-grid">
+      {pg==="me"&&(normalizeAccountType(prof?.accountType||"")==="vendor"||normalizeAccountType(prof?.accountType||"")==="brand")&&!editingProfile&&<div style={{maxWidth:900,margin:"0 auto"}}>
+
+        {/* ══ VENDOR / BRAND ME PAGE ══ */}
+        {/* Company profile card */}
+        <div style={{...T.card,padding:28,marginBottom:16,textAlign:"center",position:"relative"}}>
+          <button onClick={()=>{
+            setEditPf({name:prof?.name||"",mobile:prof?.mobile||"",accountType:prof?.accountType||"",country:prof?.country||"India",degree:"",council:"",internationalCouncil:"",regNumber:"",clinic:"",address:prof?.address||"",city:"",region:"",visibility:prof?.visibility||"public",companyName:prof?.companyName||"",brandCategory:prof?.brandCategory||"",vendorCategory:prof?.vendorCategory||"",gstNumber:prof?.gstNumber||"",contactPerson:prof?.contactPerson||"",website:prof?.website||"",instituteName:"",instituteType:"",directorName:"",bio:prof?.bio||""});
+            setEditingProfile(true);setEditErr("");
+          }} style={{...T.btnO,...T.btnSm,position:"absolute",top:16,right:16}}>✏️ Edit</button>
+
+          {uPhoto?<img src={uPhoto} style={{width:80,height:80,borderRadius:12,border:"2px solid "+T.border,objectFit:"cover",display:"block",margin:"0 auto 14px"}}/>
+            :<div style={{width:80,height:80,borderRadius:12,background:T.tealBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.8rem",margin:"0 auto 14px"}}>🏭</div>}
+          <div style={{fontSize:"1.35rem",fontWeight:700,color:T.txt}}>{prof?.companyName||uName}</div>
+          <div style={{fontSize:".84rem",color:T.mute,marginTop:4}}>{prof?.vendorCategory||prof?.brandCategory||""}</div>
+          {prof?.address&&<div style={{fontSize:".8rem",color:T.mute,marginTop:2}}>📍 {prof.address}</div>}
+          {prof?.website&&<a href={prof.website} target="_blank" rel="noopener noreferrer" style={{fontSize:".8rem",color:T.teal,textDecoration:"none",display:"inline-block",marginTop:4}}>🌐 {prof.website.replace(/^https?:\/\//,"")}</a>}
+          <div style={{display:"flex",justifyContent:"center",gap:6,marginTop:10,flexWrap:"wrap"}}>
+            <span style={T.tag(T.tealBg,T.teal)}>{normalizeAccountType(prof?.accountType||"")==="vendor"?"🏭 Vendor":"💊 Brand / Pharma"}</span>
+            {prof?.verified&&<span style={T.tag("#e8f5e9","#1a7d42")}>✓ Verified Partner</span>}
+          </div>
+          <div style={{display:"flex",justifyContent:"center",gap:8,marginTop:14,flexWrap:"wrap"}}>
+            {prof?.contactPerson&&<div style={{fontSize:".8rem",color:T.txt2}}>👤 {prof.contactPerson}</div>}
+            <div style={{fontSize:".8rem",color:T.txt2}}>✉️ {au?.email}</div>
+            {prof?.gstNumber&&<div style={{fontSize:".8rem",color:T.txt2,fontFamily:"monospace"}}>GST: {prof.gstNumber}</div>}
+          </div>
+        </div>
+
+        {/* Quick stats */}
+        {(()=>{
+          const myProducts=products.filter(p=>p.vendorId===au?.uid&&p.active!==false);
+          const myEnqs=productEnquiries.filter(e=>e.vendorId===au?.uid);
+          const openEnqs=myEnqs.filter(e=>e.status!=="fulfilled");
+          const myRewards=rewards.filter(r=>r.vendorId===au?.uid);
+          const myRedemptions=redemptions.filter(rd=>rewards.find(r=>r.id===rd.rewardId&&r.vendorId===au?.uid));
+          return(<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:16}}>
+            {[["🛍️",myProducts.length,"Products"],["📨",myEnqs.length,"Total Enquiries"],[openEnqs.length>0?"⏳":null,openEnqs.length,"Open",openEnqs.length>0],["🎁",myRewards.length,"Rewards"],["♻️",myRedemptions.length,"Redemptions"]].map(([ic,n,l,warn],i)=>
+              <div key={i} style={{...T.card,textAlign:"center",padding:"14px 8px",marginBottom:0,border:warn?"1px solid #f0d896":"1px solid "+T.border,background:warn?"#fffdf5":"#fff"}}>
+                {ic&&<div style={{fontSize:"1.1rem",marginBottom:2}}>{ic}</div>}
+                <div style={{fontSize:"1.4rem",fontWeight:700,color:warn?"#856404":T.teal}}>{n}</div>
+                <div style={{fontSize:".62rem",color:warn?"#856404":T.mute,textTransform:"uppercase",letterSpacing:.5}}>{l}</div>
+              </div>)
+            }
+          </div>);
+        })()}
+
+        {/* Product Catalog */}
+        {(()=>{
+          const myProducts=products.filter(p=>p.vendorId===au?.uid&&p.active!==false);
+          return(<div id="vendor-section-products" style={{...T.card,marginBottom:16}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
+              <h3 style={{fontSize:"1rem",fontWeight:700,margin:0}}>🛍️ Product Catalog</h3>
+              <button onClick={()=>setShowProdForm(f=>!f)} style={{...T.btn,padding:"7px 16px",fontSize:".82rem"}}>{showProdForm?"✕ Cancel":"+ Add product"}</button>
+            </div>
+
+            {/* Add product form */}
+            {showProdForm&&<div style={{padding:14,background:T.bg,borderRadius:10,marginBottom:16,display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <input value={prodForm.name} onChange={e=>setProdForm(p=>({...p,name:e.target.value}))} placeholder="Product name *" style={T.inp}/>
+                <select value={prodForm.category} onChange={e=>setProdForm(p=>({...p,category:e.target.value}))} style={T.inp}>
+                  <option value="">— Category —</option>
+                  {VENDOR_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <textarea value={prodForm.description} onChange={e=>setProdForm(p=>({...p,description:e.target.value}))} placeholder="Description — what it does, clinical use, benefits *" style={T.txa} rows={3}/>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <input value={prodForm.priceRange} onChange={e=>setProdForm(p=>({...p,priceRange:e.target.value}))} placeholder="Price (e.g. ₹2L–₹5L)" style={T.inp}/>
+                <input value={prodForm.specs} onChange={e=>setProdForm(p=>({...p,specs:e.target.value}))} placeholder="Key specs / certifications" style={T.inp}/>
+              </div>
+              <input value={prodForm.enquiryEmail} onChange={e=>setProdForm(p=>({...p,enquiryEmail:e.target.value}))} placeholder="Enquiry email (defaults to your login email)" style={T.inp}/>
+              <div>
+                <div style={{fontSize:".76rem",color:T.txt2,fontWeight:600,marginBottom:6}}>Product images (up to 5)</div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
+                  {prodImages.map((url,i)=><div key={i} style={{position:"relative"}}>
+                    <img src={url} alt="" style={{width:70,height:70,objectFit:"cover",borderRadius:6,border:"1px solid "+T.border}}/>
+                    <button type="button" onClick={()=>setProdImages(p=>p.filter((_,j)=>j!==i))} style={{position:"absolute",top:-6,right:-6,width:18,height:18,borderRadius:"50%",border:"none",background:T.err,color:"#fff",cursor:"pointer",fontSize:".6rem",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+                  </div>)}
+                </div>
+                {prodImages.length<5&&<input type="file" accept="image/*" disabled={prodUploading} onChange={async e=>{
+                  const f=e.target.files?.[0];if(!f)return;
+                  if(f.size>5*1024*1024){sh("Image must be under 5MB");return}
+                  setProdUploading(true);
+                  try{const path=`products/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;const sRef=ref(storage,path);await uploadBytes(sRef,f);const url=await getDownloadURL(sRef);setProdImages(p=>[...p,url]);sh("✓ Uploaded")}
+                  catch(e){sh("Upload failed")}
+                  setProdUploading(false);e.target.value="";
+                }} style={{fontSize:".82rem"}}/>}
+                {prodUploading&&<div style={{fontSize:".72rem",color:T.mute,marginTop:4}}>⏳ Uploading...</div>}
+              </div>
+              <button onClick={async()=>{
+                if(!prodForm.name.trim()){sh("Product name required");return}
+                if(!prodForm.description.trim()){sh("Description required");return}
+                try{
+                  await fbAdd("products",{vendorId:au.uid,vendorName:prof?.companyName||prof?.name||"",vendorEmail:au.email,vendorCategory:prof?.vendorCategory||prof?.brandCategory||"",name:prodForm.name.trim(),category:prodForm.category,description:prodForm.description.trim(),priceRange:prodForm.priceRange.trim(),specs:prodForm.specs.trim(),enquiryEmail:prodForm.enquiryEmail.trim()||au.email,images:prodImages,enquiries:0,active:true,createdAt:Date.now(),date:ds(getIST())});
+                  sh("✅ Product listed!");setProdForm({name:"",description:"",priceRange:"",category:"",specs:"",enquiryEmail:""});setProdImages([]);setShowProdForm(false);loadData();
+                }catch(e){sh("Failed to save")}
+              }} style={{...T.btn,padding:"9px 18px"}}>Publish product →</button>
+            </div>}
+
+            {/* Product grid */}
+            {myProducts.length===0&&!showProdForm&&<div style={{padding:"30px 0",textAlign:"center",color:T.mute,fontSize:".84rem"}}>No products yet. Click "+ Add product" to list your first product.</div>}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:14}}>
+              {myProducts.map(p=>{
+                const pEnqs=productEnquiries.filter(e=>e.productId===p.id);
+                const openPEnqs=pEnqs.filter(e=>e.status!=="fulfilled");
+                return(<div key={p.id} style={{border:"1px solid "+T.border,borderRadius:10,overflow:"hidden",background:"#fff"}}>
+                  {p.images?.[0]?<img src={p.images[0]} alt={p.name} style={{width:"100%",height:130,objectFit:"cover"}}/>
+                    :<div style={{width:"100%",height:80,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2rem"}}>🛍️</div>}
+                  <div style={{padding:12}}>
+                    <div style={{fontSize:".92rem",fontWeight:700,color:T.txt,marginBottom:3}}>{p.name}</div>
+                    {p.category&&<div style={{fontSize:".68rem",color:T.mute,marginBottom:6}}>{p.category}</div>}
+                    {p.priceRange&&<div style={{fontSize:".78rem",fontWeight:600,color:T.teal,marginBottom:6}}>{p.priceRange}</div>}
+                    <div style={{fontSize:".74rem",color:T.txt2,lineHeight:1.5,marginBottom:10,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.description}</div>
+
+                    {/* Enquiry summary on card */}
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:pEnqs.length>0?10:0,padding:pEnqs.length>0?"6px 8px":0,background:pEnqs.length>0?T.bg:"transparent",borderRadius:6}}>
+                      {pEnqs.length>0&&<>
+                        <span style={{fontSize:".72rem",color:T.txt2}}>📨 {pEnqs.length} enquir{pEnqs.length===1?"y":"ies"}</span>
+                        {openPEnqs.length>0&&<span style={{fontSize:".68rem",fontWeight:700,color:"#856404",background:"#fff8e1",padding:"1px 7px",borderRadius:4}}>⏳ {openPEnqs.length} open</span>}
+                        {openPEnqs.length===0&&<span style={{fontSize:".68rem",color:"#1a7d42",fontWeight:600}}>✓ All done</span>}
+                      </>}
+                    </div>
+
+                    {/* Inline enquiries list */}
+                    {pEnqs.length>0&&<div style={{marginBottom:10,display:"flex",flexDirection:"column",gap:5}}>
+                      {pEnqs.slice(0,3).map(e=><div key={e.id} style={{padding:"6px 8px",background:e.status==="fulfilled"?"#f0faf5":"#fffdf5",borderRadius:6,border:"1px solid "+T.border}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6,flexWrap:"wrap"}}>
+                          <div style={{minWidth:0}}>
+                            <div style={{fontSize:".74rem",fontWeight:600,color:T.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.doctorName}</div>
+                            <div style={{fontSize:".66rem",color:T.mute}}>{fD(e.date||"")}</div>
+                          </div>
+                          <div style={{display:"flex",gap:4,flexShrink:0}}>
+                            <a href={`mailto:${e.doctorEmail}?subject=Re: ${p.name}`} style={{fontSize:".62rem",...T.btnO,...T.btnSm,padding:"1px 6px",textDecoration:"none",display:"inline-block"}}>Reply</a>
+                            <button onClick={async()=>{const ns=e.status==="fulfilled"?"new":"fulfilled";await fbSet("productEnquiries",e.id,{status:ns,updatedAt:Date.now()});loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".62rem",padding:"1px 6px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal}}>
+                              {e.status==="fulfilled"?"↩":"✓"}
+                            </button>
+                          </div>
+                        </div>
+                        {e.message&&<div style={{fontSize:".7rem",color:T.txt2,fontStyle:"italic",marginTop:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>"{e.message}"</div>}
+                      </div>)}
+                      {pEnqs.length>3&&<div style={{fontSize:".7rem",color:T.mute,textAlign:"center",fontStyle:"italic"}}>+{pEnqs.length-3} more in enquiry ledger</div>}
+                    </div>}
+
+                    <button onClick={async()=>{if(!window.confirm("Remove this product?"))return;await fbSet("products",p.id,{active:false});sh("Removed");loadData()}} style={{...T.btnO,...T.btnSm,color:T.err,borderColor:T.err,width:"100%",fontSize:".72rem"}}>Remove listing</button>
+                  </div>
+                </div>);
+              })}
+            </div>
+          </div>);
+        })()}
+
+        {/* Enquiry Ledger — all enquiries consolidated */}
+        {(()=>{
+          const myEnqs=productEnquiries.filter(e=>e.vendorId===au?.uid).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+          if(myEnqs.length===0)return null;
+          const open=myEnqs.filter(e=>e.status!=="fulfilled");
+          return(<div id="vendor-section-enquiries" style={{...T.card,marginBottom:16}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+              <h3 style={{fontSize:"1rem",fontWeight:700,margin:0}}>📨 All Enquiries</h3>
+              <div style={{display:"flex",gap:8,fontSize:".74rem"}}>
+                {open.length>0&&<span style={{color:"#856404",fontWeight:700,background:"#fff8e1",padding:"2px 10px",borderRadius:6}}>⏳ {open.length} open</span>}
+                <span style={{color:"#1a7d42",fontWeight:600}}>✓ {myEnqs.length-open.length} fulfilled</span>
+              </div>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {myEnqs.map(e=><div key={e.id} style={{padding:"10px 12px",borderRadius:8,border:"1px solid "+T.border,background:e.status==="fulfilled"?"#f0faf5":"#fff"}}>
+                <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:".84rem",fontWeight:700}}>{e.doctorName} <span style={{fontWeight:400,color:T.mute}}>→</span> <span style={{color:T.teal}}>{e.productName}</span></div>
+                    <div style={{fontSize:".7rem",color:T.mute,marginTop:2}}>{e.doctorEmail} {e.doctorClinic&&`· ${e.doctorClinic}`} · {fD(e.date||"")}</div>
+                    {e.message&&<div style={{fontSize:".76rem",fontStyle:"italic",color:T.txt2,marginTop:5,padding:"4px 8px",background:T.bg,borderRadius:5,borderLeft:"2px solid "+T.border}}>"{e.message}"</div>}
+                  </div>
+                  <div style={{display:"flex",gap:5,flexShrink:0,alignItems:"flex-start"}}>
+                    <a href={`mailto:${e.doctorEmail}?subject=Re: ${e.productName}`} style={{...T.btnO,...T.btnSm,fontSize:".7rem",padding:"3px 10px",textDecoration:"none",display:"inline-block"}}>📧 Reply</a>
+                    <button onClick={async()=>{const ns=e.status==="fulfilled"?"new":"fulfilled";await fbSet("productEnquiries",e.id,{status:ns,updatedAt:Date.now()});sh(ns==="fulfilled"?"✓ Done":"Reopened");loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".7rem",padding:"3px 10px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal}}>
+                      {e.status==="fulfilled"?"Reopen":"✓ Done"}
+                    </button>
+                  </div>
+                </div>
+              </div>)}
+            </div>
+          </div>);
+        })()}
+
+        {/* Vendor reward partner + placement sections */}
+        {(()=>{
+          const aType=normalizeAccountType(prof?.accountType||"");
+          if(aType!=="vendor"&&aType!=="brand")return null;
+          const myPlacements=sponsorPlacements.filter(p=>p.vendorId===au?.uid);
+          const myRewards=rewards.filter(r=>r.vendorId===au?.uid);
+          return(<div style={{display:"flex",flexDirection:"column",gap:14}}>
+
+            {/* Reward partner section */}
+            <div id="vendor-section-rewards" style={{...T.card,padding:18,borderLeft:"3px solid "+T.gold}}>
+              <h3 style={{fontSize:"1rem",fontWeight:700,marginBottom:8}}>🎁 Reward Partner</h3>
+              <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.6,marginBottom:12}}>Offer discounts, samples, training or vouchers as rewards doctors can redeem with points.</p>
+              {myRewards.length>0&&<div style={{marginBottom:12}}>
+                {myRewards.map(r=><div key={r.id} style={{padding:"7px 10px",background:T.bg,borderRadius:6,marginBottom:6,fontSize:".8rem"}}>
+                  <b>{r.title}</b> · {r.pointCost||0} pts · <span style={{color:r.active!==false?T.teal:T.mute}}>{r.active!==false?"Active":"Inactive"}</span>
+                </div>)}
+              </div>}
+              <details style={{padding:"10px 12px",background:T.bg,borderRadius:8}}>
+                <summary style={{cursor:"pointer",fontSize:".88rem",fontWeight:600}}>+ Propose a new reward</summary>
+                <div style={{marginTop:10,fontSize:".82rem",color:T.txt2}}>Go to your Me page profile and use the reward partner form, or WhatsApp <a href="https://wa.me/918390200008" target="_blank" rel="noopener noreferrer" style={{color:T.teal}}>+91-8390200008</a> to discuss a reward offering.</div>
+              </details>
+            </div>
+
+            {/* Sponsored placement */}
+            <div id="vendor-section-placement" style={{...T.card,padding:18,marginBottom:0}}>
+              <h3 style={{fontSize:"1rem",fontWeight:700,marginBottom:8}}>📢 Sponsored Placements</h3>
+              {myPlacements.length>0&&<div style={{marginBottom:12}}>
+                {myPlacements.map(sp=><div key={sp.id} style={{padding:"7px 10px",background:sp.status==="active"?T.tealBg+"44":T.bg,borderRadius:6,marginBottom:6,display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+                  <span style={{fontSize:".82rem",fontWeight:600}}>{sp.title}</span>
+                  <span style={{fontSize:".68rem",fontWeight:700,padding:"2px 8px",borderRadius:6,background:sp.status==="active"?T.tealBg:T.goldBg,color:sp.status==="active"?T.teal:T.gold}}>{sp.status==="active"?"🟢 Live":sp.status==="approved"?"✓ Approved":"⏳ Pending"}</span>
+                </div>)}
+              </div>}
+              <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.6,marginBottom:10}}>Get featured on SKINARIO's home page, articles, or quiz. Manually invoiced — no payment integration needed.</p>
+              <button onClick={()=>{const el=document.getElementById("vendor-placement-form");if(el)el.style.display=el.style.display==="none"?"block":"none";}} style={{...T.btnO,padding:"7px 16px",fontSize:".82rem"}}>+ Request placement</button>
+              <div id="vendor-placement-form" style={{display:"none",marginTop:12,padding:14,background:T.bg,borderRadius:8,flexDirection:"column",gap:10}}>
+                <select value={spForm.placementType} onChange={e=>setSpForm(p=>({...p,placementType:e.target.value}))} style={T.inp}>
+                  <option value="home_banner">🏠 Home spotlight banner</option>
+                  <option value="article_sidebar">📰 Article sidebar</option>
+                  <option value="quiz_sponsor">🧠 Quiz sponsor label</option>
+                  <option value="vendor_featured">🏭 Featured in vendor directory</option>
+                </select>
+                <input value={spForm.title} onChange={e=>setSpForm(p=>({...p,title:e.target.value}))} placeholder="Ad headline *" style={T.inp}/>
+                <input value={spForm.tagline} onChange={e=>setSpForm(p=>({...p,tagline:e.target.value}))} placeholder="Short tagline" style={T.inp}/>
+                <input value={spForm.website} onChange={e=>setSpForm(p=>({...p,website:e.target.value}))} placeholder="Landing page URL" style={T.inp}/>
+                <input value={spForm.budget} onChange={e=>setSpForm(p=>({...p,budget:e.target.value}))} placeholder="Budget/duration (e.g. ₹5000/month)" style={T.inp}/>
+                {spForm.logo&&<img src={spForm.logo} alt="" style={{maxHeight:50,maxWidth:160,borderRadius:6}}/>}
+                <input type="file" accept="image/*" disabled={spUploading} onChange={async e=>{
+                  const f=e.target.files?.[0];if(!f)return;setSpUploading(true);
+                  try{const path=`sponsor-placements/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;const sRef=ref(storage,path);await uploadBytes(sRef,f);const url=await getDownloadURL(sRef);setSpForm(p=>({...p,logo:url}));sh("✓ Logo uploaded");}
+                  catch(e){sh("Upload failed")}setSpUploading(false);e.target.value="";
+                }} style={{fontSize:".82rem"}}/>
+                <button onClick={async()=>{
+                  if(!spForm.title.trim()){sh("Title required");return}
+                  if(!spForm.logo){sh("Logo required");return}
+                  try{await fbAdd("sponsorPlacements",{vendorId:au.uid,vendorName:prof?.companyName||prof?.name||"",vendorEmail:au.email,placementType:spForm.placementType,title:spForm.title.trim(),tagline:spForm.tagline.trim(),logo:spForm.logo,website:spForm.website.trim(),budget:spForm.budget.trim(),status:"pending",createdAt:Date.now()});
+                  sh("📨 Request submitted! We'll contact you shortly.");setSpForm({title:"",tagline:"",logo:"",website:"",placementType:"home_banner",budget:""});loadData();}
+                  catch(e){sh("Failed to submit")}
+                }} style={{...T.btn,padding:"9px 18px"}}>Submit request →</button>
+              </div>
+            </div>
+          </div>);
+        })()}
+
+        {/* Profile edit form — shared: edit button sets editingProfile=true, handled below */}
+      </div>}
+
+      {pg==="me"&&(normalizeAccountType(prof?.accountType||"")==="vendor"||normalizeAccountType(prof?.accountType||"")==="brand")&&editingProfile&&<div style={{maxWidth:900,margin:"0 auto",padding:"8px 0"}}>
+        <div style={{...T.card,borderLeft:"3px solid "+T.gold,padding:22}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}>
+            <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>✏️ Edit company profile</h3>
+            <button onClick={()=>{setEditingProfile(false);setEditErr("")}} style={{background:"none",border:"none",fontSize:"1rem",color:T.mute,cursor:"pointer"}}>✕</button>
+          </div>
+          {/* Re-use the same edit form that the doctor layout uses — it handles all account types */}
+          {/* Brand/vendor fields */}
+          <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Company name *</label>
+          <input value={editPf.companyName||""} onChange={e=>setEditPf(p=>({...p,companyName:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
+          {(editPf.accountType==="vendor")&&<>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Vendor category *</label>
+            <select value={editPf.vendorCategory||""} onChange={e=>setEditPf(p=>({...p,vendorCategory:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+              <option value="">— Select —</option>{VENDOR_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+          </>}
+          {(editPf.accountType==="brand"||editPf.accountType==="pharma")&&<>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Brand category *</label>
+            <select value={editPf.brandCategory||""} onChange={e=>setEditPf(p=>({...p,brandCategory:e.target.value}))} style={{...T.inp,marginBottom:12}}>
+              <option value="">— Select —</option>{BRAND_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+          </>}
+          <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Contact person *</label>
+          <input value={editPf.contactPerson||""} onChange={e=>setEditPf(p=>({...p,contactPerson:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
+          {editPf.accountType==="vendor"&&<>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>GST Number (optional)</label>
+            <input value={editPf.gstNumber||""} onChange={e=>setEditPf(p=>({...p,gstNumber:e.target.value.toUpperCase()}))} style={{...T.inp,fontFamily:"monospace",marginBottom:12}}/>
+          </>}
+          <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Website</label>
+          <input value={editPf.website||""} onChange={e=>setEditPf(p=>({...p,website:e.target.value}))} placeholder="https://" style={{...T.inp,marginBottom:12}}/>
+          <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Address / City</label>
+          <input value={editPf.address||""} onChange={e=>setEditPf(p=>({...p,address:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
+          <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Country</label>
+          <select value={editPf.country||"India"} onChange={e=>setEditPf(p=>({...p,country:e.target.value}))} style={{...T.inp,marginBottom:16}}>
+            {COUNTRIES.map(c=><option key={c} value={c}>{c}</option>)}
+          </select>
+          {editErr&&<div style={{color:T.err,fontSize:".82rem",marginBottom:10}}>{editErr}</div>}
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={async()=>{
+              if(!editPf.companyName?.trim()){setEditErr("Company name required");return}
+              if(!editPf.contactPerson?.trim()){setEditErr("Contact person required");return}
+              const updated={
+                name:editPf.companyName.trim(),companyName:editPf.companyName.trim(),
+                contactPerson:editPf.contactPerson.trim(),website:editPf.website?.trim()||"",
+                address:editPf.address?.trim()||"",country:editPf.country||"India",
+                ...(editPf.accountType==="vendor"?{vendorCategory:editPf.vendorCategory,gstNumber:editPf.gstNumber?.trim()||""}:{}),
+                ...(editPf.accountType==="brand"||editPf.accountType==="pharma"?{brandCategory:editPf.brandCategory}:{}),
+              };
+              try{await fbSet("users",au.uid,updated);setProf(p=>({...p,...updated}));setEditingProfile(false);sh("✓ Profile updated!");}
+              catch(e){setEditErr("Save failed — please try again")}
+            }} style={{...T.btn,padding:"9px 20px"}}>Save changes</button>
+            <button onClick={()=>{setEditingProfile(false);setEditErr("")}} style={T.btnO}>Cancel</button>
+          </div>
+        </div>
+      </div>}
+
+      {pg==="me"&&!(normalizeAccountType(prof?.accountType||"")==="vendor"||normalizeAccountType(prof?.accountType||"")==="brand")&&<div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 340px",gap:18,alignItems:"start"}} className="me-grid">
 
         {/* ═══ MAIN COLUMN: Profile + Saved Items ═══ */}
         <div style={{minWidth:0}}>
