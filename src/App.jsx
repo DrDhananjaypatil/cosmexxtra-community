@@ -2287,6 +2287,8 @@ export default function App(){
   };
 
   // ─── FOLLOW SYSTEM ────────────────────────────────────────────────────────
+  // follows state MUST be declared before the useMemo hooks below (TDZ prevention)
+  const[follows,setFollows]=useState([]);
   // followedUids: set of UIDs the current user follows
   const followedUids=useMemo(()=>new Set(follows.filter(f=>f.followerId===au?.uid).map(f=>f.followedId)),[follows,au?.uid]);
   // myFollowerCount: how many follow ME
@@ -2385,10 +2387,9 @@ export default function App(){
   const[rewards,setRewards]=useState([]);
   const[redemptions,setRedemptions]=useState([]);
   const[vendorApplications,setVendorApplications]=useState([]);
-  const[products,setProducts]=useState([]); // vendor product/equipment listings
+  const[products,setProducts]=useState([]);
   const[productEnquiries,setProductEnquiries]=useState([]);
-  const[follows,setFollows]=useState([]); // all follows where follower=au.uid or followed=au.uid // enquiry ledger for Phase 3
-  const[sponsorPlacements,setSponsorPlacements]=useState([]); // Phase 4 sponsored home placements
+  const[sponsorPlacements,setSponsorPlacements]=useState([]);
   const[vrImage,setVrImage]=useState(""); // vendor reward proposal: uploaded image URL
   const[vrUploading,setVrUploading]=useState(false);
   // Phase 3: product listings
