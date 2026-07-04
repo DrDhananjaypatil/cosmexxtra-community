@@ -2264,8 +2264,29 @@ export default function App(){
   const KNOWN_PAGES=["home","me","quiz","library","forum","cases","rewards","submit","rank","events","videos","admin","profile","ad","consent","vendors"];
   const sh=m=>setToast(m);const go=p=>{const safe=KNOWN_PAGES.includes(p)?p:"home";setPg(safe);setSelA(null);setSelV(null);setSelAd(null);setSelE(null);setSelU(null);setSelFP(null);setSelCs(null);setEdForm(null)};
 
+  // Toggle enquiry status + notify doctor by email + in-app
+  const toggleEnquiryStatus=async(e)=>{
+    const newStatus=e.status==="fulfilled"?"new":"fulfilled";
+    await fbSet("productEnquiries",e.id,{status:newStatus,updatedAt:Date.now()});
+    sh(newStatus==="fulfilled"?"✓ Marked as done":"↩ Reopened");
+    // Email the doctor about status change
+    fetch("/api/send-email",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        type:"enquiry_status",
+        to:e.doctorEmail,
+        data:{doctorName:e.doctorName,productName:e.productName,vendorName:e.vendorName,status:newStatus,message:e.message||""},
+      }),
+    }).catch(()=>{});
+    // In-app notification to doctor
+    if(e.doctorUid){
+      createNotif({toUid:e.doctorUid,fromUid:au?.uid,fromName:prof?.companyName||uName,fromIni:uIni,fromPhoto:uPhoto||"",type:"enquiry_update",text:`${newStatus==="fulfilled"?"closed":"reopened"} your enquiry for "${e.productName}"`,linkType:"vendors",linkId:e.productId,linkLabel:e.productName}).catch(()=>{});
+    }
+    loadData();
+  };
+
   // ─── FOLLOW SYSTEM ────────────────────────────────────────────────────────
-  const[follows,setFollows]=useState([]); // all follows where follower=au.uid or followed=au.uid // enquiry ledger for Phase 3
   // followedUids: set of UIDs the current user follows
   const followedUids=useMemo(()=>new Set(follows.filter(f=>f.followerId===au?.uid).map(f=>f.followedId)),[follows,au?.uid]);
   // myFollowerCount: how many follow ME
@@ -2366,6 +2387,7 @@ export default function App(){
   const[vendorApplications,setVendorApplications]=useState([]);
   const[products,setProducts]=useState([]); // vendor product/equipment listings
   const[productEnquiries,setProductEnquiries]=useState([]);
+  const[follows,setFollows]=useState([]); // all follows where follower=au.uid or followed=au.uid // enquiry ledger for Phase 3
   const[sponsorPlacements,setSponsorPlacements]=useState([]); // Phase 4 sponsored home placements
   const[vrImage,setVrImage]=useState(""); // vendor reward proposal: uploaded image URL
   const[vrUploading,setVrUploading]=useState(false);
@@ -2376,8 +2398,9 @@ export default function App(){
   const[showProdForm,setShowProdForm]=useState(false);
   const[vendorScrollTo,setVendorScrollTo]=useState(null); // "products"|"rewards"|"placement"|"enquiries" — scroll Me page to that section
   const[selProduct,setSelProduct]=useState(null);
-  const[enquiryModal,setEnquiryModal]=useState(null); // {product} — open enquiry form
-  const[enquiryMsg,setEnquiryMsg]=useState(""); // product detail view
+  const[enquiryModal,setEnquiryModal]=useState(null);
+  const[enquiryMsg,setEnquiryMsg]=useState("");
+  const[followersModal,setFollowersModal]=useState(null); // null | "followers" | "following" | {uid, name} for other profiles
   // Phase 4: sponsor placements
   const[spForm,setSpForm]=useState({title:"",tagline:"",logo:"",website:"",placementType:"home_banner",budget:""});
   const[spUploading,setSpUploading]=useState(false);
@@ -5133,10 +5156,10 @@ ${forDownload
               <p style={{color:T.txt2,fontSize:".9rem",marginTop:3,fontStyle:"italic",letterSpacing:.3}}>Learn. Discuss. Lead the field.</p>
               {/* Followers / Following — Instagram style */}
               <div style={{display:"flex",gap:16,marginTop:6}}>
-                <span style={{fontSize:".82rem",color:T.txt,cursor:"pointer"}} onClick={()=>go("me")}>
+                <span style={{fontSize:".82rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:au.uid,name:"me",type:"followers"})}>
                   <b style={{fontWeight:700,color:T.txt}}>{myFollowerCount}</b> <span style={{color:T.mute}}>Followers</span>
                 </span>
-                <span style={{fontSize:".82rem",color:T.txt,cursor:"pointer"}} onClick={()=>go("me")}>
+                <span style={{fontSize:".82rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:au.uid,name:"me",type:"following"})}>
                   <b style={{fontWeight:700,color:T.txt}}>{myFollowingCount}</b> <span style={{color:T.mute}}>Following</span>
                 </span>
               </div>
@@ -6922,10 +6945,10 @@ ${forDownload
                   <div style={{fontSize:".75rem",color:T.mute,marginTop:6}}>Joined {fD(u.joined)}</div>
                   {/* Follower / Following counts */}
                   <div style={{display:"flex",gap:16,marginTop:8}}>
-                    <span style={{fontSize:".84rem",color:T.txt}}>
+                    <span style={{fontSize:".84rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:u.id,name:u.name,type:"followers"})}>
                       <b style={{fontWeight:700}}>{follows.filter(f=>f.followedId===u.id).length}</b> <span style={{color:T.mute}}>Followers</span>
                     </span>
-                    <span style={{fontSize:".84rem",color:T.txt}}>
+                    <span style={{fontSize:".84rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:u.id,name:u.name,type:"following"})}>
                       <b style={{fontWeight:700}}>{follows.filter(f=>f.followerId===u.id).length}</b> <span style={{color:T.mute}}>Following</span>
                     </span>
                   </div>
@@ -7521,7 +7544,7 @@ ${forDownload
                           </div>
                           <div style={{display:"flex",gap:4,flexShrink:0}}>
                             <a href={`mailto:${e.doctorEmail}?subject=Re: ${p.name}`} style={{fontSize:".62rem",...T.btnO,...T.btnSm,padding:"1px 6px",textDecoration:"none",display:"inline-block"}}>Reply</a>
-                            <button onClick={async()=>{const ns=e.status==="fulfilled"?"new":"fulfilled";await fbSet("productEnquiries",e.id,{status:ns,updatedAt:Date.now()});loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".62rem",padding:"1px 6px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal}}>
+                            <button onClick={async()=>{await toggleEnquiryStatus(e)}} style={{...T.btnO,...T.btnSm,fontSize:".62rem",padding:"1px 6px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal}}>
                               {e.status==="fulfilled"?"↩":"✓"}
                             </button>
                           </div>
@@ -7562,7 +7585,7 @@ ${forDownload
                   </div>
                   <div style={{display:"flex",gap:5,flexShrink:0,alignItems:"flex-start"}}>
                     <a href={`mailto:${e.doctorEmail}?subject=Re: ${e.productName}`} style={{...T.btnO,...T.btnSm,fontSize:".7rem",padding:"3px 10px",textDecoration:"none",display:"inline-block"}}>📧 Reply</a>
-                    <button onClick={async()=>{const ns=e.status==="fulfilled"?"new":"fulfilled";await fbSet("productEnquiries",e.id,{status:ns,updatedAt:Date.now()});sh(ns==="fulfilled"?"✓ Done":"Reopened");loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".7rem",padding:"3px 10px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal}}>
+                    <button onClick={async()=>{await toggleEnquiryStatus(e)}} style={{...T.btnO,...T.btnSm,fontSize:".7rem",padding:"3px 10px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal}}>
                       {e.status==="fulfilled"?"Reopen":"✓ Done"}
                     </button>
                   </div>
@@ -8379,12 +8402,7 @@ ${forDownload
                         <div style={{fontSize:".68rem",color:T.mute}}>{e.doctorEmail} · {fD(e.date)}</div>
                         {e.message&&<div style={{fontSize:".72rem",color:T.txt2,marginTop:3,fontStyle:"italic",display:"-webkit-box",WebkitLineClamp:1,WebkitBoxOrient:"vertical",overflow:"hidden"}}>"{e.message}"</div>}
                       </div>
-                      <button onClick={async()=>{
-                        const newStatus=e.status==="fulfilled"?"new":"fulfilled";
-                        await fbSet("productEnquiries",e.id,{status:newStatus,updatedAt:Date.now()});
-                        sh(newStatus==="fulfilled"?"✓ Marked fulfilled":"Marked open");
-                        loadData();
-                      }} style={{...T.btnO,...T.btnSm,fontSize:".65rem",padding:"2px 8px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal,flexShrink:0}}>
+                      <button onClick={async()=>{await toggleEnquiryStatus(e)}} style={{...T.btnO,...T.btnSm,fontSize:".65rem",padding:"2px 8px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal,flexShrink:0}}>
                         {e.status==="fulfilled"?"✓ Fulfilled":"Mark fulfilled"}
                       </button>
                     </div>)}
@@ -8433,12 +8451,7 @@ ${forDownload
                     </span>
                     <div style={{display:"flex",gap:5}}>
                       <a href={`mailto:${e.doctorEmail}?subject=Re: Your enquiry about ${e.productName}`} style={{...T.btnO,...T.btnSm,fontSize:".65rem",padding:"2px 8px",textDecoration:"none",display:"inline-block"}}>📧 Reply</a>
-                      <button onClick={async()=>{
-                        const newStatus=e.status==="fulfilled"?"new":"fulfilled";
-                        await fbSet("productEnquiries",e.id,{status:newStatus,updatedAt:Date.now()});
-                        sh(newStatus==="fulfilled"?"✓ Marked fulfilled":"Reopened");
-                        loadData();
-                      }} style={{...T.btnO,...T.btnSm,fontSize:".65rem",padding:"2px 8px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal}}>
+                      <button onClick={async()=>{await toggleEnquiryStatus(e)}} style={{...T.btnO,...T.btnSm,fontSize:".65rem",padding:"2px 8px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal}}>
                         {e.status==="fulfilled"?"Reopen":"✓ Done"}
                       </button>
                     </div>
@@ -9139,12 +9152,7 @@ ${forDownload
                             <span style={{fontSize:".68rem",fontWeight:700,padding:"2px 8px",borderRadius:6,background:e.status==="fulfilled"?"#e8f5e9":"#fff8e1",color:e.status==="fulfilled"?"#1a7d42":"#856404"}}>
                               {e.status==="fulfilled"?"✓ Fulfilled":"⏳ Open"}
                             </span>
-                            <button onClick={async()=>{
-                              const newStatus=e.status==="fulfilled"?"new":"fulfilled";
-                              await fbSet("productEnquiries",e.id,{status:newStatus,updatedAt:Date.now()});
-                              sh(newStatus==="fulfilled"?"✓ Marked fulfilled":"Reopened");
-                              loadData();
-                            }} style={{...T.btnO,...T.btnSm,fontSize:".68rem",padding:"2px 9px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal}}>
+                            <button onClick={async()=>{await toggleEnquiryStatus(e)}} style={{...T.btnO,...T.btnSm,fontSize:".68rem",padding:"2px 9px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal}}>
                               {e.status==="fulfilled"?"Reopen":"Mark fulfilled"}
                             </button>
                           </div>
@@ -10123,6 +10131,45 @@ ${forDownload
       }}/>}
 
       {/* ═══ PRODUCT ENQUIRY MODAL ═══ */}
+      {/* ═══ FOLLOWERS / FOLLOWING MODAL ═══ */}
+      {followersModal&&(()=>{
+        const isMyProfile=followersModal.uid===au?.uid;
+        const title=followersModal.type==="followers"
+          ?`${isMyProfile?"Your":followersModal.name+"'s"} Followers`
+          :`${isMyProfile?"You're":followersModal.name+" is"} Following`;
+        const list=followersModal.type==="followers"
+          ?follows.filter(f=>f.followedId===followersModal.uid)
+          :follows.filter(f=>f.followerId===followersModal.uid);
+        return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:1100,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setFollowersModal(null)}>
+          <div style={{background:"#fff",borderRadius:16,width:"100%",maxWidth:420,maxHeight:"70vh",display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid "+T.border,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <h3 style={{margin:0,fontSize:"1rem",fontWeight:700}}>{title}</h3>
+              <button onClick={()=>setFollowersModal(null)} style={{background:"none",border:"none",fontSize:"1.2rem",cursor:"pointer",color:T.mute}}>✕</button>
+            </div>
+            <div style={{overflowY:"auto",flex:1,padding:"8px 0"}}>
+              {list.length===0&&<div style={{padding:"30px 20px",textAlign:"center",color:T.mute,fontSize:".88rem"}}>
+                {followersModal.type==="followers"?"No followers yet":"Not following anyone yet"}
+              </div>}
+              {list.map(f=>{
+                const uid=followersModal.type==="followers"?f.followerId:f.followedId;
+                const name=followersModal.type==="followers"?f.followerName:f.followedName;
+                const photo=followersModal.type==="followers"?f.followerPhoto:f.followedPhoto;
+                const user=allUsers.find(u=>u.id===uid)||{id:uid,name,photo};
+                return(<div key={f.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 18px",borderBottom:"1px solid "+T.border+"55"}}>
+                  {photo?<img src={photo} onClick={()=>{viewProfile(uid);setFollowersModal(null)}} style={{width:44,height:44,borderRadius:"50%",objectFit:"cover",cursor:"pointer",flexShrink:0}}/>
+                    :<div onClick={()=>{viewProfile(uid);setFollowersModal(null)}} style={{...T.av(44,T.tealBg,T.teal),cursor:"pointer",flexShrink:0}}>{(name||"?")[0]}</div>}
+                  <div style={{flex:1,minWidth:0}}>
+                    <div onClick={()=>{viewProfile(uid);setFollowersModal(null)}} style={{fontSize:".88rem",fontWeight:600,color:T.txt,cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name||"Unknown"}</div>
+                    {user.accountType&&<div style={{fontSize:".7rem",color:T.mute,marginTop:1}}>{user.degree||user.companyName||user.instituteName||""}</div>}
+                  </div>
+                  <FollowBtn user={user} size="sm"/>
+                </div>);
+              })}
+            </div>
+          </div>
+        </div>);
+      })()}
+
       {enquiryModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:1100,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setEnquiryModal(null)}>
         <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:480,padding:24,boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}} onClick={e=>e.stopPropagation()}>
           <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:16,gap:12}}>
@@ -10184,26 +10231,17 @@ ${forDownload
                   linkId:enquiryModal.id,
                   linkLabel:enquiryModal.name,
                 });
-                // Email the vendor (fire-and-forget, non-blocking — best effort only)
+                // Email the vendor
                 fetch("/api/send-email",{
                   method:"POST",
                   headers:{"Content-Type":"application/json"},
                   body:JSON.stringify({
                     type:"product_enquiry",
                     to:enquiryModal.enquiryEmail||enquiryModal.vendorEmail,
-                    data:{
-                      vendorName:enquiryModal.vendorName,
-                      productName:enquiryModal.name,
-                      doctorName:uName,
-                      doctorEmail:au.email,
-                      message:enquiryMsg.trim(),
-                    },
+                    data:{vendorName:enquiryModal.vendorName,productName:enquiryModal.name,doctorName:uName,doctorEmail:au.email,message:enquiryMsg.trim()},
                   }),
-                }).catch(()=>{}); // silent fail — in-app notif + mailto are the reliable channels
-                // Open email to vendor with pre-filled message
-                const mailBody=encodeURIComponent(`${enquiryMsg.trim()}\n\n— ${uName}\n${au.email}\n\n(Sent via SKINARIO platform)`);
-                window.open(`mailto:${enquiryModal.enquiryEmail||enquiryModal.vendorEmail}?subject=SKINARIO Enquiry: ${enquiryModal.name}&body=${mailBody}`,"_blank");
-                sh("📧 Enquiry logged and email opened!");
+                }).catch(()=>{});
+                sh("✅ Enquiry submitted! The vendor will be in touch.");
                 setEnquiryModal(null);
                 setEnquiryMsg("");
                 loadData();

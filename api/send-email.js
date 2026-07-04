@@ -178,6 +178,32 @@ function templateReply({ name, replierName, contentType, contentTitle, snippet }
   return { subject: `${replierName} replied to your ${contentType}`, preview, html: wrapEmail({ preview, content }) };
 }
 
+function templateEnquiryStatus({ doctorName, productName, vendorName, status, message }) {
+  const firstName = (doctorName || "").split(" ")[0] || "Doctor";
+  const isFulfilled = status === "fulfilled";
+  const preview = `${vendorName} has ${isFulfilled ? "closed" : "reopened"} your enquiry for "${productName}".`;
+  const content = `
+    <div style="font-size:13px;color:${C.gold};letter-spacing:3px;text-transform:uppercase;font-weight:600;margin-bottom:18px;font-family:Arial,sans-serif;">Enquiry Update</div>
+    <h1 style="font-size:26px;font-weight:400;color:${C.burgundy};margin:0 0 22px;font-family:Georgia,serif;line-height:1.25;">Your enquiry has been ${isFulfilled ? "marked as done" : "reopened"}</h1>
+    <p style="margin:0 0 18px;color:${C.text};">Hi ${firstName},</p>
+    <p style="margin:0 0 18px;color:${C.text};"><b style="color:${C.burgundy};">${vendorName}</b> has ${isFulfilled ? "closed/fulfilled" : "reopened"} your enquiry for <b style="color:${C.burgundy};">"${productName}"</b>.</p>
+    ${isFulfilled ? `<div style="padding:14px 18px;background:#e8f5e9;border-left:3px solid #1a7d42;border-radius:0 8px 8px 0;margin:20px 0;">
+      <p style="margin:0;color:#1a7d42;font-size:14px;font-weight:600;">✓ Enquiry fulfilled — the vendor has responded to your request.</p>
+    </div>` : `<div style="padding:14px 18px;background:#fff8e1;border-left:3px solid #f0a500;border-radius:0 8px 8px 0;margin:20px 0;">
+      <p style="margin:0;color:#856404;font-size:14px;font-weight:600;">↩ Enquiry reopened — the vendor is looking into your request again.</p>
+    </div>`}
+    ${message ? `<div style="padding:18px 22px;background:${C.cream};border-left:3px solid ${C.gold};border-radius:0 8px 8px 0;margin:24px 0;">
+      <div style="font-size:12px;color:${C.gold};letter-spacing:2px;text-transform:uppercase;font-weight:700;margin-bottom:8px;font-family:Arial,sans-serif;">Your original enquiry</div>
+      <div style="color:${C.text};font-size:14px;font-style:italic;line-height:1.7;">"${(message).slice(0, 300)}"</div>
+    </div>` : ""}
+    <p style="margin:18px 0;color:${C.text};">If you have further questions, you can contact ${vendorName} directly through SKINARIO.</p>
+    <div style="text-align:center;margin:30px 0;">
+      <a href="${SITE_URL}/vendors" style="display:inline-block;background:${C.burgundy};color:${C.creamDark};text-decoration:none;padding:14px 32px;border-radius:999px;font-size:14px;letter-spacing:1.5px;font-weight:700;font-family:Arial,sans-serif;">VIEW ON SKINARIO →</a>
+    </div>
+  `;
+  return { subject: `Enquiry ${isFulfilled ? "fulfilled" : "reopened"}: ${productName} — ${vendorName}`, preview, html: wrapEmail({ preview, content }) };
+}
+
 function templateProductEnquiry({ vendorName, productName, doctorName, doctorEmail, message }) {
   const firstWord = (vendorName || "").split(" ")[0] || "Team";
   const preview = `${doctorName} enquired about "${productName}" on SKINARIO.`;
@@ -212,6 +238,7 @@ function buildEmail(type, data) {
     case "submission_rejected": return templateSubmissionRejected(data);
     case "reply": return templateReply(data);
     case "product_enquiry": return templateProductEnquiry(data);
+    case "enquiry_status": return templateEnquiryStatus(data);
     default: throw new Error(`Unknown email type: ${type}`);
   }
 }
