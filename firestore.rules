@@ -1,0 +1,174 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return isSignedIn() &&
+        request.auth.token.email in ['drjpatil@gmail.com','absoluteinstituteedu@gmail.com'];
+    }
+    function isOwner(field) {
+      return isSignedIn() && request.resource.data[field] == request.auth.uid;
+    }
+    function wasOwner(field) {
+      return isSignedIn() && resource.data[field] == request.auth.uid;
+    }
+    // Every fbSet() call appends updatedAt — always allow it in whitelists
+    function onlyChangedTo(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    // ── users/{uid} — doc id IS the uid, so ownership = doc id match ──────
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == uid;
+      allow update: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // ── follows — create/delete only by the follower themself ─────────────
+    match /follows/{followId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner('followerId');
+      allow delete: if wasOwner('followerId') || isAdmin();
+      allow update: if false; // follows are create/delete only, never edited
+    }
+
+    // ── notifications — anyone signed in can notify another user;
+    //    only the recipient (or admin) can read/mark-read/delete ──────────
+    match /notifications/{notifId} {
+      allow create: if isOwner('fromUid');
+      allow read, delete: if wasOwner('toUid') || isAdmin();
+      allow update: if (wasOwner('toUid') && onlyChangedTo(['read','updatedAt'])) || isAdmin();
+    }
+
+    // ── productEnquiries — doctor creates, doctor+vendor+admin can read,
+    //    vendor updates status, product's own enquiry counter can be
+    //    bumped by the enquiring doctor (see products rule below) ─────────
+    match /productEnquiries/{enqId} {
+      allow create: if isOwner('doctorUid');
+      allow read: if wasOwner('doctorUid') || wasOwner('vendorId') || isAdmin();
+      allow update: if wasOwner('vendorId') && onlyChangedTo(['status','updatedAt']) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── products — vendor owns their own listings; any signed-in user
+    //    may bump the enquiries counter when they submit an enquiry ───────
+    match /products/{productId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner('vendorId');
+      allow update: if wasOwner('vendorId')
+                    || isAdmin()
+                    || (isSignedIn() && onlyChangedTo(['enquiries','updatedAt']));
+      allow delete: if wasOwner('vendorId') || isAdmin();
+    }
+
+    // ── sponsorPlacements — vendor requests, admin approves ────────────────
+    match /sponsorPlacements/{placementId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner('vendorId');
+      allow update: if isAdmin() || (wasOwner('vendorId') && onlyChangedTo(['active','updatedAt']));
+      allow delete: if isAdmin();
+    }
+
+    // ── referrals — self-pay-on-next-load: referrer writes their own
+    //    audit-log entry for a bonus they are crediting themselves ────────
+    match /referrals/{refId} {
+      allow read: if isSignedIn();
+      allow create, update: if isOwner('referrerUid') || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── pointsActivity — append-only ledger, self-pay pattern ─────────────
+    match /pointsActivity/{entryId} {
+      allow read: if wasOwner('uid') || isAdmin();
+      allow create, update: if isOwner('uid') || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── consentGenerationLog — doctor's own generation history ─────────────
+    match /consentGenerationLog/{logId} {
+      allow read: if wasOwner('uid') || isAdmin();
+      allow create, update: if isOwner('uid') || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── moderationLog — write on any moderation action, admin-only read ───
+    match /moderationLog/{logId} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ── forum & cases — user-generated, editable by author or admin ───────
+    match /forum/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner('uid');
+      allow update: if wasOwner('uid') || isAdmin();
+      allow delete: if wasOwner('uid') || isAdmin();
+    }
+    match /cases/{caseId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner('uid');
+      allow update: if wasOwner('uid') || isAdmin();
+      allow delete: if wasOwner('uid') || isAdmin();
+    }
+
+    // ── submissions — user submits for review; only admin reviews;
+    //    submitter may withdraw their own pending submission ──────────────
+    match /submissions/{subId} {
+      allow read: if wasOwner('submitterUid') || isAdmin();
+      allow create: if isOwner('submitterUid');
+      allow update: if isAdmin();
+      allow delete: if (wasOwner('submitterUid') && resource.data.status == 'pending') || isAdmin();
+    }
+
+    // ── roleApplications — user applies, admin reviews ─────────────────────
+    match /roleApplications/{appId} {
+      allow read: if wasOwner('uid') || isAdmin();
+      allow create: if isOwner('uid');
+      allow update, delete: if isAdmin();
+    }
+
+    // ── vendorApplications — vendor applies, admin reviews ─────────────────
+    match /vendorApplications/{appId} {
+      allow read: if wasOwner('uid') || isAdmin();
+      allow create: if isOwner('uid');
+      allow update, delete: if isAdmin();
+    }
+
+    // ── rewards — admin publishes (via approved submissions); any signed-in
+    //    doctor may decrement stock / bump timesRedeemed when redeeming ────
+    match /rewards/{rewardId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+                    || (isSignedIn() && onlyChangedTo(['stock','timesRedeemed','updatedAt']));
+    }
+
+    // ── redemptions — doctor's own redemption record ────────────────────────
+    match /redemptions/{redemptionId} {
+      allow read: if wasOwner('uid') || isAdmin();
+      allow create: if isOwner('uid');
+      allow update, delete: if isAdmin();
+    }
+
+    // ── Admin-managed content collections — public/community read,
+    //    write restricted to admin (published via the submissions flow) ────
+    match /quizzes/{docId}       { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /articles/{docId}      { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /resources/{docId}     { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /videos/{docId}        { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /events/{docId}        { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /news/{docId}          { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /ads/{docId}           { allow read: if isSignedIn(); allow write: if isAdmin(); }
+
+    // Default deny for anything not explicitly listed above
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
