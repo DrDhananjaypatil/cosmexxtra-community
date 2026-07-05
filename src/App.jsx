@@ -9697,8 +9697,8 @@ ${forDownload
             const q=adminUserSearch.toLowerCase();
             const filtered=allUsers.filter(u=>{
               const matchSearch=!q||(u.name||"").toLowerCase().includes(q)||(u.email||"").toLowerCase().includes(q)||(u.clinic||"").toLowerCase().includes(q)||(u.city||"").toLowerCase().includes(q)||(u.companyName||"").toLowerCase().includes(q)||(u.regNumber||"").toLowerCase().includes(q);
-              const matchFilter=adminUserFilter==="all"
-                ||adminUserFilter==="flagged"?u.regFlagged
+              const matchFilter=adminUserFilter==="all"?true
+                :adminUserFilter==="flagged"?u.regFlagged
                 :adminUserFilter==="premium"?u.paid
                 :adminUserFilter==="verified"?u.verified
                 :(u.accountType||"")===(adminUserFilter);
