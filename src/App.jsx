@@ -2266,6 +2266,7 @@ export default function App(){
 
   // ─── FOLLOW SYSTEM ────────────────────────────────────────────────────────
   const[follows,setFollows]=useState([]); // all follows where follower=au.uid or followed=au.uid // enquiry ledger for Phase 3
+  const[followersModal,setFollowersModal]=useState(null); // {uid,name,type:"followers"|"following"}
   // followedUids: set of UIDs the current user follows
   const followedUids=useMemo(()=>new Set(follows.filter(f=>f.followerId===au?.uid).map(f=>f.followedId)),[follows,au?.uid]);
   // myFollowerCount: how many follow ME
@@ -5134,10 +5135,10 @@ ${forDownload
               <p style={{color:T.txt2,fontSize:".9rem",marginTop:3,fontStyle:"italic",letterSpacing:.3}}>Learn. Discuss. Lead the field.</p>
               {/* Followers / Following — Instagram style */}
               <div style={{display:"flex",gap:16,marginTop:6}}>
-                <span style={{fontSize:".82rem",color:T.txt,cursor:"pointer"}} onClick={()=>go("me")}>
+                <span style={{fontSize:".82rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:au?.uid,name:"me",type:"followers"})}>
                   <b style={{fontWeight:700,color:T.txt}}>{myFollowerCount}</b> <span style={{color:T.mute}}>Followers</span>
                 </span>
-                <span style={{fontSize:".82rem",color:T.txt,cursor:"pointer"}} onClick={()=>go("me")}>
+                <span style={{fontSize:".82rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:au?.uid,name:"me",type:"following"})}>
                   <b style={{fontWeight:700,color:T.txt}}>{myFollowingCount}</b> <span style={{color:T.mute}}>Following</span>
                 </span>
               </div>
@@ -6923,10 +6924,10 @@ ${forDownload
                   <div style={{fontSize:".75rem",color:T.mute,marginTop:6}}>Joined {fD(u.joined)}</div>
                   {/* Follower / Following counts */}
                   <div style={{display:"flex",gap:16,marginTop:8}}>
-                    <span style={{fontSize:".84rem",color:T.txt}}>
+                    <span style={{fontSize:".84rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:u.id,name:u.name,type:"followers"})}>
                       <b style={{fontWeight:700}}>{follows.filter(f=>f.followedId===u.id).length}</b> <span style={{color:T.mute}}>Followers</span>
                     </span>
-                    <span style={{fontSize:".84rem",color:T.txt}}>
+                    <span style={{fontSize:".84rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:u.id,name:u.name,type:"following"})}>
                       <b style={{fontWeight:700}}>{follows.filter(f=>f.followerId===u.id).length}</b> <span style={{color:T.mute}}>Following</span>
                     </span>
                   </div>
@@ -10124,6 +10125,52 @@ ${forDownload
       }}/>}
 
       {/* ═══ PRODUCT ENQUIRY MODAL ═══ */}
+      {/* ═══ FOLLOWERS / FOLLOWING MODAL ═══ */}
+      {followersModal&&(()=>{
+        const isMyProfile=followersModal.uid===au?.uid;
+        const isFollowers=followersModal.type==="followers";
+        const title=isFollowers
+          ?(isMyProfile?"Your Followers":`${followersModal.name}'s Followers`)
+          :(isMyProfile?"You're Following":`${followersModal.name} is Following`);
+        const list=isFollowers
+          ?follows.filter(f=>f.followedId===followersModal.uid)
+          :follows.filter(f=>f.followerId===followersModal.uid);
+        return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:1200,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setFollowersModal(null)}>
+          <div style={{background:"#fff",borderRadius:16,width:"100%",maxWidth:420,maxHeight:"72vh",display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 20px 60px rgba(0,0,0,0.25)"}} onClick={e=>e.stopPropagation()}>
+            {/* Header */}
+            <div style={{padding:"14px 18px",borderBottom:"1px solid "+T.border,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+              <h3 style={{margin:0,fontSize:"1rem",fontWeight:700,color:T.txt}}>{title}</h3>
+              <button onClick={()=>setFollowersModal(null)} style={{background:"none",border:"none",fontSize:"1.3rem",cursor:"pointer",color:T.mute,lineHeight:1}}>✕</button>
+            </div>
+            {/* List */}
+            <div style={{overflowY:"auto",flex:1,padding:"6px 0"}}>
+              {list.length===0
+                ?<div style={{padding:"40px 20px",textAlign:"center",color:T.mute,fontSize:".88rem"}}>
+                  {isFollowers?"No followers yet — share your profile to get discovered!":"Not following anyone yet — find doctors on the Rank page."}
+                </div>
+                :list.map(f=>{
+                  const uid=isFollowers?f.followerId:f.followedId;
+                  const name=isFollowers?(f.followerName||"Unknown"):(f.followedName||"Unknown");
+                  const photo=isFollowers?(f.followerPhoto||""):(f.followedPhoto||"");
+                  const user=allUsers.find(u=>u.id===uid)||{id:uid,name,photo};
+                  return(<div key={f.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 18px",borderBottom:"1px solid "+T.border+"44"}}>
+                    {photo
+                      ?<img src={photo} onClick={()=>{viewProfile(uid);setFollowersModal(null)}} style={{width:46,height:46,borderRadius:"50%",objectFit:"cover",cursor:"pointer",flexShrink:0}}/>
+                      :<div onClick={()=>{viewProfile(uid);setFollowersModal(null)}} style={{...T.av(46,T.tealBg,T.teal),cursor:"pointer",flexShrink:0,fontWeight:700}}>{(name[0]||"?").toUpperCase()}</div>
+                    }
+                    <div style={{flex:1,minWidth:0}}>
+                      <div onClick={()=>{viewProfile(uid);setFollowersModal(null)}} style={{fontSize:".9rem",fontWeight:600,color:T.txt,cursor:"pointer",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</div>
+                      <div style={{fontSize:".72rem",color:T.mute,marginTop:2}}>{user.degree||user.companyName||user.instituteName||user.accountType||""}</div>
+                    </div>
+                    <FollowBtn user={user} size="sm"/>
+                  </div>);
+                })
+              }
+            </div>
+          </div>
+        </div>);
+      })()}
+
       {enquiryModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:1100,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setEnquiryModal(null)}>
         <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:480,padding:24,boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}} onClick={e=>e.stopPropagation()}>
           <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:16,gap:12}}>
