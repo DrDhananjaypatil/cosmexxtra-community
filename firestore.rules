@@ -67,11 +67,11 @@ service cloud.firestore {
       allow delete: if wasOwner('vendorId') || isAdmin();
     }
 
-    // ── sponsorPlacements — vendor requests, admin approves ────────────────
+    // ── sponsorPlacements — vendor requests; admin approves/activates ──────
     match /sponsorPlacements/{placementId} {
       allow read: if isSignedIn();
       allow create: if isOwner('vendorId');
-      allow update: if isAdmin() || (wasOwner('vendorId') && onlyChangedTo(['active','updatedAt']));
+      allow update: if isAdmin() || (wasOwner('vendorId') && onlyChangedTo(['status','updatedAt']));
       allow delete: if isAdmin();
     }
 
@@ -103,17 +103,22 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
-    // ── forum & cases — user-generated, editable by author or admin ───────
+    // ── forum & cases — user-generated; author/admin can fully edit,
+    //    any signed-in user can bump views or append a comment ────────────
     match /forum/{postId} {
       allow read: if isSignedIn();
       allow create: if isOwner('uid');
-      allow update: if wasOwner('uid') || isAdmin();
+      allow update: if wasOwner('uid') || isAdmin()
+                    || (isSignedIn() && onlyChangedTo(['views','updatedAt']))
+                    || (isSignedIn() && onlyChangedTo(['comments','updatedAt']));
       allow delete: if wasOwner('uid') || isAdmin();
     }
     match /cases/{caseId} {
       allow read: if isSignedIn();
       allow create: if isOwner('uid');
-      allow update: if wasOwner('uid') || isAdmin();
+      allow update: if wasOwner('uid') || isAdmin()
+                    || (isSignedIn() && onlyChangedTo(['views','updatedAt']))
+                    || (isSignedIn() && onlyChangedTo(['comments','updatedAt']));
       allow delete: if wasOwner('uid') || isAdmin();
     }
 
@@ -156,15 +161,50 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // ── Admin-managed content collections — public/community read,
-    //    write restricted to admin (published via the submissions flow) ────
-    match /quizzes/{docId}       { allow read: if isSignedIn(); allow write: if isAdmin(); }
-    match /articles/{docId}      { allow read: if isSignedIn(); allow write: if isAdmin(); }
-    match /resources/{docId}     { allow read: if isSignedIn(); allow write: if isAdmin(); }
-    match /videos/{docId}        { allow read: if isSignedIn(); allow write: if isAdmin(); }
-    match /events/{docId}        { allow read: if isSignedIn(); allow write: if isAdmin(); }
-    match /news/{docId}          { allow read: if isSignedIn(); allow write: if isAdmin(); }
-    match /ads/{docId}           { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    // ── Admin-managed content collections — admin has full write access
+    //    (published via the submissions flow); any signed-in user may still
+    //    touch specific interaction fields (answering, viewing, commenting,
+    //    RSVPing, clicking) without being able to edit the content itself ──
+    match /quizzes/{docId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+                    || (isSignedIn() && onlyChangedTo(['answers','updatedAt']))
+                    || (isSignedIn() && onlyChangedTo(['comments','updatedAt']))
+                    || (isSignedIn() && onlyChangedTo(['views','updatedAt']))
+                    || (isSignedIn() && onlyChangedTo(['igImageUrl','updatedAt']));
+    }
+    match /articles/{docId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (isSignedIn() && onlyChangedTo(['views','updatedAt']));
+    }
+    match /resources/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /videos/{docId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (isSignedIn() && onlyChangedTo(['views','updatedAt']));
+    }
+    match /events/{docId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (isSignedIn() && onlyChangedTo(['attendees','updatedAt']));
+    }
+    match /news/{docId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (isSignedIn() && onlyChangedTo(['views','updatedAt']));
+    }
+    match /ads/{docId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+                    || (isSignedIn() && onlyChangedTo(['clicks','updatedAt']))
+                    || (isSignedIn() && onlyChangedTo(['visits','updatedAt']));
+    }
 
     // Default deny for anything not explicitly listed above
     match /{document=**} {
