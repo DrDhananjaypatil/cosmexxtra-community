@@ -66,6 +66,7 @@ CRITICAL RULES:
 6. The 3 options must all be PLAUSIBLE clinical actions.
 7. The explanation must include why the correct answer is right, why the others are not, and a "Clinical pearl" takeaway.
 8. IMPORTANT — VARY THE CORRECT ANSWER POSITION. The correct option should appear at index 0, 1, or 2 with roughly equal frequency over time. Do NOT default to placing the correct answer first. Decide naturally based on what makes the best question, then ORDER the options so the correct one is sometimes first, sometimes second, sometimes third.
+9. CONSISTENCY CHECK — if the scenario states an explicit constraint or preference (e.g. "non-invasive," "no injectables," "minimal downtime," "budget-conscious," "avoid lasers," "breastfeeding," "pregnant"), the correct answer MUST actually satisfy that constraint, and at least one of the three options must be a genuinely valid choice under it. Do not write a scenario that asks for a non-invasive option and then mark an injectable procedure (fillers, polynucleotides, mesotherapy, biostimulators, threads) as correct — injectable/needle-based procedures are NOT non-invasive, regardless of how minimal the needle gauge is. If you cannot construct a scenario where the constraint and the correct answer are consistent, choose a different topic or drop the constraining phrase from the scenario entirely.
 
 Return ONLY this exact JSON (no markdown, no extra text). Replace ALL values — do not copy the example correctIndex below:
 {
