@@ -10203,7 +10203,7 @@ ${forDownload
               if(!enquiryMsg.trim()){sh("Please write a message");return}
               try{
                 // Log enquiry to Firestore
-                await fbAdd("productEnquiries",{
+                const newId=await fbAdd("productEnquiries",{
                   productId:enquiryModal.id,
                   productName:enquiryModal.name,
                   vendorId:enquiryModal.vendorId,
@@ -10217,6 +10217,7 @@ ${forDownload
                   createdAt:Date.now(),
                   date:ds(getIST()),
                 });
+                if(!newId){sh("❌ Could not save your enquiry. Check your connection and try again.");return}
                 // Increment product enquiry counter
                 await fbSet("products",enquiryModal.id,{enquiries:(enquiryModal.enquiries||0)+1});
                 // Notify the vendor in-app
@@ -10247,11 +10248,8 @@ ${forDownload
                       message:enquiryMsg.trim(),
                     },
                   }),
-                }).catch(()=>{}); // silent fail — in-app notif + mailto are the reliable channels
-                // Open email to vendor with pre-filled message
-                const mailBody=encodeURIComponent(`${enquiryMsg.trim()}\n\n— ${uName}\n${au.email}\n\n(Sent via SKINARIO platform)`);
-                window.open(`mailto:${enquiryModal.enquiryEmail||enquiryModal.vendorEmail}?subject=SKINARIO Enquiry: ${enquiryModal.name}&body=${mailBody}`,"_blank");
-                sh("📧 Enquiry logged and email opened!");
+                }).catch(()=>{}); // silent fail — in-app notif is the reliable channel either way
+                sh("✅ Enquiry sent! The vendor has been notified.");
                 setEnquiryModal(null);
                 setEnquiryMsg("");
                 loadData();
