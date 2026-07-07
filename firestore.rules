@@ -38,20 +38,27 @@ service cloud.firestore {
       allow update: if false; // follows are create/delete only, never edited
     }
 
-    // ── notifications — anyone signed in can notify another user;
-    //    only the recipient (or admin) can read/mark-read/delete ──────────
+    // ── notifications — anyone signed in can notify another user.
+    //    NOTE: the app fetches this collection unfiltered (no `where` clause)
+    //    for every logged-in user to build their notification bell client-side,
+    //    so read access must be isSignedIn() — a per-doc ownership read rule
+    //    here would reject the entire unfiltered query for non-admins. Writes
+    //    remain properly restricted below. ─────────────────────────────────
     match /notifications/{notifId} {
+      allow read: if isSignedIn();
       allow create: if isOwner('fromUid');
-      allow read, delete: if wasOwner('toUid') || isAdmin();
+      allow delete: if wasOwner('toUid') || isAdmin();
       allow update: if (wasOwner('toUid') && onlyChangedTo(['read','updatedAt'])) || isAdmin();
     }
 
-    // ── productEnquiries — doctor creates, doctor+vendor+admin can read,
-    //    vendor updates status, product's own enquiry counter can be
-    //    bumped by the enquiring doctor (see products rule below) ─────────
+    // ── productEnquiries — doctor creates; read is open (see notifications
+    //    note above — this is bulk-fetched unfiltered too, by both the doctor
+    //    ledger and the vendor's own dashboard); vendor updates status;
+    //    product's own enquiry counter can be bumped by the enquiring doctor
+    //    (see products rule below) ───────────────────────────────────────
     match /productEnquiries/{enqId} {
+      allow read: if isSignedIn();
       allow create: if isOwner('doctorUid');
-      allow read: if wasOwner('doctorUid') || wasOwner('vendorId') || isAdmin();
       allow update: if wasOwner('vendorId') && onlyChangedTo(['status','updatedAt']) || isAdmin();
       allow delete: if isAdmin();
     }
@@ -123,24 +130,27 @@ service cloud.firestore {
     }
 
     // ── submissions — user submits for review; only admin reviews;
-    //    submitter may withdraw their own pending submission ──────────────
+    //    submitter may withdraw their own pending submission. Read is open
+    //    (bulk-fetched unfiltered in loadData() for every user) ────────────
     match /submissions/{subId} {
-      allow read: if wasOwner('submitterUid') || isAdmin();
+      allow read: if isSignedIn();
       allow create: if isOwner('submitterUid');
       allow update: if isAdmin();
       allow delete: if (wasOwner('submitterUid') && resource.data.status == 'pending') || isAdmin();
     }
 
-    // ── roleApplications — user applies, admin reviews ─────────────────────
+    // ── roleApplications — user applies, admin reviews (read open — see
+    //    submissions note above) ──────────────────────────────────────────
     match /roleApplications/{appId} {
-      allow read: if wasOwner('uid') || isAdmin();
+      allow read: if isSignedIn();
       allow create: if isOwner('uid');
       allow update, delete: if isAdmin();
     }
 
-    // ── vendorApplications — vendor applies, admin reviews ─────────────────
+    // ── vendorApplications — vendor applies, admin reviews (read open —
+    //    see submissions note above) ─────────────────────────────────────
     match /vendorApplications/{appId} {
-      allow read: if wasOwner('uid') || isAdmin();
+      allow read: if isSignedIn();
       allow create: if isOwner('uid');
       allow update, delete: if isAdmin();
     }
@@ -154,9 +164,10 @@ service cloud.firestore {
                     || (isSignedIn() && onlyChangedTo(['stock','timesRedeemed','updatedAt']));
     }
 
-    // ── redemptions — doctor's own redemption record ────────────────────────
+    // ── redemptions — doctor's own redemption record (read open — bulk-
+    //    fetched unfiltered in loadData() for every user) ─────────────────
     match /redemptions/{redemptionId} {
-      allow read: if wasOwner('uid') || isAdmin();
+      allow read: if isSignedIn();
       allow create: if isOwner('uid');
       allow update, delete: if isAdmin();
     }
