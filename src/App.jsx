@@ -679,6 +679,24 @@ const VENDOR_CATEGORIES=["Dermal Fillers","Botox / Neurotoxin Injectables","PDRN
 const getIST=()=>new Date(new Date().toLocaleString("en-US",{timeZone:"Asia/Kolkata"}));
 const ds=d=>d.toISOString().split("T")[0];
 const fD=s=>{try{return new Date(s+"T12:00:00").toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}catch{return s}};
+// Computes the SKINARIO-member price + offer badges for a product, from its `offers` array.
+// offers: [{type:"percent_off",percent}, {type:"flat_price",price}, {type:"buy_get",buyQty,freeQty}, {type:"slab_percent",minQty,percent}]
+function getProductOffers(p){
+  const mrp=Number(p?.mrp)||0;
+  const offers=Array.isArray(p?.offers)?p.offers:[];
+  let memberPrice=null;
+  const flat=offers.find(o=>o.type==="flat_price"&&Number(o.price)>0);
+  const pct=offers.find(o=>o.type==="percent_off"&&Number(o.percent)>0);
+  if(flat)memberPrice=Number(flat.price);
+  else if(pct&&mrp>0)memberPrice=Math.round(mrp*(1-Number(pct.percent)/100));
+  const buyGets=offers.filter(o=>o.type==="buy_get"&&Number(o.buyQty)>0&&Number(o.freeQty)>0);
+  const slabs=offers.filter(o=>o.type==="slab_percent"&&Number(o.minQty)>0&&Number(o.percent)>0).sort((a,b)=>Number(a.minQty)-Number(b.minQty));
+  const badges=[
+    ...buyGets.map(o=>`🎁 Buy ${o.buyQty} Get ${o.freeQty} Free`),
+    ...slabs.map(o=>`📊 Buy ${o.minQty}+: ${o.percent}% off`),
+  ];
+  return{mrp,memberPrice,percentOff:pct?Number(pct.percent):null,badges,hasOffers:!!(memberPrice||badges.length)};
+}
 const fDateRange=(start,end)=>{
   if(!start)return"";
   if(!end||end===start){const d=new Date(start+"T12:00:00");return d.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}
@@ -2371,7 +2389,8 @@ export default function App(){
   const[vrImage,setVrImage]=useState(""); // vendor reward proposal: uploaded image URL
   const[vrUploading,setVrUploading]=useState(false);
   // Phase 3: product listings
-  const[prodForm,setProdForm]=useState({name:"",description:"",priceRange:"",category:"",specs:"",enquiryEmail:""});
+  const[prodForm,setProdForm]=useState({name:"",description:"",priceRange:"",category:"",specs:"",enquiryEmail:"",mrp:"",offers:[]});
+  const[offerDraft,setOfferDraft]=useState({type:"percent_off",percent:"",price:"",buyQty:"",freeQty:"",minQty:""});
   const[prodImages,setProdImages]=useState([]); // uploaded product image URLs
   const[prodUploading,setProdUploading]=useState(false);
   const[showProdForm,setShowProdForm]=useState(false);
@@ -6053,18 +6072,30 @@ ${forDownload
               return(<div style={T.card}>
                 <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>🛍️ Products & Equipment</h4>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:12}}>
-                  {vProducts.map(p=><div key={p.id} style={{border:"1px solid "+T.border,borderRadius:8,overflow:"hidden",cursor:"pointer",transition:"box-shadow .12s"}} onClick={()=>setSelProduct(p)} onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"} onMouseLeave={e=>e.currentTarget.style.boxShadow=""}>
+                  {vProducts.map(p=>{
+                    const off=getProductOffers(p);
+                    return(<div key={p.id} style={{border:"1px solid "+T.border,borderRadius:8,overflow:"hidden",cursor:"pointer",transition:"box-shadow .12s"}} onClick={()=>setSelProduct(p)} onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"} onMouseLeave={e=>e.currentTarget.style.boxShadow=""}>
                     {p.images?.[0]?<img src={p.images[0]} alt={p.name} style={{width:"100%",height:140,objectFit:"cover"}}/>:<div style={{width:"100%",height:100,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2rem"}}>🛍️</div>}
                     <div style={{padding:12}}>
                       <div style={{fontSize:".88rem",fontWeight:700,marginBottom:4}}>{p.name}</div>
                       {p.category&&<div style={{fontSize:".68rem",color:T.mute,marginBottom:6}}>{p.category}</div>}
                       <div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden",marginBottom:8}}>{p.description}</div>
+                      {off.mrp>0&&<div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:4}}>
+                        {off.memberPrice?<>
+                          <span style={{fontSize:".74rem",color:T.mute,textDecoration:"line-through"}}>₹{off.mrp}</span>
+                          <span style={{fontSize:".92rem",fontWeight:700,color:T.teal}}>₹{off.memberPrice}</span>
+                          <span style={{fontSize:".62rem",color:T.gold,fontWeight:700}}>MEMBER PRICE</span>
+                        </>:<span style={{fontSize:".84rem",fontWeight:700,color:T.txt}}>₹{off.mrp}</span>}
+                      </div>}
+                      {off.badges.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
+                        {off.badges.map((b,i)=><span key={i} style={{fontSize:".62rem",fontWeight:600,color:T.goldD,background:T.goldBg,padding:"2px 7px",borderRadius:4}}>{b}</span>)}
+                      </div>}
                       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                        {p.priceRange&&<div style={{fontSize:".78rem",fontWeight:600,color:T.teal}}>{p.priceRange}</div>}
-                        <button onClick={async(e)=>{e.stopPropagation();setEnquiryMsg("");setEnquiryModal(p);}} style={{...T.btn,padding:"5px 12px",fontSize:".72rem"}}>Enquire →</button>
+                        {!off.mrp&&p.priceRange&&<div style={{fontSize:".78rem",fontWeight:600,color:T.teal}}>{p.priceRange}</div>}
+                        <button onClick={async(e)=>{e.stopPropagation();setEnquiryMsg("");setEnquiryModal(p);}} style={{...T.btn,padding:"5px 12px",fontSize:".72rem",marginLeft:"auto"}}>Enquire →</button>
                       </div>
                     </div>
-                  </div>)}
+                  </div>)})}
                 </div>
               </div>);
             })()}
@@ -7461,6 +7492,49 @@ ${forDownload
                 <input value={prodForm.specs} onChange={e=>setProdForm(p=>({...p,specs:e.target.value}))} placeholder="Key specs / certifications" style={T.inp}/>
               </div>
               <input value={prodForm.enquiryEmail} onChange={e=>setProdForm(p=>({...p,enquiryEmail:e.target.value}))} placeholder="Enquiry email (defaults to your login email)" style={T.inp}/>
+              <div style={{padding:12,background:"#fff",borderRadius:8,border:"1px solid "+T.border}}>
+                <div style={{fontSize:".76rem",color:T.txt2,fontWeight:600,marginBottom:8}}>💰 Pricing & member offers (optional)</div>
+                <input type="number" value={prodForm.mrp} onChange={e=>setProdForm(p=>({...p,mrp:e.target.value}))} placeholder="MRP ₹ (numeric, e.g. 4500)" style={{...T.inp,marginBottom:10}}/>
+                {prodForm.offers.length>0&&<div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:10}}>
+                  {prodForm.offers.map((o,i)=>{
+                    const label=o.type==="percent_off"?`${o.percent}% off for SKINARIO members`
+                      :o.type==="flat_price"?`Flat member price ₹${o.price}`
+                      :o.type==="buy_get"?`Buy ${o.buyQty} Get ${o.freeQty} Free`
+                      :`Buy ${o.minQty}+: ${o.percent}% off`;
+                    return(<div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"6px 10px",background:T.bg,borderRadius:6,fontSize:".78rem"}}>
+                      <span>{label}</span>
+                      <button type="button" onClick={()=>setProdForm(p=>({...p,offers:p.offers.filter((_,j)=>j!==i)}))} style={{background:"none",border:"none",color:T.err,cursor:"pointer",fontSize:".78rem",fontWeight:700}}>✕ Remove</button>
+                    </div>);
+                  })}
+                </div>}
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                  <select value={offerDraft.type} onChange={e=>setOfferDraft(d=>({...d,type:e.target.value}))} style={{...T.inp,maxWidth:190}}>
+                    <option value="percent_off">% off for members</option>
+                    <option value="flat_price">Flat member price</option>
+                    <option value="buy_get">Buy X Get Y Free</option>
+                    <option value="slab_percent">Quantity slab % off</option>
+                  </select>
+                  {offerDraft.type==="percent_off"&&<input type="number" value={offerDraft.percent} onChange={e=>setOfferDraft(d=>({...d,percent:e.target.value}))} placeholder="% off" style={{...T.inp,maxWidth:100}}/>}
+                  {offerDraft.type==="flat_price"&&<input type="number" value={offerDraft.price} onChange={e=>setOfferDraft(d=>({...d,price:e.target.value}))} placeholder="₹ price" style={{...T.inp,maxWidth:110}}/>}
+                  {offerDraft.type==="buy_get"&&<>
+                    <input type="number" value={offerDraft.buyQty} onChange={e=>setOfferDraft(d=>({...d,buyQty:e.target.value}))} placeholder="Buy qty" style={{...T.inp,maxWidth:90}}/>
+                    <input type="number" value={offerDraft.freeQty} onChange={e=>setOfferDraft(d=>({...d,freeQty:e.target.value}))} placeholder="Free qty" style={{...T.inp,maxWidth:90}}/>
+                  </>}
+                  {offerDraft.type==="slab_percent"&&<>
+                    <input type="number" value={offerDraft.minQty} onChange={e=>setOfferDraft(d=>({...d,minQty:e.target.value}))} placeholder="Min qty" style={{...T.inp,maxWidth:90}}/>
+                    <input type="number" value={offerDraft.percent} onChange={e=>setOfferDraft(d=>({...d,percent:e.target.value}))} placeholder="% off" style={{...T.inp,maxWidth:90}}/>
+                  </>}
+                  <button type="button" onClick={()=>{
+                    const d=offerDraft;
+                    if(d.type==="percent_off"&&!(Number(d.percent)>0)){sh("Enter a % off value");return}
+                    if(d.type==="flat_price"&&!(Number(d.price)>0)){sh("Enter a member price");return}
+                    if(d.type==="buy_get"&&!(Number(d.buyQty)>0&&Number(d.freeQty)>0)){sh("Enter buy & free quantities");return}
+                    if(d.type==="slab_percent"&&!(Number(d.minQty)>0&&Number(d.percent)>0)){sh("Enter min quantity & % off");return}
+                    setProdForm(p=>({...p,offers:[...p.offers,{...d}]}));
+                    setOfferDraft({type:"percent_off",percent:"",price:"",buyQty:"",freeQty:"",minQty:""});
+                  }} style={{...T.btnO,...T.btnSm,padding:"7px 14px"}}>+ Add offer</button>
+                </div>
+              </div>
               <div>
                 <div style={{fontSize:".76rem",color:T.txt2,fontWeight:600,marginBottom:6}}>Product images (up to 5)</div>
                 <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
@@ -7483,8 +7557,8 @@ ${forDownload
                 if(!prodForm.name.trim()){sh("Product name required");return}
                 if(!prodForm.description.trim()){sh("Description required");return}
                 try{
-                  await fbAdd("products",{vendorId:au.uid,vendorName:prof?.companyName||prof?.name||"",vendorEmail:au.email,vendorCategory:prof?.vendorCategory||prof?.brandCategory||"",name:prodForm.name.trim(),category:prodForm.category,description:prodForm.description.trim(),priceRange:prodForm.priceRange.trim(),specs:prodForm.specs.trim(),enquiryEmail:prodForm.enquiryEmail.trim()||au.email,images:prodImages,enquiries:0,active:true,createdAt:Date.now(),date:ds(getIST())});
-                  sh("✅ Product listed!");setProdForm({name:"",description:"",priceRange:"",category:"",specs:"",enquiryEmail:""});setProdImages([]);setShowProdForm(false);loadData();
+                  await fbAdd("products",{vendorId:au.uid,vendorName:prof?.companyName||prof?.name||"",vendorEmail:au.email,vendorCategory:prof?.vendorCategory||prof?.brandCategory||"",name:prodForm.name.trim(),category:prodForm.category,description:prodForm.description.trim(),priceRange:prodForm.priceRange.trim(),specs:prodForm.specs.trim(),enquiryEmail:prodForm.enquiryEmail.trim()||au.email,mrp:Number(prodForm.mrp)||0,offers:prodForm.offers,images:prodImages,enquiries:0,active:true,createdAt:Date.now(),date:ds(getIST())});
+                  sh("✅ Product listed!");setProdForm({name:"",description:"",priceRange:"",category:"",specs:"",enquiryEmail:"",mrp:"",offers:[]});setProdImages([]);setShowProdForm(false);loadData();
                 }catch(e){sh("Failed to save")}
               }} style={{...T.btn,padding:"9px 18px"}}>Publish product →</button>
             </div>}
@@ -7502,6 +7576,10 @@ ${forDownload
                     <div style={{fontSize:".92rem",fontWeight:700,color:T.txt,marginBottom:3}}>{p.name}</div>
                     {p.category&&<div style={{fontSize:".68rem",color:T.mute,marginBottom:6}}>{p.category}</div>}
                     {p.priceRange&&<div style={{fontSize:".78rem",fontWeight:600,color:T.teal,marginBottom:6}}>{p.priceRange}</div>}
+                    {(()=>{const off=getProductOffers(p);if(!off.mrp&&!off.badges.length)return null;return(<div style={{marginBottom:6}}>
+                      {off.mrp>0&&<div style={{fontSize:".76rem",fontWeight:600,color:T.txt}}>MRP ₹{off.mrp}{off.memberPrice?` → Member ₹${off.memberPrice}`:""}</div>}
+                      {off.badges.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:4}}>{off.badges.map((b,i)=><span key={i} style={{fontSize:".6rem",fontWeight:600,color:T.goldD,background:T.goldBg,padding:"1px 6px",borderRadius:4}}>{b}</span>)}</div>}
+                    </div>)})()}
                     <div style={{fontSize:".74rem",color:T.txt2,lineHeight:1.5,marginBottom:10,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.description}</div>
 
                     {/* Enquiry summary on card */}
