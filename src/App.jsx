@@ -2397,6 +2397,33 @@ export default function App(){
   const[vendorScrollTo,setVendorScrollTo]=useState(null); // "products"|"rewards"|"placement"|"enquiries" — scroll Me page to that section
   const[selProduct,setSelProduct]=useState(null);
   const[enquiryModal,setEnquiryModal]=useState(null); // {product} — open enquiry form
+  const[replyOpenId,setReplyOpenId]=useState(null); // enquiry id whose reply box is expanded
+  const[replyText,setReplyText]=useState("");
+  const[replySending,setReplySending]=useState(false);
+  const sendEnquiryReply=async(e)=>{
+    if(!replyText.trim())return;
+    setReplySending(true);
+    try{
+      await fbSet("productEnquiries",e.id,{vendorReply:replyText.trim(),vendorRepliedAt:Date.now()});
+      await createNotif({
+        toUid:e.doctorUid,fromUid:au.uid,
+        fromName:prof?.companyName||prof?.name||"Vendor",fromIni:uIni,fromPhoto:uPhoto||"",
+        type:"enquiry_reply",text:`replied to your enquiry about "${e.productName}"`,
+        linkType:"enquiry",linkId:e.id,linkLabel:e.productName,
+      });
+      fetch("/api/send-email",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({type:"reply",to:e.doctorEmail,data:{
+          name:e.doctorName,replierName:prof?.companyName||prof?.name||"Vendor",
+          contentType:"product enquiry",contentTitle:e.productName,snippet:replyText.trim(),
+        }}),
+      }).catch(()=>{});
+      sh("✅ Reply sent!");
+      setReplyOpenId(null);setReplyText("");
+      loadData();
+    }catch(err){console.error(err);sh("Failed to send reply")}
+    setReplySending(false);
+  };
   const[enquiryMsg,setEnquiryMsg]=useState(""); // product detail view
   // Phase 4: sponsor placements
   const[spForm,setSpForm]=useState({title:"",tagline:"",logo:"",website:"",placementType:"home_banner",budget:""});
@@ -7600,7 +7627,6 @@ ${forDownload
                             <div style={{fontSize:".66rem",color:T.mute}}>{fD(e.date||"")}</div>
                           </div>
                           <div style={{display:"flex",gap:4,flexShrink:0}}>
-                            <a href={`mailto:${e.doctorEmail}?subject=Re: ${p.name}`} style={{fontSize:".62rem",...T.btnO,...T.btnSm,padding:"1px 6px",textDecoration:"none",display:"inline-block"}}>Reply</a>
                             <button onClick={async()=>{const ns=e.status==="fulfilled"?"new":"fulfilled";await fbSet("productEnquiries",e.id,{status:ns,updatedAt:Date.now()});loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".62rem",padding:"1px 6px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal}}>
                               {e.status==="fulfilled"?"↩":"✓"}
                             </button>
@@ -7639,14 +7665,19 @@ ${forDownload
                     <div style={{fontSize:".84rem",fontWeight:700}}>{e.doctorName} <span style={{fontWeight:400,color:T.mute}}>→</span> <span style={{color:T.teal}}>{e.productName}</span></div>
                     <div style={{fontSize:".7rem",color:T.mute,marginTop:2}}>{e.doctorEmail} {e.doctorClinic&&`· ${e.doctorClinic}`} · {fD(e.date||"")}</div>
                     {e.message&&<div style={{fontSize:".76rem",fontStyle:"italic",color:T.txt2,marginTop:5,padding:"4px 8px",background:T.bg,borderRadius:5,borderLeft:"2px solid "+T.border}}>"{e.message}"</div>}
+                    {e.vendorReply&&<div style={{fontSize:".76rem",color:T.teal,marginTop:5,padding:"4px 8px",background:T.tealBg,borderRadius:5,borderLeft:"2px solid "+T.teal}}>↩ You replied: "{e.vendorReply}"</div>}
                   </div>
                   <div style={{display:"flex",gap:5,flexShrink:0,alignItems:"flex-start"}}>
-                    <a href={`mailto:${e.doctorEmail}?subject=Re: ${e.productName}`} style={{...T.btnO,...T.btnSm,fontSize:".7rem",padding:"3px 10px",textDecoration:"none",display:"inline-block"}}>📧 Reply</a>
+                    <button onClick={()=>{setReplyOpenId(replyOpenId===e.id?null:e.id);setReplyText("");}} style={{...T.btnO,...T.btnSm,fontSize:".7rem",padding:"3px 10px"}}>{e.vendorReply?"✉️ Reply again":"✉️ Reply"}</button>
                     <button onClick={async()=>{const ns=e.status==="fulfilled"?"new":"fulfilled";await fbSet("productEnquiries",e.id,{status:ns,updatedAt:Date.now()});sh(ns==="fulfilled"?"✓ Done":"Reopened");loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".7rem",padding:"3px 10px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal}}>
                       {e.status==="fulfilled"?"Reopen":"✓ Done"}
                     </button>
                   </div>
                 </div>
+                {replyOpenId===e.id&&<div style={{marginTop:8,display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <textarea value={replyText} onChange={ev=>setReplyText(ev.target.value)} placeholder={`Reply to ${e.doctorName}...`} rows={2} style={{...T.inp,flex:1,minWidth:200,resize:"vertical"}}/>
+                  <button disabled={replySending||!replyText.trim()} onClick={()=>sendEnquiryReply(e)} style={{...T.btn,padding:"6px 16px",fontSize:".76rem",opacity:replySending||!replyText.trim()?.6:1,alignSelf:"flex-start"}}>{replySending?"Sending...":"Send"}</button>
+                </div>}
               </div>)}
             </div>
           </div>);

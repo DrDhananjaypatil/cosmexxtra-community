@@ -59,7 +59,7 @@ service cloud.firestore {
     match /productEnquiries/{enqId} {
       allow read: if isSignedIn();
       allow create: if isOwner('doctorUid');
-      allow update: if wasOwner('vendorId') && onlyChangedTo(['status','updatedAt']) || isAdmin();
+      allow update: if wasOwner('vendorId') && onlyChangedTo(['status','updatedAt','vendorReply','vendorRepliedAt']) || isAdmin();
       allow delete: if isAdmin();
     }
 
