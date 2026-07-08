@@ -2389,13 +2389,15 @@ export default function App(){
   const[vrImage,setVrImage]=useState(""); // vendor reward proposal: uploaded image URL
   const[vrUploading,setVrUploading]=useState(false);
   // Phase 3: product listings
-  const[prodForm,setProdForm]=useState({name:"",description:"",priceRange:"",category:"",specs:"",enquiryEmail:"",mrp:"",offers:[]});
+  const[prodForm,setProdForm]=useState({name:"",description:"",priceRange:"",category:"",specs:"",enquiryEmail:"",mrp:"",offers:[],moreInfo:"",website:""});
+  const[editingProductId,setEditingProductId]=useState(null); // product id being edited, null = creating new
   const[offerDraft,setOfferDraft]=useState({type:"percent_off",percent:"",price:"",buyQty:"",freeQty:"",minQty:""});
   const[prodImages,setProdImages]=useState([]); // uploaded product image URLs
   const[prodUploading,setProdUploading]=useState(false);
   const[showProdForm,setShowProdForm]=useState(false);
   const[vendorScrollTo,setVendorScrollTo]=useState(null); // "products"|"rewards"|"placement"|"enquiries" — scroll Me page to that section
   const[selProduct,setSelProduct]=useState(null);
+  const[selProductImgIdx,setSelProductImgIdx]=useState(0);
   const[enquiryModal,setEnquiryModal]=useState(null); // {product} — open enquiry form
   const[replyOpenId,setReplyOpenId]=useState(null); // enquiry id whose reply box is expanded
   const[replyText,setReplyText]=useState("");
@@ -2411,13 +2413,6 @@ export default function App(){
         type:"enquiry_reply",text:`replied to your enquiry about "${e.productName}"`,
         linkType:"enquiry",linkId:e.id,linkLabel:e.productName,
       });
-      fetch("/api/send-email",{
-        method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({type:"reply",to:e.doctorEmail,data:{
-          name:e.doctorName,replierName:prof?.companyName||prof?.name||"Vendor",
-          contentType:"product enquiry",contentTitle:e.productName,snippet:replyText.trim(),
-        }}),
-      }).catch(()=>{});
       sh("✅ Reply sent!");
       setReplyOpenId(null);setReplyText("");
       loadData();
@@ -6101,7 +6096,7 @@ ${forDownload
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:12}}>
                   {vProducts.map(p=>{
                     const off=getProductOffers(p);
-                    return(<div key={p.id} style={{border:"1px solid "+T.border,borderRadius:8,overflow:"hidden",cursor:"pointer",transition:"box-shadow .12s"}} onClick={()=>setSelProduct(p)} onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"} onMouseLeave={e=>e.currentTarget.style.boxShadow=""}>
+                    return(<div key={p.id} style={{border:"1px solid "+T.border,borderRadius:8,overflow:"hidden",cursor:"pointer",transition:"box-shadow .12s"}} onClick={()=>{setSelProduct(p);setSelProductImgIdx(0);}} onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"} onMouseLeave={e=>e.currentTarget.style.boxShadow=""}>
                     {p.images?.[0]?<img src={p.images[0]} alt={p.name} style={{width:"100%",height:140,objectFit:"cover"}}/>:<div style={{width:"100%",height:100,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2rem"}}>🛍️</div>}
                     <div style={{padding:12}}>
                       <div style={{fontSize:".88rem",fontWeight:700,marginBottom:4}}>{p.name}</div>
@@ -7501,11 +7496,12 @@ ${forDownload
           return(<div id="vendor-section-products" style={{...T.card,marginBottom:16}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
               <h3 style={{fontSize:"1rem",fontWeight:700,margin:0}}>🛍️ Product Catalog</h3>
-              <button onClick={()=>setShowProdForm(f=>!f)} style={{...T.btn,padding:"7px 16px",fontSize:".82rem"}}>{showProdForm?"✕ Cancel":"+ Add product"}</button>
+              <button onClick={()=>{if(showProdForm){setEditingProductId(null);setProdForm({name:"",description:"",priceRange:"",category:"",specs:"",enquiryEmail:"",mrp:"",offers:[],moreInfo:"",website:""});setProdImages([]);}setShowProdForm(f=>!f);}} style={{...T.btn,padding:"7px 16px",fontSize:".82rem"}}>{showProdForm?"✕ Cancel":"+ Add product"}</button>
             </div>
 
-            {/* Add product form */}
+            {/* Add/Edit product form */}
             {showProdForm&&<div style={{padding:14,background:T.bg,borderRadius:10,marginBottom:16,display:"flex",flexDirection:"column",gap:10}}>
+              {editingProductId&&<div style={{fontSize:".78rem",fontWeight:600,color:T.teal}}>✏️ Editing product</div>}
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <input value={prodForm.name} onChange={e=>setProdForm(p=>({...p,name:e.target.value}))} placeholder="Product name *" style={T.inp}/>
                 <select value={prodForm.category} onChange={e=>setProdForm(p=>({...p,category:e.target.value}))} style={T.inp}>
@@ -7513,12 +7509,16 @@ ${forDownload
                   {VENDOR_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              <textarea value={prodForm.description} onChange={e=>setProdForm(p=>({...p,description:e.target.value}))} placeholder="Description — what it does, clinical use, benefits *" style={T.txa} rows={3}/>
+              <textarea value={prodForm.description} onChange={e=>setProdForm(p=>({...p,description:e.target.value}))} placeholder="Short description — what it does, clinical use, benefits *" style={T.txa} rows={3}/>
+              <textarea value={prodForm.moreInfo} onChange={e=>setProdForm(p=>({...p,moreInfo:e.target.value}))} placeholder="More details (optional) — full specifications, usage instructions, indications, certifications, features. Shown on the product's detail page." style={T.txa} rows={4}/>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <input value={prodForm.priceRange} onChange={e=>setProdForm(p=>({...p,priceRange:e.target.value}))} placeholder="Price (e.g. ₹2L–₹5L)" style={T.inp}/>
                 <input value={prodForm.specs} onChange={e=>setProdForm(p=>({...p,specs:e.target.value}))} placeholder="Key specs / certifications" style={T.inp}/>
               </div>
-              <input value={prodForm.enquiryEmail} onChange={e=>setProdForm(p=>({...p,enquiryEmail:e.target.value}))} placeholder="Enquiry email (defaults to your login email)" style={T.inp}/>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <input value={prodForm.enquiryEmail} onChange={e=>setProdForm(p=>({...p,enquiryEmail:e.target.value}))} placeholder="Enquiry email (defaults to your login email)" style={T.inp}/>
+                <input value={prodForm.website} onChange={e=>setProdForm(p=>({...p,website:e.target.value}))} placeholder="Product page / brochure link (optional)" style={T.inp}/>
+              </div>
               <div style={{padding:12,background:"#fff",borderRadius:8,border:"1px solid "+T.border}}>
                 <div style={{fontSize:".76rem",color:T.txt2,fontWeight:600,marginBottom:8}}>💰 Pricing & member offers (optional)</div>
                 <input type="number" value={prodForm.mrp} onChange={e=>setProdForm(p=>({...p,mrp:e.target.value}))} placeholder="MRP ₹ (numeric, e.g. 4500)" style={{...T.inp,marginBottom:10}}/>
@@ -7563,14 +7563,14 @@ ${forDownload
                 </div>
               </div>
               <div>
-                <div style={{fontSize:".76rem",color:T.txt2,fontWeight:600,marginBottom:6}}>Product images (up to 5)</div>
+                <div style={{fontSize:".76rem",color:T.txt2,fontWeight:600,marginBottom:6}}>Product images (up to 8)</div>
                 <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
                   {prodImages.map((url,i)=><div key={i} style={{position:"relative"}}>
                     <img src={url} alt="" style={{width:70,height:70,objectFit:"cover",borderRadius:6,border:"1px solid "+T.border}}/>
                     <button type="button" onClick={()=>setProdImages(p=>p.filter((_,j)=>j!==i))} style={{position:"absolute",top:-6,right:-6,width:18,height:18,borderRadius:"50%",border:"none",background:T.err,color:"#fff",cursor:"pointer",fontSize:".6rem",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
                   </div>)}
                 </div>
-                {prodImages.length<5&&<input type="file" accept="image/*" disabled={prodUploading} onChange={async e=>{
+                {prodImages.length<8&&<input type="file" accept="image/*" disabled={prodUploading} onChange={async e=>{
                   const f=e.target.files?.[0];if(!f)return;
                   if(f.size>5*1024*1024){sh("Image must be under 5MB");return}
                   setProdUploading(true);
@@ -7584,10 +7584,17 @@ ${forDownload
                 if(!prodForm.name.trim()){sh("Product name required");return}
                 if(!prodForm.description.trim()){sh("Description required");return}
                 try{
-                  await fbAdd("products",{vendorId:au.uid,vendorName:prof?.companyName||prof?.name||"",vendorEmail:au.email,vendorCategory:prof?.vendorCategory||prof?.brandCategory||"",name:prodForm.name.trim(),category:prodForm.category,description:prodForm.description.trim(),priceRange:prodForm.priceRange.trim(),specs:prodForm.specs.trim(),enquiryEmail:prodForm.enquiryEmail.trim()||au.email,mrp:Number(prodForm.mrp)||0,offers:prodForm.offers,images:prodImages,enquiries:0,active:true,createdAt:Date.now(),date:ds(getIST())});
-                  sh("✅ Product listed!");setProdForm({name:"",description:"",priceRange:"",category:"",specs:"",enquiryEmail:"",mrp:"",offers:[]});setProdImages([]);setShowProdForm(false);loadData();
+                  const payload={vendorId:au.uid,vendorName:prof?.companyName||prof?.name||"",vendorEmail:au.email,vendorCategory:prof?.vendorCategory||prof?.brandCategory||"",name:prodForm.name.trim(),category:prodForm.category,description:prodForm.description.trim(),moreInfo:prodForm.moreInfo.trim(),website:prodForm.website.trim(),priceRange:prodForm.priceRange.trim(),specs:prodForm.specs.trim(),enquiryEmail:prodForm.enquiryEmail.trim()||au.email,mrp:Number(prodForm.mrp)||0,offers:prodForm.offers,images:prodImages};
+                  if(editingProductId){
+                    await fbSet("products",editingProductId,payload);
+                    sh("✅ Product updated!");
+                  }else{
+                    await fbAdd("products",{...payload,enquiries:0,active:true,createdAt:Date.now(),date:ds(getIST())});
+                    sh("✅ Product listed!");
+                  }
+                  setProdForm({name:"",description:"",priceRange:"",category:"",specs:"",enquiryEmail:"",mrp:"",offers:[],moreInfo:"",website:""});setProdImages([]);setEditingProductId(null);setShowProdForm(false);loadData();
                 }catch(e){sh("Failed to save")}
-              }} style={{...T.btn,padding:"9px 18px"}}>Publish product →</button>
+              }} style={{...T.btn,padding:"9px 18px"}}>{editingProductId?"Update product →":"Publish product →"}</button>
             </div>}
 
             {/* Product grid */}
@@ -7637,7 +7644,16 @@ ${forDownload
                       {pEnqs.length>3&&<div style={{fontSize:".7rem",color:T.mute,textAlign:"center",fontStyle:"italic"}}>+{pEnqs.length-3} more in enquiry ledger</div>}
                     </div>}
 
-                    <button onClick={async()=>{if(!window.confirm("Remove this product?"))return;await fbSet("products",p.id,{active:false});sh("Removed");loadData()}} style={{...T.btnO,...T.btnSm,color:T.err,borderColor:T.err,width:"100%",fontSize:".72rem"}}>Remove listing</button>
+                    <div style={{display:"flex",gap:6}}>
+                      <button onClick={()=>{
+                        setProdForm({name:p.name||"",description:p.description||"",priceRange:p.priceRange||"",category:p.category||"",specs:p.specs||"",enquiryEmail:p.enquiryEmail||"",mrp:p.mrp?String(p.mrp):"",offers:Array.isArray(p.offers)?p.offers:[],moreInfo:p.moreInfo||"",website:p.website||""});
+                        setProdImages(Array.isArray(p.images)?p.images:[]);
+                        setEditingProductId(p.id);
+                        setShowProdForm(true);
+                        setTimeout(()=>{document.getElementById("vendor-section-products")?.scrollIntoView({behavior:"smooth",block:"start"})},50);
+                      }} style={{...T.btnO,...T.btnSm,flex:1,fontSize:".72rem"}}>✏️ Edit</button>
+                      <button onClick={async()=>{if(!window.confirm("Remove this product?"))return;await fbSet("products",p.id,{active:false});sh("Removed");loadData()}} style={{...T.btnO,...T.btnSm,color:T.err,borderColor:T.err,flex:1,fontSize:".72rem"}}>Remove</button>
+                    </div>
                   </div>
                 </div>);
               })}
@@ -7663,7 +7679,7 @@ ${forDownload
                 <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:".84rem",fontWeight:700}}>{e.doctorName} <span style={{fontWeight:400,color:T.mute}}>→</span> <span style={{color:T.teal}}>{e.productName}</span></div>
-                    <div style={{fontSize:".7rem",color:T.mute,marginTop:2}}>{e.doctorEmail} {e.doctorClinic&&`· ${e.doctorClinic}`} · {fD(e.date||"")}</div>
+                    <div style={{fontSize:".7rem",color:T.mute,marginTop:2}}>{e.doctorEmail} {e.doctorPhone&&`· 📱 ${e.doctorPhone}`} {e.doctorClinic&&`· ${e.doctorClinic}`} · {fD(e.date||"")}</div>
                     {e.message&&<div style={{fontSize:".76rem",fontStyle:"italic",color:T.txt2,marginTop:5,padding:"4px 8px",background:T.bg,borderRadius:5,borderLeft:"2px solid "+T.border}}>"{e.message}"</div>}
                     {e.vendorReply&&<div style={{fontSize:".76rem",color:T.teal,marginTop:5,padding:"4px 8px",background:T.tealBg,borderRadius:5,borderLeft:"2px solid "+T.teal}}>↩ You replied: "{e.vendorReply}"</div>}
                   </div>
@@ -9240,7 +9256,7 @@ ${forDownload
                               <span style={{fontSize:".82rem",fontWeight:600,color:T.teal}}>{e.productName}</span>
                             </div>
                             <div style={{fontSize:".72rem",color:T.mute,marginBottom:6}}>
-                              {e.doctorEmail} {e.doctorClinic&&`· ${e.doctorClinic}`} · {fD(e.date)}
+                              {e.doctorEmail} {e.doctorPhone&&`· 📱 ${e.doctorPhone}`} {e.doctorClinic&&`· ${e.doctorClinic}`} · {fD(e.date)}
                             </div>
                             {e.message&&<div style={{fontSize:".78rem",color:T.txt2,padding:"6px 10px",background:"#fafafa",borderRadius:6,borderLeft:"2px solid "+T.border,fontStyle:"italic",lineHeight:1.5}}>
                               "{e.message}"
@@ -10321,6 +10337,7 @@ ${forDownload
                   doctorUid:au.uid,
                   doctorName:uName,
                   doctorEmail:au.email,
+                  doctorPhone:prof?.mobile||prof?.clinicPhone||"",
                   message:enquiryMsg.trim(),
                   status:"new", // new → contacted → fulfilled
                   createdAt:Date.now(),
@@ -10342,22 +10359,6 @@ ${forDownload
                   linkId:enquiryModal.id,
                   linkLabel:enquiryModal.name,
                 });
-                // Email the vendor (fire-and-forget, non-blocking — best effort only)
-                fetch("/api/send-email",{
-                  method:"POST",
-                  headers:{"Content-Type":"application/json"},
-                  body:JSON.stringify({
-                    type:"product_enquiry",
-                    to:enquiryModal.enquiryEmail||enquiryModal.vendorEmail,
-                    data:{
-                      vendorName:enquiryModal.vendorName,
-                      productName:enquiryModal.name,
-                      doctorName:uName,
-                      doctorEmail:au.email,
-                      message:enquiryMsg.trim(),
-                    },
-                  }),
-                }).catch(()=>{}); // silent fail — in-app notif is the reliable channel either way
                 sh("✅ Enquiry sent! The vendor has been notified.");
                 setEnquiryModal(null);
                 setEnquiryMsg("");
@@ -10368,7 +10369,58 @@ ${forDownload
         </div>
       </div>}
 
-      {/* ═══ CONSENT PREVIEW MODAL ═══ */}
+      {/* ═══ PRODUCT DETAIL MODAL ═══ */}
+      {selProduct&&(()=>{
+        const p=selProduct;
+        const off=getProductOffers(p);
+        const imgs=Array.isArray(p.images)&&p.images.length?p.images:[];
+        return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:1150,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setSelProduct(null)}>
+          <div style={{background:"#fff",borderRadius:14,maxWidth:640,width:"100%",maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+            {imgs.length>0?<div>
+              <img src={imgs[selProductImgIdx]||imgs[0]} alt={p.name} style={{width:"100%",height:280,objectFit:"cover",borderRadius:"14px 14px 0 0"}}/>
+              {imgs.length>1&&<div style={{display:"flex",gap:6,padding:"10px 16px 0",overflowX:"auto"}}>
+                {imgs.map((url,i)=><img key={i} src={url} alt="" onClick={()=>setSelProductImgIdx(i)} style={{width:52,height:52,objectFit:"cover",borderRadius:6,cursor:"pointer",border:i===selProductImgIdx?"2px solid "+T.teal:"2px solid transparent",opacity:i===selProductImgIdx?1:.7,flexShrink:0}}/>)}
+              </div>}
+            </div>:<div style={{width:"100%",height:140,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"3rem",borderRadius:"14px 14px 0 0"}}>🛍️</div>}
+            <div style={{padding:20}}>
+              <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
+                <div>
+                  <h2 style={{fontSize:"1.2rem",fontWeight:700,margin:0}}>{p.name}</h2>
+                  {p.category&&<div style={{fontSize:".8rem",color:T.mute,marginTop:2}}>{p.category} · {p.vendorName}</div>}
+                </div>
+                <button onClick={()=>setSelProduct(null)} style={{...T.btnO,...T.btnSm,flexShrink:0}}>✕</button>
+              </div>
+
+              {off.mrp>0&&<div style={{display:"flex",alignItems:"baseline",gap:8,marginTop:12}}>
+                {off.memberPrice?<>
+                  <span style={{fontSize:".9rem",color:T.mute,textDecoration:"line-through"}}>₹{off.mrp}</span>
+                  <span style={{fontSize:"1.3rem",fontWeight:700,color:T.teal}}>₹{off.memberPrice}</span>
+                  <span style={{fontSize:".68rem",color:T.gold,fontWeight:700}}>MEMBER PRICE</span>
+                </>:<span style={{fontSize:"1.1rem",fontWeight:700,color:T.txt}}>₹{off.mrp}</span>}
+              </div>}
+              {!off.mrp&&p.priceRange&&<div style={{fontSize:"1rem",fontWeight:700,color:T.teal,marginTop:12}}>{p.priceRange}</div>}
+              {off.badges.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:5,marginTop:8}}>
+                {off.badges.map((b,i)=><span key={i} style={{fontSize:".7rem",fontWeight:600,color:T.goldD,background:T.goldBg,padding:"3px 9px",borderRadius:5}}>{b}</span>)}
+              </div>}
+
+              <div style={{marginTop:16,fontSize:".88rem",color:T.txt2,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{p.description}</div>
+              {p.moreInfo&&<div style={{marginTop:14}}>
+                <div style={{fontSize:".78rem",fontWeight:700,color:T.txt,marginBottom:4}}>More details</div>
+                <div style={{fontSize:".84rem",color:T.txt2,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{p.moreInfo}</div>
+              </div>}
+              {p.specs&&<div style={{marginTop:14}}>
+                <div style={{fontSize:".78rem",fontWeight:700,color:T.txt,marginBottom:4}}>Specs / certifications</div>
+                <div style={{fontSize:".84rem",color:T.txt2}}>{p.specs}</div>
+              </div>}
+              {p.website&&<div style={{marginTop:14}}>
+                <a href={p.website.startsWith("http")?p.website:`https://${p.website}`} target="_blank" rel="noopener noreferrer" style={{fontSize:".84rem",color:T.teal,fontWeight:600}}>🔗 View product page / brochure →</a>
+              </div>}
+
+              <button onClick={()=>{setSelProduct(null);setEnquiryMsg("");setEnquiryModal(p);}} style={{...T.btn,padding:"10px 20px",marginTop:20,width:"100%"}}>Enquire about this product →</button>
+            </div>
+          </div>
+        </div>);
+      })()}
       {consentPreview && (() => {
         const isVern = consentPreview.langCode !== "en";
         const langLabel = CONSENT_LANGUAGES.find(l => l.code === consentPreview.langCode)?.label || "English";
