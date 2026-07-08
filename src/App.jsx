@@ -2398,6 +2398,7 @@ export default function App(){
   const[vendorScrollTo,setVendorScrollTo]=useState(null); // "products"|"rewards"|"placement"|"enquiries" — scroll Me page to that section
   const[selProduct,setSelProduct]=useState(null);
   const[selProductImgIdx,setSelProductImgIdx]=useState(0);
+  const[shareOpenId,setShareOpenId]=useState(null); // product id whose share menu is expanded on the card
   const[enquiryModal,setEnquiryModal]=useState(null); // {product} — open enquiry form
   const[replyOpenId,setReplyOpenId]=useState(null); // enquiry id whose reply box is expanded
   const[replyText,setReplyText]=useState("");
@@ -6127,10 +6128,13 @@ ${forDownload
                       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6}}>
                         {!off.mrp&&p.priceRange&&<div style={{fontSize:".78rem",fontWeight:600,color:T.teal}}>{p.priceRange}</div>}
                         <div style={{display:"flex",gap:6,marginLeft:"auto"}}>
-                          <button onClick={async e=>{e.stopPropagation();try{await navigator.clipboard.writeText(`${SITE_URL}/?product=${p.id}`);sh("🔗 Product link copied!")}catch{sh(`Link: ${SITE_URL}/?product=${p.id}`)}}} title="Copy shareable link" style={{...T.btnO,...T.btnSm,padding:"5px 9px",fontSize:".72rem"}}>🔗</button>
+                          <button onClick={e=>{e.stopPropagation();setShareOpenId(shareOpenId===p.id?null:p.id);}} style={{...T.btnO,...T.btnSm,padding:"5px 10px",fontSize:".72rem"}}>📤 Share</button>
                           <button onClick={async(e)=>{e.stopPropagation();setEnquiryMsg("");setEnquiryModal(p);}} style={{...T.btn,padding:"5px 12px",fontSize:".72rem"}}>Enquire →</button>
                         </div>
                       </div>
+                      {shareOpenId===p.id&&<div onClick={e=>e.stopPropagation()} style={{marginTop:10,paddingTop:10,borderTop:"1px solid "+T.border}}>
+                        <ShareBar title={p.name} url={`${SITE_URL}/?product=${p.id}`} description={p.description?.slice(0,120)} itemId={p.id} itemType="products" currentUser={au} prof={prof} onShare={handleShare}/>
+                      </div>}
                     </div>
                   </div>)})}
                 </div>
