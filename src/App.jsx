@@ -676,6 +676,7 @@ const INSTITUTE_TYPES=["Medical College","Aesthetic Academy / Training Center","
 // ═══ PHARMA / BRAND CATEGORIES ═══
 const BRAND_CATEGORIES=["Pharmaceutical","Aesthetic Devices","Cosmeceuticals / Skincare","Injectables (Toxin/Filler)","Threads","Energy Devices (Laser/RF/HIFU)","Distributor / Retailer","Other"];
 const VENDOR_CATEGORIES=["Dermal Fillers","Botox / Neurotoxin Injectables","PDRN / Polynucleotides & Skin Boosters","Threads (PDO/PLA/PCL)","Chemical Peels","PRP / PRF Kits & Centrifuges","Laser & Energy Devices","RF / HIFU Devices","Microneedling & DermaPen","Cryotherapy Equipment","Consumables & Disposables","Skincare & Post-procedure Products","Clinic Management Software","Medical Furniture & Equipment","Distribution / Import-Export","Training Equipment","Other"];
+const TEAM_DESIGNATIONS=["National Sales Manager / Country Head","Regional Sales Manager (RSM)","Area Sales Manager (ASM)","Territory Manager / Sales Executive","Medical/Professional Service Representative (MR/PSR)","Key Account Manager","Application Specialist / Service Engineer","Business Development Manager","Distributor / Channel Partner Contact","Customer Support Executive","Admissions Coordinator","Other"];
 const getIST=()=>new Date(new Date().toLocaleString("en-US",{timeZone:"Asia/Kolkata"}));
 const ds=d=>d.toISOString().split("T")[0];
 const fD=s=>{try{return new Date(s+"T12:00:00").toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}catch{return s}};
@@ -2384,6 +2385,10 @@ export default function App(){
   const[redemptions,setRedemptions]=useState([]);
   const[vendorApplications,setVendorApplications]=useState([]);
   const[products,setProducts]=useState([]); // vendor product/equipment listings
+  const[teamMembers,setTeamMembers]=useState([]); // vendor team/local contact directory
+  const[showTeamForm,setShowTeamForm]=useState(false);
+  const[editingTeamId,setEditingTeamId]=useState(null);
+  const[teamForm,setTeamForm]=useState({name:"",designation:"",customDesignation:"",city:"",state:"",country:"India",mobile:"",whatsapp:"",email:"",isPrimary:false});
   const[productEnquiries,setProductEnquiries]=useState([]);
   const[sponsorPlacements,setSponsorPlacements]=useState([]); // Phase 4 sponsored home placements
   const[vrImage,setVrImage]=useState(""); // vendor reward proposal: uploaded image URL
@@ -2421,6 +2426,7 @@ export default function App(){
     setReplySending(false);
   };
   const[enquiryMsg,setEnquiryMsg]=useState(""); // product detail view
+  const[enquiryQty,setEnquiryQty]=useState(1); // tentative quantity for business-value estimate
   // Phase 4: sponsor placements
   const[spForm,setSpForm]=useState({title:"",tagline:"",logo:"",website:"",placementType:"home_banner",budget:""});
   const[spUploading,setSpUploading]=useState(false);
@@ -2592,7 +2598,7 @@ export default function App(){
     if(!consentDoctorReg)setConsentDoctorReg(prof.doctorRegNumber||prof.regNumber||"");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[pg,prof]);
-  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl)},[]);
+  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl,tm]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000),fbGetAll("teamMembers","createdAt","desc",2000)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl);setTeamMembers(tm)},[]);
 
   // Load current user's points-earning history from pointsActivity ledger.
   // Uses where(uid) so the list query satisfies security rules (can't list others' docs).
@@ -5047,6 +5053,8 @@ ${forDownload
             const va=vendorApplications.find(a=>a.uid===au?.uid);
             const productEnqCounts=Object.fromEntries(myProducts.map(p=>[p.id,productEnquiries.filter(e=>e.productId===p.id).length]));
             const topProduct=[...myProducts].sort((a,b)=>(productEnqCounts[b.id]||0)-(productEnqCounts[a.id]||0))[0];
+            const businessGenerated=myEnquiries.filter(e=>e.status==="fulfilled").reduce((sum,e)=>sum+(e.tentativeValue||0),0);
+            const pipelineValue=openEnquiries.reduce((sum,e)=>sum+(e.tentativeValue||0),0);
 
             return(<div style={{...T.card,padding:24,marginBottom:16,background:"linear-gradient(135deg,#fff,"+T.tealBg+"33)",borderLeft:"3px solid "+T.teal}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18,flexWrap:"wrap",gap:10}}>
@@ -5100,6 +5108,20 @@ ${forDownload
                   </div>)}
                 </div>
               </div>}
+
+              {/* Business value — from tentative quantity × price at enquiry time, counted once marked fulfilled */}
+              <div style={{...T.card,padding:"14px 16px",marginBottom:18,background:"linear-gradient(135deg,"+T.goldBg+",#fff)",border:"1px solid #e8d488",display:"flex",gap:20,flexWrap:"wrap"}}>
+                <div>
+                  <div style={{fontSize:".68rem",color:T.goldD,textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginBottom:4}}>💰 Business Generated</div>
+                  <div style={{fontSize:"1.4rem",fontWeight:700,color:T.txt}}>₹{businessGenerated.toLocaleString("en-IN")}</div>
+                  <div style={{fontSize:".68rem",color:T.mute,marginTop:2}}>from fulfilled enquiries</div>
+                </div>
+                {pipelineValue>0&&<div>
+                  <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:4}}>Est. pipeline</div>
+                  <div style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>₹{pipelineValue.toLocaleString("en-IN")}</div>
+                  <div style={{fontSize:".68rem",color:T.mute,marginTop:2}}>from open enquiries</div>
+                </div>}
+              </div>
 
               {/* Top performer + sponsor status */}
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginBottom:18}}>
@@ -6129,7 +6151,7 @@ ${forDownload
                         {!off.mrp&&p.priceRange&&<div style={{fontSize:".78rem",fontWeight:600,color:T.teal}}>{p.priceRange}</div>}
                         <div style={{display:"flex",gap:6,marginLeft:"auto"}}>
                           <button onClick={e=>{e.stopPropagation();setShareOpenId(shareOpenId===p.id?null:p.id);}} style={{...T.btnO,...T.btnSm,padding:"5px 10px",fontSize:".72rem"}}>📤 Share</button>
-                          <button onClick={async(e)=>{e.stopPropagation();setEnquiryMsg("");setEnquiryModal(p);}} style={{...T.btn,padding:"5px 12px",fontSize:".72rem"}}>Enquire →</button>
+                          <button onClick={async(e)=>{e.stopPropagation();setEnquiryMsg("");setEnquiryQty(1);setEnquiryModal(p);}} style={{...T.btn,padding:"5px 12px",fontSize:".72rem"}}>Enquire →</button>
                         </div>
                       </div>
                       {shareOpenId===p.id&&<div onClick={e=>e.stopPropagation()} style={{marginTop:10,paddingTop:10,borderTop:"1px solid "+T.border}}>
@@ -6137,6 +6159,30 @@ ${forDownload
                       </div>}
                     </div>
                   </div>)})}
+                </div>
+              </div>);
+            })()}
+
+            {/* Contact People — team/local contacts */}
+            {(()=>{
+              const vTeam=teamMembers.filter(t=>t.vendorId===selVendor.id&&t.active!==false).sort((a,b)=>(b.isPrimary?1:0)-(a.isPrimary?1:0)||(a.name||"").localeCompare(b.name||""));
+              if(vTeam.length===0)return null;
+              return(<div style={{...T.card,marginTop:14}}>
+                <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>📇 Contact People</h4>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {vTeam.map(t=><div key={t.id} style={{display:"flex",gap:12,alignItems:"flex-start",padding:"12px 14px",background:t.isPrimary?T.tealBg+"55":T.bg,borderRadius:8,flexWrap:"wrap",border:t.isPrimary?"1px solid "+T.teal:"1px solid transparent"}}>
+                    <div style={{width:40,height:40,borderRadius:"50%",background:T.teal,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:".9rem",flexShrink:0}}>{(t.name||"?").slice(0,1).toUpperCase()}</div>
+                    <div style={{flex:1,minWidth:180}}>
+                      <div style={{fontSize:".88rem",fontWeight:700}}>{t.name} {t.isPrimary&&<span style={{fontSize:".62rem",fontWeight:700,color:T.teal,background:"#fff",padding:"1px 7px",borderRadius:5,marginLeft:4}}>PRIMARY</span>}</div>
+                      <div style={{fontSize:".76rem",color:T.txt2}}>{t.designation}</div>
+                      <div style={{fontSize:".74rem",color:T.mute,marginTop:2}}>📍 {t.city}, {t.state}{t.country&&t.country!=="India"?`, ${t.country}`:""}</div>
+                      <div style={{fontSize:".74rem",marginTop:4,display:"flex",gap:10,flexWrap:"wrap"}}>
+                        <a href={`tel:${t.mobile}`} style={{color:T.teal,fontWeight:600,textDecoration:"none"}}>📱 {t.mobile}</a>
+                        {t.whatsapp&&<a href={`https://wa.me/${t.whatsapp.replace(/[^0-9]/g,"")}`} target="_blank" rel="noopener noreferrer" style={{color:"#25D366",fontWeight:600,textDecoration:"none"}}>💬 WhatsApp</a>}
+                        <a href={`mailto:${t.email}`} style={{color:T.teal,fontWeight:600,textDecoration:"none"}}>✉️ {t.email}</a>
+                      </div>
+                    </div>
+                  </div>)}
                 </div>
               </div>);
             })()}
@@ -7680,6 +7726,81 @@ ${forDownload
           </div>);
         })()}
 
+        {/* ─── TEAM / LOCAL CONTACTS ─── */}
+        {(()=>{
+          const myTeam=teamMembers.filter(t=>t.vendorId===au?.uid&&t.active!==false).sort((a,b)=>(b.isPrimary?1:0)-(a.isPrimary?1:0)||(a.name||"").localeCompare(b.name||""));
+          return(<div id="vendor-section-team" style={{...T.card,marginBottom:16}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
+              <h3 style={{fontSize:"1rem",fontWeight:700,margin:0}}>👥 Team & Local Contacts</h3>
+              <button onClick={()=>{if(showTeamForm){setEditingTeamId(null);setTeamForm({name:"",designation:"",customDesignation:"",city:"",state:"",country:"India",mobile:"",whatsapp:"",email:"",isPrimary:false});}setShowTeamForm(f=>!f);}} style={{...T.btn,padding:"7px 16px",fontSize:".82rem"}}>{showTeamForm?"✕ Cancel":"+ Add team member"}</button>
+            </div>
+            <div style={{fontSize:".78rem",color:T.mute,marginBottom:14}}>Add regional/local contact people (sales, service, support) so doctors know exactly who to reach in their area. Shown on your public company profile.</div>
+
+            {showTeamForm&&<div style={{padding:14,background:T.bg,borderRadius:10,marginBottom:16,display:"flex",flexDirection:"column",gap:10}}>
+              {editingTeamId&&<div style={{fontSize:".78rem",fontWeight:600,color:T.teal}}>✏️ Editing team member</div>}
+              <input value={teamForm.name} onChange={e=>setTeamForm(p=>({...p,name:e.target.value}))} placeholder="Full name *" style={T.inp}/>
+              <div style={{display:"grid",gridTemplateColumns:teamForm.designation==="Other"?"1fr 1fr":"1fr",gap:10}}>
+                <select value={teamForm.designation} onChange={e=>setTeamForm(p=>({...p,designation:e.target.value}))} style={T.inp}>
+                  <option value="">— Designation —</option>
+                  {TEAM_DESIGNATIONS.map(d=><option key={d} value={d}>{d}</option>)}
+                </select>
+                {teamForm.designation==="Other"&&<input value={teamForm.customDesignation} onChange={e=>setTeamForm(p=>({...p,customDesignation:e.target.value}))} placeholder="Specify designation" style={T.inp}/>}
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+                <input value={teamForm.city} onChange={e=>setTeamForm(p=>({...p,city:e.target.value}))} placeholder="City *" style={T.inp}/>
+                <input value={teamForm.state} onChange={e=>setTeamForm(p=>({...p,state:e.target.value}))} placeholder="State *" style={T.inp}/>
+                <input value={teamForm.country} onChange={e=>setTeamForm(p=>({...p,country:e.target.value}))} placeholder="Country" style={T.inp}/>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <input value={teamForm.mobile} onChange={e=>setTeamForm(p=>({...p,mobile:e.target.value}))} placeholder="Mobile number *" style={T.inp}/>
+                <input value={teamForm.whatsapp} onChange={e=>setTeamForm(p=>({...p,whatsapp:e.target.value}))} placeholder="WhatsApp (if different, optional)" style={T.inp}/>
+              </div>
+              <input value={teamForm.email} onChange={e=>setTeamForm(p=>({...p,email:e.target.value}))} placeholder="Email address *" style={T.inp}/>
+              <label style={{display:"flex",alignItems:"center",gap:8,fontSize:".82rem",color:T.txt2,cursor:"pointer"}}>
+                <input type="checkbox" checked={teamForm.isPrimary} onChange={e=>setTeamForm(p=>({...p,isPrimary:e.target.checked}))}/>
+                Mark as primary contact (shown first on your profile)
+              </label>
+              <button onClick={async()=>{
+                if(!teamForm.name.trim()){sh("Name required");return}
+                const desig=teamForm.designation==="Other"?teamForm.customDesignation.trim():teamForm.designation;
+                if(!desig){sh("Designation required");return}
+                if(!teamForm.city.trim()||!teamForm.state.trim()){sh("City and state required");return}
+                if(!teamForm.mobile.trim()){sh("Mobile number required");return}
+                if(!teamForm.email.trim()){sh("Email required");return}
+                try{
+                  const payload={vendorId:au.uid,vendorName:prof?.companyName||prof?.name||"",name:teamForm.name.trim(),designation:desig,city:teamForm.city.trim(),state:teamForm.state.trim(),country:teamForm.country.trim()||"India",mobile:teamForm.mobile.trim(),whatsapp:teamForm.whatsapp.trim(),email:teamForm.email.trim(),isPrimary:teamForm.isPrimary,active:true};
+                  if(editingTeamId){await fbSet("teamMembers",editingTeamId,payload);sh("✅ Team member updated!")}
+                  else{await fbAdd("teamMembers",payload);sh("✅ Team member added!")}
+                  setTeamForm({name:"",designation:"",customDesignation:"",city:"",state:"",country:"India",mobile:"",whatsapp:"",email:"",isPrimary:false});
+                  setEditingTeamId(null);setShowTeamForm(false);loadData();
+                }catch(e){sh("Failed to save")}
+              }} style={{...T.btn,padding:"9px 18px"}}>{editingTeamId?"Update contact →":"Add contact →"}</button>
+            </div>}
+
+            {myTeam.length===0?<p style={{color:T.mute,fontSize:".82rem"}}>No team members added yet. Add local sales/service contacts so doctors in each region know who to reach.</p>:
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {myTeam.map(t=><div key={t.id} style={{display:"flex",gap:12,alignItems:"flex-start",padding:"12px 14px",background:t.isPrimary?T.tealBg+"55":T.bg,borderRadius:8,flexWrap:"wrap",border:t.isPrimary?"1px solid "+T.teal:"1px solid transparent"}}>
+                <div style={{width:40,height:40,borderRadius:"50%",background:T.teal,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:".9rem",flexShrink:0}}>{(t.name||"?").slice(0,1).toUpperCase()}</div>
+                <div style={{flex:1,minWidth:180}}>
+                  <div style={{fontSize:".88rem",fontWeight:700}}>{t.name} {t.isPrimary&&<span style={{fontSize:".62rem",fontWeight:700,color:T.teal,background:"#fff",padding:"1px 7px",borderRadius:5,marginLeft:4}}>PRIMARY</span>}</div>
+                  <div style={{fontSize:".76rem",color:T.txt2}}>{t.designation}</div>
+                  <div style={{fontSize:".74rem",color:T.mute,marginTop:2}}>📍 {t.city}, {t.state}{t.country&&t.country!=="India"?`, ${t.country}`:""}</div>
+                  <div style={{fontSize:".74rem",color:T.mute,marginTop:2}}>📱 {t.mobile} {t.whatsapp&&`· 💬 ${t.whatsapp}`} · ✉️ {t.email}</div>
+                </div>
+                <div style={{display:"flex",gap:6,flexShrink:0}}>
+                  <button onClick={()=>{
+                    const isCustom=!TEAM_DESIGNATIONS.includes(t.designation);
+                    setTeamForm({name:t.name||"",designation:isCustom?"Other":t.designation,customDesignation:isCustom?t.designation:"",city:t.city||"",state:t.state||"",country:t.country||"India",mobile:t.mobile||"",whatsapp:t.whatsapp||"",email:t.email||"",isPrimary:!!t.isPrimary});
+                    setEditingTeamId(t.id);setShowTeamForm(true);
+                    setTimeout(()=>{document.getElementById("vendor-section-team")?.scrollIntoView({behavior:"smooth",block:"start"})},50);
+                  }} style={{...T.btnO,...T.btnSm,fontSize:".7rem",padding:"4px 10px"}}>✏️ Edit</button>
+                  <button onClick={async()=>{if(!window.confirm(`Remove ${t.name}?`))return;await fbSet("teamMembers",t.id,{active:false});sh("Removed");loadData()}} style={{...T.btnO,...T.btnSm,color:T.err,borderColor:T.err,fontSize:".7rem",padding:"4px 10px"}}>Remove</button>
+                </div>
+              </div>)}
+            </div>}
+          </div>);
+        })()}
+
         {/* Enquiry Ledger — all enquiries consolidated */}
         {(()=>{
           const myEnqs=productEnquiries.filter(e=>e.vendorId===au?.uid).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
@@ -7699,6 +7820,7 @@ ${forDownload
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:".84rem",fontWeight:700}}>{e.doctorName} <span style={{fontWeight:400,color:T.mute}}>→</span> <span style={{color:T.teal}}>{e.productName}</span></div>
                     <div style={{fontSize:".7rem",color:T.mute,marginTop:2}}>{e.doctorEmail} {e.doctorPhone&&`· 📱 ${e.doctorPhone}`} {e.doctorClinic&&`· ${e.doctorClinic}`} · {fD(e.date||"")}</div>
+                    {(e.qty>0||e.tentativeValue>0)&&<div style={{fontSize:".72rem",fontWeight:600,color:T.goldD,marginTop:3}}>Qty: {e.qty||1} · Est. value ₹{(e.tentativeValue||0).toLocaleString("en-IN")}</div>}
                     {e.message&&<div style={{fontSize:".76rem",fontStyle:"italic",color:T.txt2,marginTop:5,padding:"4px 8px",background:T.bg,borderRadius:5,borderLeft:"2px solid "+T.border}}>"{e.message}"</div>}
                     {e.vendorReply&&<div style={{fontSize:".76rem",color:T.teal,marginTop:5,padding:"4px 8px",background:T.tealBg,borderRadius:5,borderLeft:"2px solid "+T.teal}}>↩ You replied: "{e.vendorReply}"</div>}
                   </div>
@@ -9214,12 +9336,13 @@ ${forDownload
               {products.filter(p=>p.active!==false).map(p=>{
                 const pEnqs=productEnquiries.filter(e=>e.productId===p.id);
                 const fulfilled=pEnqs.filter(e=>e.status==="fulfilled").length;
+                const pBusiness=pEnqs.filter(e=>e.status==="fulfilled").reduce((s,e)=>s+(e.tentativeValue||0),0);
                 return(<div key={p.id} style={{display:"flex",gap:12,alignItems:"center",padding:"10px 12px",background:T.bg,borderRadius:8,flexWrap:"wrap"}}>
                   {p.images?.[0]&&<img src={p.images[0]} alt="" style={{width:48,height:48,objectFit:"cover",borderRadius:6,border:"1px solid "+T.border,flexShrink:0}}/>}
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:".88rem",fontWeight:600}}>{p.name}</div>
                     <div style={{fontSize:".72rem",color:T.mute}}>{p.vendorName} · {p.category} {p.priceRange&&`· ${p.priceRange}`}</div>
-                    <div style={{fontSize:".72rem",color:T.teal,marginTop:2}}>📧 {pEnqs.length} enquiries · ✓ {fulfilled} fulfilled</div>
+                    <div style={{fontSize:".72rem",color:T.teal,marginTop:2}}>📧 {pEnqs.length} enquiries · ✓ {fulfilled} fulfilled {pBusiness>0&&<span style={{color:T.goldD,fontWeight:700}}> · 💰 ₹{pBusiness.toLocaleString("en-IN")}</span>}</div>
                   </div>
                   <button onClick={async()=>{if(!window.confirm("Remove this listing?"))return;await fbSet("products",p.id,{active:false});loadData();sh("Removed")}} style={{...T.btnDanger,...T.btnSm}}>Remove</button>
                 </div>);
@@ -9231,10 +9354,11 @@ ${forDownload
           <div style={{...T.card,marginTop:16}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
               <h4 style={{fontSize:"1rem",fontWeight:700,margin:0}}>📋 Product Enquiry Ledger</h4>
-              <div style={{display:"flex",gap:10,fontSize:".78rem"}}>
+              <div style={{display:"flex",gap:10,fontSize:".78rem",flexWrap:"wrap"}}>
                 <span style={{color:T.teal,fontWeight:600}}>{productEnquiries.length} total</span>
                 <span style={{color:"#1a7d42",fontWeight:600}}>✓ {productEnquiries.filter(e=>e.status==="fulfilled").length} fulfilled</span>
                 <span style={{color:T.warn,fontWeight:600}}>⏳ {productEnquiries.filter(e=>e.status!=="fulfilled").length} open</span>
+                <span style={{color:T.goldD,fontWeight:700}}>💰 ₹{productEnquiries.filter(e=>e.status==="fulfilled").reduce((s,e)=>s+(e.tentativeValue||0),0).toLocaleString("en-IN")} platform business generated</span>
               </div>
             </div>
             {productEnquiries.length===0?<p style={{color:T.mute,fontSize:".82rem"}}>No enquiries yet.</p>:(()=>{
@@ -9250,6 +9374,7 @@ ${forDownload
                 {companies.map(c=>{
                   const openCount=c.enquiries.filter(e=>e.status!=="fulfilled").length;
                   const fulfilledCount=c.enquiries.length-openCount;
+                  const companyBusiness=c.enquiries.filter(e=>e.status==="fulfilled").reduce((s,e)=>s+(e.tentativeValue||0),0);
                   const isOpen=expandedEnquiryCompany===c.vendorId;
                   return(<div key={c.vendorId} style={{border:"1px solid "+T.border,borderRadius:10,overflow:"hidden"}}>
                     {/* Company header row — click to expand */}
@@ -9258,10 +9383,11 @@ ${forDownload
                         <span style={{fontSize:".85rem",color:T.mute,transition:"transform .15s",display:"inline-block",transform:isOpen?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
                         <span style={{fontSize:".92rem",fontWeight:700,color:T.txt}}>{c.vendorName}</span>
                       </div>
-                      <div style={{display:"flex",gap:10,fontSize:".74rem",flexShrink:0}}>
+                      <div style={{display:"flex",gap:10,fontSize:".74rem",flexShrink:0,flexWrap:"wrap"}}>
                         <span style={{color:T.teal,fontWeight:600}}>{c.enquiries.length} total</span>
                         {openCount>0&&<span style={{color:T.warn,fontWeight:600}}>⏳ {openCount} open</span>}
                         {fulfilledCount>0&&<span style={{color:"#1a7d42",fontWeight:600}}>✓ {fulfilledCount} fulfilled</span>}
+                        {companyBusiness>0&&<span style={{color:T.goldD,fontWeight:700}}>💰 ₹{companyBusiness.toLocaleString("en-IN")}</span>}
                       </div>
                     </div>
                     {/* Expanded enquiry list for this company */}
@@ -9277,6 +9403,7 @@ ${forDownload
                             <div style={{fontSize:".72rem",color:T.mute,marginBottom:6}}>
                               {e.doctorEmail} {e.doctorPhone&&`· 📱 ${e.doctorPhone}`} {e.doctorClinic&&`· ${e.doctorClinic}`} · {fD(e.date)}
                             </div>
+                            {(e.qty>0||e.tentativeValue>0)&&<div style={{fontSize:".7rem",fontWeight:600,color:T.goldD,marginBottom:6}}>Qty: {e.qty||1} · Est. value ₹{(e.tentativeValue||0).toLocaleString("en-IN")}</div>}
                             {e.message&&<div style={{fontSize:".78rem",color:T.txt2,padding:"6px 10px",background:"#fafafa",borderRadius:6,borderLeft:"2px solid "+T.border,fontStyle:"italic",lineHeight:1.5}}>
                               "{e.message}"
                             </div>}
@@ -10341,11 +10468,18 @@ ${forDownload
             style={{...T.txa,marginBottom:14,fontSize:".88rem"}}
           />
 
+          <label style={{display:"block",fontSize:".74rem",color:T.teal,fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>Tentative quantity</label>
+          <input type="number" min={1} value={enquiryQty} onChange={e=>setEnquiryQty(Math.max(1,Number(e.target.value)||1))} style={{...T.inp,marginBottom:4,maxWidth:120}}/>
+          <div style={{fontSize:".7rem",color:T.mute,marginBottom:14}}>Helps the vendor gauge order size — doesn't commit you to a purchase.</div>
+
           <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
             <button onClick={()=>setEnquiryModal(null)} style={{...T.btnO,padding:"9px 16px"}}>Cancel</button>
             <button onClick={async()=>{
               if(!enquiryMsg.trim()){sh("Please write a message");return}
               try{
+                const off=getProductOffers(enquiryModal);
+                const unitPrice=off.memberPrice||off.mrp||0;
+                const tentativeValue=unitPrice*enquiryQty;
                 // Log enquiry to Firestore
                 const newId=await fbAdd("productEnquiries",{
                   productId:enquiryModal.id,
@@ -10358,6 +10492,9 @@ ${forDownload
                   doctorEmail:au.email,
                   doctorPhone:prof?.mobile||prof?.clinicPhone||"",
                   message:enquiryMsg.trim(),
+                  qty:enquiryQty,
+                  unitPrice,
+                  tentativeValue,
                   status:"new", // new → contacted → fulfilled
                   createdAt:Date.now(),
                   date:ds(getIST()),
@@ -10381,6 +10518,7 @@ ${forDownload
                 sh("✅ Enquiry sent! The vendor has been notified.");
                 setEnquiryModal(null);
                 setEnquiryMsg("");
+                setEnquiryQty(1);
                 loadData();
               }catch(err){console.error(err);sh("Failed to log enquiry")}
             }} style={{...T.btn,padding:"9px 18px"}}>Send enquiry →</button>
@@ -10439,7 +10577,7 @@ ${forDownload
                 <ShareBar title={p.name} url={`${SITE_URL}/?product=${p.id}`} description={p.description?.slice(0,120)} itemId={p.id} itemType="products" currentUser={au} prof={prof} onShare={handleShare}/>
               </div>
 
-              <button onClick={()=>{setSelProduct(null);setEnquiryMsg("");setEnquiryModal(p);}} style={{...T.btn,padding:"10px 20px",marginTop:16,width:"100%"}}>Enquire about this product →</button>
+              <button onClick={()=>{setSelProduct(null);setEnquiryMsg("");setEnquiryQty(1);setEnquiryModal(p);}} style={{...T.btn,padding:"10px 20px",marginTop:16,width:"100%"}}>Enquire about this product →</button>
             </div>
           </div>
         </div>);

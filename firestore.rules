@@ -74,6 +74,18 @@ service cloud.firestore {
       allow delete: if wasOwner('vendorId') || isAdmin();
     }
 
+    // ── teamMembers — vendor's own local sales/service contacts. Read is
+    //    open (bulk-fetched unfiltered for both the vendor's own dashboard
+    //    and the public vendor profile page — see notifications note above
+    //    for why per-doc ownership reads don't work with this app's fetch
+    //    pattern). Only the owning vendor (or admin) can write. ────────────
+    match /teamMembers/{memberId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner('vendorId');
+      allow update: if wasOwner('vendorId') || isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // ── sponsorPlacements — vendor requests; admin approves/activates ──────
     match /sponsorPlacements/{placementId} {
       allow read: if isSignedIn();
