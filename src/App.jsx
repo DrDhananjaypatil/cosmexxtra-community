@@ -2787,8 +2787,19 @@ export default function App(){
       const found=cases.find(c=>c.id===caseId);
       if(found){setPg("cases");setSelCs(found);window.history.replaceState({},"",window.location.pathname)}
       else{setPg("cases");window.history.replaceState({},"",window.location.pathname)}
+    }else if(params.get("product")&&products.length){
+      const productId=params.get("product");
+      const found=products.find(x=>x.id===productId);
+      if(found){
+        const vendor=allUsers.find(u=>u.id===found.vendorId);
+        setPg("vendors");
+        if(vendor)setSelVendor(vendor);
+        setSelProduct(found);
+        setSelProductImgIdx(0);
+        window.history.replaceState({},"",window.location.pathname);
+      }else{sh("Product not found");window.history.replaceState({},"",window.location.pathname)}
     }
-  },[scr,articles,videos,forumPosts,events,ads,quizzes,cases]);
+  },[scr,articles,videos,forumPosts,events,ads,quizzes,cases,products,allUsers]);
 
   const isAdm=prof&&ADMINS.includes(au?.email);const isPd=prof?.paid;const today=ds(getIST());const hr=getIST().getHours();
   const uName=prof?.name||au?.displayName||"Doctor";const uIni=(uName.replace(/^Dr\.?\s*/i,"").split(" ").map(w=>w[0]).join("").toUpperCase()||"D").slice(0,2);const uPhoto=au?.photoURL;
@@ -6113,9 +6124,12 @@ ${forDownload
                       {off.badges.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
                         {off.badges.map((b,i)=><span key={i} style={{fontSize:".62rem",fontWeight:600,color:T.goldD,background:T.goldBg,padding:"2px 7px",borderRadius:4}}>{b}</span>)}
                       </div>}
-                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6}}>
                         {!off.mrp&&p.priceRange&&<div style={{fontSize:".78rem",fontWeight:600,color:T.teal}}>{p.priceRange}</div>}
-                        <button onClick={async(e)=>{e.stopPropagation();setEnquiryMsg("");setEnquiryModal(p);}} style={{...T.btn,padding:"5px 12px",fontSize:".72rem",marginLeft:"auto"}}>Enquire →</button>
+                        <div style={{display:"flex",gap:6,marginLeft:"auto"}}>
+                          <button onClick={async e=>{e.stopPropagation();try{await navigator.clipboard.writeText(`${SITE_URL}/?product=${p.id}`);sh("🔗 Product link copied!")}catch{sh(`Link: ${SITE_URL}/?product=${p.id}`)}}} title="Copy shareable link" style={{...T.btnO,...T.btnSm,padding:"5px 9px",fontSize:".72rem"}}>🔗</button>
+                          <button onClick={async(e)=>{e.stopPropagation();setEnquiryMsg("");setEnquiryModal(p);}} style={{...T.btn,padding:"5px 12px",fontSize:".72rem"}}>Enquire →</button>
+                        </div>
                       </div>
                     </div>
                   </div>)})}
@@ -10417,7 +10431,11 @@ ${forDownload
                 <a href={p.website.startsWith("http")?p.website:`https://${p.website}`} target="_blank" rel="noopener noreferrer" style={{fontSize:".84rem",color:T.teal,fontWeight:600}}>🔗 View product page / brochure →</a>
               </div>}
 
-              <button onClick={()=>{setSelProduct(null);setEnquiryMsg("");setEnquiryModal(p);}} style={{...T.btn,padding:"10px 20px",marginTop:20,width:"100%"}}>Enquire about this product →</button>
+              <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid "+T.border}}>
+                <ShareBar title={p.name} url={`${SITE_URL}/?product=${p.id}`} description={p.description?.slice(0,120)} itemId={p.id} itemType="products" currentUser={au} prof={prof} onShare={handleShare}/>
+              </div>
+
+              <button onClick={()=>{setSelProduct(null);setEnquiryMsg("");setEnquiryModal(p);}} style={{...T.btn,padding:"10px 20px",marginTop:16,width:"100%"}}>Enquire about this product →</button>
             </div>
           </div>
         </div>);
