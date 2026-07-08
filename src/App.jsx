@@ -5190,6 +5190,7 @@ ${forDownload
             <button onClick={()=>go("events")} style={T.btnO}>📅 Events</button>
             <button onClick={()=>go("cases")} style={T.btnO}>🔬 Clinical cases</button>
             <button onClick={()=>go("forum")} style={T.btnO}>💬 Forum</button>
+            <button onClick={()=>go("vendors")} style={T.btnO}>🏢 Vendors</button>
             {(()=>{const aType=prof?.accountType||"";const showConsent=isAdm||aType==="doctor"||aType===""||aType===undefined;return showConsent?<button onClick={()=>go("consent")} style={{background:"#fdf6e3",color:"#785f1e",border:"1.5px solid #c8a84e",borderRadius:8,padding:"9px 18px 9px 28px",fontSize:".88rem",fontWeight:500,fontFamily:"inherit",cursor:"pointer",position:"relative",overflow:"hidden"}}><span style={{position:"absolute",top:3,left:6,fontSize:".52rem",background:"#c8a84e",color:"#fff",padding:"1px 6px",borderRadius:5,fontWeight:700,letterSpacing:.6}}>NEW</span>📋 Generate consent</button>:null;})()}
           </div>
         </div>
