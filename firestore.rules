@@ -86,6 +86,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ── wallPosts — institute's marketing/celebration photo wall ──────────
+    match /wallPosts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner('vendorId');
+      allow update: if wasOwner('vendorId') || isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // ── sponsorPlacements — vendor requests; admin approves/activates ──────
     match /sponsorPlacements/{placementId} {
       allow read: if isSignedIn();

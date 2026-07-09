@@ -677,6 +677,9 @@ const INSTITUTE_TYPES=["Medical College","Aesthetic Academy / Training Center","
 const BRAND_CATEGORIES=["Pharmaceutical","Aesthetic Devices","Cosmeceuticals / Skincare","Injectables (Toxin/Filler)","Threads","Energy Devices (Laser/RF/HIFU)","Distributor / Retailer","Other"];
 const VENDOR_CATEGORIES=["Dermal Fillers","Botox / Neurotoxin Injectables","PDRN / Polynucleotides & Skin Boosters","Threads (PDO/PLA/PCL)","Chemical Peels","PRP / PRF Kits & Centrifuges","Laser & Energy Devices","RF / HIFU Devices","Microneedling & DermaPen","Cryotherapy Equipment","Consumables & Disposables","Skincare & Post-procedure Products","Clinic Management Software","Medical Furniture & Equipment","Distribution / Import-Export","Training Equipment","Other"];
 const TEAM_DESIGNATIONS=["National Sales Manager / Country Head","Regional Sales Manager (RSM)","Area Sales Manager (ASM)","Territory Manager / Sales Executive","Medical/Professional Service Representative (MR/PSR)","Key Account Manager","Application Specialist / Service Engineer","Business Development Manager","Distributor / Channel Partner Contact","Customer Support Executive","Admissions Coordinator","Other"];
+const COURSE_TYPES=["Course","Masterclass","Webinar"];
+const COURSE_MODES=["In-person","Online (Live)","Online (Recorded)","Hybrid"];
+const COURSE_CATEGORIES=["Botox & Fillers","Threads","Chemical Peels & Skin Boosters","Laser & Energy Devices","PRP / Regenerative Medicine","Body Contouring","Hair Restoration","Aesthetic Business & Marketing","Basic/Foundation Aesthetics","Advanced/Fellowship Program","Hands-on Workshop","Other"];
 const getIST=()=>new Date(new Date().toLocaleString("en-US",{timeZone:"Asia/Kolkata"}));
 const ds=d=>d.toISOString().split("T")[0];
 const fD=s=>{try{return new Date(s+"T12:00:00").toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}catch{return s}};
@@ -2266,6 +2269,7 @@ export default function App(){
   // Vendor directory page states (must be top-level — hooks can't be inside IIFE)
   const[vendorFilter,setVendorFilter]=useState("all");
   const[vendorSearch,setVendorSearch]=useState("");
+  const[dirTab,setDirTab]=useState("vendors"); // "vendors" | "institutes" — directory page toggle
   const[selVendor,setSelVendor]=useState(null);
   const[adminUserSearch,setAdminUserSearch]=useState(""); // admin users tab search
   const[expandedEnquiryCompany,setExpandedEnquiryCompany]=useState(null); // admin: which vendor's enquiries are expanded
@@ -2386,6 +2390,9 @@ export default function App(){
   const[vendorApplications,setVendorApplications]=useState([]);
   const[products,setProducts]=useState([]); // vendor product/equipment listings
   const[teamMembers,setTeamMembers]=useState([]); // vendor team/local contact directory
+  const[wallPosts,setWallPosts]=useState([]); // institute marketing/celebration wall posts
+  const[wallForm,setWallForm]=useState({imageUrl:"",caption:""});
+  const[wallUploading,setWallUploading]=useState(false);
   const[showTeamForm,setShowTeamForm]=useState(false);
   const[editingTeamId,setEditingTeamId]=useState(null);
   const[teamForm,setTeamForm]=useState({name:"",designation:"",customDesignation:"",city:"",state:"",country:"India",mobile:"",whatsapp:"",email:"",isPrimary:false});
@@ -2394,7 +2401,7 @@ export default function App(){
   const[vrImage,setVrImage]=useState(""); // vendor reward proposal: uploaded image URL
   const[vrUploading,setVrUploading]=useState(false);
   // Phase 3: product listings
-  const[prodForm,setProdForm]=useState({name:"",description:"",priceRange:"",category:"",specs:"",enquiryEmail:"",mrp:"",offers:[],moreInfo:"",website:""});
+  const[prodForm,setProdForm]=useState({name:"",description:"",priceRange:"",category:"",specs:"",enquiryEmail:"",mrp:"",offers:[],moreInfo:"",website:"",courseType:"",courseMode:"",duration:"",scheduledDate:"",scheduledTime:"",seatsLimit:""});
   const[editingProductId,setEditingProductId]=useState(null); // product id being edited, null = creating new
   const[offerDraft,setOfferDraft]=useState({type:"percent_off",percent:"",price:"",buyQty:"",freeQty:"",minQty:""});
   const[prodImages,setProdImages]=useState([]); // uploaded product image URLs
@@ -2598,7 +2605,7 @@ export default function App(){
     if(!consentDoctorReg)setConsentDoctorReg(prof.doctorRegNumber||prof.regNumber||"");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[pg,prof]);
-  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl,tm]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000),fbGetAll("teamMembers","createdAt","desc",2000)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl);setTeamMembers(tm)},[]);
+  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl,tm,wp]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000),fbGetAll("teamMembers","createdAt","desc",2000),fbGetAll("wallPosts","createdAt","desc",500)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl);setTeamMembers(tm);setWallPosts(wp)},[]);
 
   // Load current user's points-earning history from pointsActivity ledger.
   // Uses where(uid) so the list query satisfies security rules (can't list others' docs).
@@ -5039,10 +5046,11 @@ ${forDownload
         {(()=>{
           const aType=normalizeAccountType(prof?.accountType||"");
           if(aType!=="vendor"&&aType!=="brand"&&aType!=="institute")return null;
-          const isBiz=aType==="vendor"||aType==="brand";
+          const isBiz=aType==="vendor"||aType==="brand"||aType==="institute";
 
           if(isBiz){
-            // ─── VENDOR / BRAND DASHBOARD ───
+            const isInst=aType==="institute";
+            // ─── VENDOR / BRAND / INSTITUTE DASHBOARD ───
             const myProducts=products.filter(p=>p.vendorId===au?.uid&&p.active!==false);
             const myEnquiries=productEnquiries.filter(e=>e.vendorId===au?.uid);
             const openEnquiries=myEnquiries.filter(e=>e.status!=="fulfilled");
@@ -5055,12 +5063,18 @@ ${forDownload
             const topProduct=[...myProducts].sort((a,b)=>(productEnqCounts[b.id]||0)-(productEnqCounts[a.id]||0))[0];
             const businessGenerated=myEnquiries.filter(e=>e.status==="fulfilled").reduce((sum,e)=>sum+(e.tentativeValue||0),0);
             const pipelineValue=openEnquiries.reduce((sum,e)=>sum+(e.tentativeValue||0),0);
+            // Institute-specific: knowledge content published (articles/videos/events via existing submit flow)
+            const myArticles=isInst?articles.filter(a=>a.authorEmail===au?.email||a.author===prof?.name):[];
+            const myVideos=isInst?videos.filter(v=>v.uploaderEmail===au?.email||v.uploader===prof?.name):[];
+            const mySubmissions=isInst?submissions.filter(s=>s.uid===au?.uid):[];
+            const pendingSubmissions=mySubmissions.filter(s=>s.status==="pending");
+            const myWallPosts=isInst?wallPosts.filter(w=>w.vendorId===au?.uid&&w.active!==false):[];
 
-            return(<div style={{...T.card,padding:24,marginBottom:16,background:"linear-gradient(135deg,#fff,"+T.tealBg+"33)",borderLeft:"3px solid "+T.teal}}>
+            return(<div style={{...T.card,padding:24,marginBottom:16,background:"linear-gradient(135deg,#fff,"+(isInst?T.goldBg:T.tealBg)+"33)",borderLeft:"3px solid "+(isInst?T.gold:T.teal)}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18,flexWrap:"wrap",gap:10}}>
                 <div>
-                  <div style={{fontSize:".7rem",color:T.teal,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>Business Dashboard</div>
-                  <h2 style={{fontSize:"1.3rem",fontWeight:700,margin:0}}>{prof?.companyName||uName} 👋</h2>
+                  <div style={{fontSize:".7rem",color:isInst?(T.goldD||T.gold):T.teal,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>{isInst?"Institute Dashboard":"Business Dashboard"}</div>
+                  <h2 style={{fontSize:"1.3rem",fontWeight:700,margin:0}}>{prof?.instituteName||prof?.companyName||uName} 👋</h2>
                 </div>
                 {va?.status==="approved"||prof?.verified?<span style={{...T.tag(T.tealBg,T.teal),fontSize:".74rem"}}>✓ Verified Partner</span>
                   :<span style={{...T.tag(T.goldBg,T.gold),fontSize:".74rem"}}>⏳ Pending Verification</span>}
@@ -5070,7 +5084,7 @@ ${forDownload
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:18}}>
                 <div onClick={()=>goVendor("products")} style={{padding:"14px 12px",background:"#fff",borderRadius:10,textAlign:"center",cursor:"pointer",border:"1px solid "+T.border}}>
                   <div style={{fontSize:"1.5rem",fontWeight:700,color:T.teal}}>{myProducts.length}</div>
-                  <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Products listed</div>
+                  <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>{isInst?"Courses & programs":"Products listed"}</div>
                 </div>
                 <div onClick={()=>goVendor("enquiries")} style={{padding:"14px 12px",background:openEnquiries.length>0?"#fff8e1":"#fff",borderRadius:10,textAlign:"center",cursor:"pointer",border:openEnquiries.length>0?"1px solid #f0d896":"1px solid "+T.border}}>
                   <div style={{fontSize:"1.5rem",fontWeight:700,color:openEnquiries.length>0?"#856404":T.teal}}>{openEnquiries.length}</div>
@@ -5089,6 +5103,26 @@ ${forDownload
                   <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Active rewards</div>
                 </div>
               </div>
+
+              {/* Institute-specific: knowledge content published */}
+              {isInst&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:18}}>
+                <div style={{padding:"14px 12px",background:"#fff",borderRadius:10,textAlign:"center",border:"1px solid "+T.border}}>
+                  <div style={{fontSize:"1.5rem",fontWeight:700,color:T.gold}}>{myArticles.length}</div>
+                  <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Articles published</div>
+                </div>
+                <div style={{padding:"14px 12px",background:"#fff",borderRadius:10,textAlign:"center",border:"1px solid "+T.border}}>
+                  <div style={{fontSize:"1.5rem",fontWeight:700,color:T.gold}}>{myVideos.length}</div>
+                  <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Videos published</div>
+                </div>
+                <div onClick={()=>goVendor("wall")} style={{padding:"14px 12px",background:"#fff",borderRadius:10,textAlign:"center",cursor:"pointer",border:"1px solid "+T.border}}>
+                  <div style={{fontSize:"1.5rem",fontWeight:700,color:T.gold}}>{myWallPosts.length}</div>
+                  <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Wall posts</div>
+                </div>
+                <div style={{padding:"14px 12px",background:pendingSubmissions.length>0?"#fff8e1":"#fff",borderRadius:10,textAlign:"center",border:pendingSubmissions.length>0?"1px solid #f0d896":"1px solid "+T.border}}>
+                  <div style={{fontSize:"1.5rem",fontWeight:700,color:pendingSubmissions.length>0?"#856404":T.gold}}>{pendingSubmissions.length}</div>
+                  <div style={{fontSize:".68rem",color:pendingSubmissions.length>0?"#856404":T.mute,textTransform:"uppercase",letterSpacing:.5}}>Pending review</div>
+                </div>
+              </div>}
 
               {/* Recent enquiries — most time-sensitive content */}
               {recentEnquiries.length>0&&<div style={{marginBottom:18}}>
@@ -5126,7 +5160,7 @@ ${forDownload
               {/* Top performer + sponsor status */}
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginBottom:18}}>
                 {topProduct&&<div onClick={()=>goVendor("products")} style={{padding:"12px 14px",background:"#fff",borderRadius:10,border:"1px solid "+T.border,cursor:"pointer"}}>
-                  <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:6}}>🏆 Top performing product</div>
+                  <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:6}}>🏆 {isInst?"Top performing course":"Top performing product"}</div>
                   <div style={{fontSize:".88rem",fontWeight:700,color:T.txt}}>{topProduct.name}</div>
                   <div style={{fontSize:".74rem",color:T.teal,marginTop:2}}>{productEnqCounts[topProduct.id]||0} enquiries generated · tap to view →</div>
                 </div>}
@@ -5138,7 +5172,9 @@ ${forDownload
 
               {/* Quick actions */}
               <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-                <button onClick={()=>goVendor("products")} style={T.btn}>+ Add product</button>
+                <button onClick={()=>goVendor("products")} style={T.btn}>{isInst?"+ Add course":"+ Add product"}</button>
+                {isInst&&<button onClick={()=>goVendor("wall")} style={T.btnO}>📸 Post to wall</button>}
+                {isInst&&<button onClick={()=>go("submit")} style={T.btnO}>+ Submit article/video</button>}
                 <button onClick={()=>goVendor("rewards")} style={T.btnO}>🎁 Propose reward</button>
                 <button onClick={()=>goVendor("placement")} style={T.btnO}>📢 Request placement</button>
                 <button onClick={()=>goVendor("enquiries")} style={T.btnO}>📨 View enquiries</button>
@@ -5146,57 +5182,6 @@ ${forDownload
               </div>
             </div>);
           }
-
-          // ─── INSTITUTE DASHBOARD ───
-          const myArticles=articles.filter(a=>a.authorEmail===au?.email||a.author===prof?.name);
-          const myVideos=videos.filter(v=>v.uploaderEmail===au?.email||v.uploader===prof?.name);
-          const myEvents=events.filter(e=>e.organizerEmail===au?.email||e.organizer===prof?.name);
-          const mySubmissions=submissions.filter(s=>s.uid===au?.uid);
-          const pendingSubmissions=mySubmissions.filter(s=>s.status==="pending");
-          const totalContentViews=[...myArticles,...myVideos].reduce((sum,c)=>sum+(c.views||0),0);
-          const totalContentLikes=[...myArticles,...myVideos].reduce((sum,c)=>sum+(c.likes||0),0);
-
-          return(<div style={{...T.card,padding:24,marginBottom:16,background:"linear-gradient(135deg,#fff,"+T.goldBg+"33)",borderLeft:"3px solid "+T.gold}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18,flexWrap:"wrap",gap:10}}>
-              <div>
-                <div style={{fontSize:".7rem",color:T.goldD||T.gold,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>Institute Dashboard</div>
-                <h2 style={{fontSize:"1.3rem",fontWeight:700,margin:0}}>{prof?.instituteName||uName} 👋</h2>
-              </div>
-              {prof?.verified?<span style={{...T.tag(T.tealBg,T.teal),fontSize:".74rem"}}>✓ Verified</span>:<span style={{...T.tag(T.goldBg,T.gold),fontSize:".74rem"}}>⏳ Pending Verification</span>}
-            </div>
-
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:18}}>
-              <div style={{padding:"14px 12px",background:"#fff",borderRadius:10,textAlign:"center",border:"1px solid "+T.border}}>
-                <div style={{fontSize:"1.5rem",fontWeight:700,color:T.gold}}>{myArticles.length}</div>
-                <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Articles published</div>
-              </div>
-              <div style={{padding:"14px 12px",background:"#fff",borderRadius:10,textAlign:"center",border:"1px solid "+T.border}}>
-                <div style={{fontSize:"1.5rem",fontWeight:700,color:T.gold}}>{myVideos.length}</div>
-                <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Videos published</div>
-              </div>
-              <div style={{padding:"14px 12px",background:"#fff",borderRadius:10,textAlign:"center",border:"1px solid "+T.border}}>
-                <div style={{fontSize:"1.5rem",fontWeight:700,color:T.gold}}>{myEvents.length}</div>
-                <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Events listed</div>
-              </div>
-              <div style={{padding:"14px 12px",background:pendingSubmissions.length>0?"#fff8e1":"#fff",borderRadius:10,textAlign:"center",border:pendingSubmissions.length>0?"1px solid #f0d896":"1px solid "+T.border}}>
-                <div style={{fontSize:"1.5rem",fontWeight:700,color:pendingSubmissions.length>0?"#856404":T.gold}}>{pendingSubmissions.length}</div>
-                <div style={{fontSize:".68rem",color:pendingSubmissions.length>0?"#856404":T.mute,textTransform:"uppercase",letterSpacing:.5}}>Pending review</div>
-              </div>
-              <div style={{padding:"14px 12px",background:"#fff",borderRadius:10,textAlign:"center",border:"1px solid "+T.border}}>
-                <div style={{fontSize:"1.5rem",fontWeight:700,color:T.txt}}>{totalContentViews}</div>
-                <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Total views</div>
-              </div>
-              <div style={{padding:"14px 12px",background:"#fff",borderRadius:10,textAlign:"center",border:"1px solid "+T.border}}>
-                <div style={{fontSize:"1.5rem",fontWeight:700,color:T.txt}}>{totalContentLikes}</div>
-                <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Total likes</div>
-              </div>
-            </div>
-
-            <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-              <button onClick={()=>go("submit")} style={T.btn}>+ Submit content</button>
-              <button onClick={()=>go("events")} style={T.btnO}>📅 View events</button>
-            </div>
-          </div>);
         })()}
 
         <div style={{...T.card,borderLeft:"3px solid "+T.gold,padding:24}}>
@@ -6067,7 +6052,7 @@ ${forDownload
         const approvedVendorUids=new Set(vendorApplications.filter(a=>a.status==="approved").map(a=>a.uid));
         const vendorUsers=allUsers.filter(u=>{
           const aType=normalizeAccountType(u.accountType||"");
-          return aType==="vendor"||aType==="brand"||aType==="pharma";
+          return dirTab==="institutes"?aType==="institute":(aType==="vendor"||aType==="brand"||aType==="pharma");
         });
 
         const categories=["all",...new Set(vendorUsers.map(u=>u.vendorCategory||u.brandCategory||"Other").filter(Boolean))];
@@ -6092,7 +6077,7 @@ ${forDownload
                   <div style={{fontSize:"1.3rem",fontWeight:700,color:T.txt,marginBottom:4}}>{selVendor.companyName||selVendor.name}</div>
                   <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
                     <span style={{fontSize:".72rem",padding:"2px 10px",borderRadius:10,background:T.tealBg,color:T.teal,fontWeight:600}}>
-                      {selVendor.accountType==="vendor"?"🏭 Vendor":"💊 Brand / Pharma"}
+                      {selVendor.accountType==="vendor"?"🏭 Vendor":normalizeAccountType(selVendor.accountType)==="institute"?"🎓 Institute":"💊 Brand / Pharma"}
                     </span>
                     {(selVendor.vendorCategory||selVendor.brandCategory)&&<span style={{fontSize:".72rem",padding:"2px 10px",borderRadius:10,background:T.bg,color:T.txt2}}>{selVendor.vendorCategory||selVendor.brandCategory}</span>}
                     {selVendor.country&&<span style={{fontSize:".72rem",padding:"2px 10px",borderRadius:10,background:T.bg,color:T.txt2}}>📍 {selVendor.country}</span>}
@@ -6122,19 +6107,40 @@ ${forDownload
               </div>
             </div>}
 
-            {/* Phase 3: Products */}
+            {/* Products / Courses */}
             {(()=>{
+              const isVendorInst=normalizeAccountType(selVendor.accountType||"")==="institute";
               const vProducts=products.filter(p=>p.vendorId===selVendor.id&&p.active!==false);
+              const upcoming=vProducts.filter(p=>p.scheduledDate&&p.scheduledDate>=ds(getIST())).sort((a,b)=>(a.scheduledDate||"").localeCompare(b.scheduledDate||""));
               if(vProducts.length===0)return null;
-              return(<div style={T.card}>
-                <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>🛍️ Products & Equipment</h4>
+              return(<>
+              {isVendorInst&&upcoming.length>0&&<div style={{...T.card,marginBottom:14,borderLeft:"3px solid "+T.gold}}>
+                <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>📅 Upcoming Schedule</h4>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {upcoming.map(p=><div key={p.id} onClick={()=>{setSelProduct(p);setSelProductImgIdx(0);}} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",background:T.bg,borderRadius:8,cursor:"pointer",gap:10,flexWrap:"wrap"}}>
+                    <div>
+                      <div style={{fontSize:".86rem",fontWeight:700}}>{p.name}</div>
+                      <div style={{fontSize:".72rem",color:T.mute,marginTop:2}}>{p.courseType} {p.courseMode&&`· ${p.courseMode}`}</div>
+                    </div>
+                    <div style={{fontSize:".78rem",fontWeight:700,color:T.goldD,textAlign:"right"}}>{fD(p.scheduledDate)}{p.scheduledTime?` · ${p.scheduledTime}`:""}{p.seatsLimit>0?<div style={{fontSize:".68rem",color:T.mute,fontWeight:400}}>{p.seatsLimit} seats</div>:null}</div>
+                  </div>)}
+                </div>
+              </div>}
+              <div style={T.card}>
+                <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>{isVendorInst?"🎓 Programs & Courses":"🛍️ Products & Equipment"}</h4>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:12}}>
                   {vProducts.map(p=>{
                     const off=getProductOffers(p);
                     return(<div key={p.id} style={{border:"1px solid "+T.border,borderRadius:8,overflow:"hidden",cursor:"pointer",transition:"box-shadow .12s"}} onClick={()=>{setSelProduct(p);setSelProductImgIdx(0);}} onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"} onMouseLeave={e=>e.currentTarget.style.boxShadow=""}>
-                    {p.images?.[0]?<img src={p.images[0]} alt={p.name} style={{width:"100%",height:140,objectFit:"cover"}}/>:<div style={{width:"100%",height:100,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2rem"}}>🛍️</div>}
+                    {p.images?.[0]?<img src={p.images[0]} alt={p.name} style={{width:"100%",height:140,objectFit:"cover"}}/>:<div style={{width:"100%",height:100,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2rem"}}>{isVendorInst?"🎓":"🛍️"}</div>}
                     <div style={{padding:12}}>
                       <div style={{fontSize:".88rem",fontWeight:700,marginBottom:4}}>{p.name}</div>
+                      {p.courseType&&<div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:6}}>
+                        <span style={{fontSize:".6rem",fontWeight:700,color:T.teal,background:T.tealBg,padding:"2px 7px",borderRadius:4}}>{p.courseType}</span>
+                        {p.courseMode&&<span style={{fontSize:".6rem",color:T.mute,background:T.bg,padding:"2px 7px",borderRadius:4}}>{p.courseMode}</span>}
+                        {p.duration&&<span style={{fontSize:".6rem",color:T.mute,background:T.bg,padding:"2px 7px",borderRadius:4}}>{p.duration}</span>}
+                      </div>}
+                      {p.scheduledDate&&<div style={{fontSize:".68rem",color:T.goldD,fontWeight:600,marginBottom:6}}>📅 {fD(p.scheduledDate)}{p.scheduledTime?` · ${p.scheduledTime}`:""}</div>}
                       {p.category&&<div style={{fontSize:".68rem",color:T.mute,marginBottom:6}}>{p.category}</div>}
                       <div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden",marginBottom:8}}>{p.description}</div>
                       {off.mrp>0&&<div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:4}}>
@@ -6151,7 +6157,7 @@ ${forDownload
                         {!off.mrp&&p.priceRange&&<div style={{fontSize:".78rem",fontWeight:600,color:T.teal}}>{p.priceRange}</div>}
                         <div style={{display:"flex",gap:6,marginLeft:"auto"}}>
                           <button onClick={e=>{e.stopPropagation();setShareOpenId(shareOpenId===p.id?null:p.id);}} style={{...T.btnO,...T.btnSm,padding:"5px 10px",fontSize:".72rem"}}>📤 Share</button>
-                          <button onClick={async(e)=>{e.stopPropagation();setEnquiryMsg("");setEnquiryQty(1);setEnquiryModal(p);}} style={{...T.btn,padding:"5px 12px",fontSize:".72rem"}}>Enquire →</button>
+                          <button onClick={async(e)=>{e.stopPropagation();setEnquiryMsg("");setEnquiryQty(1);setEnquiryModal(p);}} style={{...T.btn,padding:"5px 12px",fontSize:".72rem"}}>{isVendorInst?"Enquire / Enroll →":"Enquire →"}</button>
                         </div>
                       </div>
                       {shareOpenId===p.id&&<div onClick={e=>e.stopPropagation()} style={{marginTop:10,paddingTop:10,borderTop:"1px solid "+T.border}}>
@@ -6159,6 +6165,37 @@ ${forDownload
                       </div>}
                     </div>
                   </div>)})}
+                </div>
+              </div>
+              </>);
+            })()}
+
+            {/* Wall — institute marketing/celebration photos */}
+            {normalizeAccountType(selVendor.accountType||"")==="institute"&&(()=>{
+              const vWall=wallPosts.filter(w=>w.vendorId===selVendor.id&&w.active!==false).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+              if(vWall.length===0)return null;
+              return(<div style={{...T.card,marginTop:14}}>
+                <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>📸 Wall</h4>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10}}>
+                  {vWall.map(w=><div key={w.id} style={{borderRadius:8,overflow:"hidden",border:"1px solid "+T.border}}>
+                    <img src={w.imageUrl} alt="" style={{width:"100%",height:130,objectFit:"cover"}}/>
+                    <div style={{padding:8,fontSize:".72rem",color:T.txt2,lineHeight:1.4}}>{w.caption}</div>
+                  </div>)}
+                </div>
+              </div>);
+            })()}
+
+            {/* Recent forum posts from this institute */}
+            {normalizeAccountType(selVendor.accountType||"")==="institute"&&(()=>{
+              const vPosts=forumPosts.filter(p=>p.uid===selVendor.id).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,5);
+              if(vPosts.length===0)return null;
+              return(<div style={{...T.card,marginTop:14}}>
+                <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>📝 From {selVendor.instituteName||selVendor.name}</h4>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {vPosts.map(p=><div key={p.id} onClick={()=>{go("forum");setSelFP(p);}} style={{padding:"10px 12px",background:T.bg,borderRadius:8,cursor:"pointer"}}>
+                    <div style={{fontSize:".84rem",fontWeight:600,color:T.txt}}>{p.title||p.text?.slice(0,80)}</div>
+                    <div style={{fontSize:".7rem",color:T.mute,marginTop:2}}>{fD(p.date||"")}</div>
+                  </div>)}
                 </div>
               </div>);
             })()}
@@ -6190,9 +6227,14 @@ ${forDownload
         }
 
         return(<div>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:10}}>
-            <h3 style={{fontSize:"1.15rem",fontWeight:700,margin:0}}>🏭 Vendor & Brand Directory</h3>
-            <div style={{fontSize:".78rem",color:T.mute}}>{filtered.length} partner{filtered.length!==1?"s":""}</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:10}}>
+            <h3 style={{fontSize:"1.15rem",fontWeight:700,margin:0}}>{dirTab==="institutes"?"🎓 Institute Directory":"🏭 Vendor & Brand Directory"}</h3>
+            <div style={{fontSize:".78rem",color:T.mute}}>{filtered.length} {dirTab==="institutes"?"institute":"partner"}{filtered.length!==1?"s":""}</div>
+          </div>
+
+          <div style={{display:"flex",gap:8,marginBottom:14}}>
+            <button onClick={()=>{setDirTab("vendors");setVendorFilter("all");}} style={dirTab==="vendors"?T.btn:T.btnO}>🏭 Vendors & Brands</button>
+            <button onClick={()=>{setDirTab("institutes");setVendorFilter("all");}} style={dirTab==="institutes"?T.btn:T.btnO}>🎓 Institutes</button>
           </div>
 
           {/* Search + filter */}
@@ -6204,8 +6246,8 @@ ${forDownload
           </div>
 
           {filtered.length===0?<div style={{...T.card,padding:"48px 28px",textAlign:"center"}}>
-            <div style={{fontSize:"2.5rem",marginBottom:14}}>🏭</div>
-            <div style={{fontSize:"1.1rem",fontWeight:700,color:T.txt,marginBottom:8}}>Vendor & Brand directory coming soon</div>
+            <div style={{fontSize:"2.5rem",marginBottom:14}}>{dirTab==="institutes"?"🎓":"🏭"}</div>
+            <div style={{fontSize:"1.1rem",fontWeight:700,color:T.txt,marginBottom:8}}>{dirTab==="institutes"?"Institute directory coming soon":"Vendor & Brand directory coming soon"}</div>
             <div style={{fontSize:".88rem",color:T.txt2,lineHeight:1.65,maxWidth:440,margin:"0 auto 20px"}}>
               We're onboarding aesthetic device companies, pharma brands, and product distributors to SKINARIO. 
               Registered vendors will appear here with their product catalog and exclusive doctor offers.
@@ -6373,6 +6415,7 @@ ${forDownload
         const todayStr=ds(getIST());
         const upcoming=events.filter(e=>e.date&&((e.endDate||e.date)>=todayStr)).sort((a,b)=>a.date.localeCompare(b.date));
         const past=events.filter(e=>e.date&&(e.endDate||e.date)<todayStr).sort((a,b)=>b.date.localeCompare(a.date));
+        const courseListings=products.filter(p=>p.itemType==="course"&&p.active!==false&&p.scheduledDate&&p.scheduledDate>=todayStr).sort((a,b)=>a.scheduledDate.localeCompare(b.scheduledDate));
         const evTab=aTab.startsWith("ev_")?aTab.replace("ev_",""):"upcoming";
         const list=evTab==="upcoming"?upcoming:evTab==="past"?past:upcoming;
         return(<div>
@@ -6384,8 +6427,36 @@ ${forDownload
             </div>
           </div>
           <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
-            {[["upcoming","Upcoming",upcoming.length],["past","Past events",past.length]].map(([id,l,n])=><button key={id} onClick={()=>setATab("ev_"+id)} style={{padding:"7px 14px",borderRadius:10,border:`1.5px solid ${evTab===id?T.teal:T.border}`,background:evTab===id?T.tealBg:"#fff",color:evTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".82rem",fontWeight:evTab===id?600:400,fontFamily:"inherit"}}>{l} ({n})</button>)}
+            {[["upcoming","Upcoming",upcoming.length],["past","Past events",past.length],["courses","🎓 Courses & Masterclasses",courseListings.length]].map(([id,l,n])=><button key={id} onClick={()=>setATab("ev_"+id)} style={{padding:"7px 14px",borderRadius:10,border:`1.5px solid ${evTab===id?T.teal:T.border}`,background:evTab===id?T.tealBg:"#fff",color:evTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".82rem",fontWeight:evTab===id?600:400,fontFamily:"inherit"}}>{l} ({n})</button>)}
           </div>
+          {evTab==="courses"?(<>
+            {courseListings.length===0?<div style={{...T.card,textAlign:"center",padding:40}}><div style={{fontSize:"2rem",marginBottom:8}}>🎓</div><p style={{color:T.mute}}>No scheduled courses or masterclasses right now. Check back soon!</p></div>:
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:14}}>
+              {courseListings.map(p=>{const dt=new Date(p.scheduledDate+"T12:00:00");const day=dt.getDate();const mo=dt.toLocaleDateString("en-IN",{month:"short"}).toUpperCase();const off=getProductOffers(p);
+                return<div key={p.id} onClick={()=>{setSelProduct(p);setSelProductImgIdx(0);}} style={{...T.card,cursor:"pointer",marginBottom:0,padding:0,overflow:"hidden"}}>
+                  {p.images?.[0]?<img src={p.images[0]} style={{width:"100%",height:140,objectFit:"cover"}}/>:<div style={{height:140,background:"linear-gradient(135deg,"+T.goldBg+","+T.tealBg+")",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"3rem"}}>🎓</div>}
+                  <div style={{padding:16}}>
+                    <div style={{display:"flex",gap:10,alignItems:"flex-start",marginBottom:8}}>
+                      <div style={{minWidth:50,height:54,borderRadius:8,background:T.goldBg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",border:"1px solid "+T.gold+"55"}}>
+                        <div style={{fontSize:".58rem",color:T.goldD,fontWeight:700,letterSpacing:1}}>{mo}</div>
+                        <div style={{fontSize:"1.3rem",fontWeight:700,color:T.goldD,lineHeight:1}}>{day}</div>
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <span style={T.tag(T.tealBg,T.teal)}>{p.courseType||"Course"}</span>
+                        <h4 style={{fontSize:"1rem",fontWeight:600,marginTop:6,lineHeight:1.35}}>{p.name}</h4>
+                        <div style={{fontSize:".74rem",color:T.mute,marginTop:2}}>{p.vendorName}</div>
+                      </div>
+                    </div>
+                    <div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.6}}>
+                      {p.scheduledTime&&<div>🕐 {p.scheduledTime}</div>}
+                      {p.courseMode&&<div>📍 {p.courseMode}</div>}
+                      {p.seatsLimit>0&&<div>🎟️ {p.seatsLimit} seats</div>}
+                    </div>
+                    {off.mrp>0&&<div style={{marginTop:8,fontSize:".9rem",fontWeight:700,color:T.teal}}>₹{off.memberPrice||off.mrp}</div>}
+                  </div>
+                </div>})}
+            </div>}
+          </>):(<>
           {list.length===0&&<div style={{...T.card,textAlign:"center",padding:40}}><div style={{fontSize:"2rem",marginBottom:8}}>📅</div><p style={{color:T.mute}}>{evTab==="upcoming"?"No upcoming events. Check back soon!":"No past events yet."}</p></div>}
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:14}}>
             {list.map(e=>{const dt=new Date(e.date+"T12:00:00");const day=dt.getDate();const mo=dt.toLocaleDateString("en-IN",{month:"short"}).toUpperCase();const isPast=e.date<todayStr;const attending=(e.attendees||[]).find(a=>a.uid===au?.uid);const multiDay=e.endDate&&e.endDate!==e.date;const endDt=multiDay?new Date(e.endDate+"T12:00:00"):null;const endDay=multiDay?endDt.getDate():null;const endMo=multiDay?endDt.toLocaleDateString("en-IN",{month:"short"}).toUpperCase():null;const sameMonth=multiDay&&dt.getMonth()===endDt.getMonth();
@@ -6424,6 +6495,7 @@ ${forDownload
                 </div>
               </div>})}
           </div>
+          </>)}
         </div>);
       })()}
 
@@ -7510,7 +7582,7 @@ ${forDownload
         })()}
       </div>}
 
-      {pg==="me"&&(normalizeAccountType(prof?.accountType||"")==="vendor"||normalizeAccountType(prof?.accountType||"")==="brand")&&!editingProfile&&<div style={{maxWidth:900,margin:"0 auto"}}>
+      {pg==="me"&&(normalizeAccountType(prof?.accountType||"")==="vendor"||normalizeAccountType(prof?.accountType||"")==="brand"||normalizeAccountType(prof?.accountType||"")==="institute")&&!editingProfile&&<div style={{maxWidth:900,margin:"0 auto"}}>
 
         {/* ══ VENDOR / BRAND ME PAGE ══ */}
         {/* Company profile card */}
@@ -7555,38 +7627,60 @@ ${forDownload
           </div>);
         })()}
 
-        {/* Product Catalog */}
+        {/* Product / Course Catalog */}
         {(()=>{
+          const aType=normalizeAccountType(prof?.accountType||"");
+          const isInst=aType==="institute";
           const myProducts=products.filter(p=>p.vendorId===au?.uid&&p.active!==false);
           return(<div id="vendor-section-products" style={{...T.card,marginBottom:16}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
-              <h3 style={{fontSize:"1rem",fontWeight:700,margin:0}}>🛍️ Product Catalog</h3>
-              <button onClick={()=>{if(showProdForm){setEditingProductId(null);setProdForm({name:"",description:"",priceRange:"",category:"",specs:"",enquiryEmail:"",mrp:"",offers:[],moreInfo:"",website:""});setProdImages([]);}setShowProdForm(f=>!f);}} style={{...T.btn,padding:"7px 16px",fontSize:".82rem"}}>{showProdForm?"✕ Cancel":"+ Add product"}</button>
+              <h3 style={{fontSize:"1rem",fontWeight:700,margin:0}}>{isInst?"🎓 Courses & Programs":"🛍️ Product Catalog"}</h3>
+              <button onClick={()=>{if(showProdForm){setEditingProductId(null);setProdForm({name:"",description:"",priceRange:"",category:"",specs:"",enquiryEmail:"",mrp:"",offers:[],moreInfo:"",website:"",courseType:"",courseMode:"",duration:"",scheduledDate:"",scheduledTime:"",seatsLimit:""});setProdImages([]);}setShowProdForm(f=>!f);}} style={{...T.btn,padding:"7px 16px",fontSize:".82rem"}}>{showProdForm?"✕ Cancel":isInst?"+ Add course":"+ Add product"}</button>
             </div>
 
-            {/* Add/Edit product form */}
+            {/* Add/Edit product/course form */}
             {showProdForm&&<div style={{padding:14,background:T.bg,borderRadius:10,marginBottom:16,display:"flex",flexDirection:"column",gap:10}}>
-              {editingProductId&&<div style={{fontSize:".78rem",fontWeight:600,color:T.teal}}>✏️ Editing product</div>}
+              {editingProductId&&<div style={{fontSize:".78rem",fontWeight:600,color:T.teal}}>✏️ Editing {isInst?"course":"product"}</div>}
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                <input value={prodForm.name} onChange={e=>setProdForm(p=>({...p,name:e.target.value}))} placeholder="Product name *" style={T.inp}/>
+                <input value={prodForm.name} onChange={e=>setProdForm(p=>({...p,name:e.target.value}))} placeholder={isInst?"Course/program title *":"Product name *"} style={T.inp}/>
                 <select value={prodForm.category} onChange={e=>setProdForm(p=>({...p,category:e.target.value}))} style={T.inp}>
                   <option value="">— Category —</option>
-                  {VENDOR_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+                  {(isInst?COURSE_CATEGORIES:VENDOR_CATEGORIES).map(c=><option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              <textarea value={prodForm.description} onChange={e=>setProdForm(p=>({...p,description:e.target.value}))} placeholder="Short description — what it does, clinical use, benefits *" style={T.txa} rows={3}/>
-              <textarea value={prodForm.moreInfo} onChange={e=>setProdForm(p=>({...p,moreInfo:e.target.value}))} placeholder="More details (optional) — full specifications, usage instructions, indications, certifications, features. Shown on the product's detail page." style={T.txa} rows={4}/>
+              {isInst&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+                <select value={prodForm.courseType} onChange={e=>setProdForm(p=>({...p,courseType:e.target.value}))} style={T.inp}>
+                  <option value="">— Type —</option>
+                  {COURSE_TYPES.map(c=><option key={c} value={c}>{c}</option>)}
+                </select>
+                <select value={prodForm.courseMode} onChange={e=>setProdForm(p=>({...p,courseMode:e.target.value}))} style={T.inp}>
+                  <option value="">— Mode —</option>
+                  {COURSE_MODES.map(c=><option key={c} value={c}>{c}</option>)}
+                </select>
+                <input value={prodForm.duration} onChange={e=>setProdForm(p=>({...p,duration:e.target.value}))} placeholder="Duration (e.g. 2 days, 6 weeks)" style={T.inp}/>
+              </div>}
+              {isInst&&<div style={{padding:10,background:"#fff",borderRadius:8,border:"1px solid "+T.border}}>
+                <div style={{fontSize:".74rem",color:T.txt2,fontWeight:600,marginBottom:8}}>📅 Schedule this session (optional — leave blank for an evergreen/rolling-admission listing)</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+                  <input type="date" value={prodForm.scheduledDate} onChange={e=>setProdForm(p=>({...p,scheduledDate:e.target.value}))} style={T.inp}/>
+                  <input type="time" value={prodForm.scheduledTime} onChange={e=>setProdForm(p=>({...p,scheduledTime:e.target.value}))} style={T.inp}/>
+                  <input type="number" value={prodForm.seatsLimit} onChange={e=>setProdForm(p=>({...p,seatsLimit:e.target.value}))} placeholder="Seats limit (optional)" style={T.inp}/>
+                </div>
+                {prodForm.scheduledDate&&<div style={{fontSize:".7rem",color:T.teal,marginTop:6}}>Will also appear on the main Events page under Courses & Masterclasses.</div>}
+              </div>}
+              <textarea value={prodForm.description} onChange={e=>setProdForm(p=>({...p,description:e.target.value}))} placeholder={isInst?"Short description — what doctors will learn, who it's for *":"Short description — what it does, clinical use, benefits *"} style={T.txa} rows={3}/>
+              <textarea value={prodForm.moreInfo} onChange={e=>setProdForm(p=>({...p,moreInfo:e.target.value}))} placeholder={isInst?"More details (optional) — full curriculum, faculty, prerequisites, certification details.":"More details (optional) — full specifications, usage instructions, indications, certifications, features."} style={T.txa} rows={4}/>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                <input value={prodForm.priceRange} onChange={e=>setProdForm(p=>({...p,priceRange:e.target.value}))} placeholder="Price (e.g. ₹2L–₹5L)" style={T.inp}/>
-                <input value={prodForm.specs} onChange={e=>setProdForm(p=>({...p,specs:e.target.value}))} placeholder="Key specs / certifications" style={T.inp}/>
+                <input value={prodForm.priceRange} onChange={e=>setProdForm(p=>({...p,priceRange:e.target.value}))} placeholder={isInst?"Fee (text, e.g. ₹25,000)":"Price (e.g. ₹2L–₹5L)"} style={T.inp}/>
+                <input value={prodForm.specs} onChange={e=>setProdForm(p=>({...p,specs:e.target.value}))} placeholder={isInst?"Certification awarded / accreditation":"Key specs / certifications"} style={T.inp}/>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <input value={prodForm.enquiryEmail} onChange={e=>setProdForm(p=>({...p,enquiryEmail:e.target.value}))} placeholder="Enquiry email (defaults to your login email)" style={T.inp}/>
-                <input value={prodForm.website} onChange={e=>setProdForm(p=>({...p,website:e.target.value}))} placeholder="Product page / brochure link (optional)" style={T.inp}/>
+                <input value={prodForm.website} onChange={e=>setProdForm(p=>({...p,website:e.target.value}))} placeholder={isInst?"Registration / brochure link (optional)":"Product page / brochure link (optional)"} style={T.inp}/>
               </div>
               <div style={{padding:12,background:"#fff",borderRadius:8,border:"1px solid "+T.border}}>
-                <div style={{fontSize:".76rem",color:T.txt2,fontWeight:600,marginBottom:8}}>💰 Pricing & member offers (optional)</div>
-                <input type="number" value={prodForm.mrp} onChange={e=>setProdForm(p=>({...p,mrp:e.target.value}))} placeholder="MRP ₹ (numeric, e.g. 4500)" style={{...T.inp,marginBottom:10}}/>
+                <div style={{fontSize:".76rem",color:T.txt2,fontWeight:600,marginBottom:8}}>💰 {isInst?"Fee & member offers (optional)":"Pricing & member offers (optional)"}</div>
+                <input type="number" value={prodForm.mrp} onChange={e=>setProdForm(p=>({...p,mrp:e.target.value}))} placeholder={isInst?"Fee ₹ (numeric, e.g. 25000)":"MRP ₹ (numeric, e.g. 4500)"} style={{...T.inp,marginBottom:10}}/>
                 {prodForm.offers.length>0&&<div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:10}}>
                   {prodForm.offers.map((o,i)=>{
                     const label=o.type==="percent_off"?`${o.percent}% off for SKINARIO members`
@@ -7628,7 +7722,7 @@ ${forDownload
                 </div>
               </div>
               <div>
-                <div style={{fontSize:".76rem",color:T.txt2,fontWeight:600,marginBottom:6}}>Product images (up to 8)</div>
+                <div style={{fontSize:".76rem",color:T.txt2,fontWeight:600,marginBottom:6}}>{isInst?"Photos (up to 8) — venue, faculty, past batches":"Product images (up to 8)"}</div>
                 <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
                   {prodImages.map((url,i)=><div key={i} style={{position:"relative"}}>
                     <img src={url} alt="" style={{width:70,height:70,objectFit:"cover",borderRadius:6,border:"1px solid "+T.border}}/>
@@ -7646,20 +7740,20 @@ ${forDownload
                 {prodUploading&&<div style={{fontSize:".72rem",color:T.mute,marginTop:4}}>⏳ Uploading...</div>}
               </div>
               <button onClick={async()=>{
-                if(!prodForm.name.trim()){sh("Product name required");return}
+                if(!prodForm.name.trim()){sh(isInst?"Course title required":"Product name required");return}
                 if(!prodForm.description.trim()){sh("Description required");return}
                 try{
-                  const payload={vendorId:au.uid,vendorName:prof?.companyName||prof?.name||"",vendorEmail:au.email,vendorCategory:prof?.vendorCategory||prof?.brandCategory||"",name:prodForm.name.trim(),category:prodForm.category,description:prodForm.description.trim(),moreInfo:prodForm.moreInfo.trim(),website:prodForm.website.trim(),priceRange:prodForm.priceRange.trim(),specs:prodForm.specs.trim(),enquiryEmail:prodForm.enquiryEmail.trim()||au.email,mrp:Number(prodForm.mrp)||0,offers:prodForm.offers,images:prodImages};
+                  const payload={vendorId:au.uid,vendorName:prof?.companyName||prof?.instituteName||prof?.name||"",vendorEmail:au.email,vendorCategory:prof?.vendorCategory||prof?.brandCategory||"",name:prodForm.name.trim(),category:prodForm.category,description:prodForm.description.trim(),moreInfo:prodForm.moreInfo.trim(),website:prodForm.website.trim(),priceRange:prodForm.priceRange.trim(),specs:prodForm.specs.trim(),enquiryEmail:prodForm.enquiryEmail.trim()||au.email,mrp:Number(prodForm.mrp)||0,offers:prodForm.offers,images:prodImages,itemType:isInst?"course":"product",courseType:isInst?prodForm.courseType:"",courseMode:isInst?prodForm.courseMode:"",duration:isInst?prodForm.duration.trim():"",scheduledDate:isInst?prodForm.scheduledDate:"",scheduledTime:isInst?prodForm.scheduledTime:"",seatsLimit:isInst&&prodForm.seatsLimit?Number(prodForm.seatsLimit):0};
                   if(editingProductId){
                     await fbSet("products",editingProductId,payload);
-                    sh("✅ Product updated!");
+                    sh(isInst?"✅ Course updated!":"✅ Product updated!");
                   }else{
                     await fbAdd("products",{...payload,enquiries:0,active:true,createdAt:Date.now(),date:ds(getIST())});
-                    sh("✅ Product listed!");
+                    sh(isInst?"✅ Course listed!":"✅ Product listed!");
                   }
-                  setProdForm({name:"",description:"",priceRange:"",category:"",specs:"",enquiryEmail:"",mrp:"",offers:[],moreInfo:"",website:""});setProdImages([]);setEditingProductId(null);setShowProdForm(false);loadData();
+                  setProdForm({name:"",description:"",priceRange:"",category:"",specs:"",enquiryEmail:"",mrp:"",offers:[],moreInfo:"",website:"",courseType:"",courseMode:"",duration:"",scheduledDate:"",scheduledTime:"",seatsLimit:""});setProdImages([]);setEditingProductId(null);setShowProdForm(false);loadData();
                 }catch(e){sh("Failed to save")}
-              }} style={{...T.btn,padding:"9px 18px"}}>{editingProductId?"Update product →":"Publish product →"}</button>
+              }} style={{...T.btn,padding:"9px 18px"}}>{editingProductId?(isInst?"Update course →":"Update product →"):(isInst?"Publish course →":"Publish product →")}</button>
             </div>}
 
             {/* Product grid */}
@@ -7673,10 +7767,16 @@ ${forDownload
                     :<div style={{width:"100%",height:80,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2rem"}}>🛍️</div>}
                   <div style={{padding:12}}>
                     <div style={{fontSize:".92rem",fontWeight:700,color:T.txt,marginBottom:3}}>{p.name}</div>
+                    {isInst&&p.courseType&&<div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:6}}>
+                      <span style={{fontSize:".62rem",fontWeight:700,color:T.teal,background:T.tealBg,padding:"2px 7px",borderRadius:4}}>{p.courseType}</span>
+                      {p.courseMode&&<span style={{fontSize:".62rem",color:T.mute,background:T.bg,padding:"2px 7px",borderRadius:4}}>{p.courseMode}</span>}
+                      {p.duration&&<span style={{fontSize:".62rem",color:T.mute,background:T.bg,padding:"2px 7px",borderRadius:4}}>{p.duration}</span>}
+                    </div>}
+                    {isInst&&p.scheduledDate&&<div style={{fontSize:".68rem",color:T.goldD,fontWeight:600,marginBottom:6}}>📅 {fD(p.scheduledDate)}{p.scheduledTime?` · ${p.scheduledTime}`:""}{p.seatsLimit>0?` · ${p.seatsLimit} seats`:""}</div>}
                     {p.category&&<div style={{fontSize:".68rem",color:T.mute,marginBottom:6}}>{p.category}</div>}
                     {p.priceRange&&<div style={{fontSize:".78rem",fontWeight:600,color:T.teal,marginBottom:6}}>{p.priceRange}</div>}
                     {(()=>{const off=getProductOffers(p);if(!off.mrp&&!off.badges.length)return null;return(<div style={{marginBottom:6}}>
-                      {off.mrp>0&&<div style={{fontSize:".76rem",fontWeight:600,color:T.txt}}>MRP ₹{off.mrp}{off.memberPrice?` → Member ₹${off.memberPrice}`:""}</div>}
+                      {off.mrp>0&&<div style={{fontSize:".76rem",fontWeight:600,color:T.txt}}>{isInst?"Fee":"MRP"} ₹{off.mrp}{off.memberPrice?` → Member ₹${off.memberPrice}`:""}</div>}
                       {off.badges.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:4}}>{off.badges.map((b,i)=><span key={i} style={{fontSize:".6rem",fontWeight:600,color:T.goldD,background:T.goldBg,padding:"1px 6px",borderRadius:4}}>{b}</span>)}</div>}
                     </div>)})()}
                     <div style={{fontSize:".74rem",color:T.txt2,lineHeight:1.5,marginBottom:10,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.description}</div>
@@ -7711,13 +7811,13 @@ ${forDownload
 
                     <div style={{display:"flex",gap:6}}>
                       <button onClick={()=>{
-                        setProdForm({name:p.name||"",description:p.description||"",priceRange:p.priceRange||"",category:p.category||"",specs:p.specs||"",enquiryEmail:p.enquiryEmail||"",mrp:p.mrp?String(p.mrp):"",offers:Array.isArray(p.offers)?p.offers:[],moreInfo:p.moreInfo||"",website:p.website||""});
+                        setProdForm({name:p.name||"",description:p.description||"",priceRange:p.priceRange||"",category:p.category||"",specs:p.specs||"",enquiryEmail:p.enquiryEmail||"",mrp:p.mrp?String(p.mrp):"",offers:Array.isArray(p.offers)?p.offers:[],moreInfo:p.moreInfo||"",website:p.website||"",courseType:p.courseType||"",courseMode:p.courseMode||"",duration:p.duration||"",scheduledDate:p.scheduledDate||"",scheduledTime:p.scheduledTime||"",seatsLimit:p.seatsLimit?String(p.seatsLimit):""});
                         setProdImages(Array.isArray(p.images)?p.images:[]);
                         setEditingProductId(p.id);
                         setShowProdForm(true);
                         setTimeout(()=>{document.getElementById("vendor-section-products")?.scrollIntoView({behavior:"smooth",block:"start"})},50);
                       }} style={{...T.btnO,...T.btnSm,flex:1,fontSize:".72rem"}}>✏️ Edit</button>
-                      <button onClick={async()=>{if(!window.confirm("Remove this product?"))return;await fbSet("products",p.id,{active:false});sh("Removed");loadData()}} style={{...T.btnO,...T.btnSm,color:T.err,borderColor:T.err,flex:1,fontSize:".72rem"}}>Remove</button>
+                      <button onClick={async()=>{if(!window.confirm(isInst?"Remove this course?":"Remove this product?"))return;await fbSet("products",p.id,{active:false});sh("Removed");loadData()}} style={{...T.btnO,...T.btnSm,color:T.err,borderColor:T.err,flex:1,fontSize:".72rem"}}>Remove</button>
                     </div>
                   </div>
                 </div>);
@@ -7795,6 +7895,54 @@ ${forDownload
                     setTimeout(()=>{document.getElementById("vendor-section-team")?.scrollIntoView({behavior:"smooth",block:"start"})},50);
                   }} style={{...T.btnO,...T.btnSm,fontSize:".7rem",padding:"4px 10px"}}>✏️ Edit</button>
                   <button onClick={async()=>{if(!window.confirm(`Remove ${t.name}?`))return;await fbSet("teamMembers",t.id,{active:false});sh("Removed");loadData()}} style={{...T.btnO,...T.btnSm,color:T.err,borderColor:T.err,fontSize:".7rem",padding:"4px 10px"}}>Remove</button>
+                </div>
+              </div>)}
+            </div>}
+          </div>);
+        })()}
+
+        {/* ─── WALL — institute marketing/celebration posts ─── */}
+        {normalizeAccountType(prof?.accountType||"")==="institute"&&(()=>{
+          const myWall=wallPosts.filter(w=>w.vendorId===au?.uid&&w.active!==false).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+          return(<div id="vendor-section-wall" style={{...T.card,marginBottom:16}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
+              <h3 style={{fontSize:"1rem",fontWeight:700,margin:0}}>📸 Wall</h3>
+            </div>
+            <div style={{fontSize:".78rem",color:T.mute,marginBottom:14}}>Share graduation photos, workshop moments, and celebrations. Shown on your public profile and prioritized in the feed of doctors who follow you.</div>
+
+            <div style={{padding:14,background:T.bg,borderRadius:10,marginBottom:16,display:"flex",flexDirection:"column",gap:10}}>
+              {wallForm.imageUrl?<div style={{position:"relative",width:140}}>
+                <img src={wallForm.imageUrl} alt="" style={{width:140,height:140,objectFit:"cover",borderRadius:8,border:"1px solid "+T.border}}/>
+                <button type="button" onClick={()=>setWallForm(p=>({...p,imageUrl:""}))} style={{position:"absolute",top:-6,right:-6,width:20,height:20,borderRadius:"50%",border:"none",background:T.err,color:"#fff",cursor:"pointer",fontSize:".65rem"}}>✕</button>
+              </div>:<input type="file" accept="image/*" disabled={wallUploading} onChange={async e=>{
+                const f=e.target.files?.[0];if(!f)return;
+                if(f.size>5*1024*1024){sh("Image must be under 5MB");return}
+                setWallUploading(true);
+                try{const path=`wallPosts/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;const sRef=ref(storage,path);await uploadBytes(sRef,f);const url=await getDownloadURL(sRef);setWallForm(p=>({...p,imageUrl:url}));sh("✓ Uploaded")}
+                catch(e){sh("Upload failed")}
+                setWallUploading(false);e.target.value="";
+              }} style={{fontSize:".82rem"}}/>}
+              {wallUploading&&<div style={{fontSize:".72rem",color:T.mute}}>⏳ Uploading...</div>}
+              <textarea value={wallForm.caption} onChange={e=>setWallForm(p=>({...p,caption:e.target.value}))} placeholder="Caption — e.g. 'Congratulations to our June Advanced Botox batch! 🎓'" style={T.txa} rows={2}/>
+              <button onClick={async()=>{
+                if(!wallForm.imageUrl){sh("Add a photo first");return}
+                if(!wallForm.caption.trim()){sh("Add a caption");return}
+                try{
+                  await fbAdd("wallPosts",{vendorId:au.uid,vendorName:prof?.instituteName||prof?.name||"",imageUrl:wallForm.imageUrl,caption:wallForm.caption.trim(),active:true});
+                  sh("✅ Posted to wall!");
+                  setWallForm({imageUrl:"",caption:""});
+                  loadData();
+                }catch(e){sh("Failed to post")}
+              }} style={{...T.btn,padding:"9px 18px",alignSelf:"flex-start"}}>Post to wall →</button>
+            </div>
+
+            {myWall.length===0?<p style={{color:T.mute,fontSize:".82rem"}}>No wall posts yet.</p>:
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10}}>
+              {myWall.map(w=><div key={w.id} style={{borderRadius:8,overflow:"hidden",border:"1px solid "+T.border,background:"#fff"}}>
+                <img src={w.imageUrl} alt="" style={{width:"100%",height:120,objectFit:"cover"}}/>
+                <div style={{padding:8}}>
+                  <div style={{fontSize:".72rem",color:T.txt2,marginBottom:6,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{w.caption}</div>
+                  <button onClick={async()=>{if(!window.confirm("Remove this post?"))return;await fbSet("wallPosts",w.id,{active:false});sh("Removed");loadData()}} style={{...T.btnO,...T.btnSm,color:T.err,borderColor:T.err,fontSize:".68rem",width:"100%"}}>Remove</button>
                 </div>
               </div>)}
             </div>}
@@ -7906,7 +8054,7 @@ ${forDownload
         {/* Profile edit form — shared: edit button sets editingProfile=true, handled below */}
       </div>}
 
-      {pg==="me"&&(normalizeAccountType(prof?.accountType||"")==="vendor"||normalizeAccountType(prof?.accountType||"")==="brand")&&editingProfile&&<div style={{maxWidth:900,margin:"0 auto",padding:"8px 0"}}>
+      {pg==="me"&&(normalizeAccountType(prof?.accountType||"")==="vendor"||normalizeAccountType(prof?.accountType||"")==="brand"||normalizeAccountType(prof?.accountType||"")==="institute")&&editingProfile&&<div style={{maxWidth:900,margin:"0 auto",padding:"8px 0"}}>
         <div style={{...T.card,borderLeft:"3px solid "+T.gold,padding:22}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}>
             <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>✏️ Edit company profile</h3>
@@ -7962,7 +8110,7 @@ ${forDownload
         </div>
       </div>}
 
-      {pg==="me"&&!(normalizeAccountType(prof?.accountType||"")==="vendor"||normalizeAccountType(prof?.accountType||"")==="brand")&&<div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 340px",gap:18,alignItems:"start"}} className="me-grid">
+      {pg==="me"&&!(normalizeAccountType(prof?.accountType||"")==="vendor"||normalizeAccountType(prof?.accountType||"")==="brand"||normalizeAccountType(prof?.accountType||"")==="institute")&&<div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 340px",gap:18,alignItems:"start"}} className="me-grid">
 
         {/* ═══ MAIN COLUMN: Profile + Saved Items ═══ */}
         <div style={{minWidth:0}}>
