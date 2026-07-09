@@ -1,0 +1,154 @@
+rules_version = '2';
+
+// SKINARIO Firebase Storage rules
+//
+// PASTE THIS INTO: Firebase Console → Storage → Rules tab → click Publish
+// NOT into Firestore rules — those are a separate file/screen.
+//
+// Storage paths used by the app:
+//   /images/...           — forum & case post images
+//   /covers/...           — admin cover images for articles, resources, events
+//   /videos/...           — video thumbnails
+//   /news/...             — news image uploads
+//   /submissions/...      — user content submissions (nested by typeKey)
+//   /rewards/...          — reward catalog images
+//   /avatars/{uid}        — user profile photos
+//   /quiz-ig-images/...   — AI-generated Instagram post images for quizzes
+//   /article-blocks/...   — article inline block images
+//   /forum-blocks/...     — forum post inline block images
+//   /products/...         — product/course listing images (vendor + institute)
+//   /sponsor-placements/... — sponsor placement logos/banners
+//   /wallPosts/...        — institute & personal profile wall posts
+//
+// All paths use {path=**} to allow nested folders. 5MB size limit. Image MIME types only.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ═══ Forum & Case post images ═══
+    match /images/{path=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // ═══ Cover images for articles, resources, events, ads ═══
+    match /covers/{path=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // ═══ Video thumbnails ═══
+    match /videos/{path=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // ═══ News images ═══
+    match /news/{path=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // ═══ User content submissions ═══
+    match /submissions/{path=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // ═══ Reward catalog images ═══
+    match /rewards/{path=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // ═══ AI-generated Instagram post images for quizzes ═══
+    // Cached after first generation so $0.04 isn't re-spent per modal open.
+    match /quiz-ig-images/{path=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // ═══ User profile avatars ═══
+    // Only the owner can write their own avatar.
+    match /avatars/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.uid == uid
+                   && request.resource.size < 2 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ═══ Article inline block images ═══
+    match /article-blocks/{path=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // ═══ Forum post inline block images ═══
+    match /forum-blocks/{path=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // ═══ Phase 3: Product listing images ═══
+    match /products/{path=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // ═══ Phase 4: Sponsor placement logos/banners ═══
+    match /sponsor-placements/{path=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // ═══ Institute & profile wall posts ═══
+    match /wallPosts/{path=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // ═══ DEFAULT DENY ═══
+    // Anything not matched above is blocked.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
