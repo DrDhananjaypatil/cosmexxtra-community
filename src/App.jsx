@@ -2392,6 +2392,9 @@ export default function App(){
   const[teamMembers,setTeamMembers]=useState([]); // vendor team/local contact directory
   const[wallPosts,setWallPosts]=useState([]); // institute marketing/celebration wall posts
   const[wallForm,setWallForm]=useState({imageUrl:"",caption:""});
+  const[profileWallText,setProfileWallText]=useState("");
+  const[profileWallImage,setProfileWallImage]=useState("");
+  const[profileWallUploading,setProfileWallUploading]=useState(false);
   const[wallUploading,setWallUploading]=useState(false);
   const[showTeamForm,setShowTeamForm]=useState(false);
   const[editingTeamId,setEditingTeamId]=useState(null);
@@ -5210,6 +5213,7 @@ ${forDownload
             <button onClick={()=>go("cases")} style={T.btnO}>🔬 Clinical cases</button>
             <button onClick={()=>go("forum")} style={T.btnO}>💬 Forum</button>
             <button onClick={()=>go("vendors")} style={T.btnO}>🏢 Vendors</button>
+            <button onClick={()=>{setDirTab("institutes");go("vendors");}} style={T.btnO}>🎓 Institutes</button>
             {(()=>{const aType=prof?.accountType||"";const showConsent=isAdm||aType==="doctor"||aType===""||aType===undefined;return showConsent?<button onClick={()=>go("consent")} style={{background:"#fdf6e3",color:"#785f1e",border:"1.5px solid #c8a84e",borderRadius:8,padding:"9px 18px 9px 28px",fontSize:".88rem",fontWeight:500,fontFamily:"inherit",cursor:"pointer",position:"relative",overflow:"hidden"}}><span style={{position:"absolute",top:3,left:6,fontSize:".52rem",background:"#c8a84e",color:"#fff",padding:"1px 6px",borderRadius:5,fontWeight:700,letterSpacing:.6}}>NEW</span>📋 Generate consent</button>:null;})()}
           </div>
         </div>
@@ -6810,6 +6814,7 @@ ${forDownload
                       <div style={{flex:1}}>
                         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                           <b onClick={()=>viewProfile(p.uid)} style={{fontSize:".92rem",color:T.txt,cursor:"pointer"}}>{p.author}</b>
+                          {(()=>{const authorU=allUsers.find(u=>u.id===p.uid);return authorU&&normalizeAccountType(authorU.accountType||"")==="institute"?<span style={{fontSize:".62rem",fontWeight:700,color:T.goldD,background:T.goldBg,padding:"2px 7px",borderRadius:10}}>🎓 Institute</span>:null;})()}
                           {p.uid&&p.uid!==au?.uid&&<FollowBtn user={allUsers.find(u=>u.id===p.uid)||{id:p.uid,name:p.author}} size="sm"/>}
                         </div>
                         <div style={{fontSize:".72rem",color:T.mute,display:"flex",alignItems:"center",gap:6}}>
@@ -7137,6 +7142,62 @@ ${forDownload
 
           {/* PUBLIC PROFILE CONTENT */}
           {canSee&&<>
+            {/* Wall — quick status-style posts, visible to anyone who can see this profile */}
+            {isMe&&<div style={{...T.card,marginBottom:14}}>
+              <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                {u.photo?<img src={u.photo} style={{width:40,height:40,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(40,T.tealBg,T.teal),flexShrink:0}}>{u.initials||"?"}</div>}
+                <div style={{flex:1}}>
+                  <textarea value={profileWallText} onChange={e=>setProfileWallText(e.target.value)} placeholder={`What's on your mind, ${u.name?.split(" ")[0]||""}?`} rows={2} style={{...T.txa,marginBottom:8}}/>
+                  {profileWallImage&&<div style={{position:"relative",width:100,marginBottom:8}}>
+                    <img src={profileWallImage} alt="" style={{width:100,height:100,objectFit:"cover",borderRadius:8,border:"1px solid "+T.border}}/>
+                    <button type="button" onClick={()=>setProfileWallImage("")} style={{position:"absolute",top:-6,right:-6,width:18,height:18,borderRadius:"50%",border:"none",background:T.err,color:"#fff",cursor:"pointer",fontSize:".6rem"}}>✕</button>
+                  </div>}
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                    <label style={{...T.btnO,...T.btnSm,cursor:profileWallUploading?"default":"pointer",fontSize:".76rem"}}>
+                      {profileWallUploading?"⏳ Uploading...":"📷 Add photo"}
+                      <input type="file" accept="image/*" disabled={profileWallUploading} onChange={async e=>{
+                        const f=e.target.files?.[0];if(!f)return;
+                        if(f.size>5*1024*1024){sh("Image must be under 5MB");return}
+                        setProfileWallUploading(true);
+                        try{const path=`wallPosts/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;const sRef=ref(storage,path);await uploadBytes(sRef,f);const url=await getDownloadURL(sRef);setProfileWallImage(url)}
+                        catch(e){sh("Upload failed")}
+                        setProfileWallUploading(false);e.target.value="";
+                      }} style={{display:"none"}}/>
+                    </label>
+                    <button onClick={async()=>{
+                      if(!profileWallText.trim()&&!profileWallImage){sh("Write something or add a photo first");return}
+                      try{
+                        await fbAdd("wallPosts",{vendorId:au.uid,vendorName:uName,vendorPhoto:u.photo||"",imageUrl:profileWallImage,caption:profileWallText.trim(),active:true});
+                        setProfileWallText("");setProfileWallImage("");
+                        sh("✅ Posted!");
+                        loadData();
+                      }catch(e){sh("Failed to post")}
+                    }} style={{...T.btn,padding:"7px 18px",fontSize:".82rem"}}>Post</button>
+                  </div>
+                </div>
+              </div>
+            </div>}
+
+            {/* Wall feed — visible to anyone who can see this profile */}
+            {(()=>{
+              const uWall=wallPosts.filter(w=>w.vendorId===u.id&&w.active!==false).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+              if(uWall.length===0)return null;
+              return(<div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
+                {uWall.map(w=><div key={w.id} style={{...T.card,marginBottom:0}}>
+                  <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:8}}>
+                    {u.photo?<img src={u.photo} style={{width:36,height:36,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(36,T.tealBg,T.teal)}>{u.initials||"?"}</div>}
+                    <div>
+                      <div style={{fontSize:".85rem",fontWeight:700}}>{u.name}</div>
+                      <div style={{fontSize:".68rem",color:T.mute}}>{w.createdAt?fD(new Date(w.createdAt).toISOString().split("T")[0]):""}</div>
+                    </div>
+                    {isMe&&<button onClick={async()=>{if(!window.confirm("Remove this post?"))return;await fbSet("wallPosts",w.id,{active:false});sh("Removed");loadData()}} style={{marginLeft:"auto",background:"none",border:"none",color:T.mute,cursor:"pointer",fontSize:".8rem"}}>✕</button>}
+                  </div>
+                  {w.caption&&<div style={{fontSize:".88rem",color:T.txt2,lineHeight:1.6,whiteSpace:"pre-wrap",marginBottom:w.imageUrl?10:0}}>{w.caption}</div>}
+                  {w.imageUrl&&<img src={w.imageUrl} alt="" style={{width:"100%",maxHeight:360,objectFit:"cover",borderRadius:8}}/>}
+                </div>)}
+              </div>);
+            })()}
+
             {/* Doctor-specific details */}
             {u.accountType==="doctor"&&<div style={{...T.card,marginBottom:14}}>
               <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:14}}>🩺 Practice Details</h4>
