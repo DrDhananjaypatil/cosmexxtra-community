@@ -7153,17 +7153,20 @@ ${forDownload
                     <button type="button" onClick={()=>setProfileWallImage("")} style={{position:"absolute",top:-6,right:-6,width:18,height:18,borderRadius:"50%",border:"none",background:T.err,color:"#fff",cursor:"pointer",fontSize:".6rem"}}>✕</button>
                   </div>}
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
-                    <label style={{...T.btnO,...T.btnSm,cursor:profileWallUploading?"default":"pointer",fontSize:".76rem"}}>
-                      {profileWallUploading?"⏳ Uploading...":"📷 Add photo"}
-                      <input type="file" accept="image/*" disabled={profileWallUploading} onChange={async e=>{
-                        const f=e.target.files?.[0];if(!f)return;
-                        if(f.size>5*1024*1024){sh("Image must be under 5MB");return}
-                        setProfileWallUploading(true);
-                        try{const path=`wallPosts/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;const sRef=ref(storage,path);await uploadBytes(sRef,f);const url=await getDownloadURL(sRef);setProfileWallImage(url)}
-                        catch(e){sh("Upload failed")}
-                        setProfileWallUploading(false);e.target.value="";
-                      }} style={{display:"none"}}/>
-                    </label>
+                    <div>
+                      <label style={{...T.btnO,...T.btnSm,cursor:profileWallUploading?"default":"pointer",fontSize:".76rem"}}>
+                        {profileWallUploading?"⏳ Uploading...":"📷 Add photo"}
+                        <input type="file" accept="image/*" disabled={profileWallUploading} onChange={async e=>{
+                          const f=e.target.files?.[0];if(!f)return;
+                          if(f.size>5*1024*1024){sh("Image must be under 5MB");return}
+                          setProfileWallUploading(true);
+                          try{const path=`wallPosts/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;const sRef=ref(storage,path);await uploadBytes(sRef,f);const url=await getDownloadURL(sRef);setProfileWallImage(url)}
+                          catch(e){sh("Upload failed")}
+                          setProfileWallUploading(false);e.target.value="";
+                        }} style={{display:"none"}}/>
+                      </label>
+                      {!profileWallImage&&<div style={{fontSize:".64rem",color:T.mute,marginTop:3}}>📐 Best fit: 1080×1080px square or 1200×675px landscape</div>}
+                    </div>
                     <button onClick={async()=>{
                       if(!profileWallText.trim()&&!profileWallImage){sh("Write something or add a photo first");return}
                       try{
@@ -7783,7 +7786,8 @@ ${forDownload
                 </div>
               </div>
               <div>
-                <div style={{fontSize:".76rem",color:T.txt2,fontWeight:600,marginBottom:6}}>{isInst?"Photos (up to 8) — venue, faculty, past batches":"Product images (up to 8)"}</div>
+                <div style={{fontSize:".76rem",color:T.txt2,fontWeight:600,marginBottom:2}}>{isInst?"Photos (up to 8) — venue, faculty, past batches":"Product images (up to 8)"}</div>
+                <div style={{fontSize:".68rem",color:T.mute,marginBottom:6}}>📐 Best fit: 800×450px landscape (16:9), first photo is used as the main card image — keep the subject centered since edges may crop</div>
                 <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
                   {prodImages.map((url,i)=><div key={i} style={{position:"relative"}}>
                     <img src={url} alt="" style={{width:70,height:70,objectFit:"cover",borderRadius:6,border:"1px solid "+T.border}}/>
@@ -7983,6 +7987,7 @@ ${forDownload
                 catch(e){sh("Upload failed")}
                 setWallUploading(false);e.target.value="";
               }} style={{fontSize:".82rem"}}/>}
+              {!wallForm.imageUrl&&<div style={{fontSize:".68rem",color:T.mute}}>📐 Best fit: 1080×1080px square, like an Instagram post</div>}
               {wallUploading&&<div style={{fontSize:".72rem",color:T.mute}}>⏳ Uploading...</div>}
               <textarea value={wallForm.caption} onChange={e=>setWallForm(p=>({...p,caption:e.target.value}))} placeholder="Caption — e.g. 'Congratulations to our June Advanced Botox batch! 🎓'" style={T.txa} rows={2}/>
               <button onClick={async()=>{
