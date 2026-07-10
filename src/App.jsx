@@ -2399,6 +2399,8 @@ export default function App(){
   const[profileWallImage,setProfileWallImage]=useState("");
   const[profileWallUploading,setProfileWallUploading]=useState(false);
   const[wallUploading,setWallUploading]=useState(false);
+  const[logoUploading,setLogoUploading]=useState(false);
+  const[coverUploading,setCoverUploading]=useState(false);
   const[showTeamForm,setShowTeamForm]=useState(false);
   const[editingTeamId,setEditingTeamId]=useState(null);
   const[teamForm,setTeamForm]=useState({name:"",designation:"",customDesignation:"",city:"",state:"",country:"India",mobile:"",whatsapp:"",email:"",isPrimary:false});
@@ -6078,52 +6080,64 @@ ${forDownload
         if(selVendor){
           const va=vendorApplications.find(a=>a.uid===selVendor.id);
           const vRewards=rewards.filter(r=>r.vendorId===selVendor.id&&r.active!==false);
+          const vLogo=selVendor.logo||selVendor.photo;
+          const vSocials=[["instagram","📸",selVendor.instagram],["facebook","📘",selVendor.facebook],["linkedin","💼",selVendor.linkedin],["youtube","▶️",selVendor.youtube]].filter(([,,url])=>url);
           return(<div>
             <button onClick={()=>setSelVendor(null)} style={{...T.btnO,...T.btnSm,marginBottom:16}}>← Back to vendors</button>
-            <div style={{...T.card,padding:24,marginBottom:14}}>
-              <div style={{display:"flex",alignItems:"flex-start",gap:18,flexWrap:"wrap",marginBottom:16}}>
-                {selVendor.photo?<img src={selVendor.photo} alt="" style={{width:72,height:72,borderRadius:10,objectFit:"cover",border:"1px solid "+T.border}}/>
-                :<div style={{width:72,height:72,borderRadius:10,background:T.tealBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.8rem"}}>🏭</div>}
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:"1.3rem",fontWeight:700,color:T.txt,marginBottom:4}}>{selVendor.companyName||selVendor.name}</div>
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
-                    <span style={{fontSize:".72rem",padding:"2px 10px",borderRadius:10,background:T.tealBg,color:T.teal,fontWeight:600}}>
-                      {selVendor.accountType==="vendor"?"🏭 Vendor":normalizeAccountType(selVendor.accountType)==="institute"?"🎓 Institute":"💊 Brand / Pharma"}
-                    </span>
-                    {(selVendor.vendorCategory||selVendor.brandCategory)&&<span style={{fontSize:".72rem",padding:"2px 10px",borderRadius:10,background:T.bg,color:T.txt2}}>{selVendor.vendorCategory||selVendor.brandCategory}</span>}
-                    {selVendor.country&&<span style={{fontSize:".72rem",padding:"2px 10px",borderRadius:10,background:T.bg,color:T.txt2}}>📍 {selVendor.country}</span>}
-                  </div>
-                  {selVendor.address&&<div style={{fontSize:".82rem",color:T.txt2,marginBottom:4}}>📍 {selVendor.address}</div>}
-                  {selVendor.website&&<a href={selVendor.website} target="_blank" rel="noopener noreferrer" style={{fontSize:".82rem",color:T.teal,textDecoration:"none"}}>🌐 {selVendor.website.replace(/^https?:\/\//,"")}</a>}
-                  <div style={{display:"flex",gap:16,marginTop:10,alignItems:"center",flexWrap:"wrap"}}>
-                    <span style={{fontSize:".84rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:selVendor.id,name:selVendor.companyName||selVendor.name,type:"followers"})}>
-                      <b style={{fontWeight:700}}>{follows.filter(f=>f.followedId===selVendor.id).length}</b> <span style={{color:T.mute}}>Followers</span>
-                    </span>
-                    <span style={{fontSize:".84rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:selVendor.id,name:selVendor.companyName||selVendor.name,type:"following"})}>
-                      <b style={{fontWeight:700}}>{follows.filter(f=>f.followerId===selVendor.id).length}</b> <span style={{color:T.mute}}>Following</span>
-                    </span>
-                    {(()=>{
-                      const vReviews=reviews.filter(r=>r.vendorId===selVendor.id&&r.active!==false);
-                      if(vReviews.length===0)return null;
-                      const avg=vReviews.reduce((s,r)=>s+(r.rating||0),0)/vReviews.length;
-                      return<span style={{fontSize:".84rem",color:T.txt,display:"flex",alignItems:"center",gap:3}}>
-                        <span style={{color:T.gold}}>{"★".repeat(Math.round(avg))}{"☆".repeat(5-Math.round(avg))}</span>
-                        <b style={{fontWeight:700}}>{avg.toFixed(1)}</b> <span style={{color:T.mute}}>({vReviews.length} review{vReviews.length!==1?"s":""})</span>
-                      </span>;
-                    })()}
-                  </div>
+
+            {/* Cover photo + logo header — Facebook Page style */}
+            <div style={{...T.card,padding:0,marginBottom:14,overflow:"hidden",position:"relative"}}>
+              {selVendor.coverPhoto?<img src={selVendor.coverPhoto} alt="" style={{width:"100%",height:200,objectFit:"cover",display:"block"}}/>
+                :<div style={{width:"100%",height:200,background:"linear-gradient(135deg,"+T.teal+",#0d5c52)"}}/>}
+              <div style={{padding:"0 24px 24px",textAlign:"center"}}>
+                {vLogo?<img src={vLogo} style={{width:104,height:104,borderRadius:14,border:"4px solid #fff",objectFit:"cover",display:"block",margin:"-52px auto 12px",boxShadow:"0 2px 10px rgba(0,0,0,0.15)"}}/>
+                  :<div style={{width:104,height:104,borderRadius:14,border:"4px solid #fff",background:T.tealBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2.2rem",margin:"-52px auto 12px",boxShadow:"0 2px 10px rgba(0,0,0,0.15)"}}>🏭</div>}
+
+                <div style={{fontSize:"1.35rem",fontWeight:700,color:T.txt}}>{selVendor.companyName||selVendor.name}</div>
+                <div style={{display:"flex",justifyContent:"center",gap:6,flexWrap:"wrap",margin:"8px 0"}}>
+                  <span style={{fontSize:".72rem",padding:"2px 10px",borderRadius:10,background:T.tealBg,color:T.teal,fontWeight:600}}>
+                    {selVendor.accountType==="vendor"?"🏭 Vendor":normalizeAccountType(selVendor.accountType)==="institute"?"🎓 Institute":"💊 Brand / Pharma"}
+                  </span>
+                  {(selVendor.vendorCategory||selVendor.brandCategory)&&<span style={{fontSize:".72rem",padding:"2px 10px",borderRadius:10,background:T.bg,color:T.txt2}}>{selVendor.vendorCategory||selVendor.brandCategory}</span>}
+                  {selVendor.country&&<span style={{fontSize:".72rem",padding:"2px 10px",borderRadius:10,background:T.bg,color:T.txt2}}>📍 {selVendor.country}</span>}
                 </div>
-                {selVendor.id!==au?.uid&&<FollowBtn user={selVendor} size="lg"/>}
-              </div>
-              {va?.offerings&&<div style={{padding:"12px 14px",background:T.bg,borderRadius:8,fontSize:".88rem",color:T.txt,lineHeight:1.6,marginBottom:12}}>
-                <div style={{fontSize:".68rem",fontWeight:600,color:T.mute,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>About</div>
-                {va.offerings}
-              </div>}
-              <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:8}}>
-                {selVendor.contactPerson&&<div style={{fontSize:".82rem",color:T.txt2}}>👤 {selVendor.contactPerson}</div>}
-                {selVendor.email&&<a href={`mailto:${selVendor.email}`} style={{fontSize:".82rem",color:T.teal,textDecoration:"none"}}>✉️ {selVendor.email}</a>}
+                {selVendor.address&&<div style={{fontSize:".82rem",color:T.txt2,marginBottom:4}}>📍 {selVendor.address}</div>}
+                {selVendor.website&&<a href={selVendor.website} target="_blank" rel="noopener noreferrer" style={{fontSize:".82rem",color:T.teal,textDecoration:"none"}}>🌐 {selVendor.website.replace(/^https?:\/\//,"")}</a>}
+
+                {vSocials.length>0&&<div style={{display:"flex",justifyContent:"center",gap:10,marginTop:10}}>
+                  {vSocials.map(([key,icon,url])=><a key={key} href={url.startsWith("http")?url:`https://${url}`} target="_blank" rel="noopener noreferrer" style={{fontSize:"1.3rem",textDecoration:"none"}}>{icon}</a>)}
+                </div>}
+
+                <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:14,alignItems:"center",flexWrap:"wrap"}}>
+                  <span style={{fontSize:".84rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:selVendor.id,name:selVendor.companyName||selVendor.name,type:"followers"})}>
+                    <b style={{fontWeight:700}}>{follows.filter(f=>f.followedId===selVendor.id).length}</b> <span style={{color:T.mute}}>Followers</span>
+                  </span>
+                  <span style={{fontSize:".84rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:selVendor.id,name:selVendor.companyName||selVendor.name,type:"following"})}>
+                    <b style={{fontWeight:700}}>{follows.filter(f=>f.followerId===selVendor.id).length}</b> <span style={{color:T.mute}}>Following</span>
+                  </span>
+                  {(()=>{
+                    const vReviews=reviews.filter(r=>r.vendorId===selVendor.id&&r.active!==false);
+                    if(vReviews.length===0)return null;
+                    const avg=vReviews.reduce((s,r)=>s+(r.rating||0),0)/vReviews.length;
+                    return<span style={{fontSize:".84rem",color:T.txt,display:"flex",alignItems:"center",gap:3}}>
+                      <span style={{color:T.gold}}>{"★".repeat(Math.round(avg))}{"☆".repeat(5-Math.round(avg))}</span>
+                      <b style={{fontWeight:700}}>{avg.toFixed(1)}</b> <span style={{color:T.mute}}>({vReviews.length})</span>
+                    </span>;
+                  })()}
+                </div>
+                {selVendor.id!==au?.uid&&<div style={{marginTop:14}}><FollowBtn user={selVendor} size="lg"/></div>}
+                {va?.offerings&&<div style={{padding:"12px 14px",background:T.bg,borderRadius:8,fontSize:".88rem",color:T.txt,lineHeight:1.6,marginTop:16,textAlign:"left"}}>
+                  <div style={{fontSize:".68rem",fontWeight:600,color:T.mute,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>About</div>
+                  {va.offerings}
+                </div>}
+                <div style={{display:"flex",gap:14,flexWrap:"wrap",justifyContent:"center",marginTop:12}}>
+                  {selVendor.contactPerson&&<div style={{fontSize:".82rem",color:T.txt2}}>👤 {selVendor.contactPerson}</div>}
+                  {selVendor.email&&<a href={`mailto:${selVendor.email}`} style={{fontSize:".82rem",color:T.teal,textDecoration:"none"}}>✉️ {selVendor.email}</a>}
+                </div>
               </div>
             </div>
+            <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 320px",gap:18,alignItems:"start"}} className="me-grid">
+            <div style={{minWidth:0}}>
             {vRewards.length>0&&<div style={{...T.card,marginBottom:14}}>
               <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>🎁 Rewards offered by this partner</h4>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10}}>
@@ -6135,56 +6149,6 @@ ${forDownload
                 </div>)}
               </div>
             </div>}
-
-            {/* Reviews */}
-            {(()=>{
-              const vReviews=reviews.filter(r=>r.vendorId===selVendor.id&&r.active!==false).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-              const myReview=vReviews.find(r=>r.reviewerUid===au?.uid);
-              const isSelf=selVendor.id===au?.uid;
-              return(<div style={{...T.card,marginBottom:14}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
-                  <h4 style={{fontSize:".95rem",fontWeight:700,margin:0}}>⭐ Reviews {vReviews.length>0&&`(${vReviews.length})`}</h4>
-                  {!isSelf&&!showReviewForm&&<button onClick={()=>{setReviewForm(myReview?{rating:myReview.rating,comment:myReview.comment||""}:{rating:0,comment:""});setShowReviewForm(true);}} style={{...T.btnO,...T.btnSm}}>{myReview?"✏️ Edit your review":"+ Write a review"}</button>}
-                </div>
-
-                {showReviewForm&&<div style={{padding:14,background:T.bg,borderRadius:10,marginBottom:14,display:"flex",flexDirection:"column",gap:10}}>
-                  <div style={{display:"flex",gap:4}}>
-                    {[1,2,3,4,5].map(n=><span key={n} onClick={()=>setReviewForm(p=>({...p,rating:n}))} style={{fontSize:"1.6rem",cursor:"pointer",color:n<=reviewForm.rating?T.gold:T.border}}>★</span>)}
-                  </div>
-                  <textarea value={reviewForm.comment} onChange={e=>setReviewForm(p=>({...p,comment:e.target.value}))} placeholder="Share your experience — product quality, service, responsiveness..." rows={3} style={T.txa}/>
-                  <div style={{display:"flex",gap:8}}>
-                    <button onClick={async()=>{
-                      if(!reviewForm.rating){sh("Please select a star rating");return}
-                      try{
-                        if(myReview){
-                          await fbSet("reviews",myReview.id,{rating:reviewForm.rating,comment:reviewForm.comment.trim()});
-                        }else{
-                          await fbAdd("reviews",{vendorId:selVendor.id,vendorName:selVendor.companyName||selVendor.name,reviewerUid:au.uid,reviewerName:uName,rating:reviewForm.rating,comment:reviewForm.comment.trim(),active:true});
-                        }
-                        sh("✅ Review posted!");
-                        setShowReviewForm(false);
-                        loadData();
-                      }catch(e){sh("Failed to post review")}
-                    }} style={{...T.btn,padding:"7px 16px",fontSize:".82rem"}}>Post review</button>
-                    <button onClick={()=>setShowReviewForm(false)} style={{...T.btnO,padding:"7px 16px",fontSize:".82rem"}}>Cancel</button>
-                  </div>
-                </div>}
-
-                {vReviews.length===0?<p style={{color:T.mute,fontSize:".82rem"}}>No reviews yet{isSelf?"":" — be the first to share your experience"}.</p>:
-                <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                  {vReviews.map(r=><div key={r.id} style={{padding:"10px 12px",background:T.bg,borderRadius:8}}>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:4}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <span style={{fontSize:".84rem",fontWeight:700}}>{r.reviewerName}</span>
-                        <span style={{color:T.gold,fontSize:".82rem"}}>{"★".repeat(r.rating)}{"☆".repeat(5-r.rating)}</span>
-                      </div>
-                      {r.reviewerUid===au?.uid&&<button onClick={async()=>{if(!window.confirm("Delete your review?"))return;await fbSet("reviews",r.id,{active:false});sh("Removed");loadData()}} style={{background:"none",border:"none",color:T.mute,cursor:"pointer",fontSize:".76rem"}}>Delete</button>}
-                    </div>
-                    {r.comment&&<div style={{fontSize:".82rem",color:T.txt2,lineHeight:1.5}}>{r.comment}</div>}
-                  </div>)}
-                </div>}
-              </div>);
-            })()}
 
             {/* Products / Courses */}
             {(()=>{
@@ -6302,6 +6266,60 @@ ${forDownload
                 </div>
               </div>);
             })()}
+            </div>
+
+            {/* Sidebar — Reviews */}
+            <div>
+              {(()=>{
+                const vReviews=reviews.filter(r=>r.vendorId===selVendor.id&&r.active!==false).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+                const myReview=vReviews.find(r=>r.reviewerUid===au?.uid);
+                const isSelf=selVendor.id===au?.uid;
+                return(<div style={{...T.card,marginBottom:14}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+                    <h4 style={{fontSize:".95rem",fontWeight:700,margin:0}}>⭐ Reviews {vReviews.length>0&&`(${vReviews.length})`}</h4>
+                  </div>
+                  {!isSelf&&!showReviewForm&&<button onClick={()=>{setReviewForm(myReview?{rating:myReview.rating,comment:myReview.comment||""}:{rating:0,comment:""});setShowReviewForm(true);}} style={{...T.btnO,...T.btnSm,width:"100%",marginBottom:14}}>{myReview?"✏️ Edit your review":"+ Write a review"}</button>}
+
+                  {showReviewForm&&<div style={{padding:14,background:T.bg,borderRadius:10,marginBottom:14,display:"flex",flexDirection:"column",gap:10}}>
+                    <div style={{display:"flex",gap:4}}>
+                      {[1,2,3,4,5].map(n=><span key={n} onClick={()=>setReviewForm(p=>({...p,rating:n}))} style={{fontSize:"1.6rem",cursor:"pointer",color:n<=reviewForm.rating?T.gold:T.border}}>★</span>)}
+                    </div>
+                    <textarea value={reviewForm.comment} onChange={e=>setReviewForm(p=>({...p,comment:e.target.value}))} placeholder="Share your experience..." rows={3} style={T.txa}/>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={async()=>{
+                        if(!reviewForm.rating){sh("Please select a star rating");return}
+                        try{
+                          if(myReview){
+                            await fbSet("reviews",myReview.id,{rating:reviewForm.rating,comment:reviewForm.comment.trim()});
+                          }else{
+                            await fbAdd("reviews",{vendorId:selVendor.id,vendorName:selVendor.companyName||selVendor.name,reviewerUid:au.uid,reviewerName:uName,rating:reviewForm.rating,comment:reviewForm.comment.trim(),active:true});
+                          }
+                          sh("✅ Review posted!");
+                          setShowReviewForm(false);
+                          loadData();
+                        }catch(e){sh("Failed to post review")}
+                      }} style={{...T.btn,padding:"7px 16px",fontSize:".82rem"}}>Post review</button>
+                      <button onClick={()=>setShowReviewForm(false)} style={{...T.btnO,padding:"7px 16px",fontSize:".82rem"}}>Cancel</button>
+                    </div>
+                  </div>}
+
+                  {vReviews.length===0?<p style={{color:T.mute,fontSize:".82rem"}}>No reviews yet{isSelf?"":" — be the first to share your experience"}.</p>:
+                  <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                    {vReviews.map(r=><div key={r.id} style={{padding:"10px 12px",background:T.bg,borderRadius:8}}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:4}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                          <span style={{fontSize:".84rem",fontWeight:700}}>{r.reviewerName}</span>
+                          <span style={{color:T.gold,fontSize:".82rem"}}>{"★".repeat(r.rating)}{"☆".repeat(5-r.rating)}</span>
+                        </div>
+                        {r.reviewerUid===au?.uid&&<button onClick={async()=>{if(!window.confirm("Delete your review?"))return;await fbSet("reviews",r.id,{active:false});sh("Removed");loadData()}} style={{background:"none",border:"none",color:T.mute,cursor:"pointer",fontSize:".76rem"}}>Delete</button>}
+                      </div>
+                      {r.comment&&<div style={{fontSize:".82rem",color:T.txt2,lineHeight:1.5}}>{r.comment}</div>}
+                    </div>)}
+                  </div>}
+                </div>);
+              })()}
+            </div>
+            </div>
           </div>);
         }
 
@@ -7723,28 +7741,96 @@ ${forDownload
 
       {pg==="me"&&(normalizeAccountType(prof?.accountType||"")==="vendor"||normalizeAccountType(prof?.accountType||"")==="brand"||normalizeAccountType(prof?.accountType||"")==="institute")&&!editingProfile&&<div style={{maxWidth:900,margin:"0 auto"}}>
 
-        {/* ══ VENDOR / BRAND ME PAGE ══ */}
-        {/* Company profile card */}
-        <div style={{...T.card,padding:28,marginBottom:16,textAlign:"center",position:"relative"}}>
-          <button onClick={()=>{
-            setEditPf({name:prof?.name||"",mobile:prof?.mobile||"",accountType:prof?.accountType||"",country:prof?.country||"India",degree:"",council:"",internationalCouncil:"",regNumber:"",clinic:"",address:prof?.address||"",city:"",region:"",visibility:prof?.visibility||"public",companyName:prof?.companyName||"",brandCategory:prof?.brandCategory||"",vendorCategory:prof?.vendorCategory||"",gstNumber:prof?.gstNumber||"",contactPerson:prof?.contactPerson||"",website:prof?.website||"",instituteName:"",instituteType:"",directorName:"",bio:prof?.bio||""});
-            setEditingProfile(true);setEditErr("");
-          }} style={{...T.btnO,...T.btnSm,position:"absolute",top:16,right:16}}>✏️ Edit</button>
+        {/* ══ VENDOR / BRAND / INSTITUTE ME PAGE ══ */}
+        {/* Company profile card — Facebook Page style: cover photo + overlapping logo */}
+        {(()=>{
+          const bizLogo=prof?.logo||uPhoto;
+          const socials=[["instagram","📸",prof?.instagram],["facebook","📘",prof?.facebook],["linkedin","💼",prof?.linkedin],["youtube","▶️",prof?.youtube]].filter(([,,url])=>url);
+          return(<div style={{...T.card,padding:0,marginBottom:16,overflow:"hidden",position:"relative"}}>
+            <button onClick={()=>{
+              setEditPf({name:prof?.name||"",mobile:prof?.mobile||"",accountType:prof?.accountType||"",country:prof?.country||"India",degree:"",council:"",internationalCouncil:"",regNumber:"",clinic:"",address:prof?.address||"",city:"",region:"",visibility:prof?.visibility||"public",companyName:prof?.companyName||"",brandCategory:prof?.brandCategory||"",vendorCategory:prof?.vendorCategory||"",gstNumber:prof?.gstNumber||"",contactPerson:prof?.contactPerson||"",website:prof?.website||"",instituteName:"",instituteType:"",directorName:"",bio:prof?.bio||"",logo:prof?.logo||"",coverPhoto:prof?.coverPhoto||"",instagram:prof?.instagram||"",facebook:prof?.facebook||"",linkedin:prof?.linkedin||"",youtube:prof?.youtube||""});
+              setEditingProfile(true);setEditErr("");
+            }} style={{...T.btnO,...T.btnSm,position:"absolute",top:16,right:16,zIndex:2,background:"#fff"}}>✏️ Edit</button>
 
-          {uPhoto?<img src={uPhoto} style={{width:80,height:80,borderRadius:12,border:"2px solid "+T.border,objectFit:"cover",display:"block",margin:"0 auto 14px"}}/>
-            :<div style={{width:80,height:80,borderRadius:12,background:T.tealBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.8rem",margin:"0 auto 14px"}}>🏭</div>}
-          <div style={{fontSize:"1.35rem",fontWeight:700,color:T.txt}}>{prof?.companyName||uName}</div>
-          <div style={{fontSize:".84rem",color:T.mute,marginTop:4}}>{prof?.vendorCategory||prof?.brandCategory||""}</div>
-          {prof?.address&&<div style={{fontSize:".8rem",color:T.mute,marginTop:2}}>📍 {prof.address}</div>}
-          {prof?.website&&<a href={prof.website} target="_blank" rel="noopener noreferrer" style={{fontSize:".8rem",color:T.teal,textDecoration:"none",display:"inline-block",marginTop:4}}>🌐 {prof.website.replace(/^https?:\/\//,"")}</a>}
-          <div style={{display:"flex",justifyContent:"center",gap:6,marginTop:10,flexWrap:"wrap"}}>
-            <span style={T.tag(T.tealBg,T.teal)}>{normalizeAccountType(prof?.accountType||"")==="vendor"?"🏭 Vendor":"💊 Brand / Pharma"}</span>
-            {prof?.verified&&<span style={T.tag("#e8f5e9","#1a7d42")}>✓ Verified Partner</span>}
-          </div>
-          <div style={{display:"flex",justifyContent:"center",gap:8,marginTop:14,flexWrap:"wrap"}}>
-            {prof?.contactPerson&&<div style={{fontSize:".8rem",color:T.txt2}}>👤 {prof.contactPerson}</div>}
-            <div style={{fontSize:".8rem",color:T.txt2}}>✉️ {au?.email}</div>
-            {prof?.gstNumber&&<div style={{fontSize:".8rem",color:T.txt2,fontFamily:"monospace"}}>GST: {prof.gstNumber}</div>}
+            {/* Cover photo */}
+            {prof?.coverPhoto?<img src={prof.coverPhoto} alt="" style={{width:"100%",height:200,objectFit:"cover",display:"block"}}/>
+              :<div style={{width:"100%",height:200,background:"linear-gradient(135deg,"+T.teal+",#0d5c52)"}}/>}
+
+            <div style={{padding:"0 24px 24px",textAlign:"center"}}>
+              {/* Logo overlapping the cover, like a Facebook Page */}
+              {bizLogo?<img src={bizLogo} style={{width:104,height:104,borderRadius:14,border:"4px solid #fff",objectFit:"cover",display:"block",margin:"-52px auto 12px",boxShadow:"0 2px 10px rgba(0,0,0,0.15)"}}/>
+                :<div style={{width:104,height:104,borderRadius:14,border:"4px solid #fff",background:T.tealBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2.2rem",margin:"-52px auto 12px",boxShadow:"0 2px 10px rgba(0,0,0,0.15)"}}>🏭</div>}
+
+              <div style={{fontSize:"1.35rem",fontWeight:700,color:T.txt}}>{prof?.companyName||uName}</div>
+              <div style={{fontSize:".84rem",color:T.mute,marginTop:4}}>{prof?.vendorCategory||prof?.brandCategory||""}</div>
+              {prof?.address&&<div style={{fontSize:".8rem",color:T.mute,marginTop:2}}>📍 {prof.address}</div>}
+              {prof?.website&&<a href={prof.website} target="_blank" rel="noopener noreferrer" style={{fontSize:".8rem",color:T.teal,textDecoration:"none",display:"inline-block",marginTop:4}}>🌐 {prof.website.replace(/^https?:\/\//,"")}</a>}
+
+              <div style={{display:"flex",justifyContent:"center",gap:6,marginTop:10,flexWrap:"wrap"}}>
+                <span style={T.tag(T.tealBg,T.teal)}>{normalizeAccountType(prof?.accountType||"")==="vendor"?"🏭 Vendor":normalizeAccountType(prof?.accountType||"")==="institute"?"🎓 Institute":"💊 Brand / Pharma"}</span>
+                {prof?.verified&&<span style={T.tag("#e8f5e9","#1a7d42")}>✓ Verified Partner</span>}
+              </div>
+
+              <div style={{display:"flex",justifyContent:"center",gap:8,marginTop:14,flexWrap:"wrap"}}>
+                {prof?.contactPerson&&<div style={{fontSize:".8rem",color:T.txt2}}>👤 {prof.contactPerson}</div>}
+                <div style={{fontSize:".8rem",color:T.txt2}}>✉️ {au?.email}</div>
+                {prof?.gstNumber&&<div style={{fontSize:".8rem",color:T.txt2,fontFamily:"monospace"}}>GST: {prof.gstNumber}</div>}
+              </div>
+
+              {socials.length>0&&<div style={{display:"flex",justifyContent:"center",gap:10,marginTop:14}}>
+                {socials.map(([key,icon,url])=><a key={key} href={url.startsWith("http")?url:`https://${url}`} target="_blank" rel="noopener noreferrer" style={{fontSize:"1.3rem",textDecoration:"none",filter:"grayscale(0)"}}>{icon}</a>)}
+              </div>}
+
+              <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:14}}>
+                <span style={{fontSize:".84rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:au?.uid,name:prof?.companyName||uName,type:"followers"})}>
+                  <b style={{fontWeight:700}}>{follows.filter(f=>f.followedId===au?.uid).length}</b> <span style={{color:T.mute}}>Followers</span>
+                </span>
+                {(()=>{
+                  const myReviews=reviews.filter(r=>r.vendorId===au?.uid&&r.active!==false);
+                  if(myReviews.length===0)return null;
+                  const avg=myReviews.reduce((s,r)=>s+(r.rating||0),0)/myReviews.length;
+                  return<span style={{fontSize:".84rem",color:T.txt}}><span style={{color:T.gold}}>★</span> <b style={{fontWeight:700}}>{avg.toFixed(1)}</b> <span style={{color:T.mute}}>({myReviews.length})</span></span>;
+                })()}
+              </div>
+            </div>
+          </div>);
+        })()}
+
+        {/* Quick post composer — Facebook-style "What's on your mind?" */}
+        <div style={{...T.card,marginBottom:16}}>
+          <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+            {(prof?.logo||uPhoto)?<img src={prof?.logo||uPhoto} style={{width:40,height:40,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(40,T.tealBg,T.teal),flexShrink:0}}>{uIni}</div>}
+            <div style={{flex:1}}>
+              <textarea value={profileWallText} onChange={e=>setProfileWallText(e.target.value)} placeholder={`Share an update, ${prof?.companyName||uName}...`} rows={2} style={{...T.txa,marginBottom:8}}/>
+              {profileWallImage&&<div style={{position:"relative",width:100,marginBottom:8}}>
+                <img src={profileWallImage} alt="" style={{width:100,height:100,objectFit:"cover",borderRadius:8,border:"1px solid "+T.border}}/>
+                <button type="button" onClick={()=>setProfileWallImage("")} style={{position:"absolute",top:-6,right:-6,width:18,height:18,borderRadius:"50%",border:"none",background:T.err,color:"#fff",cursor:"pointer",fontSize:".6rem"}}>✕</button>
+              </div>}
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                <div>
+                  <label style={{...T.btnO,...T.btnSm,cursor:profileWallUploading?"default":"pointer",fontSize:".76rem"}}>
+                    {profileWallUploading?"⏳ Uploading...":"📷 Add photo"}
+                    <input type="file" accept="image/*" disabled={profileWallUploading} onChange={async e=>{
+                      const f=e.target.files?.[0];if(!f)return;
+                      if(f.size>5*1024*1024){sh("Image must be under 5MB");return}
+                      setProfileWallUploading(true);
+                      try{const path=`wallPosts/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;const sRef=ref(storage,path);await uploadBytes(sRef,f);const url=await getDownloadURL(sRef);setProfileWallImage(url)}
+                      catch(e){sh("Upload failed")}
+                      setProfileWallUploading(false);e.target.value="";
+                    }} style={{display:"none"}}/>
+                  </label>
+                </div>
+                <button onClick={async()=>{
+                  if(!profileWallText.trim()&&!profileWallImage){sh("Write something or add a photo first");return}
+                  try{
+                    await fbAdd("wallPosts",{vendorId:au.uid,vendorName:prof?.companyName||uName,vendorPhoto:prof?.logo||uPhoto||"",imageUrl:profileWallImage,caption:profileWallText.trim(),active:true});
+                    setProfileWallText("");setProfileWallImage("");
+                    sh("✅ Posted!");
+                    loadData();
+                  }catch(e){sh("Failed to post")}
+                }} style={{...T.btn,padding:"7px 18px",fontSize:".82rem"}}>Post</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -8202,6 +8288,36 @@ ${forDownload
             <button onClick={()=>{setEditingProfile(false);setEditErr("")}} style={{background:"none",border:"none",fontSize:"1rem",color:T.mute,cursor:"pointer"}}>✕</button>
           </div>
           {/* Re-use the same edit form that the doctor layout uses — it handles all account types */}
+          {/* Logo + cover photo */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+            <div>
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:6,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Logo</label>
+              {editPf.logo&&<img src={editPf.logo} alt="" style={{width:70,height:70,borderRadius:10,objectFit:"cover",border:"1px solid "+T.border,marginBottom:6,display:"block"}}/>}
+              <input type="file" accept="image/*" disabled={logoUploading} onChange={async e=>{
+                const f=e.target.files?.[0];if(!f)return;
+                if(f.size>5*1024*1024){sh("Image must be under 5MB");return}
+                setLogoUploading(true);
+                try{const path=`covers/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;const sRef=ref(storage,path);await uploadBytes(sRef,f);const url=await getDownloadURL(sRef);setEditPf(p=>({...p,logo:url}));sh("✓ Uploaded")}
+                catch(e){sh("Upload failed")}
+                setLogoUploading(false);e.target.value="";
+              }} style={{fontSize:".78rem"}}/>
+              {logoUploading&&<div style={{fontSize:".68rem",color:T.mute,marginTop:4}}>⏳ Uploading...</div>}
+            </div>
+            <div>
+              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:6,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Cover photo</label>
+              {editPf.coverPhoto&&<img src={editPf.coverPhoto} alt="" style={{width:"100%",height:70,borderRadius:10,objectFit:"cover",border:"1px solid "+T.border,marginBottom:6,display:"block"}}/>}
+              <input type="file" accept="image/*" disabled={coverUploading} onChange={async e=>{
+                const f=e.target.files?.[0];if(!f)return;
+                if(f.size>5*1024*1024){sh("Image must be under 5MB");return}
+                setCoverUploading(true);
+                try{const path=`covers/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;const sRef=ref(storage,path);await uploadBytes(sRef,f);const url=await getDownloadURL(sRef);setEditPf(p=>({...p,coverPhoto:url}));sh("✓ Uploaded")}
+                catch(e){sh("Upload failed")}
+                setCoverUploading(false);e.target.value="";
+              }} style={{fontSize:".78rem"}}/>
+              <div style={{fontSize:".64rem",color:T.mute,marginTop:4}}>📐 Best fit: 1200×300px wide banner</div>
+              {coverUploading&&<div style={{fontSize:".68rem",color:T.mute,marginTop:4}}>⏳ Uploading...</div>}
+            </div>
+          </div>
           {/* Brand/vendor fields */}
           <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Company name *</label>
           <input value={editPf.companyName||""} onChange={e=>setEditPf(p=>({...p,companyName:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
@@ -8231,6 +8347,13 @@ ${forDownload
           <select value={editPf.country||"India"} onChange={e=>setEditPf(p=>({...p,country:e.target.value}))} style={{...T.inp,marginBottom:16}}>
             {COUNTRIES.map(c=><option key={c} value={c}>{c}</option>)}
           </select>
+          <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:6,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Social links (optional)</label>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+            <input value={editPf.instagram||""} onChange={e=>setEditPf(p=>({...p,instagram:e.target.value}))} placeholder="📸 Instagram URL" style={T.inp}/>
+            <input value={editPf.facebook||""} onChange={e=>setEditPf(p=>({...p,facebook:e.target.value}))} placeholder="📘 Facebook URL" style={T.inp}/>
+            <input value={editPf.linkedin||""} onChange={e=>setEditPf(p=>({...p,linkedin:e.target.value}))} placeholder="💼 LinkedIn URL" style={T.inp}/>
+            <input value={editPf.youtube||""} onChange={e=>setEditPf(p=>({...p,youtube:e.target.value}))} placeholder="▶️ YouTube URL" style={T.inp}/>
+          </div>
           {editErr&&<div style={{color:T.err,fontSize:".82rem",marginBottom:10}}>{editErr}</div>}
           <div style={{display:"flex",gap:10}}>
             <button onClick={async()=>{
@@ -8240,6 +8363,9 @@ ${forDownload
                 name:editPf.companyName.trim(),companyName:editPf.companyName.trim(),
                 contactPerson:editPf.contactPerson.trim(),website:editPf.website?.trim()||"",
                 address:editPf.address?.trim()||"",country:editPf.country||"India",
+                logo:editPf.logo||"",coverPhoto:editPf.coverPhoto||"",
+                instagram:editPf.instagram?.trim()||"",facebook:editPf.facebook?.trim()||"",
+                linkedin:editPf.linkedin?.trim()||"",youtube:editPf.youtube?.trim()||"",
                 ...(editPf.accountType==="vendor"?{vendorCategory:editPf.vendorCategory,gstNumber:editPf.gstNumber?.trim()||""}:{}),
                 ...(editPf.accountType==="brand"||editPf.accountType==="pharma"?{brandCategory:editPf.brandCategory}:{}),
               };
