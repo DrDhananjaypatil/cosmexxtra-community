@@ -2392,6 +2392,9 @@ export default function App(){
   const[teamMembers,setTeamMembers]=useState([]); // vendor team/local contact directory
   const[wallPosts,setWallPosts]=useState([]); // institute marketing/celebration wall posts
   const[wallForm,setWallForm]=useState({imageUrl:"",caption:""});
+  const[reviews,setReviews]=useState([]); // vendor/institute star ratings & reviews
+  const[reviewForm,setReviewForm]=useState({rating:0,comment:""});
+  const[showReviewForm,setShowReviewForm]=useState(false);
   const[profileWallText,setProfileWallText]=useState("");
   const[profileWallImage,setProfileWallImage]=useState("");
   const[profileWallUploading,setProfileWallUploading]=useState(false);
@@ -2608,7 +2611,7 @@ export default function App(){
     if(!consentDoctorReg)setConsentDoctorReg(prof.doctorRegNumber||prof.regNumber||"");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[pg,prof]);
-  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl,tm,wp]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000),fbGetAll("teamMembers","createdAt","desc",2000),fbGetAll("wallPosts","createdAt","desc",500)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl);setTeamMembers(tm);setWallPosts(wp)},[]);
+  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl,tm,wp,rv]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000),fbGetAll("teamMembers","createdAt","desc",2000),fbGetAll("wallPosts","createdAt","desc",500),fbGetAll("reviews","createdAt","desc",2000)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl);setTeamMembers(tm);setWallPosts(wp);setReviews(rv)},[]);
 
   // Load current user's points-earning history from pointsActivity ledger.
   // Uses where(uid) so the list query satisfies security rules (can't list others' docs).
@@ -5105,6 +5108,10 @@ ${forDownload
                   <div style={{fontSize:"1.5rem",fontWeight:700,color:T.txt}}>{myRewards.length}</div>
                   <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Active rewards</div>
                 </div>
+                <div onClick={()=>setFollowersModal({uid:au?.uid,name:prof?.instituteName||prof?.companyName||uName,type:"followers"})} style={{padding:"14px 12px",background:"#fff",borderRadius:10,textAlign:"center",cursor:"pointer",border:"1px solid "+T.border}}>
+                  <div style={{fontSize:"1.5rem",fontWeight:700,color:T.teal}}>{follows.filter(f=>f.followedId===au?.uid).length}</div>
+                  <div style={{fontSize:".68rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Followers</div>
+                </div>
               </div>
 
               {/* Institute-specific: knowledge content published */}
@@ -6088,7 +6095,25 @@ ${forDownload
                   </div>
                   {selVendor.address&&<div style={{fontSize:".82rem",color:T.txt2,marginBottom:4}}>📍 {selVendor.address}</div>}
                   {selVendor.website&&<a href={selVendor.website} target="_blank" rel="noopener noreferrer" style={{fontSize:".82rem",color:T.teal,textDecoration:"none"}}>🌐 {selVendor.website.replace(/^https?:\/\//,"")}</a>}
+                  <div style={{display:"flex",gap:16,marginTop:10,alignItems:"center",flexWrap:"wrap"}}>
+                    <span style={{fontSize:".84rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:selVendor.id,name:selVendor.companyName||selVendor.name,type:"followers"})}>
+                      <b style={{fontWeight:700}}>{follows.filter(f=>f.followedId===selVendor.id).length}</b> <span style={{color:T.mute}}>Followers</span>
+                    </span>
+                    <span style={{fontSize:".84rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:selVendor.id,name:selVendor.companyName||selVendor.name,type:"following"})}>
+                      <b style={{fontWeight:700}}>{follows.filter(f=>f.followerId===selVendor.id).length}</b> <span style={{color:T.mute}}>Following</span>
+                    </span>
+                    {(()=>{
+                      const vReviews=reviews.filter(r=>r.vendorId===selVendor.id&&r.active!==false);
+                      if(vReviews.length===0)return null;
+                      const avg=vReviews.reduce((s,r)=>s+(r.rating||0),0)/vReviews.length;
+                      return<span style={{fontSize:".84rem",color:T.txt,display:"flex",alignItems:"center",gap:3}}>
+                        <span style={{color:T.gold}}>{"★".repeat(Math.round(avg))}{"☆".repeat(5-Math.round(avg))}</span>
+                        <b style={{fontWeight:700}}>{avg.toFixed(1)}</b> <span style={{color:T.mute}}>({vReviews.length} review{vReviews.length!==1?"s":""})</span>
+                      </span>;
+                    })()}
+                  </div>
                 </div>
+                {selVendor.id!==au?.uid&&<FollowBtn user={selVendor} size="lg"/>}
               </div>
               {va?.offerings&&<div style={{padding:"12px 14px",background:T.bg,borderRadius:8,fontSize:".88rem",color:T.txt,lineHeight:1.6,marginBottom:12}}>
                 <div style={{fontSize:".68rem",fontWeight:600,color:T.mute,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>About</div>
@@ -6110,6 +6135,56 @@ ${forDownload
                 </div>)}
               </div>
             </div>}
+
+            {/* Reviews */}
+            {(()=>{
+              const vReviews=reviews.filter(r=>r.vendorId===selVendor.id&&r.active!==false).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+              const myReview=vReviews.find(r=>r.reviewerUid===au?.uid);
+              const isSelf=selVendor.id===au?.uid;
+              return(<div style={{...T.card,marginBottom:14}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+                  <h4 style={{fontSize:".95rem",fontWeight:700,margin:0}}>⭐ Reviews {vReviews.length>0&&`(${vReviews.length})`}</h4>
+                  {!isSelf&&!showReviewForm&&<button onClick={()=>{setReviewForm(myReview?{rating:myReview.rating,comment:myReview.comment||""}:{rating:0,comment:""});setShowReviewForm(true);}} style={{...T.btnO,...T.btnSm}}>{myReview?"✏️ Edit your review":"+ Write a review"}</button>}
+                </div>
+
+                {showReviewForm&&<div style={{padding:14,background:T.bg,borderRadius:10,marginBottom:14,display:"flex",flexDirection:"column",gap:10}}>
+                  <div style={{display:"flex",gap:4}}>
+                    {[1,2,3,4,5].map(n=><span key={n} onClick={()=>setReviewForm(p=>({...p,rating:n}))} style={{fontSize:"1.6rem",cursor:"pointer",color:n<=reviewForm.rating?T.gold:T.border}}>★</span>)}
+                  </div>
+                  <textarea value={reviewForm.comment} onChange={e=>setReviewForm(p=>({...p,comment:e.target.value}))} placeholder="Share your experience — product quality, service, responsiveness..." rows={3} style={T.txa}/>
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={async()=>{
+                      if(!reviewForm.rating){sh("Please select a star rating");return}
+                      try{
+                        if(myReview){
+                          await fbSet("reviews",myReview.id,{rating:reviewForm.rating,comment:reviewForm.comment.trim()});
+                        }else{
+                          await fbAdd("reviews",{vendorId:selVendor.id,vendorName:selVendor.companyName||selVendor.name,reviewerUid:au.uid,reviewerName:uName,rating:reviewForm.rating,comment:reviewForm.comment.trim(),active:true});
+                        }
+                        sh("✅ Review posted!");
+                        setShowReviewForm(false);
+                        loadData();
+                      }catch(e){sh("Failed to post review")}
+                    }} style={{...T.btn,padding:"7px 16px",fontSize:".82rem"}}>Post review</button>
+                    <button onClick={()=>setShowReviewForm(false)} style={{...T.btnO,padding:"7px 16px",fontSize:".82rem"}}>Cancel</button>
+                  </div>
+                </div>}
+
+                {vReviews.length===0?<p style={{color:T.mute,fontSize:".82rem"}}>No reviews yet{isSelf?"":" — be the first to share your experience"}.</p>:
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {vReviews.map(r=><div key={r.id} style={{padding:"10px 12px",background:T.bg,borderRadius:8}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:4}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:".84rem",fontWeight:700}}>{r.reviewerName}</span>
+                        <span style={{color:T.gold,fontSize:".82rem"}}>{"★".repeat(r.rating)}{"☆".repeat(5-r.rating)}</span>
+                      </div>
+                      {r.reviewerUid===au?.uid&&<button onClick={async()=>{if(!window.confirm("Delete your review?"))return;await fbSet("reviews",r.id,{active:false});sh("Removed");loadData()}} style={{background:"none",border:"none",color:T.mute,cursor:"pointer",fontSize:".76rem"}}>Delete</button>}
+                    </div>
+                    {r.comment&&<div style={{fontSize:".82rem",color:T.txt2,lineHeight:1.5}}>{r.comment}</div>}
+                  </div>)}
+                </div>}
+              </div>);
+            })()}
 
             {/* Products / Courses */}
             {(()=>{

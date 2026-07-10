@@ -94,6 +94,16 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ── reviews — star ratings & reviews for vendors/institutes. Any
+    //    signed-in user may review; only the author (or admin) may edit
+    //    or delete their own review. Read is open (bulk-fetched). ─────────
+    match /reviews/{reviewId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner('reviewerUid');
+      allow update: if wasOwner('reviewerUid') || isAdmin();
+      allow delete: if wasOwner('reviewerUid') || isAdmin();
+    }
+
     // ── sponsorPlacements — vendor requests; admin approves/activates ──────
     match /sponsorPlacements/{placementId} {
       allow read: if isSignedIn();
