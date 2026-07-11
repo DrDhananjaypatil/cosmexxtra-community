@@ -11109,6 +11109,64 @@ ${forDownload
               </div>
             </div>
 
+            {/* Waitlist — who's asked for access, oldest first */}
+            {(()=>{
+              const waitlisted=allUsers
+                .filter(u=>Array.isArray(u.betaWaitlist)&&u.betaWaitlist.includes("study"))
+                .sort((a,b)=>(a.betaWaitlistedAt_study||0)-(b.betaWaitlistedAt_study||0));
+              return(<div style={{...T.card,marginBottom:14}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+                  <h5 style={{fontSize:".95rem",fontWeight:700,margin:0,display:"flex",alignItems:"center",gap:6}}>⏳ Waitlist <span style={{fontSize:".72rem",fontWeight:500,color:T.mute}}>({waitlisted.length})</span></h5>
+                  {waitlisted.length>0&&<div style={{fontSize:".72rem",color:T.mute}}>Oldest requests first</div>}
+                </div>
+                {waitlisted.length===0?<div style={{fontSize:".82rem",color:T.mute,fontStyle:"italic",textAlign:"center",padding:"12px 0"}}>No one waiting right now.</div>:
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {waitlisted.map(u=>{
+                    const acc=ACCOUNT_TYPES.find(t=>t.id===u.accountType);
+                    const requestedAt=u.betaWaitlistedAt_study?new Date(u.betaWaitlistedAt_study).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):"—";
+                    const activeCount=allUsers.filter(x=>Array.isArray(x.betaFeatures)&&x.betaFeatures.includes("study")).length;
+                    const capNow=getBetaCap("study");
+                    const atCap=activeCount>=capNow;
+                    return(<div key={u.id} style={{padding:12,background:T.bg,borderRadius:8,display:"flex",gap:10,alignItems:"flex-start",flexWrap:"wrap"}}>
+                      {u.photo?<img src={u.photo} style={{width:38,height:38,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(38,T.tealBg,T.teal),flexShrink:0}}>{u.initials||"?"}</div>}
+                      <div style={{flex:1,minWidth:220}}>
+                        <div style={{fontSize:".88rem",fontWeight:600,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                          <span onClick={()=>viewProfile(u.id)} style={{cursor:"pointer"}}>{u.name||"Unnamed"}</span>
+                          {u.verified&&<span title="Verified" style={{color:"#1d9bf0"}}>✓</span>}
+                          {acc&&<span style={T.tag(T.bg,T.mute)}>{acc.icon} {acc.label}</span>}
+                        </div>
+                        <div style={{fontSize:".7rem",color:T.mute,marginTop:2}}>{u.email}{u.clinic?` · ${u.clinic}`:u.companyName?` · ${u.companyName}`:""}{u.city?` · ${u.city}`:""} · requested {requestedAt}</div>
+                        {u.betaWaitlistNote_study&&u.betaWaitlistNote_study!=="(no note)"&&<div style={{fontSize:".78rem",color:T.txt2,marginTop:6,padding:"6px 10px",background:"#fff",borderRadius:6,fontStyle:"italic",lineHeight:1.5,borderLeft:"2px solid "+T.teal}}>💭 "{u.betaWaitlistNote_study}"</div>}
+                      </div>
+                      <div style={{display:"flex",gap:6,flexShrink:0}}>
+                        <button onClick={async()=>{
+                          if(atCap){
+                            if(!window.confirm(`Beta cap is ${capNow} and it's full. Approve anyway? (You may want to revoke an inactive tester first.)`))return;
+                          }
+                          const nextFeatures=[...(u.betaFeatures||[]),"study"];
+                          const nextWaitlist=(u.betaWaitlist||[]).filter(f=>f!=="study");
+                          try{
+                            await fbSet("users",u.id,{betaFeatures:nextFeatures,betaWaitlist:nextWaitlist});
+                            sh(`✓ Approved ${u.name?.split(" ")[0]||"user"} for Study beta`);
+                            loadData();
+                          }catch(err){sh("Failed to approve")}
+                        }} style={{...T.btn,...T.btnSm,fontSize:".72rem",padding:"5px 12px"}}>✓ Approve</button>
+                        <button onClick={async()=>{
+                          if(!window.confirm(`Remove ${u.name?.split(" ")[0]||"this user"} from the waitlist? They won't be notified — they'll just see the "join waitlist" screen again if they revisit.`))return;
+                          const nextWaitlist=(u.betaWaitlist||[]).filter(f=>f!=="study");
+                          try{
+                            await fbSet("users",u.id,{betaWaitlist:nextWaitlist});
+                            sh(`Removed from waitlist`);
+                            loadData();
+                          }catch(err){sh("Failed to remove")}
+                        }} style={{...T.btnO,...T.btnSm,fontSize:".72rem",padding:"5px 12px",color:T.mute}}>Reject</button>
+                      </div>
+                    </div>);
+                  })}
+                </div>}
+              </div>);
+            })()}
+
             {/* Future beta features hint */}
             <div style={{padding:14,background:T.bg,borderRadius:10,fontSize:".76rem",color:T.mute,textAlign:"center",fontStyle:"italic"}}>More beta programs will appear here as they launch.</div>
           </div>);
