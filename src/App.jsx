@@ -680,6 +680,7 @@ const TEAM_DESIGNATIONS=["National Sales Manager / Country Head","Regional Sales
 const COURSE_TYPES=["Course","Masterclass","Webinar"];
 const COURSE_MODES=["In-person","Online (Live)","Online (Recorded)","Hybrid"];
 const COURSE_CATEGORIES=["Botox & Fillers","Threads","Chemical Peels & Skin Boosters","Laser & Energy Devices","PRP / Regenerative Medicine","Body Contouring","Hair Restoration","Aesthetic Business & Marketing","Basic/Foundation Aesthetics","Advanced/Fellowship Program","Hands-on Workshop","Other"];
+const CERTIFICATION_OPTIONS=["ISO 9001 (Quality Management)","ISO 13485 (Medical Devices)","CDSCO Approved/Licensed","CE Marking","US FDA Approved/Cleared","GMP Certified","NABL Accredited","NABH Accredited","BIS Certified","AERB Registered (Laser/Radiation)","UKCA Marking","ISO 21001 (Educational Organizations)","University/Council Affiliated","Other"];
 const getIST=()=>new Date(new Date().toLocaleString("en-US",{timeZone:"Asia/Kolkata"}));
 const ds=d=>d.toISOString().split("T")[0];
 const fD=s=>{try{return new Date(s+"T12:00:00").toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}catch{return s}};
@@ -2394,6 +2395,15 @@ export default function App(){
   const[wallForm,setWallForm]=useState({imageUrl:"",caption:""});
   const[reviews,setReviews]=useState([]); // vendor/institute star ratings & reviews
   const[reviewForm,setReviewForm]=useState({rating:0,comment:""});
+  const[productReviewForm,setProductReviewForm]=useState({rating:0,comment:""});
+  const[showProductReviewForm,setShowProductReviewForm]=useState(false);
+  const[certForm,setCertForm]=useState({name:"",customName:"",logoUrl:""});
+  const[showCertForm,setShowCertForm]=useState(false);
+  const[certUploading,setCertUploading]=useState(false);
+  const[adminMessages,setAdminMessages]=useState([]);
+  const[showContactAdmin,setShowContactAdmin]=useState(false);
+  const[contactForm,setContactForm]=useState({subject:"",message:""});
+  const[adminReplyDraft,setAdminReplyDraft]=useState({});
   const[showReviewForm,setShowReviewForm]=useState(false);
   const[profileWallText,setProfileWallText]=useState("");
   const[profileWallImage,setProfileWallImage]=useState("");
@@ -2613,7 +2623,7 @@ export default function App(){
     if(!consentDoctorReg)setConsentDoctorReg(prof.doctorRegNumber||prof.regNumber||"");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[pg,prof]);
-  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl,tm,wp,rv]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000),fbGetAll("teamMembers","createdAt","desc",2000),fbGetAll("wallPosts","createdAt","desc",500),fbGetAll("reviews","createdAt","desc",2000)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl);setTeamMembers(tm);setWallPosts(wp);setReviews(rv)},[]);
+  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl,tm,wp,rv,am]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000),fbGetAll("teamMembers","createdAt","desc",2000),fbGetAll("wallPosts","createdAt","desc",500),fbGetAll("reviews","createdAt","desc",2000),fbGetAll("adminMessages","createdAt","desc",500)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl);setTeamMembers(tm);setWallPosts(wp);setReviews(rv);setAdminMessages(am)},[]);
 
   // Load current user's points-earning history from pointsActivity ledger.
   // Uses where(uid) so the list query satisfies security rules (can't list others' docs).
@@ -5227,6 +5237,71 @@ ${forDownload
           </div>
         </div>
 
+        {/* Quick post composer — Facebook-style, shown for every account type */}
+        <div style={{...T.card,marginTop:16}}>
+          <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+            {(prof?.logo||uPhoto)?<img src={prof?.logo||uPhoto} style={{width:40,height:40,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(40,T.tealBg,T.teal),flexShrink:0}}>{uIni}</div>}
+            <div style={{flex:1}}>
+              <textarea value={profileWallText} onChange={e=>setProfileWallText(e.target.value)} placeholder={`What's on your mind, ${uName.split(" ")[0]}?`} rows={2} style={{...T.txa,marginBottom:8}}/>
+              {profileWallImage&&<div style={{position:"relative",width:100,marginBottom:8}}>
+                <img src={profileWallImage} alt="" style={{width:100,height:100,objectFit:"cover",borderRadius:8,border:"1px solid "+T.border}}/>
+                <button type="button" onClick={()=>setProfileWallImage("")} style={{position:"absolute",top:-6,right:-6,width:18,height:18,borderRadius:"50%",border:"none",background:T.err,color:"#fff",cursor:"pointer",fontSize:".6rem"}}>✕</button>
+              </div>}
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                <label style={{...T.btnO,...T.btnSm,cursor:profileWallUploading?"default":"pointer",fontSize:".76rem"}}>
+                  {profileWallUploading?"⏳ Uploading...":"📷 Add photo"}
+                  <input type="file" accept="image/*" disabled={profileWallUploading} onChange={async e=>{
+                    const f=e.target.files?.[0];if(!f)return;
+                    if(f.size>5*1024*1024){sh("Image must be under 5MB");return}
+                    setProfileWallUploading(true);
+                    try{const path=`wallPosts/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;const sRef=ref(storage,path);await uploadBytes(sRef,f);const url=await getDownloadURL(sRef);setProfileWallImage(url)}
+                    catch(e){sh("Upload failed")}
+                    setProfileWallUploading(false);e.target.value="";
+                  }} style={{display:"none"}}/>
+                </label>
+                <button onClick={async()=>{
+                  if(!profileWallText.trim()&&!profileWallImage){sh("Write something or add a photo first");return}
+                  try{
+                    await fbAdd("wallPosts",{vendorId:au.uid,vendorName:prof?.companyName||uName,vendorPhoto:prof?.logo||uPhoto||"",imageUrl:profileWallImage,caption:profileWallText.trim(),active:true});
+                    setProfileWallText("");setProfileWallImage("");
+                    sh("✅ Posted!");
+                    loadData();
+                  }catch(e){sh("Failed to post")}
+                }} style={{...T.btn,padding:"7px 18px",fontSize:".82rem"}}>Post</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Wall feed — posts from people you follow (falls back to recent platform-wide posts if you don't follow anyone yet) */}
+        {(()=>{
+          const followedIds=new Set(follows.filter(f=>f.followerId===au?.uid).map(f=>f.followedId));
+          let feed=wallPosts.filter(w=>w.active!==false&&(followedIds.has(w.vendorId)||w.vendorId===au?.uid));
+          let isDiscovery=false;
+          if(feed.length===0){feed=wallPosts.filter(w=>w.active!==false);isDiscovery=true;}
+          feed=feed.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,20);
+          if(feed.length===0)return null;
+          return(<div style={{marginTop:16}}>
+            {isDiscovery&&<div style={{fontSize:".78rem",color:T.mute,marginBottom:10}}>Follow doctors, vendors & institutes to see their updates here. Meanwhile, here's what's happening on SKINARIO:</div>}
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {feed.map(w=>{
+                const author=allUsers.find(u=>u.id===w.vendorId);
+                return(<div key={w.id} style={{...T.card,marginBottom:0}}>
+                  <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:8,cursor:"pointer"}} onClick={()=>viewProfile(w.vendorId)}>
+                    {w.vendorPhoto?<img src={w.vendorPhoto} style={{width:36,height:36,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(36,T.tealBg,T.teal)}>{(w.vendorName||"?").slice(0,1).toUpperCase()}</div>}
+                    <div>
+                      <div style={{fontSize:".85rem",fontWeight:700}}>{w.vendorName}{author&&normalizeAccountType(author.accountType||"")==="institute"&&<span style={{fontSize:".6rem",fontWeight:700,color:T.goldD,background:T.goldBg,padding:"2px 7px",borderRadius:10,marginLeft:6}}>🎓 Institute</span>}</div>
+                      <div style={{fontSize:".68rem",color:T.mute}}>{w.createdAt?fD(new Date(w.createdAt).toISOString().split("T")[0]):""}</div>
+                    </div>
+                  </div>
+                  {w.caption&&<div style={{fontSize:".88rem",color:T.txt2,lineHeight:1.6,whiteSpace:"pre-wrap",marginBottom:w.imageUrl?10:0}}>{w.caption}</div>}
+                  {w.imageUrl&&<img src={w.imageUrl} alt="" style={{width:"100%",maxHeight:360,objectFit:"cover",borderRadius:8}}/>}
+                </div>);
+              })}
+            </div>
+          </div>);
+        })()}
+
         <div style={{display:"grid",gridTemplateColumns:"repeat(8,1fr)",gap:8,margin:"16px 0"}}>
           {/* Quiz + Accuracy — single column, stacked top/bottom */}
           <div onClick={()=>go("quiz")} style={{...T.card,padding:0,marginBottom:0,cursor:"pointer",overflow:"hidden",transition:"transform .12s,box-shadow .12s",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 16px rgba(0,0,0,0.08)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04)"}}>
@@ -6125,6 +6200,12 @@ ${forDownload
                     </span>;
                   })()}
                 </div>
+                {selVendor.certifications?.length>0&&<div style={{display:"flex",justifyContent:"center",gap:8,flexWrap:"wrap",marginTop:12}}>
+                  {selVendor.certifications.map((c,i)=><span key={i} style={{display:"flex",alignItems:"center",gap:5,fontSize:".72rem",fontWeight:600,color:T.txt2,background:T.bg,padding:"4px 10px",borderRadius:20,border:"1px solid "+T.border}}>
+                    {c.logoUrl&&<img src={c.logoUrl} alt="" style={{width:16,height:16,objectFit:"contain"}}/>}
+                    ✓ {c.name}
+                  </span>)}
+                </div>}
                 {selVendor.id!==au?.uid&&<div style={{marginTop:14}}><FollowBtn user={selVendor} size="lg"/></div>}
                 {va?.offerings&&<div style={{padding:"12px 14px",background:T.bg,borderRadius:8,fontSize:".88rem",color:T.txt,lineHeight:1.6,marginTop:16,textAlign:"left"}}>
                   <div style={{fontSize:".68rem",fontWeight:600,color:T.mute,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>About</div>
@@ -6160,7 +6241,7 @@ ${forDownload
               {isVendorInst&&upcoming.length>0&&<div style={{...T.card,marginBottom:14,borderLeft:"3px solid "+T.gold}}>
                 <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>📅 Upcoming Schedule</h4>
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                  {upcoming.map(p=><div key={p.id} onClick={()=>{setSelProduct(p);setSelProductImgIdx(0);}} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",background:T.bg,borderRadius:8,cursor:"pointer",gap:10,flexWrap:"wrap"}}>
+                  {upcoming.map(p=><div key={p.id} onClick={()=>{setSelProduct(p);setSelProductImgIdx(0);setShowProductReviewForm(false);}} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",background:T.bg,borderRadius:8,cursor:"pointer",gap:10,flexWrap:"wrap"}}>
                     <div>
                       <div style={{fontSize:".86rem",fontWeight:700}}>{p.name}</div>
                       <div style={{fontSize:".72rem",color:T.mute,marginTop:2}}>{p.courseType} {p.courseMode&&`· ${p.courseMode}`}</div>
@@ -6174,7 +6255,7 @@ ${forDownload
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:12}}>
                   {vProducts.map(p=>{
                     const off=getProductOffers(p);
-                    return(<div key={p.id} style={{border:"1px solid "+T.border,borderRadius:8,overflow:"hidden",cursor:"pointer",transition:"box-shadow .12s"}} onClick={()=>{setSelProduct(p);setSelProductImgIdx(0);}} onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"} onMouseLeave={e=>e.currentTarget.style.boxShadow=""}>
+                    return(<div key={p.id} style={{border:"1px solid "+T.border,borderRadius:8,overflow:"hidden",cursor:"pointer",transition:"box-shadow .12s"}} onClick={()=>{setSelProduct(p);setSelProductImgIdx(0);setShowProductReviewForm(false);}} onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.10)"} onMouseLeave={e=>e.currentTarget.style.boxShadow=""}>
                     {p.images?.[0]?<img src={p.images[0]} alt={p.name} style={{width:"100%",height:140,objectFit:"cover"}}/>:<div style={{width:"100%",height:100,background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2rem"}}>{isVendorInst?"🎓":"🛍️"}</div>}
                     <div style={{padding:12}}>
                       <div style={{fontSize:".88rem",fontWeight:700,marginBottom:4}}>{p.name}</div>
@@ -6185,6 +6266,7 @@ ${forDownload
                       </div>}
                       {p.scheduledDate&&<div style={{fontSize:".68rem",color:T.goldD,fontWeight:600,marginBottom:6}}>📅 {fD(p.scheduledDate)}{p.scheduledTime?` · ${p.scheduledTime}`:""}</div>}
                       {p.category&&<div style={{fontSize:".68rem",color:T.mute,marginBottom:6}}>{p.category}</div>}
+                      {(()=>{const pReviews=reviews.filter(r=>r.productId===p.id&&r.active!==false);if(pReviews.length===0)return null;const avg=pReviews.reduce((s,r)=>s+(r.rating||0),0)/pReviews.length;return<div style={{fontSize:".72rem",marginBottom:6,display:"flex",alignItems:"center",gap:3}}><span style={{color:T.gold}}>{"★".repeat(Math.round(avg))}{"☆".repeat(5-Math.round(avg))}</span><span style={{color:T.mute}}>{avg.toFixed(1)} ({pReviews.length})</span></div>;})()}
                       <div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden",marginBottom:8}}>{p.description}</div>
                       {off.mrp>0&&<div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:4}}>
                         {off.memberPrice?<>
@@ -6213,27 +6295,28 @@ ${forDownload
               </>);
             })()}
 
-            {/* Wall — institute marketing/celebration photos */}
-            {normalizeAccountType(selVendor.accountType||"")==="institute"&&(()=>{
+            {/* Wall — marketing/celebration posts, text and/or photo */}
+            {(()=>{
               const vWall=wallPosts.filter(w=>w.vendorId===selVendor.id&&w.active!==false).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
               if(vWall.length===0)return null;
               return(<div style={{...T.card,marginTop:14}}>
                 <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>📸 Wall</h4>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10}}>
-                  {vWall.map(w=><div key={w.id} style={{borderRadius:8,overflow:"hidden",border:"1px solid "+T.border}}>
-                    <img src={w.imageUrl} alt="" style={{width:"100%",height:130,objectFit:"cover"}}/>
-                    <div style={{padding:8,fontSize:".72rem",color:T.txt2,lineHeight:1.4}}>{w.caption}</div>
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {vWall.map(w=><div key={w.id} style={{border:"1px solid "+T.border,borderRadius:8,overflow:"hidden"}}>
+                    {w.imageUrl&&<img src={w.imageUrl} alt="" style={{width:"100%",maxHeight:280,objectFit:"cover"}}/>}
+                    {w.caption&&<div style={{padding:10,fontSize:".82rem",color:T.txt2,lineHeight:1.5,whiteSpace:"pre-wrap"}}>{w.caption}</div>}
+                    <div style={{padding:"0 10px 8px",fontSize:".68rem",color:T.mute}}>{w.createdAt?fD(new Date(w.createdAt).toISOString().split("T")[0]):""}</div>
                   </div>)}
                 </div>
               </div>);
             })()}
 
-            {/* Recent forum posts from this institute */}
-            {normalizeAccountType(selVendor.accountType||"")==="institute"&&(()=>{
+            {/* Recent forum posts from this company */}
+            {(()=>{
               const vPosts=forumPosts.filter(p=>p.uid===selVendor.id).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,5);
               if(vPosts.length===0)return null;
               return(<div style={{...T.card,marginTop:14}}>
-                <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>📝 From {selVendor.instituteName||selVendor.name}</h4>
+                <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>📝 From {selVendor.companyName||selVendor.name}</h4>
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
                   {vPosts.map(p=><div key={p.id} onClick={()=>{go("forum");setSelFP(p);}} style={{padding:"10px 12px",background:T.bg,borderRadius:8,cursor:"pointer"}}>
                     <div style={{fontSize:".84rem",fontWeight:600,color:T.txt}}>{p.title||p.text?.slice(0,80)}</div>
@@ -6530,7 +6613,7 @@ ${forDownload
             {courseListings.length===0?<div style={{...T.card,textAlign:"center",padding:40}}><div style={{fontSize:"2rem",marginBottom:8}}>🎓</div><p style={{color:T.mute}}>No scheduled courses or masterclasses right now. Check back soon!</p></div>:
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:14}}>
               {courseListings.map(p=>{const dt=new Date(p.scheduledDate+"T12:00:00");const day=dt.getDate();const mo=dt.toLocaleDateString("en-IN",{month:"short"}).toUpperCase();const off=getProductOffers(p);
-                return<div key={p.id} onClick={()=>{setSelProduct(p);setSelProductImgIdx(0);}} style={{...T.card,cursor:"pointer",marginBottom:0,padding:0,overflow:"hidden"}}>
+                return<div key={p.id} onClick={()=>{setSelProduct(p);setSelProductImgIdx(0);setShowProductReviewForm(false);}} style={{...T.card,cursor:"pointer",marginBottom:0,padding:0,overflow:"hidden"}}>
                   {p.images?.[0]?<img src={p.images[0]} style={{width:"100%",height:140,objectFit:"cover"}}/>:<div style={{height:140,background:"linear-gradient(135deg,"+T.goldBg+","+T.tealBg+")",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"3rem"}}>🎓</div>}
                   <div style={{padding:16}}>
                     <div style={{display:"flex",gap:10,alignItems:"flex-start",marginBottom:8}}>
@@ -6668,7 +6751,7 @@ ${forDownload
                 <span><b style={{color:T.teal,fontSize:".9rem"}}>{cases.reduce((s,c)=>s+(c.comments?.length||0),0)}</b> discussions</span>
               </div>
             </div>
-            {isPharma?<div style={{padding:"10px 14px",background:T.goldBg,border:"1px solid "+T.gold+"55",borderRadius:8,fontSize:".82rem",color:T.goldD,maxWidth:280}}>📢 Pharma accounts can sponsor cases & content. Contact us at <a href="mailto:partnerships@skinario.com" style={{color:T.goldD,fontWeight:600}}>partnerships@skinario.com</a>.</div>
+            {isPharma?<div style={{padding:"10px 14px",background:T.goldBg,border:"1px solid "+T.gold+"55",borderRadius:8,fontSize:".82rem",color:T.goldD,maxWidth:280}}>📢 Pharma accounts can sponsor cases & content. <button onClick={()=>setShowContactAdmin(true)} style={{background:"none",border:"none",color:T.goldD,fontWeight:700,textDecoration:"underline",cursor:"pointer",padding:0,fontSize:"inherit",fontFamily:"inherit"}}>Contact admin →</button></div>
             :<button onClick={()=>setNewCase(true)} style={{...T.btn,padding:"13px 26px",fontSize:".95rem",background:"linear-gradient(135deg,"+T.gold+","+T.goldD+")"}}>📋 Post a new case</button>}
           </div>
         </div>
@@ -6847,7 +6930,7 @@ ${forDownload
                   <div><span style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{totalLikes}</span> <span style={{fontSize:".72rem",color:T.mute,textTransform:"uppercase",letterSpacing:1}}>likes</span></div>
                 </div>
               </div>
-              {isPharma?<div style={{padding:"10px 14px",background:T.goldBg,border:"1px solid "+T.gold+"55",borderRadius:8,fontSize:".82rem",color:T.goldD,maxWidth:280}}>📢 Pharma accounts can sponsor discussions. Reach out to <a href="mailto:partnerships@skinario.com" style={{color:T.goldD,fontWeight:600}}>partnerships@skinario.com</a>.</div>
+              {isPharma?<div style={{padding:"10px 14px",background:T.goldBg,border:"1px solid "+T.gold+"55",borderRadius:8,fontSize:".82rem",color:T.goldD,maxWidth:280}}>📢 Pharma accounts can sponsor discussions. <button onClick={()=>setShowContactAdmin(true)} style={{background:"none",border:"none",color:T.goldD,fontWeight:700,textDecoration:"underline",cursor:"pointer",padding:0,fontSize:"inherit",fontFamily:"inherit"}}>Contact admin →</button></div>
               :<button onClick={()=>setNewForum(!newForum)} style={{...T.btn,padding:"12px 26px",fontSize:".92rem"}}>{newForum?"Cancel":"✏️ Start a discussion"}</button>}
             </div>
           </div>
@@ -7792,6 +7875,49 @@ ${forDownload
                   return<span style={{fontSize:".84rem",color:T.txt}}><span style={{color:T.gold}}>★</span> <b style={{fontWeight:700}}>{avg.toFixed(1)}</b> <span style={{color:T.mute}}>({myReviews.length})</span></span>;
                 })()}
               </div>
+
+              {/* Certifications & Accreditations */}
+              {(prof?.certifications?.length>0)&&<div style={{display:"flex",justifyContent:"center",gap:8,flexWrap:"wrap",marginTop:12}}>
+                {prof.certifications.map((c,i)=><span key={i} style={{display:"flex",alignItems:"center",gap:5,fontSize:".72rem",fontWeight:600,color:T.txt2,background:T.bg,padding:"4px 10px",borderRadius:20,border:"1px solid "+T.border}}>
+                  {c.logoUrl&&<img src={c.logoUrl} alt="" style={{width:16,height:16,objectFit:"contain"}}/>}
+                  ✓ {c.name}
+                </span>)}
+              </div>}
+              <button onClick={()=>setShowCertForm(f=>!f)} style={{...T.btnO,...T.btnSm,fontSize:".7rem",marginTop:10}}>{showCertForm?"✕ Close":"🏅 Manage certifications"}</button>
+
+              {showCertForm&&<div style={{marginTop:12,padding:14,background:T.bg,borderRadius:10,textAlign:"left"}}>
+                {prof?.certifications?.length>0&&<div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:10}}>
+                  {prof.certifications.map((c,i)=><div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"6px 10px",background:"#fff",borderRadius:6,fontSize:".8rem"}}>
+                    <span style={{display:"flex",alignItems:"center",gap:6}}>{c.logoUrl&&<img src={c.logoUrl} alt="" style={{width:18,height:18,objectFit:"contain"}}/>}{c.name}</span>
+                    <button onClick={async()=>{const next=prof.certifications.filter((_,j)=>j!==i);await fbSet("users",au.uid,{certifications:next});setProf(p=>({...p,certifications:next}));}} style={{background:"none",border:"none",color:T.err,cursor:"pointer",fontSize:".76rem",fontWeight:700}}>✕ Remove</button>
+                  </div>)}
+                </div>}
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                  <select value={certForm.name} onChange={e=>setCertForm(p=>({...p,name:e.target.value}))} style={{...T.inp,maxWidth:220}}>
+                    <option value="">— Select certification —</option>
+                    {CERTIFICATION_OPTIONS.map(c=><option key={c} value={c}>{c}</option>)}
+                  </select>
+                  {certForm.name==="Other"&&<input value={certForm.customName} onChange={e=>setCertForm(p=>({...p,customName:e.target.value}))} placeholder="Certification name" style={{...T.inp,maxWidth:180}}/>}
+                  <input type="file" accept="image/*" disabled={certUploading} onChange={async e=>{
+                    const f=e.target.files?.[0];if(!f)return;
+                    if(f.size>2*1024*1024){sh("Logo must be under 2MB");return}
+                    setCertUploading(true);
+                    try{const path=`covers/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;const sRef=ref(storage,path);await uploadBytes(sRef,f);const url=await getDownloadURL(sRef);setCertForm(p=>({...p,logoUrl:url}));sh("✓ Logo uploaded")}
+                    catch(e){sh("Upload failed")}
+                    setCertUploading(false);e.target.value="";
+                  }} style={{fontSize:".76rem",maxWidth:180}}/>
+                  <button onClick={async()=>{
+                    const name=certForm.name==="Other"?certForm.customName.trim():certForm.name;
+                    if(!name){sh("Select or enter a certification name");return}
+                    const next=[...(prof?.certifications||[]),{name,logoUrl:certForm.logoUrl}];
+                    await fbSet("users",au.uid,{certifications:next});
+                    setProf(p=>({...p,certifications:next}));
+                    setCertForm({name:"",customName:"",logoUrl:""});
+                    sh("✅ Certification added!");
+                  }} style={{...T.btnO,...T.btnSm,padding:"7px 14px"}}>+ Add</button>
+                </div>
+                {certUploading&&<div style={{fontSize:".68rem",color:T.mute,marginTop:6}}>⏳ Uploading logo...</div>}
+              </div>}
             </div>
           </div>);
         })()}
@@ -8166,7 +8292,7 @@ ${forDownload
             {myWall.length===0?<p style={{color:T.mute,fontSize:".82rem"}}>No wall posts yet.</p>:
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10}}>
               {myWall.map(w=><div key={w.id} style={{borderRadius:8,overflow:"hidden",border:"1px solid "+T.border,background:"#fff"}}>
-                <img src={w.imageUrl} alt="" style={{width:"100%",height:120,objectFit:"cover"}}/>
+                {w.imageUrl&&<img src={w.imageUrl} alt="" style={{width:"100%",height:120,objectFit:"cover"}}/>}
                 <div style={{padding:8}}>
                   <div style={{fontSize:".72rem",color:T.txt2,marginBottom:6,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{w.caption}</div>
                   <button onClick={async()=>{if(!window.confirm("Remove this post?"))return;await fbSet("wallPosts",w.id,{active:false});sh("Removed");loadData()}} style={{...T.btnO,...T.btnSm,color:T.err,borderColor:T.err,fontSize:".68rem",width:"100%"}}>Remove</button>
@@ -8394,6 +8520,29 @@ ${forDownload
           </div>
           <div style={{fontSize:".82rem",color:T.teal,fontWeight:600,whiteSpace:"nowrap"}}>Redeem rewards →</div>
         </div>}
+
+        {/* ═══ MY ENQUIRIES — trail of products/courses enquired about + vendor replies ═══ */}
+        {!editingProfile&&(()=>{
+          const myEnqs=productEnquiries.filter(e=>e.doctorUid===au?.uid).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+          if(myEnqs.length===0)return null;
+          return(<div style={{...T.card,marginBottom:12}}>
+            <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12,display:"flex",alignItems:"center",gap:8}}>📨 My Enquiries {myEnqs.filter(e=>e.status!=="fulfilled").length>0&&<span style={{fontSize:".68rem",fontWeight:700,padding:"2px 8px",borderRadius:6,background:"#fff3cd",color:"#856404"}}>{myEnqs.filter(e=>e.status!=="fulfilled").length} awaiting reply</span>}</h4>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {myEnqs.map(e=><div key={e.id} style={{padding:"10px 12px",background:T.bg,borderRadius:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:4}}>
+                  <span style={{fontSize:".84rem",fontWeight:700}}>{e.productName}</span>
+                  <span style={{fontSize:".68rem",fontWeight:700,padding:"2px 8px",borderRadius:6,background:e.status==="fulfilled"?"#e8f5e9":"#fff3cd",color:e.status==="fulfilled"?"#1a7d42":"#856404"}}>{e.status==="fulfilled"?"✓ Fulfilled":"⏳ Open"}</span>
+                </div>
+                <div style={{fontSize:".72rem",color:T.mute,marginBottom:4}}>{e.vendorName} · {fD(e.date||"")}</div>
+                <div style={{fontSize:".8rem",color:T.txt2,fontStyle:"italic",lineHeight:1.5}}>"{e.message}"</div>
+                {e.vendorReply?<div style={{marginTop:8,padding:"8px 10px",background:T.tealBg,borderRadius:6,borderLeft:"2px solid "+T.teal}}>
+                  <div style={{fontSize:".68rem",fontWeight:700,color:T.teal,marginBottom:2}}>↩ {e.vendorName} replied</div>
+                  <div style={{fontSize:".82rem",color:T.txt2,lineHeight:1.5}}>{e.vendorReply}</div>
+                </div>:<div style={{fontSize:".72rem",color:T.mute,marginTop:6,fontStyle:"italic"}}>No reply yet</div>}
+              </div>)}
+            </div>
+          </div>);
+        })()}
 
         {/* ═══ CONSENT TEMPLATE GENERATOR — doctor-only quick link ═══ */}
         {/* Consent tile: show to doctors + admins + accounts with no accountType set (older accounts).
@@ -8792,7 +8941,7 @@ ${forDownload
         })()}
 
         {/* ═══ VENDOR REWARD PARTNER SECTION (only for vendor accounts) ═══ */}
-        {(prof?.accountType==="vendor"||prof?.accountType==="brand"||prof?.accountType==="pharma")&&(()=>{
+        {(()=>{const _at=normalizeAccountType(prof?.accountType||"");return _at==="vendor"||_at==="brand"||_at==="institute";})()&&(()=>{
           // Find this vendor's application
           const myApp=vendorApplications.find(a=>a.uid===au?.uid);
           const status=myApp?.status||"none"; // none | pending | approved | rejected
@@ -9297,7 +9446,7 @@ ${forDownload
         </h3>
         <div style={{position:"sticky",top:0,zIndex:30,background:T.bg,padding:"10px 0",marginBottom:16,marginInline:-12,paddingInline:12,borderBottom:"1px solid "+T.border}}>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["vendors","🏢 Vendors"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["consents","📋 Consents"],["referrals","🎁 Referrals"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null);window.scrollTo({top:0,behavior:"smooth"})}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}</button>)}
+          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["vendors","🏢 Vendors"],["placements","📢 Placements"],["messages","✉️ Messages"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["consents","📋 Consents"],["referrals","🎁 Referrals"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null);window.scrollTo({top:0,behavior:"smooth"})}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}{id==="messages"&&adminMessages.filter(m=>m.status!=="replied").length>0?` (${adminMessages.filter(m=>m.status!=="replied").length})`:""}</button>)}
           </div>
         </div>
         {aTab==="stats"&&<><div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length],["Events",events.length],["Ads",ads.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>
@@ -9880,6 +10029,74 @@ ${forDownload
               ))}
             </div>}
           </div>
+        </div>}
+
+        {aTab==="placements"&&<div>
+          <div style={{...T.card,marginBottom:14}}>
+            <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>📢 Sponsor Placement Requests</h4>
+            <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.55}}>Every placement request from vendors/institutes, in one trail. Approve → vendor can then "Make Live" from here or their own dashboard.</p>
+          </div>
+          {sponsorPlacements.length===0?<p style={{color:T.mute}}>No placement requests yet.</p>:
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {[...sponsorPlacements].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).map(sp=>(
+              <div key={sp.id} style={{...T.card,marginBottom:0,padding:16}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
+                  <div>
+                    <div style={{fontSize:".92rem",fontWeight:700}}>{sp.title||sp.headline||"(untitled)"}</div>
+                    <div style={{fontSize:".76rem",color:T.mute,marginTop:2}}>{sp.vendorName} · {sp.placementType||"placement"} {sp.budget&&`· ${sp.budget}`}</div>
+                    {sp.tagline&&<div style={{fontSize:".8rem",color:T.txt2,marginTop:4}}>{sp.tagline}</div>}
+                    {sp.website&&<a href={sp.website} target="_blank" rel="noopener noreferrer" style={{fontSize:".78rem",color:T.teal}}>{sp.website}</a>}
+                  </div>
+                  <span style={{fontSize:".68rem",fontWeight:700,padding:"3px 10px",borderRadius:8,background:sp.status==="active"?"#e8f5e9":sp.status==="approved"?T.tealBg:sp.status==="rejected"?"#fdecea":T.goldBg,color:sp.status==="active"?"#1a7d42":sp.status==="approved"?T.teal:sp.status==="rejected"?T.err:T.goldD}}>{(sp.status||"pending").toUpperCase()}</span>
+                </div>
+                <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
+                  {(!sp.status||sp.status==="pending")&&<>
+                    <button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"approved",approvedAt:Date.now(),approvedBy:au.email});loadData();sh("✓ Approved")}} style={{...T.btn,...T.btnSm}}>✓ Approve</button>
+                    <button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"rejected",rejectedAt:Date.now()});loadData();sh("Rejected")}} style={{...T.btnO,...T.btnSm,color:T.err,borderColor:T.err}}>✕ Reject</button>
+                  </>}
+                  {sp.status==="approved"&&<button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"active",activatedAt:Date.now()});loadData();sh("🟢 Now live!")}} style={{...T.btn,...T.btnSm}}>▶ Make Live</button>}
+                  {sp.status==="active"&&<button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"expired",expiredAt:Date.now()});loadData();sh("Deactivated")}} style={{...T.btnO,...T.btnSm}}>⏹ Deactivate</button>}
+                </div>
+              </div>
+            ))}
+          </div>}
+        </div>}
+
+        {aTab==="messages"&&<div>
+          <div style={{...T.card,marginBottom:14}}>
+            <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>✉️ Messages to Admin</h4>
+            <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.55}}>Every "Contact Admin" message, who sent it, and our reply trail.</p>
+          </div>
+          {adminMessages.length===0?<p style={{color:T.mute}}>No messages yet.</p>:
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {[...adminMessages].sort((a,b)=>(a.status==="replied"?1:0)-(b.status==="replied"?1:0)||(b.createdAt||0)-(a.createdAt||0)).map(m=>(
+              <div key={m.id} style={{...T.card,marginBottom:0,padding:16}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
+                  <div>
+                    <div style={{fontSize:".92rem",fontWeight:700}}>{m.subject}</div>
+                    <div style={{fontSize:".76rem",color:T.mute,marginTop:2}}>{m.senderName} · {m.senderEmail}</div>
+                  </div>
+                  <span style={{fontSize:".68rem",fontWeight:700,padding:"3px 10px",borderRadius:8,background:m.status==="replied"?"#e8f5e9":"#fff3cd",color:m.status==="replied"?"#1a7d42":"#856404"}}>{m.status==="replied"?"✓ Replied":"⏳ Open"}</span>
+                </div>
+                <div style={{fontSize:".84rem",color:T.txt2,marginTop:8,lineHeight:1.55}}>{m.message}</div>
+                {m.adminReply&&<div style={{marginTop:10,padding:"8px 12px",background:T.tealBg,borderRadius:8,borderLeft:"2px solid "+T.teal}}>
+                  <div style={{fontSize:".68rem",fontWeight:700,color:T.teal,marginBottom:2}}>Our reply</div>
+                  <div style={{fontSize:".82rem",color:T.txt2,lineHeight:1.5}}>{m.adminReply}</div>
+                </div>}
+                <div style={{marginTop:10,display:"flex",gap:8}}>
+                  <input value={adminReplyDraft[m.id]??m.adminReply??""} onChange={e=>setAdminReplyDraft(p=>({...p,[m.id]:e.target.value}))} placeholder="Type a reply..." style={{...T.inp,flex:1}}/>
+                  <button onClick={async()=>{
+                    const reply=(adminReplyDraft[m.id]??"").trim();
+                    if(!reply){sh("Type a reply first");return}
+                    await fbSet("adminMessages",m.id,{adminReply:reply,status:"replied",repliedAt:Date.now(),repliedBy:au.email});
+                    await createNotif({toUid:m.uid,fromUid:au.uid,fromName:"SKINARIO Admin",fromIni:"A",fromPhoto:"",type:"admin_reply",text:`replied to your message "${m.subject}"`,linkType:"",linkId:"",linkLabel:""});
+                    sh("✓ Reply sent");
+                    loadData();
+                  }} style={{...T.btn,...T.btnSm}}>Send</button>
+                </div>
+              </div>
+            ))}
+          </div>}
         </div>}
 
         {aTab==="roles"&&<div>
@@ -10812,6 +11029,47 @@ ${forDownload
 
       {/* ═══ PRODUCT ENQUIRY MODAL ═══ */}
       {/* ═══ FOLLOWERS / FOLLOWING MODAL ═══ */}
+      {/* ═══ CONTACT ADMIN MODAL ═══ */}
+      {showContactAdmin&&(()=>{
+        const myMsgs=adminMessages.filter(m=>m.uid===au?.uid).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+        return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:1200,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setShowContactAdmin(false)}>
+          <div style={{background:"#fff",borderRadius:14,maxWidth:520,width:"100%",maxHeight:"85vh",overflowY:"auto",padding:24}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+              <h3 style={{fontSize:"1.1rem",fontWeight:700,margin:0}}>✉️ Contact Admin</h3>
+              <button onClick={()=>setShowContactAdmin(false)} style={{...T.btnO,...T.btnSm}}>✕</button>
+            </div>
+            <input value={contactForm.subject} onChange={e=>setContactForm(p=>({...p,subject:e.target.value}))} placeholder="Subject" style={{...T.inp,marginBottom:10}}/>
+            <textarea value={contactForm.message} onChange={e=>setContactForm(p=>({...p,message:e.target.value}))} placeholder="Your message..." rows={4} style={{...T.txa,marginBottom:10}}/>
+            <button onClick={async()=>{
+              if(!contactForm.subject.trim()||!contactForm.message.trim()){sh("Please fill in subject and message");return}
+              try{
+                await fbAdd("adminMessages",{uid:au.uid,senderName:uName,senderEmail:au.email,subject:contactForm.subject.trim(),message:contactForm.message.trim(),status:"open"});
+                sh("✅ Message sent to admin!");
+                setContactForm({subject:"",message:""});
+                loadData();
+              }catch(e){sh("Failed to send")}
+            }} style={{...T.btn,padding:"9px 18px",marginBottom:20}}>Send message →</button>
+
+            {myMsgs.length>0&&<>
+              <div style={{fontSize:".78rem",fontWeight:700,color:T.txt,marginBottom:10,paddingTop:14,borderTop:"1px solid "+T.border}}>Your message history</div>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {myMsgs.map(m=><div key={m.id} style={{padding:"10px 12px",background:T.bg,borderRadius:8}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+                    <span style={{fontSize:".84rem",fontWeight:700}}>{m.subject}</span>
+                    <span style={{fontSize:".64rem",fontWeight:700,padding:"2px 8px",borderRadius:6,background:m.status==="replied"?"#e8f5e9":"#fff3cd",color:m.status==="replied"?"#1a7d42":"#856404"}}>{m.status==="replied"?"✓ Replied":"⏳ Open"}</span>
+                  </div>
+                  <div style={{fontSize:".8rem",color:T.txt2,marginTop:4,lineHeight:1.5}}>{m.message}</div>
+                  {m.adminReply&&<div style={{marginTop:8,padding:"8px 10px",background:T.tealBg,borderRadius:6,borderLeft:"2px solid "+T.teal}}>
+                    <div style={{fontSize:".68rem",fontWeight:700,color:T.teal,marginBottom:2}}>Admin reply</div>
+                    <div style={{fontSize:".8rem",color:T.txt2,lineHeight:1.5}}>{m.adminReply}</div>
+                  </div>}
+                </div>)}
+              </div>
+            </>}
+          </div>
+        </div>);
+      })()}
+
       {followersModal&&(()=>{
         const isMyProfile=followersModal.uid===au?.uid;
         const isFollowers=followersModal.type==="followers";
@@ -10959,6 +11217,15 @@ ${forDownload
                 <div>
                   <h2 style={{fontSize:"1.2rem",fontWeight:700,margin:0}}>{p.name}</h2>
                   {p.category&&<div style={{fontSize:".8rem",color:T.mute,marginTop:2}}>{p.category} · {p.vendorName}</div>}
+                  {(()=>{
+                    const pReviews=reviews.filter(r=>r.productId===p.id&&r.active!==false);
+                    if(pReviews.length===0)return null;
+                    const avg=pReviews.reduce((s,r)=>s+(r.rating||0),0)/pReviews.length;
+                    return<div style={{fontSize:".8rem",marginTop:4,display:"flex",alignItems:"center",gap:4}}>
+                      <span style={{color:T.gold}}>{"★".repeat(Math.round(avg))}{"☆".repeat(5-Math.round(avg))}</span>
+                      <b>{avg.toFixed(1)}</b> <span style={{color:T.mute}}>({pReviews.length} review{pReviews.length!==1?"s":""})</span>
+                    </div>;
+                  })()}
                 </div>
                 <button onClick={()=>setSelProduct(null)} style={{...T.btnO,...T.btnSm,flexShrink:0}}>✕</button>
               </div>
@@ -10987,6 +11254,56 @@ ${forDownload
               {p.website&&<div style={{marginTop:14}}>
                 <a href={p.website.startsWith("http")?p.website:`https://${p.website}`} target="_blank" rel="noopener noreferrer" style={{fontSize:".84rem",color:T.teal,fontWeight:600}}>🔗 View product page / brochure →</a>
               </div>}
+
+              {/* Product/course-specific reviews */}
+              {(()=>{
+                const pReviews=reviews.filter(r=>r.productId===p.id&&r.active!==false).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+                const myPReview=pReviews.find(r=>r.reviewerUid===au?.uid);
+                const isSelf=p.vendorId===au?.uid;
+                return(<div style={{marginTop:16,paddingTop:14,borderTop:"1px solid "+T.border}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,flexWrap:"wrap",gap:8}}>
+                    <div style={{fontSize:".82rem",fontWeight:700,color:T.txt}}>⭐ Reviews for this {p.itemType==="course"?"course":"product"}</div>
+                    {!isSelf&&!showProductReviewForm&&<button onClick={()=>{setProductReviewForm(myPReview?{rating:myPReview.rating,comment:myPReview.comment||""}:{rating:0,comment:""});setShowProductReviewForm(true);}} style={{...T.btnO,...T.btnSm,fontSize:".72rem"}}>{myPReview?"✏️ Edit your review":"+ Rate this"}</button>}
+                  </div>
+
+                  {showProductReviewForm&&<div style={{padding:12,background:T.bg,borderRadius:8,marginBottom:12,display:"flex",flexDirection:"column",gap:8}}>
+                    <div style={{display:"flex",gap:4}}>
+                      {[1,2,3,4,5].map(n=><span key={n} onClick={()=>setProductReviewForm(p2=>({...p2,rating:n}))} style={{fontSize:"1.4rem",cursor:"pointer",color:n<=productReviewForm.rating?T.gold:T.border}}>★</span>)}
+                    </div>
+                    <textarea value={productReviewForm.comment} onChange={e=>setProductReviewForm(p2=>({...p2,comment:e.target.value}))} placeholder="How was it? Effectiveness, value, quality..." rows={2} style={T.txa}/>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={async()=>{
+                        if(!productReviewForm.rating){sh("Please select a star rating");return}
+                        try{
+                          if(myPReview){
+                            await fbSet("reviews",myPReview.id,{rating:productReviewForm.rating,comment:productReviewForm.comment.trim()});
+                          }else{
+                            await fbAdd("reviews",{vendorId:p.vendorId,vendorName:p.vendorName,productId:p.id,productName:p.name,reviewerUid:au.uid,reviewerName:uName,rating:productReviewForm.rating,comment:productReviewForm.comment.trim(),active:true});
+                          }
+                          sh("✅ Review posted!");
+                          setShowProductReviewForm(false);
+                          loadData();
+                        }catch(e){sh("Failed to post review")}
+                      }} style={{...T.btn,padding:"6px 14px",fontSize:".78rem"}}>Post review</button>
+                      <button onClick={()=>setShowProductReviewForm(false)} style={{...T.btnO,padding:"6px 14px",fontSize:".78rem"}}>Cancel</button>
+                    </div>
+                  </div>}
+
+                  {pReviews.length===0?<p style={{fontSize:".78rem",color:T.mute}}>No reviews yet{isSelf?"":" — be the first to rate it"}.</p>:
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    {pReviews.map(r=><div key={r.id} style={{padding:"8px 10px",background:T.bg,borderRadius:6}}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                          <span style={{fontSize:".8rem",fontWeight:700}}>{r.reviewerName}</span>
+                          <span style={{color:T.gold,fontSize:".76rem"}}>{"★".repeat(r.rating)}{"☆".repeat(5-r.rating)}</span>
+                        </div>
+                        {r.reviewerUid===au?.uid&&<button onClick={async()=>{if(!window.confirm("Delete your review?"))return;await fbSet("reviews",r.id,{active:false});sh("Removed");loadData()}} style={{background:"none",border:"none",color:T.mute,cursor:"pointer",fontSize:".72rem"}}>Delete</button>}
+                      </div>
+                      {r.comment&&<div style={{fontSize:".78rem",color:T.txt2,marginTop:3,lineHeight:1.5}}>{r.comment}</div>}
+                    </div>)}
+                  </div>}
+                </div>);
+              })()}
 
               <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid "+T.border}}>
                 <ShareBar title={p.name} url={`${SITE_URL}/?product=${p.id}`} description={p.description?.slice(0,120)} itemId={p.id} itemType="products" currentUser={au} prof={prof} onShare={handleShare}/>

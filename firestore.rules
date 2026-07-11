@@ -104,6 +104,16 @@ service cloud.firestore {
       allow delete: if wasOwner('reviewerUid') || isAdmin();
     }
 
+    // ── adminMessages — any signed-in user can message admin; only admin
+    //    can reply/close. Read is open (bulk-fetched by every user so they
+    //    can see their own message trail client-side). ─────────────────────
+    match /adminMessages/{msgId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner('uid');
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // ── sponsorPlacements — vendor requests; admin approves/activates ──────
     match /sponsorPlacements/{placementId} {
       allow read: if isSignedIn();
