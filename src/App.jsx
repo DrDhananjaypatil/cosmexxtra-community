@@ -2432,6 +2432,11 @@ export default function App(){
   const[adminReplyDraft,setAdminReplyDraft]=useState({});
   const[showReviewForm,setShowReviewForm]=useState(false);
   const[profileWallText,setProfileWallText]=useState("");
+  const[lightboxImg,setLightboxImg]=useState(null); // full-screen image viewer
+  const[editingPostId,setEditingPostId]=useState(null);
+  const[editingPostText,setEditingPostText]=useState("");
+  const[flagModalPost,setFlagModalPost]=useState(null); // wall post being flagged
+  const[flagReason,setFlagReason]=useState("");
   const[profileWallImage,setProfileWallImage]=useState("");
   const[profileWallUploading,setProfileWallUploading]=useState(false);
   const[wallUploading,setWallUploading]=useState(false);
@@ -5263,71 +5268,6 @@ ${forDownload
           </div>
         </div>
 
-        {/* Quick post composer — Facebook-style, shown for every account type */}
-        <div style={{...T.card,marginTop:16}}>
-          <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-            {(prof?.logo||uPhoto)?<img src={prof?.logo||uPhoto} style={{width:40,height:40,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(40,T.tealBg,T.teal),flexShrink:0}}>{uIni}</div>}
-            <div style={{flex:1}}>
-              <textarea value={profileWallText} onChange={e=>setProfileWallText(e.target.value)} placeholder={`What's on your mind, ${uName.split(" ")[0]}?`} rows={2} style={{...T.txa,marginBottom:8}}/>
-              {profileWallImage&&<div style={{position:"relative",width:100,marginBottom:8}}>
-                <img src={profileWallImage} alt="" style={{width:100,height:100,objectFit:"cover",borderRadius:8,border:"1px solid "+T.border}}/>
-                <button type="button" onClick={()=>setProfileWallImage("")} style={{position:"absolute",top:-6,right:-6,width:18,height:18,borderRadius:"50%",border:"none",background:T.err,color:"#fff",cursor:"pointer",fontSize:".6rem"}}>✕</button>
-              </div>}
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
-                <label style={{...T.btnO,...T.btnSm,cursor:profileWallUploading?"default":"pointer",fontSize:".76rem"}}>
-                  {profileWallUploading?"⏳ Uploading...":"📷 Add photo"}
-                  <input type="file" accept="image/*" disabled={profileWallUploading} onChange={async e=>{
-                    const f=e.target.files?.[0];if(!f)return;
-                    if(f.size>5*1024*1024){sh("Image must be under 5MB");return}
-                    setProfileWallUploading(true);
-                    try{const path=`wallPosts/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;const sRef=ref(storage,path);await uploadBytes(sRef,f);const url=await getDownloadURL(sRef);setProfileWallImage(url)}
-                    catch(e){sh("Upload failed")}
-                    setProfileWallUploading(false);e.target.value="";
-                  }} style={{display:"none"}}/>
-                </label>
-                <button onClick={async()=>{
-                  if(!profileWallText.trim()&&!profileWallImage){sh("Write something or add a photo first");return}
-                  try{
-                    await fbAdd("wallPosts",{vendorId:au.uid,vendorName:prof?.companyName||uName,vendorPhoto:prof?.logo||uPhoto||"",imageUrl:profileWallImage,caption:profileWallText.trim(),active:true});
-                    setProfileWallText("");setProfileWallImage("");
-                    sh("✅ Posted!");
-                    loadData();
-                  }catch(e){sh("Failed to post")}
-                }} style={{...T.btn,padding:"7px 18px",fontSize:".82rem"}}>Post</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Wall feed — posts from people you follow (falls back to recent platform-wide posts if you don't follow anyone yet) */}
-        {(()=>{
-          const followedIds=new Set(follows.filter(f=>f.followerId===au?.uid).map(f=>f.followedId));
-          let feed=wallPosts.filter(w=>w.active!==false&&(followedIds.has(w.vendorId)||w.vendorId===au?.uid));
-          let isDiscovery=false;
-          if(feed.length===0){feed=wallPosts.filter(w=>w.active!==false);isDiscovery=true;}
-          feed=feed.sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt)).slice(0,20);
-          if(feed.length===0)return null;
-          return(<div style={{marginTop:16}}>
-            {isDiscovery&&<div style={{fontSize:".78rem",color:T.mute,marginBottom:10}}>Follow doctors, vendors & institutes to see their updates here. Meanwhile, here's what's happening on SKINARIO:</div>}
-            <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {feed.map(w=>{
-                const author=allUsers.find(u=>u.id===w.vendorId);
-                return(<div key={w.id} style={{...T.card,marginBottom:0}}>
-                  <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:8,cursor:"pointer"}} onClick={()=>viewProfile(w.vendorId)}>
-                    {w.vendorPhoto?<img src={w.vendorPhoto} style={{width:36,height:36,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(36,T.tealBg,T.teal)}>{(w.vendorName||"?").slice(0,1).toUpperCase()}</div>}
-                    <div>
-                      <div style={{fontSize:".85rem",fontWeight:700}}>{w.vendorName}{author&&normalizeAccountType(author.accountType||"")==="institute"&&<span style={{fontSize:".6rem",fontWeight:700,color:T.goldD,background:T.goldBg,padding:"2px 7px",borderRadius:10,marginLeft:6}}>🎓 Institute</span>}</div>
-                      <div style={{fontSize:".68rem",color:T.mute}}>{fD(tsToDateStr(w.createdAt))}</div>
-                    </div>
-                  </div>
-                  {w.caption&&<div style={{fontSize:".88rem",color:T.txt2,lineHeight:1.6,whiteSpace:"pre-wrap",marginBottom:w.imageUrl?10:0}}>{w.caption}</div>}
-                  {w.imageUrl&&<img src={w.imageUrl} alt="" style={{width:"100%",maxHeight:360,objectFit:"cover",borderRadius:8}}/>}
-                </div>);
-              })}
-            </div>
-          </div>);
-        })()}
-
         <div style={{display:"grid",gridTemplateColumns:"repeat(8,1fr)",gap:8,margin:"16px 0"}}>
           {/* Quiz + Accuracy — single column, stacked top/bottom */}
           <div onClick={()=>go("quiz")} style={{...T.card,padding:0,marginBottom:0,cursor:"pointer",overflow:"hidden",transition:"transform .12s,box-shadow .12s",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 16px rgba(0,0,0,0.08)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04)"}}>
@@ -5403,6 +5343,110 @@ ${forDownload
                 <div style={{fontSize:".66rem",color:T.mute,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{b.desc}</div>
               </div>
             </div>)}
+          </div>);
+        })()}
+
+        {/* ═══ QUICK POST COMPOSER — Facebook-style, all account types ═══ */}
+        <div style={{...T.card,marginTop:16}}>
+          <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+            {(prof?.logo||uPhoto)?<img src={prof?.logo||uPhoto} style={{width:40,height:40,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(40,T.tealBg,T.teal),flexShrink:0}}>{uIni}</div>}
+            <div style={{flex:1}}>
+              <textarea value={profileWallText} onChange={e=>setProfileWallText(e.target.value)} placeholder={`What's on your mind, ${uName.split(" ")[0]}?`} rows={2} style={{...T.txa,marginBottom:8}}/>
+              {profileWallImage&&<div style={{position:"relative",width:100,marginBottom:8}}>
+                <img src={profileWallImage} alt="" style={{width:100,height:100,objectFit:"cover",borderRadius:8,border:"1px solid "+T.border}}/>
+                <button type="button" onClick={()=>setProfileWallImage("")} style={{position:"absolute",top:-6,right:-6,width:18,height:18,borderRadius:"50%",border:"none",background:T.err,color:"#fff",cursor:"pointer",fontSize:".6rem"}}>✕</button>
+              </div>}
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                <label style={{...T.btnO,...T.btnSm,cursor:profileWallUploading?"default":"pointer",fontSize:".76rem"}}>
+                  {profileWallUploading?"⏳ Uploading...":"📷 Add photo"}
+                  <input type="file" accept="image/*" disabled={profileWallUploading} onChange={async e=>{
+                    const f=e.target.files?.[0];if(!f)return;
+                    if(f.size>5*1024*1024){sh("Image must be under 5MB");return}
+                    setProfileWallUploading(true);
+                    try{const path=`wallPosts/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;const sRef=ref(storage,path);await uploadBytes(sRef,f);const url=await getDownloadURL(sRef);setProfileWallImage(url)}
+                    catch(e){sh("Upload failed")}
+                    setProfileWallUploading(false);e.target.value="";
+                  }} style={{display:"none"}}/>
+                </label>
+                <button onClick={async()=>{
+                  if(!profileWallText.trim()&&!profileWallImage){sh("Write something or add a photo first");return}
+                  try{
+                    await fbAdd("wallPosts",{vendorId:au.uid,vendorName:prof?.companyName||uName,vendorPhoto:prof?.logo||uPhoto||"",imageUrl:profileWallImage,caption:profileWallText.trim(),active:true,likes:[],flags:[]});
+                    setProfileWallText("");setProfileWallImage("");
+                    sh("✅ Posted!");
+                    loadData();
+                  }catch(e){sh("Failed to post")}
+                }} style={{...T.btn,padding:"7px 18px",fontSize:".82rem"}}>Post</button>
+              </div>
+              <div style={{fontSize:".68rem",color:T.mute,marginTop:8,paddingTop:8,borderTop:"1px solid "+T.border,lineHeight:1.5}}>
+                ⚠️ SKINARIO is a professional medical community. Posts must be respectful and clinically relevant. Content that is spam, defamatory, sexually explicit, hateful, misleading, or violates community standards will be removed and repeat offenders may lose posting privileges.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ═══ WALL FEED ═══ */}
+        {(()=>{
+          const followedIds=new Set(follows.filter(f=>f.followerId===au?.uid).map(f=>f.followedId));
+          let feed=wallPosts.filter(w=>w.active!==false&&(followedIds.has(w.vendorId)||w.vendorId===au?.uid));
+          let isDiscovery=false;
+          if(feed.length===0){feed=wallPosts.filter(w=>w.active!==false);isDiscovery=true;}
+          feed=feed.sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt)).slice(0,20);
+          if(feed.length===0)return null;
+          return(<div style={{marginTop:16}}>
+            {isDiscovery&&<div style={{fontSize:".78rem",color:T.mute,marginBottom:10}}>Follow doctors, vendors & institutes to see their updates here. Meanwhile, here's what's happening on SKINARIO:</div>}
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {feed.map(w=>{
+                const author=allUsers.find(u=>u.id===w.vendorId);
+                const isOwner=w.vendorId===au?.uid;
+                const isEditing=editingPostId===w.id;
+                const likes=Array.isArray(w.likes)?w.likes:[];
+                const iLiked=likes.includes(au?.uid);
+                const flagCount=Array.isArray(w.flags)?w.flags.length:0;
+                return(<div key={w.id} style={{...T.card,marginBottom:0}}>
+                  <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:8}}>
+                    <div style={{display:"flex",gap:10,alignItems:"center",cursor:"pointer",flex:1,minWidth:0}} onClick={()=>viewProfile(w.vendorId)}>
+                      {w.vendorPhoto?<img src={w.vendorPhoto} style={{width:36,height:36,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(36,T.tealBg,T.teal)}>{(w.vendorName||"?").slice(0,1).toUpperCase()}</div>}
+                      <div style={{minWidth:0}}>
+                        <div style={{fontSize:".85rem",fontWeight:700}}>{w.vendorName}{author&&normalizeAccountType(author.accountType||"")==="institute"&&<span style={{fontSize:".6rem",fontWeight:700,color:T.goldD,background:T.goldBg,padding:"2px 7px",borderRadius:10,marginLeft:6}}>🎓 Institute</span>}</div>
+                        <div style={{fontSize:".68rem",color:T.mute}}>{fD(tsToDateStr(w.createdAt))}{w.editedAt?" · edited":""}</div>
+                      </div>
+                    </div>
+                    {(isOwner||isAdm)&&!isEditing&&<div style={{display:"flex",gap:4}}>
+                      {isOwner&&<button onClick={()=>{setEditingPostId(w.id);setEditingPostText(w.caption||"")}} style={{background:"none",border:"none",color:T.mute,cursor:"pointer",fontSize:".76rem",padding:"3px 8px"}} title="Edit">✏️</button>}
+                      <button onClick={async()=>{if(!window.confirm(isAdm&&!isOwner?"Remove this post as admin?":"Delete your post?"))return;await fbSet("wallPosts",w.id,{active:false});sh(isAdm&&!isOwner?"Post removed":"Deleted");loadData()}} style={{background:"none",border:"none",color:T.err,cursor:"pointer",fontSize:".8rem",padding:"3px 8px"}} title="Delete">🗑️</button>
+                    </div>}
+                  </div>
+                  {isEditing?<div style={{marginBottom:10}}>
+                    <textarea value={editingPostText} onChange={e=>setEditingPostText(e.target.value)} rows={3} style={T.txa}/>
+                    <div style={{display:"flex",gap:8,marginTop:8}}>
+                      <button onClick={async()=>{
+                        await fbSet("wallPosts",w.id,{caption:editingPostText.trim(),editedAt:Date.now()});
+                        setEditingPostId(null);setEditingPostText("");
+                        sh("✓ Updated");loadData();
+                      }} style={{...T.btn,padding:"6px 14px",fontSize:".78rem"}}>Save</button>
+                      <button onClick={()=>{setEditingPostId(null);setEditingPostText("")}} style={{...T.btnO,padding:"6px 14px",fontSize:".78rem"}}>Cancel</button>
+                    </div>
+                  </div>:<>
+                    {w.caption&&<div style={{fontSize:".88rem",color:T.txt2,lineHeight:1.6,whiteSpace:"pre-wrap",marginBottom:w.imageUrl?10:0}}>{w.caption}</div>}
+                    {w.imageUrl&&<img src={w.imageUrl} alt="" onClick={()=>setLightboxImg(w.imageUrl)} style={{width:"100%",maxHeight:360,objectFit:"cover",borderRadius:8,cursor:"zoom-in"}}/>}
+                  </>}
+
+                  {!isEditing&&<div style={{display:"flex",gap:6,alignItems:"center",marginTop:10,paddingTop:8,borderTop:"1px solid "+T.border}}>
+                    <button onClick={async()=>{
+                      if(!au?.uid)return;
+                      const newLikes=iLiked?likes.filter(u=>u!==au.uid):[...likes,au.uid];
+                      await fbSet("wallPosts",w.id,{likes:newLikes});
+                      loadData();
+                    }} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:4,color:iLiked?T.teal:T.mute,fontSize:".78rem",fontWeight:iLiked?700:500,padding:"4px 10px",borderRadius:6}}>
+                      {iLiked?"❤️":"🤍"} {likes.length>0?likes.length:""} {likes.length===0?"Like":likes.length===1?"like":"likes"}
+                    </button>
+                    {!isOwner&&<button onClick={()=>{setFlagModalPost(w);setFlagReason("")}} title="Report as inappropriate" style={{background:"none",border:"none",cursor:"pointer",color:T.mute,fontSize:".78rem",padding:"4px 10px",borderRadius:6,marginLeft:"auto"}}>🚩 Report</button>}
+                    {isAdm&&flagCount>0&&<span style={{fontSize:".68rem",fontWeight:700,color:T.err,padding:"2px 8px",borderRadius:5,background:"#fdecea",marginLeft:isOwner?"auto":0}}>🚩 {flagCount} flag{flagCount!==1?"s":""}</span>}
+                  </div>}
+                </div>);
+              })}
+            </div>
           </div>);
         })()}
 
@@ -8356,6 +8400,9 @@ ${forDownload
                     <button onClick={async()=>{const ns=e.status==="fulfilled"?"new":"fulfilled";await fbSet("productEnquiries",e.id,{status:ns,updatedAt:Date.now()});sh(ns==="fulfilled"?"✓ Done":"Reopened");loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".7rem",padding:"3px 10px",color:e.status==="fulfilled"?T.mute:T.teal,borderColor:e.status==="fulfilled"?T.border:T.teal}}>
                       {e.status==="fulfilled"?"Reopen":"✓ Done"}
                     </button>
+                    {e.status!=="fulfilled"&&<button onClick={async()=>{if(!window.confirm("Mark this enquiry as cancelled / not interested? (Excluded from business generated total.)"))return;await fbSet("productEnquiries",e.id,{status:e.status==="cancelled"?"new":"cancelled",updatedAt:Date.now()});sh(e.status==="cancelled"?"Reopened":"Cancelled");loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".7rem",padding:"3px 10px",color:e.status==="cancelled"?T.err:T.mute,borderColor:e.status==="cancelled"?T.err:T.border}}>
+                      {e.status==="cancelled"?"↺ Reopen":"✕ Cancel"}
+                    </button>}
                   </div>
                 </div>
                 {replyOpenId===e.id&&<div style={{marginTop:8,display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -9472,7 +9519,13 @@ ${forDownload
         </h3>
         <div style={{position:"sticky",top:0,zIndex:30,background:T.bg,padding:"10px 0",marginBottom:16,marginInline:-12,paddingInline:12,borderBottom:"1px solid "+T.border}}>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["vendors","🏢 Vendors"],["placements","📢 Placements"],["messages","✉️ Messages"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["consents","📋 Consents"],["referrals","🎁 Referrals"],["users","👥 Users"]].map(([id,l])=><button key={id} onClick={()=>{setATab(id);setEdForm(null);window.scrollTo({top:0,behavior:"smooth"})}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}{id==="messages"&&adminMessages.filter(m=>m.status!=="replied").length>0?` (${adminMessages.filter(m=>m.status!=="replied").length})`:""}</button>)}
+          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["vendors","🏢 Vendors"],["flagged","🚩 Flagged"],["lowreviews","⭐ Low Reviews"],["placements","📢 Placements"],["messages","✉️ Messages"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["consents","📋 Consents"],["referrals","🎁 Referrals"],["users","👥 Users"]].map(([id,l])=>{
+            const flagCount=wallPosts.filter(w=>w.active!==false&&Array.isArray(w.flags)&&w.flags.length>0).length;
+            const lowRev=reviews.filter(r=>r.active!==false&&r.rating<=2).length;
+            const unreadMsg=adminMessages.filter(m=>m.status!=="replied").length;
+            const badge=id==="messages"&&unreadMsg>0?` (${unreadMsg})`:id==="flagged"&&flagCount>0?` (${flagCount})`:id==="lowreviews"&&lowRev>0?` (${lowRev})`:"";
+            return<button key={id} onClick={()=>{setATab(id);setEdForm(null);window.scrollTo({top:0,behavior:"smooth"})}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}{badge}</button>;
+          })}
           </div>
         </div>
         {aTab==="stats"&&<><div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length],["Events",events.length],["Ads",ads.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>
@@ -9947,7 +10000,8 @@ ${forDownload
               <div style={{display:"flex",gap:10,fontSize:".78rem",flexWrap:"wrap"}}>
                 <span style={{color:T.teal,fontWeight:600}}>{productEnquiries.length} total</span>
                 <span style={{color:"#1a7d42",fontWeight:600}}>✓ {productEnquiries.filter(e=>e.status==="fulfilled").length} fulfilled</span>
-                <span style={{color:T.warn,fontWeight:600}}>⏳ {productEnquiries.filter(e=>e.status!=="fulfilled").length} open</span>
+                <span style={{color:T.warn,fontWeight:600}}>⏳ {productEnquiries.filter(e=>e.status!=="fulfilled"&&e.status!=="cancelled").length} open</span>
+                <span style={{color:T.mute,fontWeight:600}}>✕ {productEnquiries.filter(e=>e.status==="cancelled").length} cancelled</span>
                 <span style={{color:T.goldD,fontWeight:700}}>💰 ₹{productEnquiries.filter(e=>e.status==="fulfilled").reduce((s,e)=>s+(e.tentativeValue||0),0).toLocaleString("en-IN")} platform business generated</span>
               </div>
             </div>
@@ -10055,6 +10109,70 @@ ${forDownload
               ))}
             </div>}
           </div>
+        </div>}
+
+        {aTab==="flagged"&&<div>
+          <div style={{...T.card,marginBottom:14}}>
+            <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>🚩 Flagged Posts</h4>
+            <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.55}}>Posts community members have reported. Review each and remove if it genuinely violates community standards, or dismiss the flags if it's fine.</p>
+          </div>
+          {(()=>{
+            const flagged=wallPosts.filter(w=>w.active!==false&&Array.isArray(w.flags)&&w.flags.length>0).sort((a,b)=>(b.flags?.length||0)-(a.flags?.length||0));
+            if(flagged.length===0)return <p style={{color:T.mute}}>No flagged posts. 🎉</p>;
+            return(<div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {flagged.map(w=>(
+                <div key={w.id} style={{...T.card,marginBottom:0,padding:16,border:"1.5px solid #f0a5a5"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap",marginBottom:8}}>
+                    <div>
+                      <div style={{fontSize:".92rem",fontWeight:700}}>{w.vendorName}</div>
+                      <div style={{fontSize:".72rem",color:T.mute}}>{fD(tsToDateStr(w.createdAt))}</div>
+                    </div>
+                    <span style={{fontSize:".68rem",fontWeight:700,padding:"3px 10px",borderRadius:8,background:"#fdecea",color:T.err}}>🚩 {w.flags.length} report{w.flags.length!==1?"s":""}</span>
+                  </div>
+                  {w.caption&&<div style={{fontSize:".84rem",color:T.txt2,marginBottom:8,padding:"6px 10px",background:T.bg,borderRadius:6,lineHeight:1.5,whiteSpace:"pre-wrap"}}>{w.caption}</div>}
+                  {w.imageUrl&&<img src={w.imageUrl} alt="" style={{maxWidth:200,maxHeight:150,objectFit:"cover",borderRadius:6,cursor:"zoom-in",marginBottom:8}} onClick={()=>setLightboxImg(w.imageUrl)}/>}
+                  <div style={{fontSize:".76rem",color:T.txt2,marginTop:6}}>
+                    <b>Reports:</b> {w.flags.map((f,i)=><div key={i} style={{marginLeft:8,marginTop:2}}>• <b>{f.reporterName}</b>: {f.reason}</div>)}
+                  </div>
+                  <div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}}>
+                    <button onClick={async()=>{if(!window.confirm("Remove this post permanently?"))return;await fbSet("wallPosts",w.id,{active:false});sh("Post removed");loadData();}} style={{...T.btnDanger,...T.btnSm}}>🗑️ Remove post</button>
+                    <button onClick={async()=>{if(!window.confirm("Dismiss all reports on this post? It stays visible."))return;await fbSet("wallPosts",w.id,{flags:[]});sh("Reports dismissed");loadData();}} style={{...T.btnO,...T.btnSm}}>Dismiss reports</button>
+                  </div>
+                </div>
+              ))}
+            </div>);
+          })()}
+        </div>}
+
+        {aTab==="lowreviews"&&<div>
+          <div style={{...T.card,marginBottom:14}}>
+            <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>⭐ Low-Star Reviews (1–2★)</h4>
+            <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.55}}>Reviews with 1 or 2 stars — verify authenticity. If a review looks like a competitor attack or is otherwise fake/malicious, remove it with a documented reason.</p>
+          </div>
+          {(()=>{
+            const low=reviews.filter(r=>r.active!==false&&r.rating<=2).sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt));
+            if(low.length===0)return <p style={{color:T.mute}}>No low-star reviews right now.</p>;
+            return(<div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {low.map(r=>(
+                <div key={r.id} style={{...T.card,marginBottom:0,padding:16}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
+                    <div>
+                      <div style={{fontSize:".92rem",fontWeight:700}}>{r.vendorName}{r.productName?<span style={{color:T.mute,fontWeight:400}}> · {r.productName}</span>:null}</div>
+                      <div style={{fontSize:".72rem",color:T.mute,marginTop:2}}>Reviewer: {r.reviewerName} · {fD(tsToDateStr(r.createdAt))}</div>
+                    </div>
+                    <span style={{color:T.gold,fontSize:".9rem"}}>{"★".repeat(r.rating)}{"☆".repeat(5-r.rating)}</span>
+                  </div>
+                  {r.comment&&<div style={{fontSize:".84rem",color:T.txt2,marginTop:8,padding:"6px 10px",background:T.bg,borderRadius:6,fontStyle:"italic",lineHeight:1.5}}>"{r.comment}"</div>}
+                  <button onClick={async()=>{
+                    const reason=window.prompt("Reason for removing this review (required — will be logged):");
+                    if(!reason?.trim())return;
+                    await fbSet("reviews",r.id,{active:false,removedBy:au.email,removedAt:Date.now(),removalReason:reason.trim()});
+                    sh("Review removed");loadData();
+                  }} style={{...T.btnDanger,...T.btnSm,marginTop:12}}>🗑️ Remove review</button>
+                </div>
+              ))}
+            </div>);
+          })()}
         </div>}
 
         {aTab==="placements"&&<div>
@@ -11056,6 +11174,44 @@ ${forDownload
       {/* ═══ PRODUCT ENQUIRY MODAL ═══ */}
       {/* ═══ FOLLOWERS / FOLLOWING MODAL ═══ */}
       {/* ═══ CONTACT ADMIN MODAL ═══ */}
+      {/* ═══ IMAGE LIGHTBOX ═══ */}
+      {lightboxImg&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:1300,display:"flex",alignItems:"center",justifyContent:"center",padding:16,cursor:"zoom-out"}} onClick={()=>setLightboxImg(null)}>
+        <img src={lightboxImg} alt="" style={{maxWidth:"95vw",maxHeight:"95vh",objectFit:"contain",borderRadius:6,boxShadow:"0 8px 40px rgba(0,0,0,0.5)"}}/>
+        <button onClick={()=>setLightboxImg(null)} style={{position:"absolute",top:20,right:20,width:36,height:36,borderRadius:"50%",border:"none",background:"rgba(255,255,255,0.95)",cursor:"pointer",fontSize:"1rem",fontWeight:700}}>✕</button>
+      </div>}
+
+      {/* ═══ FLAG / REPORT POST MODAL ═══ */}
+      {flagModalPost&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:1200,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setFlagModalPost(null)}>
+        <div style={{background:"#fff",borderRadius:14,maxWidth:440,width:"100%",padding:24}} onClick={e=>e.stopPropagation()}>
+          <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0,marginBottom:6}}>🚩 Report this post</h3>
+          <p style={{fontSize:".82rem",color:T.mute,marginTop:0,marginBottom:14,lineHeight:1.5}}>Only report posts that genuinely violate SKINARIO's community standards. Admin will review.</p>
+          <select value={flagReason} onChange={e=>setFlagReason(e.target.value)} style={{...T.inp,marginBottom:14}}>
+            <option value="">— Select reason —</option>
+            <option value="spam">Spam or misleading</option>
+            <option value="nudity">Sexual or nude content</option>
+            <option value="hate">Hate speech or harassment</option>
+            <option value="misinformation">Medical misinformation</option>
+            <option value="offensive">Offensive or inappropriate</option>
+            <option value="other">Other community standards violation</option>
+          </select>
+          <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+            <button onClick={()=>setFlagModalPost(null)} style={{...T.btnO,padding:"8px 16px"}}>Cancel</button>
+            <button onClick={async()=>{
+              if(!flagReason){sh("Please select a reason");return}
+              const existing=Array.isArray(flagModalPost.flags)?flagModalPost.flags:[];
+              if(existing.some(f=>f.uid===au.uid)){sh("You've already reported this post");setFlagModalPost(null);return}
+              const newFlags=[...existing,{uid:au.uid,reporterName:uName,reason:flagReason,at:Date.now()}];
+              try{
+                await fbSet("wallPosts",flagModalPost.id,{flags:newFlags});
+                sh("✅ Reported — admin will review");
+                setFlagModalPost(null);setFlagReason("");
+                loadData();
+              }catch(e){sh("Failed to report")}
+            }} style={{...T.btn,padding:"8px 16px"}}>Submit report</button>
+          </div>
+        </div>
+      </div>}
+
       {showContactAdmin&&(()=>{
         const myMsgs=adminMessages.filter(m=>m.uid===au?.uid).sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt));
         return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:1200,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setShowContactAdmin(false)}>

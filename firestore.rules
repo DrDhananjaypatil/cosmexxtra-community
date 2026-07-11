@@ -90,7 +90,10 @@ service cloud.firestore {
     match /wallPosts/{postId} {
       allow read: if isSignedIn();
       allow create: if isOwner('vendorId');
-      allow update: if wasOwner('vendorId') || isAdmin();
+      allow update: if wasOwner('vendorId')
+                    || isAdmin()
+                    || (isSignedIn() && onlyChangedTo(['likes','updatedAt']))
+                    || (isSignedIn() && onlyChangedTo(['flags','updatedAt']));
       allow delete: if isAdmin();
     }
 
