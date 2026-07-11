@@ -118,6 +118,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ── platformSettings — global config docs (e.g. betaConfig).
+    //    Signed-in read (users need to see beta cap/enabled state on the
+    //    gated landing page). Admin-only write. ─────────────────────────
+    match /platformSettings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     // ── testSeries — pre-generated monthly MCQ tests. Anyone signed-in
     //    can read (needed to take a test). Only admin can create/update/delete
     //    (tests are generated once per month via admin panel). ────────────

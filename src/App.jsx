@@ -254,7 +254,7 @@ const TEST_TOPICS=[
 const TEST_DIFFICULTIES=["Easy","Moderate","Hard"];
 const TEST_DURATION_SECONDS=600; // 10 minutes
 const TEST_QUESTION_COUNT=15;
-const BETA_STUDY_CAP=25; // Max concurrent beta users for Study feature. Bump to expand.
+const BETA_STUDY_CAP_DEFAULT=25; // Default cap on first-ever load; admin can change from Beta Settings tab.
 
 // ═══ CONSENT TEMPLATE CATALOG ═══
 // Two-level structure: category → sub-procedures. Each sub-procedure carries
@@ -2479,6 +2479,10 @@ export default function App(){
   const[testResult,setTestResult]=useState(null);
   const[testGenerating,setTestGenerating]=useState(false);
   const[waitlistNote,setWaitlistNote]=useState(""); // note field for beta access request
+  // ── Beta config (loaded from platformSettings/betaConfig doc) ────────
+  // Shape: { study: { cap, enabled, history: [{by, at, from, to, action}] }, ... }
+  const[betaConfig,setBetaConfig]=useState({});
+  const[betaEditDraft,setBetaEditDraft]=useState({}); // {cap, enabled} — admin unsaved edits
   // Test timer — decrements every second while user is taking a test.
   // NOTE: Must live AFTER studyView/activeTest state declarations above,
   // otherwise Vite's minifier triggers a TDZ crash on first render.
@@ -2714,7 +2718,7 @@ export default function App(){
     if(!consentDoctorReg)setConsentDoctorReg(prof.doctorRegNumber||prof.regNumber||"");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[pg,prof]);
-  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl,tm,wp,rv,am,ts,ta]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000),fbGetAll("teamMembers","createdAt","desc",2000),fbGetAll("wallPosts","createdAt","desc",500),fbGetAll("reviews","createdAt","desc",2000),fbGetAll("adminMessages","createdAt","desc",500),fbGetAll("testSeries","createdAt","desc",500),fbGetAll("testAttempts","createdAt","desc",500)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl);setTeamMembers(tm);setWallPosts(wp);setReviews(rv);setAdminMessages(am);setTestSeries(ts);setTestAttempts(ta.filter(x=>x.uid===au?.uid))},[au?.uid]);
+  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl,tm,wp,rv,am,ts,ta,bc]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000),fbGetAll("teamMembers","createdAt","desc",2000),fbGetAll("wallPosts","createdAt","desc",500),fbGetAll("reviews","createdAt","desc",2000),fbGetAll("adminMessages","createdAt","desc",500),fbGetAll("testSeries","createdAt","desc",500),fbGetAll("testAttempts","createdAt","desc",500),fbGet("platformSettings","betaConfig")]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl);setTeamMembers(tm);setWallPosts(wp);setReviews(rv);setAdminMessages(am);setTestSeries(ts);setTestAttempts(ta.filter(x=>x.uid===au?.uid));setBetaConfig(bc||{})},[au?.uid]);
 
   // Load current user's points-earning history from pointsActivity ledger.
   // Uses where(uid) so the list query satisfies security rules (can't list others' docs).
@@ -5094,6 +5098,18 @@ ${forDownload
   //    whose profile has the feature key in prof.betaFeatures. Admins can grant
   //    access from the Users admin tab. ──────────────────────────────────
   const hasBetaAccess=(feature)=>isAdm||(Array.isArray(prof?.betaFeatures)&&prof.betaFeatures.includes(feature));
+  // Resolve current cap for a beta feature from the Firestore config doc,
+  // falling back to hardcoded default if the doc hasn't been created yet.
+  const getBetaCap=(feature)=>{
+    if(feature==="study")return betaConfig?.study?.cap??BETA_STUDY_CAP_DEFAULT;
+    return 25;
+  };
+  // Is the beta program open for new signups (not-yet-approved users)?
+  // Admin can flip this off to pause the waitlist without changing the cap.
+  const isBetaOpen=(feature)=>{
+    if(feature==="study"){const v=betaConfig?.study?.enabled;return v===undefined?true:!!v;}
+    return true;
+  };
   const overflowNavs=[
     {id:"library",ic:"📚",l:"Library"},
     {id:"videos",ic:"🎥",l:"Videos"},
@@ -7331,10 +7347,10 @@ ${forDownload
       {pg==="study"&&!hasBetaAccess("study")&&(()=>{
         // Count active beta users and waitlist across the platform (fresh on each render).
         const activeBetaUsers=allUsers.filter(u=>Array.isArray(u.betaFeatures)&&u.betaFeatures.includes("study")).length;
-        const spotsLeft=Math.max(0,BETA_STUDY_CAP-activeBetaUsers);
+        const spotsLeft=Math.max(0,getBetaCap("study")-activeBetaUsers);
         const waitlistedUsers=allUsers.filter(u=>Array.isArray(u.betaWaitlist)&&u.betaWaitlist.includes("study"));
         const onWaitlist=Array.isArray(prof?.betaWaitlist)&&prof.betaWaitlist.includes("study");
-        const pctFull=Math.min(100,Math.round((activeBetaUsers/BETA_STUDY_CAP)*100));
+        const pctFull=Math.min(100,Math.round((activeBetaUsers/getBetaCap("study"))*100));
 
         return(<div style={{maxWidth:600,margin:"32px auto"}}>
           <div style={{...T.card,padding:32,textAlign:"center"}}>
@@ -7350,7 +7366,7 @@ ${forDownload
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
                 <div style={{fontSize:".76rem",fontWeight:700,color:T.txt,textTransform:"uppercase",letterSpacing:.5}}>Beta spots</div>
                 <div style={{fontSize:".9rem",fontWeight:700,color:spotsLeft===0?T.err:spotsLeft<=5?T.goldD:T.teal}}>
-                  {activeBetaUsers} / {BETA_STUDY_CAP} filled
+                  {activeBetaUsers} / {getBetaCap("study")} filled
                 </div>
               </div>
               <div style={{height:8,background:"#e8e8e8",borderRadius:4,overflow:"hidden",marginBottom:8}}>
@@ -7370,6 +7386,9 @@ ${forDownload
                 setProf(p=>({...p,betaWaitlist:next}));
                 sh("Removed from waitlist");
               }} style={{...T.btnO,...T.btnSm,marginTop:10,fontSize:".72rem"}}>Leave waitlist</button>
+            </div>:!isBetaOpen("study")?<div style={{padding:"14px 18px",background:T.bg,borderRadius:10,marginBottom:16,textAlign:"left"}}>
+              <div style={{fontSize:".88rem",fontWeight:700,color:T.txt,marginBottom:4}}>⏸ New signups paused</div>
+              <div style={{fontSize:".8rem",color:T.txt2,lineHeight:1.5}}>The waitlist is temporarily closed while we work through current applicants. Please check back soon.</div>
             </div>:<>
               <div style={{marginBottom:12,textAlign:"left"}}>
                 <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Why do you want access? <span style={{color:T.mute,fontWeight:400,textTransform:"none",letterSpacing:0}}>(optional)</span></label>
@@ -10232,7 +10251,7 @@ ${forDownload
         </h3>
         <div style={{position:"sticky",top:0,zIndex:30,background:T.bg,padding:"10px 0",marginBottom:16,marginInline:-12,paddingInline:12,borderBottom:"1px solid "+T.border}}>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["vendors","🏢 Vendors"],["flagged","🚩 Flagged"],["lowreviews","⭐ Low Reviews"],["placements","📢 Placements"],["messages","✉️ Messages"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["consents","📋 Consents"],["referrals","🎁 Referrals"],["users","👥 Users"]].map(([id,l])=>{
+          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["vendors","🏢 Vendors"],["flagged","🚩 Flagged"],["lowreviews","⭐ Low Reviews"],["placements","📢 Placements"],["messages","✉️ Messages"],["beta","🎯 Beta"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["consents","📋 Consents"],["referrals","🎁 Referrals"],["users","👥 Users"]].map(([id,l])=>{
             const flagCount=wallPosts.filter(w=>w.active!==false&&Array.isArray(w.flags)&&w.flags.length>0).length;
             const lowRev=reviews.filter(r=>r.active!==false&&r.rating<=2).length;
             const unreadMsg=adminMessages.filter(m=>m.status!=="replied").length;
@@ -10971,6 +10990,130 @@ ${forDownload
           })()}
         </div>}
 
+        {aTab==="beta"&&(()=>{
+          const feature="study";
+          const currentCap=getBetaCap(feature);
+          const currentEnabled=isBetaOpen(feature);
+          const activeUsers=allUsers.filter(u=>Array.isArray(u.betaFeatures)&&u.betaFeatures.includes(feature)).length;
+          const waitlistUsers=allUsers.filter(u=>Array.isArray(u.betaWaitlist)&&u.betaWaitlist.includes(feature)).length;
+          const history=Array.isArray(betaConfig?.study?.history)?betaConfig.study.history:[];
+          // Local draft state for the input — falls back to current cap
+          const draftCap=betaEditDraft.cap??currentCap;
+          const draftEnabled=betaEditDraft.enabled??currentEnabled;
+          const changed=draftCap!==currentCap||draftEnabled!==currentEnabled;
+          const spotsLeft=Math.max(0,currentCap-activeUsers);
+          const pctFull=Math.min(100,Math.round((activeUsers/Math.max(1,currentCap))*100));
+
+          return(<div>
+            <div style={{...T.card,marginBottom:14,borderLeft:"3px solid "+T.teal}}>
+              <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>🎯 Beta Programs</h4>
+              <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.55,margin:0}}>Manage caps, toggles, and history for features in beta. Changes here are logged automatically.</p>
+            </div>
+
+            {/* Study feature card */}
+            <div style={{...T.card,marginBottom:14}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,paddingBottom:14,borderBottom:"1px solid "+T.border}}>
+                <div style={{fontSize:"1.6rem"}}>🎯</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:"1rem",fontWeight:700}}>Study & Test Series</div>
+                  <div style={{fontSize:".76rem",color:T.mute}}>10-topic MCQ tests with weak-area analysis</div>
+                </div>
+                <div style={{fontSize:".68rem",fontWeight:700,color:"#fff",background:currentEnabled?T.teal:T.mute,padding:"3px 10px",borderRadius:6}}>{currentEnabled?"● OPEN":"⏸ PAUSED"}</div>
+              </div>
+
+              {/* Live stats */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:16}}>
+                <div style={{padding:12,background:T.bg,borderRadius:8}}>
+                  <div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{activeUsers}</div>
+                  <div style={{fontSize:".64rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Active testers</div>
+                </div>
+                <div style={{padding:12,background:T.bg,borderRadius:8}}>
+                  <div style={{fontSize:"1.4rem",fontWeight:700,color:spotsLeft===0?T.err:spotsLeft<=5?T.goldD:T.txt}}>{spotsLeft}</div>
+                  <div style={{fontSize:".64rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Spots left</div>
+                </div>
+                <div style={{padding:12,background:T.bg,borderRadius:8}}>
+                  <div style={{fontSize:"1.4rem",fontWeight:700,color:T.goldD}}>{waitlistUsers}</div>
+                  <div style={{fontSize:".64rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>On waitlist</div>
+                </div>
+                <div style={{padding:12,background:T.bg,borderRadius:8}}>
+                  <div style={{fontSize:"1.4rem",fontWeight:700,color:T.txt}}>{pctFull}%</div>
+                  <div style={{fontSize:".64rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Filled</div>
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              <div style={{height:8,background:"#e8e8e8",borderRadius:4,overflow:"hidden",marginBottom:16}}>
+                <div style={{height:"100%",width:pctFull+"%",background:pctFull>=100?T.err:pctFull>=80?"linear-gradient(90deg,"+T.gold+","+T.goldD+")":"linear-gradient(90deg,"+T.teal+",#0d5c52)",transition:"width .4s"}}/>
+              </div>
+
+              {/* Cap editor */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
+                <div>
+                  <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Beta cap</label>
+                  <input type="number" min="0" max="10000" value={draftCap} onChange={e=>{
+                    const v=parseInt(e.target.value,10);
+                    setBetaEditDraft(p=>({...p,cap:isNaN(v)?0:Math.max(0,v)}));
+                  }} style={{...T.inp,marginBottom:4}}/>
+                  <div style={{fontSize:".68rem",color:T.mute}}>Currently {currentCap}. {draftCap<activeUsers&&<span style={{color:T.err,fontWeight:600}}>⚠ Lower than current {activeUsers} active users — existing users keep access.</span>}</div>
+                </div>
+                <div>
+                  <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Accept new signups</label>
+                  <div style={{display:"flex",gap:0,marginBottom:4,borderRadius:8,overflow:"hidden",border:"1px solid "+T.border}}>
+                    <button onClick={()=>setBetaEditDraft(p=>({...p,enabled:true}))} style={{flex:1,padding:"9px",border:"none",background:draftEnabled?T.teal:"#fff",color:draftEnabled?"#fff":T.mute,cursor:"pointer",fontSize:".82rem",fontWeight:600,fontFamily:"inherit"}}>● Open</button>
+                    <button onClick={()=>setBetaEditDraft(p=>({...p,enabled:false}))} style={{flex:1,padding:"9px",border:"none",background:!draftEnabled?T.mute:"#fff",color:!draftEnabled?"#fff":T.txt2,cursor:"pointer",fontSize:".82rem",fontWeight:600,fontFamily:"inherit"}}>⏸ Paused</button>
+                  </div>
+                  <div style={{fontSize:".68rem",color:T.mute}}>Paused = the waitlist form is closed but existing users still have access.</div>
+                </div>
+              </div>
+
+              {/* Save + reset */}
+              {changed&&<div style={{padding:"10px 14px",background:T.goldBg,borderRadius:8,marginBottom:14,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                <div style={{fontSize:".82rem",color:T.txt,fontWeight:600,flex:1}}>Unsaved changes</div>
+                <button onClick={()=>setBetaEditDraft({})} style={{...T.btnO,...T.btnSm}}>Discard</button>
+                <button onClick={async()=>{
+                  const changes=[];
+                  if(draftCap!==currentCap)changes.push({field:"cap",from:currentCap,to:draftCap});
+                  if(draftEnabled!==currentEnabled)changes.push({field:"enabled",from:currentEnabled,to:draftEnabled});
+                  const newEntries=changes.map(c=>({at:Date.now(),by:au.email,...c}));
+                  const nextConfig={
+                    ...betaConfig,
+                    study:{
+                      ...(betaConfig?.study||{}),
+                      cap:draftCap,
+                      enabled:draftEnabled,
+                      history:[...history,...newEntries].slice(-100),
+                    },
+                  };
+                  try{
+                    await fbSet("platformSettings","betaConfig",nextConfig);
+                    setBetaConfig(nextConfig);
+                    setBetaEditDraft({});
+                    sh("✓ Beta config updated");
+                    loadData();
+                  }catch(err){console.error(err);sh("Failed to save — check Firestore rules for platformSettings")}
+                }} style={{...T.btn,...T.btnSm}}>Save changes</button>
+              </div>}
+
+              {/* History */}
+              <div style={{marginTop:8}}>
+                <h5 style={{fontSize:".82rem",fontWeight:700,margin:0,marginBottom:8}}>📜 Change history <span style={{fontSize:".68rem",color:T.mute,fontWeight:400}}>({history.length})</span></h5>
+                {history.length===0?<div style={{fontSize:".76rem",color:T.mute,fontStyle:"italic"}}>No changes yet — every save will be logged here.</div>
+                :<div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:240,overflowY:"auto"}}>
+                  {[...history].reverse().slice(0,50).map((h,i)=><div key={i} style={{padding:"7px 10px",background:T.bg,borderRadius:6,fontSize:".74rem",display:"flex",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
+                    <span style={{color:T.txt2}}>
+                      <b>{h.field==="cap"?"Cap":"Signups"}</b> changed from <b>{String(h.from)}</b> → <b>{String(h.to)}</b>
+                    </span>
+                    <span style={{color:T.mute,fontSize:".7rem"}}>{h.by} · {new Date(h.at).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"})}</span>
+                  </div>)}
+                </div>}
+              </div>
+            </div>
+
+            {/* Future beta features hint */}
+            <div style={{padding:14,background:T.bg,borderRadius:10,fontSize:".76rem",color:T.mute,textAlign:"center",fontStyle:"italic"}}>More beta programs will appear here as they launch.</div>
+          </div>);
+        })()}
+
         {aTab==="placements"&&<div>
           <div style={{...T.card,marginBottom:14}}>
             <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>📢 Sponsor Placement Requests</h4>
@@ -11510,7 +11653,7 @@ ${forDownload
         {aTab==="users"&&<div style={T.card}>
           {/* Header */}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
-            <p style={{color:T.mute,fontSize:".82rem",margin:0}}>{allUsers.length} total · 🚩 {allUsers.filter(u=>u.regFlagged).length} flagged · ✓ {allUsers.filter(u=>u.verified).length} verified · 🎯 {allUsers.filter(u=>Array.isArray(u.betaFeatures)&&u.betaFeatures.includes("study")).length}/{BETA_STUDY_CAP} in Study beta · ⏳ {allUsers.filter(u=>Array.isArray(u.betaWaitlist)&&u.betaWaitlist.includes("study")).length} waitlisted</p>
+            <p style={{color:T.mute,fontSize:".82rem",margin:0}}>{allUsers.length} total · 🚩 {allUsers.filter(u=>u.regFlagged).length} flagged · ✓ {allUsers.filter(u=>u.verified).length} verified · 🎯 {allUsers.filter(u=>Array.isArray(u.betaFeatures)&&u.betaFeatures.includes("study")).length}/{getBetaCap("study")} in Study beta · ⏳ {allUsers.filter(u=>Array.isArray(u.betaWaitlist)&&u.betaWaitlist.includes("study")).length} waitlisted</p>
           </div>
 
           {/* Search + filter row */}
@@ -11586,8 +11729,8 @@ ${forDownload
                     // Cap enforcement — count current active beta users (not including this one)
                     if(!inStudyBeta){
                       const activeCount=allUsers.filter(x=>x.id!==u.id&&Array.isArray(x.betaFeatures)&&x.betaFeatures.includes("study")).length;
-                      if(activeCount>=BETA_STUDY_CAP){
-                        if(!window.confirm(`Beta cap is ${BETA_STUDY_CAP} and it's full. Grant anyway? (Raises the effective cap for this session — consider revoking an inactive user instead.)`))return;
+                      if(activeCount>=getBetaCap("study")){
+                        if(!window.confirm(`Beta cap is ${getBetaCap("study")} and it's full. Grant anyway? (Raises the effective cap for this session — consider revoking an inactive user instead.)`))return;
                       }
                     }
                     const next=inStudyBeta?current.filter(f=>f!=="study"):[...current,"study"];
