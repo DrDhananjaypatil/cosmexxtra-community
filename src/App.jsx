@@ -254,6 +254,7 @@ const TEST_TOPICS=[
 const TEST_DIFFICULTIES=["Easy","Moderate","Hard"];
 const TEST_DURATION_SECONDS=600; // 10 minutes
 const TEST_QUESTION_COUNT=15;
+const BETA_STUDY_CAP=25; // Max concurrent beta users for Study feature. Bump to expand.
 
 // ═══ CONSENT TEMPLATE CATALOG ═══
 // Two-level structure: category → sub-procedures. Each sub-procedure carries
@@ -2477,6 +2478,7 @@ export default function App(){
   const[testCurrentQ,setTestCurrentQ]=useState(0);
   const[testResult,setTestResult]=useState(null);
   const[testGenerating,setTestGenerating]=useState(false);
+  const[waitlistNote,setWaitlistNote]=useState(""); // note field for beta access request
   // Test timer — decrements every second while user is taking a test.
   // NOTE: Must live AFTER studyView/activeTest state declarations above,
   // otherwise Vite's minifier triggers a TDZ crash on first render.
@@ -5096,7 +5098,9 @@ ${forDownload
     {id:"library",ic:"📚",l:"Library"},
     {id:"videos",ic:"🎥",l:"Videos"},
     {id:"events",ic:"📅",l:"Events"},
-    ...(hasBetaAccess("study")?[{id:"study",ic:"🎯",l:"Study & Test",beta:true}]:[]),
+    // Study nav is visible to everyone (buzz), but the page itself is beta-gated.
+    // Non-beta users clicking it land on the "join waitlist" screen.
+    {id:"study",ic:"🎯",l:"Study & Test",beta:true},
     {id:"vendors",ic:"🏭",l:"Vendors"},
     {id:"rank",ic:"🏆",l:"Rank"},
     {id:"consent",ic:"📋",l:"Consent"},
@@ -5465,6 +5469,7 @@ ${forDownload
             <button onClick={()=>go("vendors")} style={T.btnO}>🏢 Vendors</button>
             <button onClick={()=>{setDirTab("institutes");go("vendors");}} style={T.btnO}>🎓 Institutes</button>
             {(()=>{const aType=prof?.accountType||"";const showConsent=isAdm||aType==="doctor"||aType===""||aType===undefined;return showConsent?<button onClick={()=>go("consent")} style={{background:"#fdf6e3",color:"#785f1e",border:"1.5px solid #c8a84e",borderRadius:8,padding:"9px 18px 9px 28px",fontSize:".88rem",fontWeight:500,fontFamily:"inherit",cursor:"pointer",position:"relative",overflow:"hidden"}}><span style={{position:"absolute",top:3,left:6,fontSize:".52rem",background:"#c8a84e",color:"#fff",padding:"1px 6px",borderRadius:5,fontWeight:700,letterSpacing:.6}}>NEW</span>📋 Generate consent</button>:null;})()}
+            <button onClick={()=>go("study")} style={{background:"linear-gradient(135deg,"+T.tealBg+","+T.goldBg+")",color:T.teal,border:"1.5px solid "+T.teal,borderRadius:8,padding:"9px 18px 9px 30px",fontSize:".88rem",fontWeight:600,fontFamily:"inherit",cursor:"pointer",position:"relative",overflow:"hidden"}}><span style={{position:"absolute",top:3,left:6,fontSize:".52rem",background:T.goldD,color:"#fff",padding:"1px 6px",borderRadius:5,fontWeight:700,letterSpacing:.6}}>BETA</span>🎯 Try Study</button>
           </div>
         </div>
 
@@ -7323,17 +7328,71 @@ ${forDownload
       </div>}
 
       {/* ═══ STUDY / TEST SERIES PAGE ═══ */}
-      {pg==="study"&&!hasBetaAccess("study")&&<div style={{maxWidth:600,margin:"40px auto"}}>
-        <div style={{...T.card,padding:32,textAlign:"center"}}>
-          <div style={{fontSize:"3rem",marginBottom:10}}>🔒</div>
-          <h2 style={{fontSize:"1.3rem",fontWeight:700,margin:0,marginBottom:8}}>Study &amp; Test — Beta</h2>
-          <p style={{color:T.txt2,fontSize:".9rem",lineHeight:1.55,marginBottom:16}}>
-            This feature is currently in limited beta. We're rolling it out gradually to a small group of doctors while we polish the experience.
-          </p>
-          <p style={{color:T.mute,fontSize:".82rem",marginBottom:20}}>Want early access? Message the admin from your profile.</p>
-          <button onClick={()=>go("home")} style={T.btn}>← Back to home</button>
-        </div>
-      </div>}
+      {pg==="study"&&!hasBetaAccess("study")&&(()=>{
+        // Count active beta users and waitlist across the platform (fresh on each render).
+        const activeBetaUsers=allUsers.filter(u=>Array.isArray(u.betaFeatures)&&u.betaFeatures.includes("study")).length;
+        const spotsLeft=Math.max(0,BETA_STUDY_CAP-activeBetaUsers);
+        const waitlistedUsers=allUsers.filter(u=>Array.isArray(u.betaWaitlist)&&u.betaWaitlist.includes("study"));
+        const onWaitlist=Array.isArray(prof?.betaWaitlist)&&prof.betaWaitlist.includes("study");
+        const pctFull=Math.min(100,Math.round((activeBetaUsers/BETA_STUDY_CAP)*100));
+
+        return(<div style={{maxWidth:600,margin:"32px auto"}}>
+          <div style={{...T.card,padding:32,textAlign:"center"}}>
+            <div style={{fontSize:"3rem",marginBottom:8}}>🎯</div>
+            <div style={{fontSize:".62rem",fontWeight:700,color:"#fff",background:T.goldD,padding:"3px 10px",borderRadius:5,letterSpacing:1,display:"inline-block",marginBottom:14}}>BETA · LIMITED ACCESS</div>
+            <h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0,marginBottom:8}}>Study &amp; Test Series</h2>
+            <p style={{color:T.txt2,fontSize:".92rem",lineHeight:1.55,margin:"0 auto 20px",maxWidth:440}}>
+              15-question timed MCQ tests across 10 aesthetic medicine topics. Get instant feedback with weak-area analysis and personal progress tracking.
+            </p>
+
+            {/* Live scarcity meter */}
+            <div style={{padding:"14px 18px",background:T.bg,borderRadius:10,marginBottom:16,textAlign:"left"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
+                <div style={{fontSize:".76rem",fontWeight:700,color:T.txt,textTransform:"uppercase",letterSpacing:.5}}>Beta spots</div>
+                <div style={{fontSize:".9rem",fontWeight:700,color:spotsLeft===0?T.err:spotsLeft<=5?T.goldD:T.teal}}>
+                  {activeBetaUsers} / {BETA_STUDY_CAP} filled
+                </div>
+              </div>
+              <div style={{height:8,background:"#e8e8e8",borderRadius:4,overflow:"hidden",marginBottom:8}}>
+                <div style={{height:"100%",width:pctFull+"%",background:spotsLeft===0?T.err:spotsLeft<=5?"linear-gradient(90deg,"+T.gold+","+T.goldD+")":"linear-gradient(90deg,"+T.teal+",#0d5c52)",transition:"width .4s"}}/>
+              </div>
+              <div style={{fontSize:".72rem",color:T.mute}}>
+                {spotsLeft>0?`${spotsLeft} spot${spotsLeft===1?"":"s"} left`:"All spots filled — join the waitlist"} · {waitlistedUsers.length} on waitlist
+              </div>
+            </div>
+
+            {onWaitlist?<div style={{padding:"14px 18px",background:T.tealBg,borderRadius:10,marginBottom:16,textAlign:"left"}}>
+              <div style={{fontSize:".88rem",fontWeight:700,color:T.teal,marginBottom:4}}>✓ You're on the waitlist</div>
+              <div style={{fontSize:".8rem",color:T.txt2,lineHeight:1.5}}>Admin reviews requests personally. You'll see the feature appear in your nav once approved.</div>
+              <button onClick={async()=>{
+                const next=(prof.betaWaitlist||[]).filter(f=>f!=="study");
+                await fbSet("users",au.uid,{betaWaitlist:next});
+                setProf(p=>({...p,betaWaitlist:next}));
+                sh("Removed from waitlist");
+              }} style={{...T.btnO,...T.btnSm,marginTop:10,fontSize:".72rem"}}>Leave waitlist</button>
+            </div>:<>
+              <div style={{marginBottom:12,textAlign:"left"}}>
+                <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Why do you want access? <span style={{color:T.mute,fontWeight:400,textTransform:"none",letterSpacing:0}}>(optional)</span></label>
+                <textarea value={waitlistNote} onChange={e=>setWaitlistNote(e.target.value)} placeholder="e.g. Prepping for board exam, want to sharpen my botox knowledge, teaching a fellowship..." rows={3} style={T.txa}/>
+              </div>
+              <button onClick={async()=>{
+                try{
+                  const current=Array.isArray(prof?.betaWaitlist)?prof.betaWaitlist:[];
+                  const next=[...current,"study"];
+                  await fbSet("users",au.uid,{betaWaitlist:next,betaWaitlistNote_study:waitlistNote.trim()||"(no note)",betaWaitlistedAt_study:Date.now()});
+                  setProf(p=>({...p,betaWaitlist:next}));
+                  setWaitlistNote("");
+                  sh("✅ Added to waitlist — admin will review");
+                  loadData();
+                }catch(e){sh("Failed to join waitlist")}
+              }} style={{...T.btn,padding:"11px 24px",fontSize:".92rem",width:"100%"}}>Join the waitlist →</button>
+            </>}
+
+            <div style={{marginTop:16,fontSize:".72rem",color:T.mute,lineHeight:1.5}}>Early beta users help shape the feature. Give feedback via the Contact Admin button once you're in.</div>
+            <button onClick={()=>go("home")} style={{...T.btnO,marginTop:16,fontSize:".8rem"}}>← Back to home</button>
+          </div>
+        </div>);
+      })()}
       {pg==="study"&&hasBetaAccess("study")&&<div style={{maxWidth:900}}>
         {(()=>{
           const monthKey=new Date().toISOString().slice(0,7);
@@ -11451,7 +11510,7 @@ ${forDownload
         {aTab==="users"&&<div style={T.card}>
           {/* Header */}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
-            <p style={{color:T.mute,fontSize:".82rem",margin:0}}>{allUsers.length} total · 🚩 {allUsers.filter(u=>u.regFlagged).length} flagged · ✓ {allUsers.filter(u=>u.verified).length} verified · 🎯 {allUsers.filter(u=>Array.isArray(u.betaFeatures)&&u.betaFeatures.includes("study")).length} in Study beta</p>
+            <p style={{color:T.mute,fontSize:".82rem",margin:0}}>{allUsers.length} total · 🚩 {allUsers.filter(u=>u.regFlagged).length} flagged · ✓ {allUsers.filter(u=>u.verified).length} verified · 🎯 {allUsers.filter(u=>Array.isArray(u.betaFeatures)&&u.betaFeatures.includes("study")).length}/{BETA_STUDY_CAP} in Study beta · ⏳ {allUsers.filter(u=>Array.isArray(u.betaWaitlist)&&u.betaWaitlist.includes("study")).length} waitlisted</p>
           </div>
 
           {/* Search + filter row */}
@@ -11473,6 +11532,7 @@ ${forDownload
               <option value="premium">⭐ Premium</option>
               <option value="verified">✓ Verified</option>
               <option value="beta-study">🎯 Study Beta users</option>
+              <option value="waitlist-study">⏳ Study Waitlist</option>
             </select>
             {(adminUserSearch||adminUserFilter!=="all")&&<button onClick={()=>{setAdminUserSearch("");setAdminUserFilter("all")}} style={{...T.btnO,...T.btnSm,whiteSpace:"nowrap"}}>✕ Clear</button>}
           </div>
@@ -11487,6 +11547,7 @@ ${forDownload
                 :adminUserFilter==="premium"?u.paid
                 :adminUserFilter==="verified"?u.verified
                 :adminUserFilter==="beta-study"?(Array.isArray(u.betaFeatures)&&u.betaFeatures.includes("study"))
+                :adminUserFilter==="waitlist-study"?(Array.isArray(u.betaWaitlist)&&u.betaWaitlist.includes("study"))
                 :(u.accountType||"")===(adminUserFilter);
               return matchSearch&&matchFilter;
             });
@@ -11507,9 +11568,11 @@ ${forDownload
                         {ADMINS.includes(u.email)&&<span style={T.tag(T.tealBg,T.teal)}>Admin</span>}
                         {u.regFlagged&&<span style={T.tag(T.errBg,T.err)}>🚩</span>}
                         {inStudyBeta&&<span style={T.tag(T.goldBg,T.goldD)}>🎯 Study Beta</span>}
+                        {Array.isArray(u.betaWaitlist)&&u.betaWaitlist.includes("study")&&!inStudyBeta&&<span style={T.tag("#fff3cd","#856404")}>⏳ Waitlist</span>}
                         {acc&&<span style={T.tag(T.bg,T.mute)}>{acc.icon} {acc.label}</span>}
                       </div>
                       <div style={{fontSize:".7rem",color:T.mute}}>{u.email} · {u.clinic||u.companyName||u.instituteName||""}{(u.city||u.country)?` · ${u.city||u.country}`:""}  · joined {u.joined||""}</div>
+                      {Array.isArray(u.betaWaitlist)&&u.betaWaitlist.includes("study")&&!inStudyBeta&&u.betaWaitlistNote_study&&<div style={{fontSize:".7rem",color:T.txt2,marginTop:2,fontStyle:"italic"}}>💭 "{u.betaWaitlistNote_study}"</div>}
                     </div>
                     <div style={{textAlign:"right",fontSize:".72rem",flexShrink:0}}>
                       {u.accountType==="doctor"&&<div style={{color:T.teal,fontWeight:600}}>{u.points||0} pts · {a2}%</div>}
@@ -11520,9 +11583,19 @@ ${forDownload
                   <button onClick={async(e)=>{
                     e.stopPropagation();
                     const current=Array.isArray(u.betaFeatures)?u.betaFeatures:[];
+                    // Cap enforcement — count current active beta users (not including this one)
+                    if(!inStudyBeta){
+                      const activeCount=allUsers.filter(x=>x.id!==u.id&&Array.isArray(x.betaFeatures)&&x.betaFeatures.includes("study")).length;
+                      if(activeCount>=BETA_STUDY_CAP){
+                        if(!window.confirm(`Beta cap is ${BETA_STUDY_CAP} and it's full. Grant anyway? (Raises the effective cap for this session — consider revoking an inactive user instead.)`))return;
+                      }
+                    }
                     const next=inStudyBeta?current.filter(f=>f!=="study"):[...current,"study"];
+                    const wlCurrent=Array.isArray(u.betaWaitlist)?u.betaWaitlist:[];
+                    // When granting, also clear them off the waitlist
+                    const wlNext=inStudyBeta?wlCurrent:wlCurrent.filter(f=>f!=="study");
                     try{
-                      await fbSet("users",u.id,{betaFeatures:next});
+                      await fbSet("users",u.id,{betaFeatures:next,betaWaitlist:wlNext});
                       sh(inStudyBeta?`Revoked Study beta for ${u.name?.split(" ")[0]||"user"}`:`Granted Study beta to ${u.name?.split(" ")[0]||"user"}`);
                       loadData();
                     }catch(err){sh("Failed to update beta access")}
