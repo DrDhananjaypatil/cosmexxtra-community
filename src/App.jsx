@@ -684,6 +684,32 @@ const CERTIFICATION_OPTIONS=["ISO 9001 (Quality Management)","ISO 13485 (Medical
 const getIST=()=>new Date(new Date().toLocaleString("en-US",{timeZone:"Asia/Kolkata"}));
 const ds=d=>d.toISOString().split("T")[0];
 const fD=s=>{try{return new Date(s+"T12:00:00").toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})}catch{return s}};
+// Safely converts a Firestore Timestamp object, epoch number, ISO string, or Date into a "YYYY-MM-DD" string.
+// serverTimestamp() writes come back as Firestore Timestamp objects (with .seconds), not plain numbers —
+// passing those straight into `new Date(x)` silently produces an Invalid Date and crashes on .toISOString().
+function tsToDateStr(ts){
+  if(!ts)return "";
+  try{
+    let d;
+    if(typeof ts==="number")d=new Date(ts);
+    else if(typeof ts.toDate==="function")d=ts.toDate();
+    else if(typeof ts.seconds==="number")d=new Date(ts.seconds*1000);
+    else d=new Date(ts);
+    if(isNaN(d.getTime()))return "";
+    return d.toISOString().split("T")[0];
+  }catch{return ""}
+}
+// Same as tsToDateStr but returns epoch milliseconds (0 on failure) — for precise chronological sorting.
+function tsToMillis(ts){
+  if(!ts)return 0;
+  try{
+    if(typeof ts==="number")return ts;
+    if(typeof ts.toDate==="function")return ts.toDate().getTime();
+    if(typeof ts.seconds==="number")return ts.seconds*1000;
+    const d=new Date(ts);
+    return isNaN(d.getTime())?0:d.getTime();
+  }catch{return 0}
+}
 // Computes the SKINARIO-member price + offer badges for a product, from its `offers` array.
 // offers: [{type:"percent_off",percent}, {type:"flat_price",price}, {type:"buy_get",buyQty,freeQty}, {type:"slab_percent",minQty,percent}]
 function getProductOffers(p){
@@ -5279,7 +5305,7 @@ ${forDownload
           let feed=wallPosts.filter(w=>w.active!==false&&(followedIds.has(w.vendorId)||w.vendorId===au?.uid));
           let isDiscovery=false;
           if(feed.length===0){feed=wallPosts.filter(w=>w.active!==false);isDiscovery=true;}
-          feed=feed.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,20);
+          feed=feed.sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt)).slice(0,20);
           if(feed.length===0)return null;
           return(<div style={{marginTop:16}}>
             {isDiscovery&&<div style={{fontSize:".78rem",color:T.mute,marginBottom:10}}>Follow doctors, vendors & institutes to see their updates here. Meanwhile, here's what's happening on SKINARIO:</div>}
@@ -5291,7 +5317,7 @@ ${forDownload
                     {w.vendorPhoto?<img src={w.vendorPhoto} style={{width:36,height:36,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(36,T.tealBg,T.teal)}>{(w.vendorName||"?").slice(0,1).toUpperCase()}</div>}
                     <div>
                       <div style={{fontSize:".85rem",fontWeight:700}}>{w.vendorName}{author&&normalizeAccountType(author.accountType||"")==="institute"&&<span style={{fontSize:".6rem",fontWeight:700,color:T.goldD,background:T.goldBg,padding:"2px 7px",borderRadius:10,marginLeft:6}}>🎓 Institute</span>}</div>
-                      <div style={{fontSize:".68rem",color:T.mute}}>{w.createdAt?fD(new Date(w.createdAt).toISOString().split("T")[0]):""}</div>
+                      <div style={{fontSize:".68rem",color:T.mute}}>{fD(tsToDateStr(w.createdAt))}</div>
                     </div>
                   </div>
                   {w.caption&&<div style={{fontSize:".88rem",color:T.txt2,lineHeight:1.6,whiteSpace:"pre-wrap",marginBottom:w.imageUrl?10:0}}>{w.caption}</div>}
@@ -6297,7 +6323,7 @@ ${forDownload
 
             {/* Wall — marketing/celebration posts, text and/or photo */}
             {(()=>{
-              const vWall=wallPosts.filter(w=>w.vendorId===selVendor.id&&w.active!==false).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+              const vWall=wallPosts.filter(w=>w.vendorId===selVendor.id&&w.active!==false).sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt));
               if(vWall.length===0)return null;
               return(<div style={{...T.card,marginTop:14}}>
                 <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>📸 Wall</h4>
@@ -6305,7 +6331,7 @@ ${forDownload
                   {vWall.map(w=><div key={w.id} style={{border:"1px solid "+T.border,borderRadius:8,overflow:"hidden"}}>
                     {w.imageUrl&&<img src={w.imageUrl} alt="" style={{width:"100%",maxHeight:280,objectFit:"cover"}}/>}
                     {w.caption&&<div style={{padding:10,fontSize:".82rem",color:T.txt2,lineHeight:1.5,whiteSpace:"pre-wrap"}}>{w.caption}</div>}
-                    <div style={{padding:"0 10px 8px",fontSize:".68rem",color:T.mute}}>{w.createdAt?fD(new Date(w.createdAt).toISOString().split("T")[0]):""}</div>
+                    <div style={{padding:"0 10px 8px",fontSize:".68rem",color:T.mute}}>{fD(tsToDateStr(w.createdAt))}</div>
                   </div>)}
                 </div>
               </div>);
@@ -6354,7 +6380,7 @@ ${forDownload
             {/* Sidebar — Reviews */}
             <div>
               {(()=>{
-                const vReviews=reviews.filter(r=>r.vendorId===selVendor.id&&r.active!==false).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+                const vReviews=reviews.filter(r=>r.vendorId===selVendor.id&&r.active!==false).sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt));
                 const myReview=vReviews.find(r=>r.reviewerUid===au?.uid);
                 const isSelf=selVendor.id===au?.uid;
                 return(<div style={{...T.card,marginBottom:14}}>
@@ -7359,7 +7385,7 @@ ${forDownload
 
             {/* Wall feed — visible to anyone who can see this profile */}
             {(()=>{
-              const uWall=wallPosts.filter(w=>w.vendorId===u.id&&w.active!==false).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+              const uWall=wallPosts.filter(w=>w.vendorId===u.id&&w.active!==false).sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt));
               if(uWall.length===0)return null;
               return(<div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
                 {uWall.map(w=><div key={w.id} style={{...T.card,marginBottom:0}}>
@@ -7367,7 +7393,7 @@ ${forDownload
                     {u.photo?<img src={u.photo} style={{width:36,height:36,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(36,T.tealBg,T.teal)}>{u.initials||"?"}</div>}
                     <div>
                       <div style={{fontSize:".85rem",fontWeight:700}}>{u.name}</div>
-                      <div style={{fontSize:".68rem",color:T.mute}}>{w.createdAt?fD(new Date(w.createdAt).toISOString().split("T")[0]):""}</div>
+                      <div style={{fontSize:".68rem",color:T.mute}}>{fD(tsToDateStr(w.createdAt))}</div>
                     </div>
                     {isMe&&<button onClick={async()=>{if(!window.confirm("Remove this post?"))return;await fbSet("wallPosts",w.id,{active:false});sh("Removed");loadData()}} style={{marginLeft:"auto",background:"none",border:"none",color:T.mute,cursor:"pointer",fontSize:".8rem"}}>✕</button>}
                   </div>
@@ -8255,7 +8281,7 @@ ${forDownload
 
         {/* ─── WALL — institute marketing/celebration posts ─── */}
         {normalizeAccountType(prof?.accountType||"")==="institute"&&(()=>{
-          const myWall=wallPosts.filter(w=>w.vendorId===au?.uid&&w.active!==false).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+          const myWall=wallPosts.filter(w=>w.vendorId===au?.uid&&w.active!==false).sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt));
           return(<div id="vendor-section-wall" style={{...T.card,marginBottom:16}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
               <h3 style={{fontSize:"1rem",fontWeight:700,margin:0}}>📸 Wall</h3>
@@ -10038,7 +10064,7 @@ ${forDownload
           </div>
           {sponsorPlacements.length===0?<p style={{color:T.mute}}>No placement requests yet.</p>:
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {[...sponsorPlacements].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).map(sp=>(
+            {[...sponsorPlacements].sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt)).map(sp=>(
               <div key={sp.id} style={{...T.card,marginBottom:0,padding:16}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
                   <div>
@@ -10069,7 +10095,7 @@ ${forDownload
           </div>
           {adminMessages.length===0?<p style={{color:T.mute}}>No messages yet.</p>:
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {[...adminMessages].sort((a,b)=>(a.status==="replied"?1:0)-(b.status==="replied"?1:0)||(b.createdAt||0)-(a.createdAt||0)).map(m=>(
+            {[...adminMessages].sort((a,b)=>(a.status==="replied"?1:0)-(b.status==="replied"?1:0)||tsToMillis(b.createdAt)-tsToMillis(a.createdAt)).map(m=>(
               <div key={m.id} style={{...T.card,marginBottom:0,padding:16}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
                   <div>
@@ -11031,7 +11057,7 @@ ${forDownload
       {/* ═══ FOLLOWERS / FOLLOWING MODAL ═══ */}
       {/* ═══ CONTACT ADMIN MODAL ═══ */}
       {showContactAdmin&&(()=>{
-        const myMsgs=adminMessages.filter(m=>m.uid===au?.uid).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+        const myMsgs=adminMessages.filter(m=>m.uid===au?.uid).sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt));
         return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:1200,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setShowContactAdmin(false)}>
           <div style={{background:"#fff",borderRadius:14,maxWidth:520,width:"100%",maxHeight:"85vh",overflowY:"auto",padding:24}} onClick={e=>e.stopPropagation()}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
@@ -11257,7 +11283,7 @@ ${forDownload
 
               {/* Product/course-specific reviews */}
               {(()=>{
-                const pReviews=reviews.filter(r=>r.productId===p.id&&r.active!==false).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+                const pReviews=reviews.filter(r=>r.productId===p.id&&r.active!==false).sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt));
                 const myPReview=pReviews.find(r=>r.reviewerUid===au?.uid);
                 const isSelf=p.vendorId===au?.uid;
                 return(<div style={{marginTop:16,paddingTop:14,borderTop:"1px solid "+T.border}}>
