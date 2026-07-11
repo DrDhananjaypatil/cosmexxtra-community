@@ -2426,22 +2426,6 @@ export default function App(){
     }
   };
   useEffect(()=>{if(toast){const t=setTimeout(()=>setToast(null),3000);return()=>clearTimeout(t)}},[toast]);
-  // Test timer — decrements every second while user is taking a test
-  useEffect(()=>{
-    if(studyView!=="taking"||!activeTest)return;
-    const iv=setInterval(()=>{
-      setTestTimeLeft(prev=>{
-        if(prev<=1){
-          clearInterval(iv);
-          // Auto-submit when time hits zero. We compute the result here from the latest answers state.
-          setTimeout(()=>submitTest(true),50);
-          return 0;
-        }
-        return prev-1;
-      });
-    },1000);
-    return()=>clearInterval(iv);
-  },[studyView,activeTest]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const[ads,setAds]=useState([]);
   const[newsPosts,setNewsPosts]=useState([]); // admin-curated news
@@ -2493,6 +2477,24 @@ export default function App(){
   const[testCurrentQ,setTestCurrentQ]=useState(0);
   const[testResult,setTestResult]=useState(null);
   const[testGenerating,setTestGenerating]=useState(false);
+  // Test timer — decrements every second while user is taking a test.
+  // NOTE: Must live AFTER studyView/activeTest state declarations above,
+  // otherwise Vite's minifier triggers a TDZ crash on first render.
+  useEffect(()=>{
+    if(studyView!=="taking"||!activeTest)return;
+    const iv=setInterval(()=>{
+      setTestTimeLeft(prev=>{
+        if(prev<=1){
+          clearInterval(iv);
+          // Auto-submit when time hits zero
+          setTimeout(()=>submitTest(true),50);
+          return 0;
+        }
+        return prev-1;
+      });
+    },1000);
+    return()=>clearInterval(iv);
+  },[studyView,activeTest]); // eslint-disable-line react-hooks/exhaustive-deps
   const[profileWallImage,setProfileWallImage]=useState("");
   const[profileWallUploading,setProfileWallUploading]=useState(false);
   const[wallUploading,setWallUploading]=useState(false);
