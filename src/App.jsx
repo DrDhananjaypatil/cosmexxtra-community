@@ -5080,11 +5080,15 @@ ${forDownload
     {id:"cases",ic:"🔬",l:"Cases"},
     {id:"me",ic:"👤",l:"Me"},
   ];
+  // ── Beta access gates. Feature is visible in nav ONLY to admins and users
+  //    whose profile has the feature key in prof.betaFeatures. Admins can grant
+  //    access from the Users admin tab. ──────────────────────────────────
+  const hasBetaAccess=(feature)=>isAdm||(Array.isArray(prof?.betaFeatures)&&prof.betaFeatures.includes(feature));
   const overflowNavs=[
     {id:"library",ic:"📚",l:"Library"},
     {id:"videos",ic:"🎥",l:"Videos"},
     {id:"events",ic:"📅",l:"Events"},
-    {id:"study",ic:"🎯",l:"Study & Test"},
+    ...(hasBetaAccess("study")?[{id:"study",ic:"🎯",l:"Study & Test",beta:true}]:[]),
     {id:"vendors",ic:"🏭",l:"Vendors"},
     {id:"rank",ic:"🏆",l:"Rank"},
     {id:"consent",ic:"📋",l:"Consent"},
@@ -5150,6 +5154,7 @@ ${forDownload
                 {/* Overflow nav items */}
                 {overflowNavs.map(n=><button key={n.id} onClick={()=>{go(n.id);setMoreOpen(false)}} style={{width:"100%",background:pg===n.id?T.tealBg:"none",border:"none",borderLeft:pg===n.id?"3px solid "+T.teal:"3px solid transparent",color:pg===n.id?T.teal:T.txt,padding:"9px 16px",cursor:"pointer",fontSize:".84rem",fontFamily:"inherit",fontWeight:pg===n.id?600:400,display:"flex",alignItems:"center",gap:10,textAlign:"left"}}>
                   <span style={{fontSize:"1rem",width:20,textAlign:"center"}}>{n.ic}</span>{n.l}
+                  {n.beta&&<span style={{fontSize:".54rem",fontWeight:700,color:"#fff",background:T.goldD,padding:"1px 5px",borderRadius:4,letterSpacing:.5,marginLeft:"auto"}}>BETA</span>}
                 </button>)}
                 {/* Notification count in overflow */}
                 {(()=>{const unread=notifs.filter(n=>!n.read).length;return unread>0?<div onClick={()=>{setMoreOpen(false);setNotifsOpen(true)}} style={{padding:"9px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontSize:".84rem",color:T.err,fontWeight:600,borderTop:"1px solid "+T.border,marginTop:4}}>
@@ -7294,7 +7299,18 @@ ${forDownload
       </div>}
 
       {/* ═══ STUDY / TEST SERIES PAGE ═══ */}
-      {pg==="study"&&<div style={{maxWidth:900}}>
+      {pg==="study"&&!hasBetaAccess("study")&&<div style={{maxWidth:600,margin:"40px auto"}}>
+        <div style={{...T.card,padding:32,textAlign:"center"}}>
+          <div style={{fontSize:"3rem",marginBottom:10}}>🔒</div>
+          <h2 style={{fontSize:"1.3rem",fontWeight:700,margin:0,marginBottom:8}}>Study &amp; Test — Beta</h2>
+          <p style={{color:T.txt2,fontSize:".9rem",lineHeight:1.55,marginBottom:16}}>
+            This feature is currently in limited beta. We're rolling it out gradually to a small group of doctors while we polish the experience.
+          </p>
+          <p style={{color:T.mute,fontSize:".82rem",marginBottom:20}}>Want early access? Message the admin from your profile.</p>
+          <button onClick={()=>go("home")} style={T.btn}>← Back to home</button>
+        </div>
+      </div>}
+      {pg==="study"&&hasBetaAccess("study")&&<div style={{maxWidth:900}}>
         {(()=>{
           const monthKey=new Date().toISOString().slice(0,7);
           const monthLabel=new Date().toLocaleDateString("en-IN",{year:"numeric",month:"long"});
@@ -11391,7 +11407,7 @@ ${forDownload
         {aTab==="users"&&<div style={T.card}>
           {/* Header */}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
-            <p style={{color:T.mute,fontSize:".82rem",margin:0}}>{allUsers.length} total · 🚩 {allUsers.filter(u=>u.regFlagged).length} flagged · ✓ {allUsers.filter(u=>u.verified).length} verified</p>
+            <p style={{color:T.mute,fontSize:".82rem",margin:0}}>{allUsers.length} total · 🚩 {allUsers.filter(u=>u.regFlagged).length} flagged · ✓ {allUsers.filter(u=>u.verified).length} verified · 🎯 {allUsers.filter(u=>Array.isArray(u.betaFeatures)&&u.betaFeatures.includes("study")).length} in Study beta</p>
           </div>
 
           {/* Search + filter row */}
@@ -11412,6 +11428,7 @@ ${forDownload
               <option value="flagged">🚩 Flagged</option>
               <option value="premium">⭐ Premium</option>
               <option value="verified">✓ Verified</option>
+              <option value="beta-study">🎯 Study Beta users</option>
             </select>
             {(adminUserSearch||adminUserFilter!=="all")&&<button onClick={()=>{setAdminUserSearch("");setAdminUserFilter("all")}} style={{...T.btnO,...T.btnSm,whiteSpace:"nowrap"}}>✕ Clear</button>}
           </div>
@@ -11425,6 +11442,7 @@ ${forDownload
                 :adminUserFilter==="flagged"?u.regFlagged
                 :adminUserFilter==="premium"?u.paid
                 :adminUserFilter==="verified"?u.verified
+                :adminUserFilter==="beta-study"?(Array.isArray(u.betaFeatures)&&u.betaFeatures.includes("study"))
                 :(u.accountType||"")===(adminUserFilter);
               return matchSearch&&matchFilter;
             });
@@ -11434,22 +11452,39 @@ ${forDownload
               {filtered.map(u=>{
                 const a2=u.totalAnswered?Math.round(u.totalCorrect/u.totalAnswered*100):0;
                 const acc=ACCOUNT_TYPES.find(t=>t.id===u.accountType);
-                return<div key={u.id} onClick={()=>viewProfile(u.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 8px",borderBottom:"1px solid "+T.border,cursor:"pointer",borderRadius:6,...(u.regFlagged?{background:T.errBg+"55"}:{})}}>
-                  {u.photo?<img src={u.photo} style={{width:34,height:34,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(34,T.tealBg,T.teal)}>{u.initials||"?"}</div>}
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:".88rem",fontWeight:500,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                      {u.name||"Unnamed"}
-                      {u.verified&&<span title="Verified" style={{color:"#1d9bf0"}}>✓</span>}
-                      {ADMINS.includes(u.email)&&<span style={T.tag(T.tealBg,T.teal)}>Admin</span>}
-                      {u.regFlagged&&<span style={T.tag(T.errBg,T.err)}>🚩</span>}
-                      {acc&&<span style={T.tag(T.bg,T.mute)}>{acc.icon} {acc.label}</span>}
+                const inStudyBeta=Array.isArray(u.betaFeatures)&&u.betaFeatures.includes("study");
+                return<div key={u.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 8px",borderBottom:"1px solid "+T.border,borderRadius:6,...(u.regFlagged?{background:T.errBg+"55"}:{})}}>
+                  <div onClick={()=>viewProfile(u.id)} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",flex:1,minWidth:0}}>
+                    {u.photo?<img src={u.photo} style={{width:34,height:34,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(34,T.tealBg,T.teal)}>{u.initials||"?"}</div>}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:".88rem",fontWeight:500,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                        {u.name||"Unnamed"}
+                        {u.verified&&<span title="Verified" style={{color:"#1d9bf0"}}>✓</span>}
+                        {ADMINS.includes(u.email)&&<span style={T.tag(T.tealBg,T.teal)}>Admin</span>}
+                        {u.regFlagged&&<span style={T.tag(T.errBg,T.err)}>🚩</span>}
+                        {inStudyBeta&&<span style={T.tag(T.goldBg,T.goldD)}>🎯 Study Beta</span>}
+                        {acc&&<span style={T.tag(T.bg,T.mute)}>{acc.icon} {acc.label}</span>}
+                      </div>
+                      <div style={{fontSize:".7rem",color:T.mute}}>{u.email} · {u.clinic||u.companyName||u.instituteName||""}{(u.city||u.country)?` · ${u.city||u.country}`:""}  · joined {u.joined||""}</div>
                     </div>
-                    <div style={{fontSize:".7rem",color:T.mute}}>{u.email} · {u.clinic||u.companyName||u.instituteName||""}{(u.city||u.country)?` · ${u.city||u.country}`:""}  · joined {u.joined||""}</div>
+                    <div style={{textAlign:"right",fontSize:".72rem",flexShrink:0}}>
+                      {u.accountType==="doctor"&&<div style={{color:T.teal,fontWeight:600}}>{u.points||0} pts · {a2}%</div>}
+                      <div style={{color:T.mute}}>{u.paid?"⭐ Premium":"Free"}</div>
+                    </div>
                   </div>
-                  <div style={{textAlign:"right",fontSize:".72rem",flexShrink:0}}>
-                    {u.accountType==="doctor"&&<div style={{color:T.teal,fontWeight:600}}>{u.points||0} pts · {a2}%</div>}
-                    <div style={{color:T.mute}}>{u.paid?"⭐ Premium":"Free"}</div>
-                  </div>
+                  {/* Beta toggle — sits outside the viewProfile click zone */}
+                  <button onClick={async(e)=>{
+                    e.stopPropagation();
+                    const current=Array.isArray(u.betaFeatures)?u.betaFeatures:[];
+                    const next=inStudyBeta?current.filter(f=>f!=="study"):[...current,"study"];
+                    try{
+                      await fbSet("users",u.id,{betaFeatures:next});
+                      sh(inStudyBeta?`Revoked Study beta for ${u.name?.split(" ")[0]||"user"}`:`Granted Study beta to ${u.name?.split(" ")[0]||"user"}`);
+                      loadData();
+                    }catch(err){sh("Failed to update beta access")}
+                  }} title={inStudyBeta?"Revoke Study beta access":"Grant Study beta access"} style={{...(inStudyBeta?T.btnDanger:T.btnO),...T.btnSm,fontSize:".68rem",flexShrink:0,whiteSpace:"nowrap"}}>
+                    {inStudyBeta?"✕ Revoke Study":"🎯 Grant Study"}
+                  </button>
                 </div>;
               })}
             </>);
