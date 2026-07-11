@@ -2323,7 +2323,7 @@ export default function App(){
   const[adminUserFilter,setAdminUserFilter]=useState("all"); // all/doctor/brand/vendor/institute/flagged/premium
   const[profileReturnPg,setProfileReturnPg]=useState("home"); // where to go when "Back" clicked on profile page
   const[authMode,setAuthMode]=useState("signin");const[authEmail,setAuthEmail]=useState("");const[authPass,setAuthPass]=useState("");const[authName,setAuthName]=useState("");const[authBusy,setAuthBusy]=useState(false);const[authErr,setAuthErr]=useState("");
-  const[pf,setPf]=useState({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",vendorCategory:"",gstNumber:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});const[edForm,setEdForm]=useState(null);const[setupStep,setSetupStep]=useState(0);const[setupErr,setSetupErr]=useState("");
+  const[pf,setPf]=useState({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",brandCategories:[],vendorCategory:"",vendorCategories:[],gstNumber:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});const[edForm,setEdForm]=useState(null);const[setupStep,setSetupStep]=useState(0);const[setupErr,setSetupErr]=useState("");
   // Forum/Cases new post state
   const[newForum,setNewForum]=useState(false);const[fpT,setFpT]=useState("");const[fpC,setFpC]=useState(TOPICS[0]);
   const[fpBlocks,setFpBlocks]=useState([]); // block editor for forum post body (replaces fpB + fpImgs)
@@ -2733,7 +2733,7 @@ export default function App(){
       try{await fbSet("users",u.uid,{referralCode:code});p={...p,referralCode:code}}catch(e){console.warn("referral code backfill failed:",e)}
     }
     setProf(p);setScr("main");loadData()
-  }else{setPf({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:au?.displayName||"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});setSetupStep(0);setSetupErr("");setScr("setup")}}else{setAu(null);setProf(null);setScr("landing")}});return()=>unsub()},[loadData]);
+  }else{setPf({accountType:"",country:"India",internationalCouncil:"",city:"",region:"",name:au?.displayName||"",mobile:"",degree:"",council:"",regNumber:"",clinic:"",address:"",visibility:"public",companyName:"",brandCategory:"",brandCategories:[],vendorCategory:"",vendorCategories:[],contactPerson:"",website:"",instituteName:"",instituteType:"",directorName:""});setSetupStep(0);setSetupErr("");setScr("setup")}}else{setAu(null);setProf(null);setScr("landing")}});return()=>unsub()},[loadData]);
 
   // Load the current user's points ledger once authenticated
   useEffect(()=>{if(au?.uid)loadMyLedger()},[au,loadMyLedger]);
@@ -2958,12 +2958,12 @@ export default function App(){
     }
     if(pf.accountType==="pharma"||pf.accountType==="brand"){
       if(!pf.companyName?.trim()){setSetupErr("Company name is required");return}
-      if(!pf.brandCategory){setSetupErr("Pick a brand category");return}
+      if(!pf.brandCategories?.length){setSetupErr("Pick at least one brand category");return}
       if(!pf.contactPerson?.trim()){setSetupErr("Contact person is required");return}
     }
     if(pf.accountType==="vendor"){
       if(!pf.companyName?.trim()){setSetupErr("Company name is required");return}
-      if(!pf.vendorCategory){setSetupErr("Pick a vendor category");return}
+      if(!pf.vendorCategories?.length){setSetupErr("Pick at least one vendor category");return}
       if(!pf.contactPerson?.trim()){setSetupErr("Contact person is required");return}
     }
     if(pf.accountType==="institute"){
@@ -3019,8 +3019,8 @@ export default function App(){
         // India-specific OR international-specific council
         ...(pf.country==="India"?{council:pf.council}:{internationalCouncil:pf.internationalCouncil.trim(),city:pf.city.trim(),region:pf.region?.trim()||""})
       }:{}),
-      ...(pf.accountType==="pharma"||pf.accountType==="brand"?{companyName:pf.companyName.trim(),brandCategory:pf.brandCategory,contactPerson:pf.contactPerson.trim(),website:pf.website?.trim()||"",address:pf.address?.trim()||""}:{}),
-      ...(pf.accountType==="vendor"?{companyName:pf.companyName.trim(),vendorCategory:pf.vendorCategory,contactPerson:pf.contactPerson.trim(),gstNumber:pf.gstNumber?.trim()||"",website:pf.website?.trim()||"",address:pf.address?.trim()||""}:{}),
+      ...(pf.accountType==="pharma"||pf.accountType==="brand"?{companyName:pf.companyName.trim(),brandCategories:pf.brandCategories,brandCategory:pf.brandCategories.join(", "),contactPerson:pf.contactPerson.trim(),website:pf.website?.trim()||"",address:pf.address?.trim()||""}:{}),
+      ...(pf.accountType==="vendor"?{companyName:pf.companyName.trim(),vendorCategories:pf.vendorCategories,vendorCategory:pf.vendorCategories.join(", "),contactPerson:pf.contactPerson.trim(),gstNumber:pf.gstNumber?.trim()||"",website:pf.website?.trim()||"",address:pf.address?.trim()||""}:{}),
       ...(pf.accountType==="institute"?{instituteName:pf.instituteName.trim(),instituteType:pf.instituteType,directorName:pf.directorName.trim(),address:pf.address?.trim()||"",website:pf.website?.trim()||""}:{})
     };
     await fbSet("users",au.uid,p);
@@ -4976,10 +4976,14 @@ ${forDownload
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Company / Brand Name <span style={{color:T.err}}>*</span></label>
             <input value={pf.companyName} onChange={e=>setPf(p=>({...p,companyName:e.target.value}))} placeholder="e.g. Sun Pharma Aesthetics, Galderma India" style={{...T.inp,marginBottom:12}}/>
 
-            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Brand Category <span style={{color:T.err}}>*</span></label>
-            <select value={pf.brandCategory} onChange={e=>setPf(p=>({...p,brandCategory:e.target.value}))} style={{...T.inp,marginBottom:12}}>
-              <option value="">— Select —</option>{BRAND_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
-            </select>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Sectors you work in <span style={{color:T.err}}>*</span></label>
+            <div style={{fontSize:".72rem",color:T.mute,marginBottom:8,lineHeight:1.5}}>Select every category your company operates in — you can be in multiple.</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+              {BRAND_CATEGORIES.map(c=>{
+                const on=pf.brandCategories?.includes(c);
+                return<button type="button" key={c} onClick={()=>setPf(p=>({...p,brandCategories:on?(p.brandCategories||[]).filter(x=>x!==c):[...(p.brandCategories||[]),c]}))} style={{padding:"6px 12px",borderRadius:16,border:"1.5px solid "+(on?T.teal:T.border),background:on?T.tealBg:"#fff",color:on?T.teal:T.txt2,cursor:"pointer",fontSize:".78rem",fontWeight:on?600:400,fontFamily:"inherit"}}>{on?"✓ ":""}{c}</button>;
+              })}
+            </div>
 
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Contact Person Name <span style={{color:T.err}}>*</span></label>
             <input value={pf.contactPerson} onChange={e=>setPf(p=>({...p,contactPerson:e.target.value}))} placeholder="Person handling SKINARIO partnerships" style={{...T.inp,marginBottom:12}}/>
@@ -5001,10 +5005,14 @@ ${forDownload
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Company Name <span style={{color:T.err}}>*</span></label>
             <input value={pf.companyName} onChange={e=>setPf(p=>({...p,companyName:e.target.value}))} placeholder="e.g. Cynosure India, MedTech Distributors" style={{...T.inp,marginBottom:12}}/>
 
-            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Vendor Category <span style={{color:T.err}}>*</span></label>
-            <select value={pf.vendorCategory} onChange={e=>setPf(p=>({...p,vendorCategory:e.target.value}))} style={{...T.inp,marginBottom:12}}>
-              <option value="">— Select —</option>{VENDOR_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
-            </select>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Sectors you deal in <span style={{color:T.err}}>*</span></label>
+            <div style={{fontSize:".72rem",color:T.mute,marginBottom:8,lineHeight:1.5}}>Select every category your company supplies or distributes — you can be in multiple (e.g. fillers + threads + lasers).</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+              {VENDOR_CATEGORIES.map(c=>{
+                const on=pf.vendorCategories?.includes(c);
+                return<button type="button" key={c} onClick={()=>setPf(p=>({...p,vendorCategories:on?(p.vendorCategories||[]).filter(x=>x!==c):[...(p.vendorCategories||[]),c]}))} style={{padding:"6px 12px",borderRadius:16,border:"1.5px solid "+(on?T.teal:T.border),background:on?T.tealBg:"#fff",color:on?T.teal:T.txt2,cursor:"pointer",fontSize:".78rem",fontWeight:on?600:400,fontFamily:"inherit"}}>{on?"✓ ":""}{c}</button>;
+              })}
+            </div>
 
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Contact Person Name <span style={{color:T.err}}>*</span></label>
             <input value={pf.contactPerson} onChange={e=>setPf(p=>({...p,contactPerson:e.target.value}))} placeholder="Your name / partnership contact" style={{...T.inp,marginBottom:12}}/>
@@ -6448,11 +6456,24 @@ ${forDownload
           return dirTab==="institutes"?aType==="institute":(aType==="vendor"||aType==="brand"||aType==="pharma");
         });
 
-        const categories=["all",...new Set(vendorUsers.map(u=>u.vendorCategory||u.brandCategory||"Other").filter(Boolean))];
+        // Helper: return the full list of categories a business account is in.
+        // Falls back to the legacy single-string field for accounts created before multi-select.
+        const getCats=(u)=>{
+          const arr=Array.isArray(u.vendorCategories)&&u.vendorCategories.length?u.vendorCategories
+                   :Array.isArray(u.brandCategories)&&u.brandCategories.length?u.brandCategories
+                   :[];
+          if(arr.length)return arr;
+          const legacy=u.vendorCategory||u.brandCategory||"";
+          return legacy?legacy.split(", ").map(s=>s.trim()).filter(Boolean):[];
+        };
+
+        const allCats=new Set();
+        vendorUsers.forEach(u=>getCats(u).forEach(c=>allCats.add(c)));
+        const categories=["all",...allCats];
 
         const filtered=vendorUsers.filter(u=>{
-          const cat=u.vendorCategory||u.brandCategory||"";
-          const matchCat=vendorFilter==="all"||cat===vendorFilter;
+          const cats=getCats(u);
+          const matchCat=vendorFilter==="all"||cats.includes(vendorFilter);
           const matchSearch=!vendorSearch||(u.companyName||u.name||"").toLowerCase().includes(vendorSearch.toLowerCase());
           return matchCat&&matchSearch;
         });
@@ -6478,7 +6499,10 @@ ${forDownload
                   <span style={{fontSize:".72rem",padding:"2px 10px",borderRadius:10,background:T.tealBg,color:T.teal,fontWeight:600}}>
                     {selVendor.accountType==="vendor"?"🏭 Vendor":normalizeAccountType(selVendor.accountType)==="institute"?"🎓 Institute":"💊 Brand / Pharma"}
                   </span>
-                  {(selVendor.vendorCategory||selVendor.brandCategory)&&<span style={{fontSize:".72rem",padding:"2px 10px",borderRadius:10,background:T.bg,color:T.txt2}}>{selVendor.vendorCategory||selVendor.brandCategory}</span>}
+                  {(()=>{
+                    const cats=getCats(selVendor);
+                    return cats.map(c=><span key={c} style={{fontSize:".72rem",padding:"2px 10px",borderRadius:10,background:T.bg,color:T.txt2}}>{c}</span>);
+                  })()}
                   {selVendor.country&&<span style={{fontSize:".72rem",padding:"2px 10px",borderRadius:10,background:T.bg,color:T.txt2}}>📍 {selVendor.country}</span>}
                 </div>
                 {selVendor.address&&<div style={{fontSize:".82rem",color:T.txt2,marginBottom:4}}>📍 {selVendor.address}</div>}
@@ -9128,16 +9152,26 @@ ${forDownload
           <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Company name *</label>
           <input value={editPf.companyName||""} onChange={e=>setEditPf(p=>({...p,companyName:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
           {(editPf.accountType==="vendor")&&<>
-            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Vendor category *</label>
-            <select value={editPf.vendorCategory||""} onChange={e=>setEditPf(p=>({...p,vendorCategory:e.target.value}))} style={{...T.inp,marginBottom:12}}>
-              <option value="">— Select —</option>{VENDOR_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
-            </select>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Sectors you deal in *</label>
+            <div style={{fontSize:".7rem",color:T.mute,marginBottom:8}}>Toggle every category your company supplies or distributes.</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+              {VENDOR_CATEGORIES.map(c=>{
+                const cur=Array.isArray(editPf.vendorCategories)&&editPf.vendorCategories.length?editPf.vendorCategories:(editPf.vendorCategory?editPf.vendorCategory.split(", ").map(s=>s.trim()).filter(Boolean):[]);
+                const on=cur.includes(c);
+                return<button type="button" key={c} onClick={()=>{const next=on?cur.filter(x=>x!==c):[...cur,c];setEditPf(p=>({...p,vendorCategories:next,vendorCategory:next.join(", ")}));}} style={{padding:"5px 10px",borderRadius:14,border:"1.5px solid "+(on?T.teal:T.border),background:on?T.tealBg:"#fff",color:on?T.teal:T.txt2,cursor:"pointer",fontSize:".74rem",fontWeight:on?600:400,fontFamily:"inherit"}}>{on?"✓ ":""}{c}</button>;
+              })}
+            </div>
           </>}
           {(editPf.accountType==="brand"||editPf.accountType==="pharma")&&<>
-            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Brand category *</label>
-            <select value={editPf.brandCategory||""} onChange={e=>setEditPf(p=>({...p,brandCategory:e.target.value}))} style={{...T.inp,marginBottom:12}}>
-              <option value="">— Select —</option>{BRAND_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
-            </select>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Sectors you work in *</label>
+            <div style={{fontSize:".7rem",color:T.mute,marginBottom:8}}>Toggle every category your company operates in.</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+              {BRAND_CATEGORIES.map(c=>{
+                const cur=Array.isArray(editPf.brandCategories)&&editPf.brandCategories.length?editPf.brandCategories:(editPf.brandCategory?editPf.brandCategory.split(", ").map(s=>s.trim()).filter(Boolean):[]);
+                const on=cur.includes(c);
+                return<button type="button" key={c} onClick={()=>{const next=on?cur.filter(x=>x!==c):[...cur,c];setEditPf(p=>({...p,brandCategories:next,brandCategory:next.join(", ")}));}} style={{padding:"5px 10px",borderRadius:14,border:"1.5px solid "+(on?T.teal:T.border),background:on?T.tealBg:"#fff",color:on?T.teal:T.txt2,cursor:"pointer",fontSize:".74rem",fontWeight:on?600:400,fontFamily:"inherit"}}>{on?"✓ ":""}{c}</button>;
+              })}
+            </div>
           </>}
           <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Contact person *</label>
           <input value={editPf.contactPerson||""} onChange={e=>setEditPf(p=>({...p,contactPerson:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
@@ -9172,8 +9206,8 @@ ${forDownload
                 logo:editPf.logo||"",coverPhoto:editPf.coverPhoto||"",
                 instagram:editPf.instagram?.trim()||"",facebook:editPf.facebook?.trim()||"",
                 linkedin:editPf.linkedin?.trim()||"",youtube:editPf.youtube?.trim()||"",
-                ...(editPf.accountType==="vendor"?{vendorCategory:editPf.vendorCategory,gstNumber:editPf.gstNumber?.trim()||""}:{}),
-                ...(editPf.accountType==="brand"||editPf.accountType==="pharma"?{brandCategory:editPf.brandCategory}:{}),
+                ...(editPf.accountType==="vendor"?{vendorCategory:editPf.vendorCategory,vendorCategories:Array.isArray(editPf.vendorCategories)?editPf.vendorCategories:(editPf.vendorCategory?editPf.vendorCategory.split(", ").map(s=>s.trim()).filter(Boolean):[]),gstNumber:editPf.gstNumber?.trim()||""}:{}),
+                ...(editPf.accountType==="brand"||editPf.accountType==="pharma"?{brandCategory:editPf.brandCategory,brandCategories:Array.isArray(editPf.brandCategories)?editPf.brandCategories:(editPf.brandCategory?editPf.brandCategory.split(", ").map(s=>s.trim()).filter(Boolean):[])}:{}),
               };
               try{await fbSet("users",au.uid,updated);setProf(p=>({...p,...updated}));setEditingProfile(false);sh("✓ Profile updated!");}
               catch(e){setEditErr("Save failed — please try again")}
@@ -9355,10 +9389,15 @@ ${forDownload
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Company / brand name <span style={{color:T.err}}>*</span></label>
             <input value={editPf.companyName} onChange={e=>setEditPf(p=>({...p,companyName:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
 
-            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Brand category <span style={{color:T.err}}>*</span></label>
-            <select value={editPf.brandCategory} onChange={e=>setEditPf(p=>({...p,brandCategory:e.target.value}))} style={{...T.inp,marginBottom:12}}>
-              <option value="">— Select —</option>{BRAND_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
-            </select>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Sectors you work in <span style={{color:T.err}}>*</span></label>
+            <div style={{fontSize:".7rem",color:T.mute,marginBottom:8}}>Toggle every category your company operates in.</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+              {BRAND_CATEGORIES.map(c=>{
+                const cur=Array.isArray(editPf.brandCategories)&&editPf.brandCategories.length?editPf.brandCategories:(editPf.brandCategory?editPf.brandCategory.split(", ").map(s=>s.trim()).filter(Boolean):[]);
+                const on=cur.includes(c);
+                return<button type="button" key={c} onClick={()=>{const next=on?cur.filter(x=>x!==c):[...cur,c];setEditPf(p=>({...p,brandCategories:next,brandCategory:next.join(", ")}));}} style={{padding:"5px 10px",borderRadius:14,border:"1.5px solid "+(on?T.teal:T.border),background:on?T.tealBg:"#fff",color:on?T.teal:T.txt2,cursor:"pointer",fontSize:".74rem",fontWeight:on?600:400,fontFamily:"inherit"}}>{on?"✓ ":""}{c}</button>;
+              })}
+            </div>
 
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Contact person <span style={{color:T.err}}>*</span></label>
             <input value={editPf.contactPerson} onChange={e=>setEditPf(p=>({...p,contactPerson:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
@@ -9380,10 +9419,15 @@ ${forDownload
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Company name <span style={{color:T.err}}>*</span></label>
             <input value={editPf.companyName||""} onChange={e=>setEditPf(p=>({...p,companyName:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
 
-            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Vendor category <span style={{color:T.err}}>*</span></label>
-            <select value={editPf.vendorCategory||""} onChange={e=>setEditPf(p=>({...p,vendorCategory:e.target.value}))} style={{...T.inp,marginBottom:12}}>
-              <option value="">— Select —</option>{VENDOR_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
-            </select>
+            <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Sectors you deal in <span style={{color:T.err}}>*</span></label>
+            <div style={{fontSize:".7rem",color:T.mute,marginBottom:8}}>Toggle every category your company supplies or distributes.</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+              {VENDOR_CATEGORIES.map(c=>{
+                const cur=Array.isArray(editPf.vendorCategories)&&editPf.vendorCategories.length?editPf.vendorCategories:(editPf.vendorCategory?editPf.vendorCategory.split(", ").map(s=>s.trim()).filter(Boolean):[]);
+                const on=cur.includes(c);
+                return<button type="button" key={c} onClick={()=>{const next=on?cur.filter(x=>x!==c):[...cur,c];setEditPf(p=>({...p,vendorCategories:next,vendorCategory:next.join(", ")}));}} style={{padding:"5px 10px",borderRadius:14,border:"1.5px solid "+(on?T.teal:T.border),background:on?T.tealBg:"#fff",color:on?T.teal:T.txt2,cursor:"pointer",fontSize:".74rem",fontWeight:on?600:400,fontFamily:"inherit"}}>{on?"✓ ":""}{c}</button>;
+              })}
+            </div>
 
             <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Contact person <span style={{color:T.err}}>*</span></label>
             <input value={editPf.contactPerson||""} onChange={e=>setEditPf(p=>({...p,contactPerson:e.target.value}))} style={{...T.inp,marginBottom:12}}/>
