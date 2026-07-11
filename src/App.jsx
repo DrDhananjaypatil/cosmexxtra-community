@@ -4932,7 +4932,28 @@ ${forDownload
 
   return(
     <div style={{minHeight:"100vh",background:T.bg,fontFamily:"system-ui",color:T.txt}}>
-      <style>{`.nav-more-row:hover{background:#f5fafa}.nav-more-row:hover *{color:#0d6b6e}`}</style>
+      <style>{`
+        .nav-more-row:hover{background:#f5fafa}
+        .nav-more-row:hover *{color:#0d6b6e}
+
+        /* Responsive layout — must be global so it applies on Me, vendor profiles, etc, not just Home */
+        @media (max-width: 900px) {
+          .home-grid { grid-template-columns: 1fr !important; }
+          .home-sidebar { order: 2; }
+          .me-grid { grid-template-columns: 1fr !important; }
+          .me-grid > div:nth-child(2) { order: 2; }
+          .leaderboard-grid { grid-template-columns: 1fr !important; }
+          .article-grid { grid-template-columns: 1fr !important; }
+          .article-sidebar { position: static !important; }
+        }
+        @media (max-width: 700px) {
+          .me-info-grid { grid-template-columns: 1fr !important; gap: 16px !important; }
+        }
+        @media (max-width: 600px) {
+          .me-grid img, .home-grid img { max-width: 100%; height: auto; }
+          .me-grid, .home-grid { word-wrap: break-word; overflow-wrap: anywhere; }
+        }
+      `}</style>
       <div style={{position:"sticky",top:0,zIndex:100,background:"#ffffffee",backdropFilter:"blur(16px)",borderBottom:"1px solid "+T.border,padding:"6px 24px"}}>
         <div style={{maxWidth:W,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           {/* Logo + wordmark */}
@@ -5481,17 +5502,21 @@ ${forDownload
                     </div>}
                     <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
                       {(prof?.logo||uPhoto)?<img src={prof?.logo||uPhoto} style={{width:28,height:28,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(28,T.tealBg,T.teal),fontSize:".7rem",flexShrink:0}}>{uIni}</div>}
-                      <input value={commentDraft[w.id]||""} onChange={e=>setCommentDraft(p=>({...p,[w.id]:e.target.value}))} onKeyDown={async e=>{
-                        if(e.key==="Enter"&&!e.shiftKey){
-                          e.preventDefault();
+                      {(()=>{
+                        const submitComment=async()=>{
                           const txt=(commentDraft[w.id]||"").trim();
                           if(!txt)return;
                           const nextComments=[...(w.comments||[]),{uid:au.uid,name:prof?.companyName||uName,photo:prof?.logo||uPhoto||"",text:txt,at:Date.now()}];
                           await fbSet("wallPosts",w.id,{comments:nextComments});
                           setCommentDraft(p=>({...p,[w.id]:""}));
                           loadData();
-                        }
-                      }} placeholder="Write a comment…" style={{...T.inp,flex:1,fontSize:".82rem"}}/>
+                        };
+                        const draft=(commentDraft[w.id]||"").trim();
+                        return<>
+                          <input value={commentDraft[w.id]||""} onChange={e=>setCommentDraft(p=>({...p,[w.id]:e.target.value}))} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();submitComment();}}} placeholder="Write a comment…" style={{...T.inp,flex:1,fontSize:".82rem"}}/>
+                          <button onClick={submitComment} disabled={!draft} style={{...T.btn,padding:"7px 14px",fontSize:".78rem",opacity:draft?1:0.5,cursor:draft?"pointer":"default",flexShrink:0}}>Send</button>
+                        </>;
+                      })()}
                     </div>
                   </div>}
                 </div>);
@@ -5981,23 +6006,6 @@ ${forDownload
         </aside>
         {/* ═══ END RIGHT SIDEBAR ═══ */}
 
-        <style>{`
-          @media (max-width: 900px) {
-            .home-grid { grid-template-columns: 1fr !important; }
-            .home-sidebar { order: 2; }
-            .me-grid { grid-template-columns: 1fr !important; }
-            .me-grid > div:nth-child(2) { order: 2; }
-            .leaderboard-grid { grid-template-columns: 1fr !important; }
-          }
-          @media (max-width: 700px) {
-            .me-info-grid { grid-template-columns: 1fr !important; gap: 16px !important; }
-          }
-          /* Prevent images and long words from pushing their containers wider than the viewport on mobile */
-          @media (max-width: 600px) {
-            .me-grid img, .home-grid img { max-width: 100%; height: auto; }
-            .me-grid, .home-grid { word-wrap: break-word; overflow-wrap: anywhere; }
-          }
-        `}</style>
       </div>}
       {pg==="home"&&selA&&<div>
         <button onClick={()=>setSelA(null)} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back</button>
