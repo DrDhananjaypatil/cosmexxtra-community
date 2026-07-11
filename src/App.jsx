@@ -234,6 +234,10 @@ function genReferralCode(name,uid){
   return `${namePart}-${hashPart}`;
 }
 const TOPICS=["Botox & Neurotoxins","Dermal Fillers","Threads","PDRN & Polynucleotides","Peptides & Skin Boosters","Chemical Peels","Laser & Energy Devices","Hair Restoration","Body Contouring","Anti-Aging & Regenerative","Skincare Science","Pigmentation & Melasma","Acne & Scars","Practice Management"];
+// Presets for the new Case Blog builder. Each section has one of these labels + free-text content
+// (or a before/after image pair). Users can also enter a Custom label.
+const CASE_BLOCK_TEXT_PRESETS=["Patient Profile","Case History","Chief Complaint","Examination Findings","Previous Rx / Prior Treatments","Diagnosis","Treatment Given","Products Used","Outcome / Follow-up","Discussion Question for Community","Learning Point","Additional Notes","Custom…"];
+const CASE_BLOCK_IMAGE_PRESETS=["Before & After","Baseline vs Result","Session 1 vs Final","Custom…"];
 
 // ═══ CONSENT TEMPLATE CATALOG ═══
 // Two-level structure: category → sub-procedures. Each sub-procedure carries
@@ -2308,6 +2312,10 @@ export default function App(){
   const[newForum,setNewForum]=useState(false);const[fpT,setFpT]=useState("");const[fpC,setFpC]=useState(TOPICS[0]);
   const[fpBlocks,setFpBlocks]=useState([]); // block editor for forum post body (replaces fpB + fpImgs)
   const[newCase,setNewCase]=useState(false);const[ccT,setCcT]=useState("");const[ccB,setCcB]=useState("");const[ccC,setCcC]=useState(TOPICS[0]);const[ccImgs,setCcImgs]=useState([]);const[ccUp,setCcUp]=useState(false);const[ccDiag,setCcDiag]=useState("");const[ccHistory,setCcHistory]=useState("");const[ccTreatment,setCcTreatment]=useState("");const[ccOutcome,setCcOutcome]=useState("");
+  // ── New "Case Blog" block builder — an ordered list of sections, each with a preset label + text or before/after images ─────
+  const[caseBlocks,setCaseBlocks]=useState([]); // {id, type: "text"|"beforeAfter", label, value?, beforeUrl?, afterUrl?}
+  const[caseBlockUploading,setCaseBlockUploading]=useState({}); // per-block-id upload state
+  const[showAddBlockPicker,setShowAddBlockPicker]=useState(false);
 
   // KNOWN_PAGES must match every page condition the app actually renders.
   // If you add a new page (`pg==="xyz"&&...` block), add "xyz" here too.
@@ -4207,7 +4215,21 @@ ${forDownload
   };
 
   // ═══ CLINICAL CASE POST ═══
-  const postCase=async()=>{if(!ccT.trim()){sh("Title required");return}if(!ccImgs.length){sh("Add at least 1 image");return}await fbAdd("cases",{author:uName,ini:uIni,uid:au.uid,photo:uPhoto||"",title:ccT,cat:ccC,body:ccB,history:ccHistory,treatment:ccTreatment,outcome:ccOutcome,diagnosis:ccDiag,images:ccImgs,likedBy:[],likes:0,comments:[],date:ds(getIST())});setCcT("");setCcB("");setCcImgs([]);setCcDiag("");setCcHistory("");setCcTreatment("");setCcOutcome("");setNewCase(false);sh("Case posted!");loadData();await awardPoints("case_post")};
+  const postCase=async()=>{
+    if(!ccT.trim()){sh("Title required");return}
+    if(caseBlocks.length===0){sh("Add at least one section (History, Before/After, etc.)");return}
+    // Validate each block has some content
+    for(const b of caseBlocks){
+      if(b.type==="text"&&!b.value?.trim()){sh(`"${b.label}" section is empty`);return}
+      if(b.type==="beforeAfter"&&(!b.beforeUrl||!b.afterUrl)){sh(`"${b.label}" section needs both a Before and After image`);return}
+    }
+    // Populate legacy top-level image field from the first beforeAfter block so existing feed thumbnails still work
+    const firstImgBlock=caseBlocks.find(b=>b.type==="beforeAfter");
+    const legacyImages=firstImgBlock?[firstImgBlock.beforeUrl,firstImgBlock.afterUrl]:[];
+    await fbAdd("cases",{author:uName,ini:uIni,uid:au.uid,photo:uPhoto||"",title:ccT,cat:ccC,blocks:caseBlocks,images:legacyImages,likedBy:[],likes:0,comments:[],date:ds(getIST())});
+    setCcT("");setCcC(TOPICS[0]);setCaseBlocks([]);setShowAddBlockPicker(false);
+    setNewCase(false);sh("Case posted!");loadData();await awardPoints("case_post");
+  };
 
   // ═══ CASE COMMENT ═══
   const addCaseComment=async(caseId,caseObj,txt)=>{
@@ -6924,25 +6946,76 @@ ${forDownload
               <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Category</label>
               <select value={ccC} onChange={e=>setCcC(e.target.value)} style={{...T.inp,marginBottom:14}}>{TOPICS.map(t=><option key={t} value={t}>{t}</option>)}</select>
 
-              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Clinical images <span style={{color:T.err}}>*</span></label>
-              <div style={{marginBottom:16,padding:12,background:T.bg,borderRadius:10}}><ImgUpload images={ccImgs} setImages={setCcImgs} uploading={ccUp} setUploading={setCcUp}/></div>
+              <div style={{padding:"12px 14px",background:T.bg,borderRadius:8,marginBottom:14,fontSize:".75rem",color:T.txt2,lineHeight:1.5}}>💡 Build your case as a blog. Add sections in any order — Case History, Before &amp; After photos, Discussion Question, and more. You can add as many as you need.</div>
 
-              <div style={{padding:"12px 14px",background:T.bg,borderRadius:8,marginBottom:14,fontSize:".75rem",color:T.txt2,lineHeight:1.5}}>💡 The fields below are optional — fill in what's relevant for your case. You can always edit later.</div>
+              {/* Ordered list of blocks */}
+              {caseBlocks.map((b,idx)=>(
+                <div key={b.id} style={{marginBottom:14,padding:14,background:T.bg,borderRadius:10,border:"1px solid "+T.border}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+                    <div style={{display:"flex",flexDirection:"column",gap:1}}>
+                      <button onClick={()=>{if(idx===0)return;const next=[...caseBlocks];[next[idx-1],next[idx]]=[next[idx],next[idx-1]];setCaseBlocks(next);}} disabled={idx===0} title="Move up" style={{background:"none",border:"none",cursor:idx===0?"default":"pointer",color:idx===0?T.border:T.mute,fontSize:".7rem",padding:0,lineHeight:1}}>▲</button>
+                      <button onClick={()=>{if(idx===caseBlocks.length-1)return;const next=[...caseBlocks];[next[idx],next[idx+1]]=[next[idx+1],next[idx]];setCaseBlocks(next);}} disabled={idx===caseBlocks.length-1} title="Move down" style={{background:"none",border:"none",cursor:idx===caseBlocks.length-1?"default":"pointer",color:idx===caseBlocks.length-1?T.border:T.mute,fontSize:".7rem",padding:0,lineHeight:1}}>▼</button>
+                    </div>
+                    <input value={b.label} onChange={e=>{const next=[...caseBlocks];next[idx]={...b,label:e.target.value};setCaseBlocks(next);}} style={{...T.inp,fontWeight:600,fontSize:".88rem",flex:1,padding:"6px 10px"}}/>
+                    <button onClick={()=>{if(!window.confirm(`Delete "${b.label}" section?`))return;setCaseBlocks(caseBlocks.filter(x=>x.id!==b.id));}} title="Delete section" style={{background:"none",border:"none",cursor:"pointer",color:T.err,fontSize:".9rem",padding:4}}>🗑️</button>
+                  </div>
+                  {b.type==="text"?
+                    <MarkdownEditor value={b.value||""} onChange={v=>{const next=[...caseBlocks];next[idx]={...b,value:v};setCaseBlocks(next);}} placeholder={`Write ${b.label.toLowerCase()}...`} rows={3}/>
+                    :
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                      {["beforeUrl","afterUrl"].map((key,ki)=>{
+                        const label=ki===0?"Before":"After";
+                        const url=b[key];
+                        const upKey=`${b.id}_${key}`;
+                        const isUp=caseBlockUploading[upKey];
+                        return(<div key={key}>
+                          <div style={{fontSize:".68rem",color:T.mute,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>{label}</div>
+                          {url?<div style={{position:"relative"}}>
+                            <img src={url} alt="" style={{width:"100%",height:140,objectFit:"cover",borderRadius:8,border:"1px solid "+T.border}}/>
+                            <button onClick={()=>{const next=[...caseBlocks];next[idx]={...b,[key]:""};setCaseBlocks(next);}} style={{position:"absolute",top:4,right:4,width:22,height:22,borderRadius:"50%",border:"none",background:"rgba(0,0,0,0.6)",color:"#fff",cursor:"pointer",fontSize:".7rem"}}>✕</button>
+                          </div>:<label style={{display:"flex",alignItems:"center",justifyContent:"center",height:140,border:"2px dashed "+T.border,borderRadius:8,cursor:isUp?"default":"pointer",fontSize:".78rem",color:T.mute,background:"#fff"}}>
+                            {isUp?"⏳ Uploading...":`+ Add ${label}`}
+                            <input type="file" accept="image/*" disabled={isUp} onChange={async e=>{
+                              const f=e.target.files?.[0];if(!f)return;
+                              if(f.size>5*1024*1024){sh("Image must be under 5MB");return;}
+                              setCaseBlockUploading(p=>({...p,[upKey]:true}));
+                              try{const path=`images/cases_${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;const sRef=ref(storage,path);await uploadBytes(sRef,f);const dlUrl=await getDownloadURL(sRef);const next=[...caseBlocks];next[idx]={...b,[key]:dlUrl};setCaseBlocks(next);}
+                              catch(e){sh("Upload failed");}
+                              setCaseBlockUploading(p=>({...p,[upKey]:false}));e.target.value="";
+                            }} style={{display:"none"}}/>
+                          </label>}
+                        </div>);
+                      })}
+                    </div>
+                  }
+                </div>
+              ))}
 
-              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>📝 History &amp; presentation</label>
-              <div style={{marginBottom:12}}><MarkdownEditor value={ccHistory} onChange={setCcHistory} placeholder="Patient demographics, chief complaint, duration of symptoms, relevant past history..." rows={3}/></div>
-
-              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>💊 Treatment given</label>
-              <div style={{marginBottom:12}}><MarkdownEditor value={ccTreatment} onChange={setCcTreatment} placeholder="Medications prescribed, procedures performed, dosage, duration..." rows={3}/></div>
-
-              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>📈 Outcome</label>
-              <div style={{marginBottom:12}}><MarkdownEditor value={ccOutcome} onChange={setCcOutcome} placeholder="Response to treatment, follow-up findings, current status..." rows={2}/></div>
-
-              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>💡 Discussion question</label>
-              <input value={ccDiag} onChange={e=>setCcDiag(e.target.value)} placeholder="What's your differential? Any thoughts on management?" style={{...T.inp,marginBottom:14}}/>
-
-              <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Additional notes</label>
-              <div style={{marginBottom:4}}><MarkdownEditor value={ccB} onChange={setCcB} placeholder="Any additional context (optional)..." rows={2}/></div>
+              {/* Add section — dropdown picker */}
+              {!showAddBlockPicker?<button onClick={()=>setShowAddBlockPicker(true)} style={{...T.btnO,width:"100%",padding:"12px",borderStyle:"dashed",fontSize:".88rem",fontWeight:600,color:T.teal}}>+ Add section</button>
+                :<div style={{padding:14,background:T.tealBg,borderRadius:10}}>
+                  <div style={{fontSize:".76rem",fontWeight:700,color:T.teal,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Pick a section type</div>
+                  <div style={{fontSize:".7rem",color:T.txt2,marginBottom:6,fontWeight:600}}>📝 Text section</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+                    {CASE_BLOCK_TEXT_PRESETS.map(p=><button key={p} onClick={()=>{
+                      let label=p;
+                      if(p==="Custom…"){const custom=window.prompt("Section heading:");if(!custom?.trim())return;label=custom.trim();}
+                      setCaseBlocks([...caseBlocks,{id:"b"+Date.now()+Math.random().toString(36).slice(2,7),type:"text",label,value:""}]);
+                      setShowAddBlockPicker(false);
+                    }} style={{...T.btnO,padding:"6px 12px",fontSize:".76rem",background:"#fff"}}>{p}</button>)}
+                  </div>
+                  <div style={{fontSize:".7rem",color:T.txt2,marginBottom:6,fontWeight:600}}>🖼️ Image section (before + after)</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+                    {CASE_BLOCK_IMAGE_PRESETS.map(p=><button key={p} onClick={()=>{
+                      let label=p;
+                      if(p==="Custom…"){const custom=window.prompt("Image section heading:");if(!custom?.trim())return;label=custom.trim();}
+                      setCaseBlocks([...caseBlocks,{id:"b"+Date.now()+Math.random().toString(36).slice(2,7),type:"beforeAfter",label,beforeUrl:"",afterUrl:""}]);
+                      setShowAddBlockPicker(false);
+                    }} style={{...T.btnO,padding:"6px 12px",fontSize:".76rem",background:"#fff"}}>{p}</button>)}
+                  </div>
+                  <button onClick={()=>setShowAddBlockPicker(false)} style={{...T.btnO,padding:"4px 10px",fontSize:".72rem"}}>Cancel</button>
+                </div>
+              }
             </div>
 
             {/* Modal footer */}
@@ -6988,6 +7061,26 @@ ${forDownload
                     <span style={T.tag(T.tealBg,T.teal)}>{cs.cat}</span>
                   </div>
                   <h3 style={{fontSize:"1.2rem",fontWeight:700,lineHeight:1.35,marginBottom:14}}>{cs.title}</h3>
+
+                  {/* NEW block-based rendering (Case Blog format). If cs.blocks isn't set, fall back to the legacy fixed-field render below. */}
+                  {Array.isArray(cs.blocks)&&cs.blocks.length>0?<div>
+                    {cs.blocks.map((b,i)=>b.type==="beforeAfter"?
+                      <div key={b.id||i} style={{marginBottom:16}}>
+                        <div style={{fontSize:".68rem",color:T.teal,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>🖼️ {b.label}</div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                          {[b.beforeUrl,b.afterUrl].map((url,ki)=>url?<div key={ki}>
+                            <div style={{fontSize:".62rem",color:T.mute,fontWeight:600,letterSpacing:.5,marginBottom:3,textTransform:"uppercase"}}>{ki===0?"Before":"After"}</div>
+                            <img src={url} alt="" onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=url;im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v);}} style={{width:"100%",height:220,objectFit:"cover",borderRadius:8,cursor:"zoom-in",border:"1px solid "+T.border}}/>
+                          </div>:null)}
+                        </div>
+                      </div>
+                      :
+                      <div key={b.id||i} style={{marginBottom:14}}>
+                        <div style={{fontSize:".68rem",color:T.teal,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:5}}>{b.label}</div>
+                        <MarkdownView text={b.value||""} style={{fontSize:".9rem",color:T.txt2}}/>
+                      </div>
+                    )}
+                  </div>:<>
                   {cs.history&&<div style={{marginBottom:14}}>
                     <div style={{fontSize:".68rem",color:T.teal,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:5}}>📝 History & Presentation</div>
                     <MarkdownView text={cs.history} style={{fontSize:".9rem",color:T.txt2}}/>
@@ -7007,11 +7100,12 @@ ${forDownload
                     <div style={{fontSize:".68rem",color:T.goldD,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>💡 Discussion</div>
                     <div style={{fontSize:".95rem",color:T.txt,lineHeight:1.6,fontWeight:500}}>{cs.diagnosis}</div>
                   </div>}
+                  </>}
                   <div style={{display:"flex",alignItems:"center",gap:12,paddingTop:12,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
                     <LikeBtn liked={(cs.likedBy||[]).includes(au?.uid)} count={cs.likes||0} onToggle={()=>toggleLike("cases",cs.id,cs,setCases)}/>
                     <span style={{fontSize:".75rem",color:T.mute}}>💬 {cs.comments?.length||0} comments</span>
                     {(cs.views||0)>0&&<span style={{fontSize:".75rem",color:T.mute}}>👁️ {cs.views} views</span>}
-                    <ShareBar title={cs.title} url={`${SITE_URL}/?case=${cs.id}`} description={(cs.history||cs.body||"").slice(0,120)} itemId={cs.id} itemType="cases" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
+                    <ShareBar title={cs.title} url={`${SITE_URL}/?case=${cs.id}`} description={(cs.history||cs.body||(Array.isArray(cs.blocks)&&cs.blocks.find(b=>b.type==="text")?.value)||"").slice(0,120)} itemId={cs.id} itemType="cases" currentUser={au} prof={prof} onSaveToggle={toggleSave} onShare={handleShare}/>
                   </div>
                   {(cs.comments||[]).length>0&&<div style={{marginTop:12,paddingLeft:10,borderLeft:"2px solid "+T.border}}>
                     {cs.comments.map((x,i)=><div key={i} style={{padding:"6px 0",fontSize:".85rem"}}>
