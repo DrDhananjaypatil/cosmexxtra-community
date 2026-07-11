@@ -5937,6 +5937,7 @@ ${forDownload
             .home-grid { grid-template-columns: 1fr !important; }
             .home-sidebar { order: 2; }
             .me-grid { grid-template-columns: 1fr !important; }
+            .me-info-grid { grid-template-columns: 1fr !important; }
             .leaderboard-grid { grid-template-columns: 1fr !important; }
           }
         `}</style>
@@ -6254,38 +6255,49 @@ ${forDownload
                   {vSocials.map(([key,icon,url])=><a key={key} href={url.startsWith("http")?url:`https://${url}`} target="_blank" rel="noopener noreferrer" style={{fontSize:"1.3rem",textDecoration:"none"}}>{icon}</a>)}
                 </div>}
 
-                <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:14,alignItems:"center",flexWrap:"wrap"}}>
-                  <span style={{fontSize:".84rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:selVendor.id,name:selVendor.companyName||selVendor.name,type:"followers"})}>
-                    <b style={{fontWeight:700}}>{follows.filter(f=>f.followedId===selVendor.id).length}</b> <span style={{color:T.mute}}>Followers</span>
-                  </span>
-                  <span style={{fontSize:".84rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:selVendor.id,name:selVendor.companyName||selVendor.name,type:"following"})}>
-                    <b style={{fontWeight:700}}>{follows.filter(f=>f.followerId===selVendor.id).length}</b> <span style={{color:T.mute}}>Following</span>
-                  </span>
-                  {(()=>{
-                    const vReviews=reviews.filter(r=>r.vendorId===selVendor.id&&r.active!==false);
-                    if(vReviews.length===0)return null;
-                    const avg=vReviews.reduce((s,r)=>s+(r.rating||0),0)/vReviews.length;
-                    return<span style={{fontSize:".84rem",color:T.txt,display:"flex",alignItems:"center",gap:3}}>
-                      <span style={{color:T.gold}}>{"★".repeat(Math.round(avg))}{"☆".repeat(5-Math.round(avg))}</span>
-                      <b style={{fontWeight:700}}>{avg.toFixed(1)}</b> <span style={{color:T.mute}}>({vReviews.length})</span>
-                    </span>;
-                  })()}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginTop:18,textAlign:"left"}} className="me-info-grid">
+                  {/* LEFT — Certifications */}
+                  <div>
+                    <div style={{fontSize:".68rem",fontWeight:700,color:T.mute,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>🏅 Certifications & Accreditations</div>
+                    {selVendor.certifications?.length>0?<div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {selVendor.certifications.map((c,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:8,fontSize:".78rem",fontWeight:600,color:T.txt2,background:T.bg,padding:"6px 10px",borderRadius:8,border:"1px solid "+T.border}}>
+                        {c.logoUrl?<img src={c.logoUrl} alt="" style={{width:20,height:20,objectFit:"contain",flexShrink:0}}/>:<span style={{color:"#1a7d42"}}>✓</span>}
+                        <span>{c.name}</span>
+                      </div>)}
+                    </div>:<div style={{fontSize:".76rem",color:T.mute,fontStyle:"italic"}}>None listed.</div>}
+                  </div>
+
+                  {/* RIGHT — Contact & Community */}
+                  <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                    <div style={{fontSize:".68rem",fontWeight:700,color:T.mute,textTransform:"uppercase",letterSpacing:1}}>📇 Contact & Community</div>
+                    {selVendor.contactPerson&&<div style={{fontSize:".82rem",color:T.txt2}}>👤 {selVendor.contactPerson}</div>}
+                    {selVendor.email&&<div style={{fontSize:".82rem",color:T.txt2}}>✉️ <a href={`mailto:${selVendor.email}`} style={{color:T.teal,textDecoration:"none"}}>{selVendor.email}</a></div>}
+                    {selVendor.mobile&&<div style={{fontSize:".82rem",color:T.txt2}}>📞 {selVendor.mobile}</div>}
+                    <div style={{display:"flex",gap:16,marginTop:6,paddingTop:10,borderTop:"1px solid "+T.border,flexWrap:"wrap",alignItems:"center"}}>
+                      <span style={{fontSize:".84rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:selVendor.id,name:selVendor.companyName||selVendor.name,type:"followers"})}>
+                        <b style={{fontWeight:700}}>{follows.filter(f=>f.followedId===selVendor.id).length}</b> <span style={{color:T.mute}}>Followers</span>
+                      </span>
+                      <span style={{fontSize:".84rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:selVendor.id,name:selVendor.companyName||selVendor.name,type:"following"})}>
+                        <b style={{fontWeight:700}}>{follows.filter(f=>f.followerId===selVendor.id).length}</b> <span style={{color:T.mute}}>Following</span>
+                      </span>
+                      {(()=>{
+                        const vReviews=reviews.filter(r=>r.vendorId===selVendor.id&&r.active!==false);
+                        if(vReviews.length===0)return null;
+                        const avg=vReviews.reduce((s,r)=>s+(r.rating||0),0)/vReviews.length;
+                        return<span style={{fontSize:".84rem",color:T.txt,display:"flex",alignItems:"center",gap:3}}>
+                          <span style={{color:T.gold}}>{"★".repeat(Math.round(avg))}{"☆".repeat(5-Math.round(avg))}</span>
+                          <b style={{fontWeight:700}}>{avg.toFixed(1)}</b> <span style={{color:T.mute}}>({vReviews.length})</span>
+                        </span>;
+                      })()}
+                    </div>
+                  </div>
                 </div>
-                {selVendor.certifications?.length>0&&<div style={{display:"flex",justifyContent:"center",gap:8,flexWrap:"wrap",marginTop:12}}>
-                  {selVendor.certifications.map((c,i)=><span key={i} style={{display:"flex",alignItems:"center",gap:5,fontSize:".72rem",fontWeight:600,color:T.txt2,background:T.bg,padding:"4px 10px",borderRadius:20,border:"1px solid "+T.border}}>
-                    {c.logoUrl&&<img src={c.logoUrl} alt="" style={{width:16,height:16,objectFit:"contain"}}/>}
-                    ✓ {c.name}
-                  </span>)}
-                </div>}
-                {selVendor.id!==au?.uid&&<div style={{marginTop:14}}><FollowBtn user={selVendor} size="lg"/></div>}
+
+                {selVendor.id!==au?.uid&&<div style={{marginTop:14,textAlign:"center"}}><FollowBtn user={selVendor} size="lg"/></div>}
                 {va?.offerings&&<div style={{padding:"12px 14px",background:T.bg,borderRadius:8,fontSize:".88rem",color:T.txt,lineHeight:1.6,marginTop:16,textAlign:"left"}}>
                   <div style={{fontSize:".68rem",fontWeight:600,color:T.mute,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>About</div>
                   {va.offerings}
                 </div>}
-                <div style={{display:"flex",gap:14,flexWrap:"wrap",justifyContent:"center",marginTop:12}}>
-                  {selVendor.contactPerson&&<div style={{fontSize:".82rem",color:T.txt2}}>👤 {selVendor.contactPerson}</div>}
-                  {selVendor.email&&<a href={`mailto:${selVendor.email}`} style={{fontSize:".82rem",color:T.teal,textDecoration:"none"}}>✉️ {selVendor.email}</a>}
-                </div>
               </div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 320px",gap:18,alignItems:"start"}} className="me-grid">
@@ -7925,36 +7937,42 @@ ${forDownload
                 {prof?.verified&&<span style={T.tag("#e8f5e9","#1a7d42")}>✓ Verified Partner</span>}
               </div>
 
-              <div style={{display:"flex",justifyContent:"center",gap:8,marginTop:14,flexWrap:"wrap"}}>
-                {prof?.contactPerson&&<div style={{fontSize:".8rem",color:T.txt2}}>👤 {prof.contactPerson}</div>}
-                <div style={{fontSize:".8rem",color:T.txt2}}>✉️ {au?.email}</div>
-                {prof?.gstNumber&&<div style={{fontSize:".8rem",color:T.txt2,fontFamily:"monospace"}}>GST: {prof.gstNumber}</div>}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginTop:16,textAlign:"left"}} className="me-info-grid">
+                {/* LEFT — Certifications & Accreditations */}
+                <div>
+                  <div style={{fontSize:".68rem",fontWeight:700,color:T.mute,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>🏅 Certifications & Accreditations</div>
+                  {prof?.certifications?.length>0?<div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {prof.certifications.map((c,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:8,fontSize:".78rem",fontWeight:600,color:T.txt2,background:T.bg,padding:"6px 10px",borderRadius:8,border:"1px solid "+T.border}}>
+                      {c.logoUrl?<img src={c.logoUrl} alt="" style={{width:20,height:20,objectFit:"contain",flexShrink:0}}/>:<span style={{color:"#1a7d42"}}>✓</span>}
+                      <span>{c.name}</span>
+                    </div>)}
+                  </div>:<div style={{fontSize:".76rem",color:T.mute,fontStyle:"italic"}}>None yet — showcase your credentials by adding them below.</div>}
+                  <button onClick={()=>setShowCertForm(f=>!f)} style={{...T.btnO,...T.btnSm,fontSize:".7rem",marginTop:10}}>{showCertForm?"✕ Close":"+ Add / Manage"}</button>
+                </div>
+
+                {/* RIGHT — Contact, Socials, Followers/Stars */}
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  <div style={{fontSize:".68rem",fontWeight:700,color:T.mute,textTransform:"uppercase",letterSpacing:1}}>📇 Contact & Community</div>
+                  {prof?.contactPerson&&<div style={{fontSize:".82rem",color:T.txt2}}>👤 {prof.contactPerson}</div>}
+                  <div style={{fontSize:".82rem",color:T.txt2}}>✉️ <a href={`mailto:${au?.email}`} style={{color:T.teal,textDecoration:"none"}}>{au?.email}</a></div>
+                  {prof?.mobile&&<div style={{fontSize:".82rem",color:T.txt2}}>📞 {prof.mobile}</div>}
+                  {prof?.gstNumber&&<div style={{fontSize:".8rem",color:T.txt2,fontFamily:"monospace"}}>GST: {prof.gstNumber}</div>}
+                  {socials.length>0&&<div style={{display:"flex",gap:10,marginTop:4}}>
+                    {socials.map(([key,icon,url])=><a key={key} href={url.startsWith("http")?url:`https://${url}`} target="_blank" rel="noopener noreferrer" style={{fontSize:"1.3rem",textDecoration:"none"}}>{icon}</a>)}
+                  </div>}
+                  <div style={{display:"flex",gap:16,marginTop:6,paddingTop:10,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
+                    <span style={{fontSize:".84rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:au?.uid,name:prof?.companyName||uName,type:"followers"})}>
+                      <b style={{fontWeight:700}}>{follows.filter(f=>f.followedId===au?.uid).length}</b> <span style={{color:T.mute}}>Followers</span>
+                    </span>
+                    {(()=>{
+                      const myReviews=reviews.filter(r=>r.vendorId===au?.uid&&r.active!==false);
+                      if(myReviews.length===0)return null;
+                      const avg=myReviews.reduce((s,r)=>s+(r.rating||0),0)/myReviews.length;
+                      return<span style={{fontSize:".84rem",color:T.txt}}><span style={{color:T.gold}}>★</span> <b style={{fontWeight:700}}>{avg.toFixed(1)}</b> <span style={{color:T.mute}}>({myReviews.length})</span></span>;
+                    })()}
+                  </div>
+                </div>
               </div>
-
-              {socials.length>0&&<div style={{display:"flex",justifyContent:"center",gap:10,marginTop:14}}>
-                {socials.map(([key,icon,url])=><a key={key} href={url.startsWith("http")?url:`https://${url}`} target="_blank" rel="noopener noreferrer" style={{fontSize:"1.3rem",textDecoration:"none",filter:"grayscale(0)"}}>{icon}</a>)}
-              </div>}
-
-              <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:14}}>
-                <span style={{fontSize:".84rem",color:T.txt,cursor:"pointer"}} onClick={()=>setFollowersModal({uid:au?.uid,name:prof?.companyName||uName,type:"followers"})}>
-                  <b style={{fontWeight:700}}>{follows.filter(f=>f.followedId===au?.uid).length}</b> <span style={{color:T.mute}}>Followers</span>
-                </span>
-                {(()=>{
-                  const myReviews=reviews.filter(r=>r.vendorId===au?.uid&&r.active!==false);
-                  if(myReviews.length===0)return null;
-                  const avg=myReviews.reduce((s,r)=>s+(r.rating||0),0)/myReviews.length;
-                  return<span style={{fontSize:".84rem",color:T.txt}}><span style={{color:T.gold}}>★</span> <b style={{fontWeight:700}}>{avg.toFixed(1)}</b> <span style={{color:T.mute}}>({myReviews.length})</span></span>;
-                })()}
-              </div>
-
-              {/* Certifications & Accreditations */}
-              {(prof?.certifications?.length>0)&&<div style={{display:"flex",justifyContent:"center",gap:8,flexWrap:"wrap",marginTop:12}}>
-                {prof.certifications.map((c,i)=><span key={i} style={{display:"flex",alignItems:"center",gap:5,fontSize:".72rem",fontWeight:600,color:T.txt2,background:T.bg,padding:"4px 10px",borderRadius:20,border:"1px solid "+T.border}}>
-                  {c.logoUrl&&<img src={c.logoUrl} alt="" style={{width:16,height:16,objectFit:"contain"}}/>}
-                  ✓ {c.name}
-                </span>)}
-              </div>}
-              <button onClick={()=>setShowCertForm(f=>!f)} style={{...T.btnO,...T.btnSm,fontSize:".7rem",marginTop:10}}>{showCertForm?"✕ Close":"🏅 Manage certifications"}</button>
 
               {showCertForm&&<div style={{marginTop:12,padding:14,background:T.bg,borderRadius:10,textAlign:"left"}}>
                 {prof?.certifications?.length>0&&<div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:10}}>
