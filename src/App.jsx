@@ -238,22 +238,6 @@ const TOPICS=["Botox & Neurotoxins","Dermal Fillers","Threads","PDRN & Polynucle
 // (or a before/after image pair). Users can also enter a Custom label.
 const CASE_BLOCK_TEXT_PRESETS=["Patient Profile","Case History","Chief Complaint","Examination Findings","Previous Rx / Prior Treatments","Diagnosis","Treatment Given","Products Used","Outcome / Follow-up","Discussion Question for Community","Learning Point","Additional Notes","Custom…"];
 const CASE_BLOCK_IMAGE_PRESETS=["Before & After","Baseline vs Result","Session 1 vs Final","Custom…"];
-// ── Test Series topics (10 topics, per plan). Each will get 3 variants × 3 difficulties per month.
-const TEST_TOPICS=[
-  {id:"botox-fillers",label:"Botox & Fillers",icon:"💉"},
-  {id:"threads",label:"Threads",icon:"🧵"},
-  {id:"peels",label:"Chemical Peels",icon:"🧪"},
-  {id:"laser",label:"Laser & Energy Devices",icon:"⚡"},
-  {id:"prp",label:"PRP & Regenerative",icon:"🩸"},
-  {id:"hair",label:"Hair Restoration",icon:"💇"},
-  {id:"body",label:"Body Contouring",icon:"💪"},
-  {id:"antiaging",label:"Anti-Aging",icon:"✨"},
-  {id:"pigmentation",label:"Pigmentation & Melasma",icon:"🎨"},
-  {id:"acne",label:"Acne & Scars",icon:"🔬"},
-];
-const TEST_DIFFICULTIES=["Easy","Moderate","Hard"];
-const TEST_DURATION_SECONDS=600; // 10 minutes
-const TEST_QUESTION_COUNT=15;
 
 // ═══ CONSENT TEMPLATE CATALOG ═══
 // Two-level structure: category → sub-procedures. Each sub-procedure carries
@@ -2335,7 +2319,7 @@ export default function App(){
 
   // KNOWN_PAGES must match every page condition the app actually renders.
   // If you add a new page (`pg==="xyz"&&...` block), add "xyz" here too.
-  const KNOWN_PAGES=["home","me","quiz","library","forum","cases","rewards","submit","rank","events","videos","admin","profile","ad","consent","vendors","study"];
+  const KNOWN_PAGES=["home","me","quiz","library","forum","cases","rewards","submit","rank","events","videos","admin","profile","ad","consent","vendors"];
   const sh=m=>setToast(m);const go=p=>{const safe=KNOWN_PAGES.includes(p)?p:"home";setPg(safe);setSelA(null);setSelV(null);setSelAd(null);setSelE(null);setSelU(null);setSelFP(null);setSelCs(null);setEdForm(null)};
 
   // ─── FOLLOW SYSTEM ────────────────────────────────────────────────────────
@@ -2426,22 +2410,6 @@ export default function App(){
     }
   };
   useEffect(()=>{if(toast){const t=setTimeout(()=>setToast(null),3000);return()=>clearTimeout(t)}},[toast]);
-  // Test timer — decrements every second while user is taking a test
-  useEffect(()=>{
-    if(studyView!=="taking"||!activeTest)return;
-    const iv=setInterval(()=>{
-      setTestTimeLeft(prev=>{
-        if(prev<=1){
-          clearInterval(iv);
-          // Auto-submit when time hits zero. We compute the result here from the latest answers state.
-          setTimeout(()=>submitTest(true),50);
-          return 0;
-        }
-        return prev-1;
-      });
-    },1000);
-    return()=>clearInterval(iv);
-  },[studyView,activeTest]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const[ads,setAds]=useState([]);
   const[newsPosts,setNewsPosts]=useState([]); // admin-curated news
@@ -2480,19 +2448,6 @@ export default function App(){
   const[myEnqsOpen,setMyEnqsOpen]=useState(false);
   const[openCommentsFor,setOpenCommentsFor]=useState(null); // wallPost id whose comments are expanded
   const[commentDraft,setCommentDraft]=useState({});
-  // ── Study/Test Series page state ─────
-  const[testSeries,setTestSeries]=useState([]);       // all published tests
-  const[testAttempts,setTestAttempts]=useState([]);   // this user's attempt history
-  const[studyView,setStudyView]=useState("home");     // "home" | "picker" | "intro" | "taking" | "result"
-  const[selTestTopic,setSelTestTopic]=useState(null); // topic obj chosen at picker
-  const[selTestDiff,setSelTestDiff]=useState(null);   // "Easy"/"Moderate"/"Hard"
-  const[activeTest,setActiveTest]=useState(null);     // the loaded test doc + shuffled questions
-  const[testAnswers,setTestAnswers]=useState({});     // {qIdx: chosenOptionIdx}
-  const[testStartedAt,setTestStartedAt]=useState(0);
-  const[testTimeLeft,setTestTimeLeft]=useState(TEST_DURATION_SECONDS);
-  const[testCurrentQ,setTestCurrentQ]=useState(0);
-  const[testResult,setTestResult]=useState(null);
-  const[testGenerating,setTestGenerating]=useState(false);
   const[profileWallImage,setProfileWallImage]=useState("");
   const[profileWallUploading,setProfileWallUploading]=useState(false);
   const[wallUploading,setWallUploading]=useState(false);
@@ -2710,7 +2665,7 @@ export default function App(){
     if(!consentDoctorReg)setConsentDoctorReg(prof.doctorRegNumber||prof.regNumber||"");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[pg,prof]);
-  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl,tm,wp,rv,am,ts,ta]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000),fbGetAll("teamMembers","createdAt","desc",2000),fbGetAll("wallPosts","createdAt","desc",500),fbGetAll("reviews","createdAt","desc",2000),fbGetAll("adminMessages","createdAt","desc",500),fbGetAll("testSeries","createdAt","desc",500),fbGetAll("testAttempts","createdAt","desc",500)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl);setTeamMembers(tm);setWallPosts(wp);setReviews(rv);setAdminMessages(am);setTestSeries(ts);setTestAttempts(ta.filter(x=>x.uid===au?.uid))},[au?.uid]);
+  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl,tm,wp,rv,am]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000),fbGetAll("teamMembers","createdAt","desc",2000),fbGetAll("wallPosts","createdAt","desc",500),fbGetAll("reviews","createdAt","desc",2000),fbGetAll("adminMessages","createdAt","desc",500)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl);setTeamMembers(tm);setWallPosts(wp);setReviews(rv);setAdminMessages(am)},[]);
 
   // Load current user's points-earning history from pointsActivity ledger.
   // Uses where(uid) so the list query satisfies security rules (can't list others' docs).
@@ -4260,99 +4215,6 @@ ${forDownload
   };
 
   // ═══ CLINICAL CASE POST ═══
-  // ══════ TEST SERIES — START / SUBMIT / ADMIN GENERATE ══════════════════
-  // Start a test: pick a random variant for this topic+difficulty+month,
-  // shuffle the question order (per confirmed plan), then transition to intro screen.
-  const startTest=(topic,difficulty)=>{
-    const monthKey=new Date().toISOString().slice(0,7); // YYYY-MM
-    const variants=testSeries.filter(t=>t.topicId===topic.id&&t.difficulty===difficulty&&t.monthKey===monthKey);
-    if(variants.length===0){sh("No test available for this topic/difficulty yet. Check back soon!");return;}
-    const pick=variants[Math.floor(Math.random()*variants.length)];
-    // Fisher-Yates shuffle a copy of the questions
-    const shuffled=[...(pick.questions||[])];
-    for(let i=shuffled.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];}
-    setActiveTest({...pick,questions:shuffled});
-    setSelTestTopic(topic);setSelTestDiff(difficulty);
-    setTestAnswers({});setTestCurrentQ(0);
-    setTestTimeLeft(TEST_DURATION_SECONDS);
-    setStudyView("intro");
-  };
-
-  // Called from intro "Begin test" button — records start time, starts timer
-  const confirmStartTest=()=>{
-    setTestStartedAt(Date.now());
-    setStudyView("taking");
-  };
-
-  // Submit the test — compute score + sub-area breakdown, write attempt to Firestore.
-  const submitTest=async(auto=false)=>{
-    if(!activeTest){setStudyView("home");return;}
-    const qs=activeTest.questions||[];
-    let correct=0;
-    const subAreaStats={}; // {subArea: {right, total}}
-    qs.forEach((q,idx)=>{
-      const chosen=testAnswers[idx];
-      const isRight=chosen===q.correctIndex;
-      if(isRight)correct++;
-      const area=q.subArea||"General";
-      if(!subAreaStats[area])subAreaStats[area]={right:0,total:0};
-      subAreaStats[area].total++;
-      if(isRight)subAreaStats[area].right++;
-    });
-    const total=qs.length;
-    const accuracy=total?Math.round((correct/total)*100):0;
-    const elapsed=testStartedAt?Math.min(TEST_DURATION_SECONDS,Math.floor((Date.now()-testStartedAt)/1000)):TEST_DURATION_SECONDS;
-    const result={
-      uid:au.uid,uName,
-      testId:activeTest.id,
-      topicId:activeTest.topicId,topic:activeTest.topic,
-      difficulty:activeTest.difficulty,
-      monthKey:activeTest.monthKey,
-      totalQuestions:total,correctAnswers:correct,accuracy,
-      timeSpentSeconds:elapsed,
-      wasAutoSubmitted:auto,
-      answers:testAnswers,
-      subAreaStats,
-    };
-    try{
-      const id=await fbAdd("testAttempts",result);
-      setTestResult({id,...result});
-    }catch(e){
-      console.error(e);
-      // Still show local result even if save failed
-      setTestResult(result);
-      sh("Result saved locally (upload failed — please screenshot)");
-    }
-    setStudyView("result");
-    loadData();
-  };
-
-  // ADMIN — generate a fresh test variant for a topic+difficulty
-  const adminGenerateTest=async(topic,difficulty)=>{
-    setTestGenerating(true);
-    try{
-      const r=await fetch("/api/generate-test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({topic:topic.label,difficulty})});
-      const data=await r.json();
-      if(!data.ok||!data.test){sh("Generation failed: "+(data.error||"unknown"));setTestGenerating(false);return;}
-      const monthKey=new Date().toISOString().slice(0,7);
-      // Determine variant number for this topic/difficulty/month (1, 2, or 3 — we cap at 3)
-      const existing=testSeries.filter(t=>t.topicId===topic.id&&t.difficulty===difficulty&&t.monthKey===monthKey);
-      const variantNum=existing.length+1;
-      if(variantNum>3){sh("Already 3 variants exist for this topic/difficulty this month");setTestGenerating(false);return;}
-      await fbAdd("testSeries",{
-        topicId:topic.id,topic:topic.label,icon:topic.icon,
-        difficulty,monthKey,variantNum,
-        questions:data.test.questions,
-        generatedBy:au.email,
-      });
-      sh(`✅ ${topic.label} (${difficulty}) — variant ${variantNum} generated!`);
-      loadData();
-    }catch(e){
-      console.error(e);sh("Generation error: "+e.message);
-    }
-    setTestGenerating(false);
-  };
-
   const postCase=async()=>{
     if(!ccT.trim()){sh("Title required");return}
     if(caseBlocks.length===0){sh("Add at least one section (History, Before/After, etc.)");return}
@@ -5082,7 +4944,6 @@ ${forDownload
     {id:"library",ic:"📚",l:"Library"},
     {id:"videos",ic:"🎥",l:"Videos"},
     {id:"events",ic:"📅",l:"Events"},
-    {id:"study",ic:"🎯",l:"Study & Test"},
     {id:"vendors",ic:"🏭",l:"Vendors"},
     {id:"rank",ic:"🏆",l:"Rank"},
     {id:"consent",ic:"📋",l:"Consent"},
@@ -7289,278 +7150,6 @@ ${forDownload
             </div>);
           })}
         </div>}
-      </div>}
-
-      {/* ═══ STUDY / TEST SERIES PAGE ═══ */}
-      {pg==="study"&&<div style={{maxWidth:900}}>
-        {(()=>{
-          const monthKey=new Date().toISOString().slice(0,7);
-          const monthLabel=new Date().toLocaleDateString("en-IN",{year:"numeric",month:"long"});
-          const myAttempts=testAttempts.filter(a=>a.uid===au?.uid);
-
-          // ── VIEW: home (topic picker + stats intro) ───────────────────
-          if(studyView==="home"){
-            return(<div>
-              <div style={{...T.card,padding:"22px 22px 20px",marginBottom:16,background:"linear-gradient(135deg,"+T.tealBg+","+T.goldBg+"55)",borderLeft:"3px solid "+T.teal}}>
-                <h2 style={{fontSize:"1.35rem",fontWeight:700,margin:0,marginBottom:6}}>🎯 Study & Test Series</h2>
-                <p style={{fontSize:".88rem",color:T.txt2,lineHeight:1.55,margin:0}}>
-                  Test your aesthetic medicine knowledge with a 15-question timed MCQ ({TEST_DURATION_SECONDS/60} minutes). Pick a topic, choose your difficulty, and get personal feedback with weak-area suggestions.
-                </p>
-                <div style={{fontSize:".72rem",color:T.mute,marginTop:10}}>📅 This month: <b>{monthLabel}</b> · Fresh test variants added each month</div>
-              </div>
-
-              {/* Personal quick-stats */}
-              {myAttempts.length>0&&<div style={{...T.card,marginBottom:16}}>
-                <h4 style={{fontSize:".95rem",fontWeight:700,margin:0,marginBottom:12}}>📊 Your progress</h4>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10}}>
-                  {[
-                    ["Tests taken",myAttempts.length],
-                    ["Avg accuracy",Math.round(myAttempts.reduce((s,a)=>s+(a.accuracy||0),0)/myAttempts.length)+"%"],
-                    ["Best score",Math.max(...myAttempts.map(a=>a.accuracy||0))+"%"],
-                    ["Latest topic",myAttempts[0]?.topic||"—"],
-                  ].map(([l,v])=><div key={l} style={{textAlign:"center",padding:12,background:T.bg,borderRadius:10}}>
-                    <div style={{fontSize:"1.35rem",fontWeight:700,color:T.teal}}>{v}</div>
-                    <div style={{fontSize:".62rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5,marginTop:2}}>{l}</div>
-                  </div>)}
-                </div>
-              </div>}
-
-              <h4 style={{fontSize:".92rem",fontWeight:700,marginBottom:12}}>Pick a topic to test yourself</h4>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10,marginBottom:16}}>
-                {TEST_TOPICS.map(t=>{
-                  const availCount=testSeries.filter(x=>x.topicId===t.id&&x.monthKey===monthKey).length;
-                  const myTopicAttempts=myAttempts.filter(a=>a.topicId===t.id);
-                  const myBest=myTopicAttempts.length?Math.max(...myTopicAttempts.map(a=>a.accuracy||0)):null;
-                  return(<div key={t.id} onClick={()=>{setSelTestTopic(t);setStudyView("picker");}} style={{...T.card,cursor:availCount>0?"pointer":"default",marginBottom:0,padding:16,opacity:availCount>0?1:0.55,transition:"all .15s"}} onMouseEnter={e=>{if(availCount>0){e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 18px rgba(0,0,0,0.08)";}}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
-                    <div style={{fontSize:"1.8rem",marginBottom:6}}>{t.icon}</div>
-                    <div style={{fontSize:".95rem",fontWeight:700,marginBottom:4}}>{t.label}</div>
-                    <div style={{fontSize:".72rem",color:T.mute}}>{availCount>0?`${availCount} test${availCount!==1?"s":""} available`:"Coming soon"}</div>
-                    {myBest!==null&&<div style={{fontSize:".7rem",color:T.teal,fontWeight:600,marginTop:5}}>Your best: {myBest}%</div>}
-                  </div>);
-                })}
-              </div>
-
-              {/* Recent attempts list */}
-              {myAttempts.length>0&&<div style={{...T.card}}>
-                <h4 style={{fontSize:".92rem",fontWeight:700,margin:0,marginBottom:10}}>Recent attempts</h4>
-                <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                  {myAttempts.slice(0,8).map(a=><div key={a.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",background:T.bg,borderRadius:8,gap:10,flexWrap:"wrap"}}>
-                    <div style={{minWidth:0,flex:1}}>
-                      <div style={{fontSize:".84rem",fontWeight:600,color:T.txt}}>{a.topic} <span style={{color:T.mute,fontWeight:400,fontSize:".72rem"}}>· {a.difficulty}</span></div>
-                      <div style={{fontSize:".68rem",color:T.mute}}>{fD(tsToDateStr(a.createdAt))}</div>
-                    </div>
-                    <div style={{fontSize:".9rem",fontWeight:700,color:a.accuracy>=70?"#1a7d42":a.accuracy>=50?T.goldD:T.err}}>{a.accuracy}% <span style={{fontSize:".7rem",color:T.mute,fontWeight:400}}>({a.correctAnswers}/{a.totalQuestions})</span></div>
-                  </div>)}
-                </div>
-              </div>}
-
-              {/* Admin generation panel */}
-              {isAdm&&<div style={{...T.card,marginTop:16,borderLeft:"3px solid "+T.gold}}>
-                <h4 style={{fontSize:".92rem",fontWeight:700,margin:0,marginBottom:8}}>⚙️ Admin — Generate monthly tests</h4>
-                <p style={{fontSize:".76rem",color:T.mute,marginTop:0,marginBottom:12,lineHeight:1.5}}>Generate up to 3 variants per topic × difficulty for {monthLabel}. Uses ~₹6 of AI credit per generation.</p>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:8}}>
-                  {TEST_TOPICS.map(t=>{
-                    return(<div key={t.id} style={{padding:10,background:T.bg,borderRadius:8}}>
-                      <div style={{fontSize:".82rem",fontWeight:600,marginBottom:6}}>{t.icon} {t.label}</div>
-                      <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                        {TEST_DIFFICULTIES.map(d=>{
-                          const count=testSeries.filter(x=>x.topicId===t.id&&x.difficulty===d&&x.monthKey===monthKey).length;
-                          return(<button key={d} disabled={testGenerating||count>=3} onClick={()=>adminGenerateTest(t,d)} style={{...T.btnO,padding:"4px 8px",fontSize:".68rem",opacity:count>=3?0.5:1}}>{d} ({count}/3)</button>);
-                        })}
-                      </div>
-                    </div>);
-                  })}
-                </div>
-                {testGenerating&&<div style={{marginTop:10,fontSize:".78rem",color:T.teal,fontWeight:600}}>⏳ Generating... this takes ~15 seconds.</div>}
-              </div>}
-            </div>);
-          }
-
-          // ── VIEW: picker (difficulty selection for chosen topic) ─────
-          if(studyView==="picker"&&selTestTopic){
-            return(<div>
-              <button onClick={()=>{setStudyView("home");setSelTestTopic(null);}} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back to topics</button>
-              <div style={{...T.card,padding:22,marginBottom:16,textAlign:"center"}}>
-                <div style={{fontSize:"2.5rem",marginBottom:6}}>{selTestTopic.icon}</div>
-                <h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0,marginBottom:6}}>{selTestTopic.label}</h2>
-                <p style={{color:T.mute,fontSize:".84rem",margin:0}}>Choose your difficulty level</p>
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}>
-                {TEST_DIFFICULTIES.map(d=>{
-                  const monthKey=new Date().toISOString().slice(0,7);
-                  const avail=testSeries.filter(x=>x.topicId===selTestTopic.id&&x.difficulty===d&&x.monthKey===monthKey).length;
-                  const myBest=myAttempts.filter(a=>a.topicId===selTestTopic.id&&a.difficulty===d);
-                  const best=myBest.length?Math.max(...myBest.map(a=>a.accuracy||0)):null;
-                  const dColor=d==="Easy"?"#1a7d42":d==="Moderate"?T.goldD:T.err;
-                  return(<div key={d} onClick={()=>{if(avail>0)startTest(selTestTopic,d);}} style={{...T.card,marginBottom:0,padding:18,cursor:avail>0?"pointer":"default",opacity:avail>0?1:0.5,borderLeft:"3px solid "+dColor,transition:"all .15s"}} onMouseEnter={e=>{if(avail>0){e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 18px rgba(0,0,0,0.08)";}}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
-                    <div style={{fontSize:".95rem",fontWeight:700,color:dColor,marginBottom:4}}>{d}</div>
-                    <div style={{fontSize:".72rem",color:T.mute}}>{avail>0?`${avail} variant${avail!==1?"s":""} · ${TEST_QUESTION_COUNT} Qs · ${TEST_DURATION_SECONDS/60} min`:"Not yet available"}</div>
-                    {best!==null&&<div style={{fontSize:".72rem",color:T.teal,fontWeight:600,marginTop:6}}>Your best: {best}%</div>}
-                  </div>);
-                })}
-              </div>
-            </div>);
-          }
-
-          // ── VIEW: intro (before starting the timed test) ─────
-          if(studyView==="intro"&&activeTest){
-            return(<div style={{maxWidth:600,margin:"0 auto"}}>
-              <div style={{...T.card,padding:28,textAlign:"center"}}>
-                <div style={{fontSize:"3rem",marginBottom:10}}>{selTestTopic?.icon||"🎯"}</div>
-                <h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0}}>{activeTest.topic}</h2>
-                <div style={{fontSize:".82rem",color:T.mute,marginTop:4,marginBottom:20}}>{activeTest.difficulty} · Variant {activeTest.variantNum}</div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:20}}>
-                  {[["Questions",activeTest.questions?.length||TEST_QUESTION_COUNT],["Time",`${TEST_DURATION_SECONDS/60} min`],["Format","MCQ"]].map(([l,v])=><div key={l} style={{padding:12,background:T.bg,borderRadius:10}}>
-                    <div style={{fontSize:"1.15rem",fontWeight:700,color:T.teal}}>{v}</div>
-                    <div style={{fontSize:".64rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5,marginTop:2}}>{l}</div>
-                  </div>)}
-                </div>
-                <div style={{textAlign:"left",padding:14,background:T.bg,borderRadius:10,marginBottom:20,fontSize:".82rem",color:T.txt2,lineHeight:1.6}}>
-                  <b>Before you start:</b>
-                  <ul style={{margin:"6px 0 0",paddingLeft:20}}>
-                    <li>Timer starts when you click <b>Begin</b> — no pauses</li>
-                    <li>You can skip and return to questions during the test</li>
-                    <li>Auto-submits when time runs out</li>
-                    <li>Answers &amp; explanations shown after submission</li>
-                  </ul>
-                </div>
-                <div style={{display:"flex",gap:10,justifyContent:"center"}}>
-                  <button onClick={()=>{setStudyView("picker");setActiveTest(null);}} style={T.btnO}>Cancel</button>
-                  <button onClick={confirmStartTest} style={{...T.btn,padding:"10px 24px",fontSize:".92rem"}}>▶ Begin test</button>
-                </div>
-              </div>
-            </div>);
-          }
-
-          // ── VIEW: taking (actual test in progress) ─────
-          if(studyView==="taking"&&activeTest){
-            const qs=activeTest.questions||[];
-            const q=qs[testCurrentQ];
-            if(!q)return null;
-            const mm=Math.floor(testTimeLeft/60).toString().padStart(2,"0");
-            const ss=(testTimeLeft%60).toString().padStart(2,"0");
-            const timeLow=testTimeLeft<=60;
-            const answered=Object.keys(testAnswers).length;
-            return(<div style={{maxWidth:760,margin:"0 auto"}}>
-              {/* Sticky bar with timer + progress */}
-              <div style={{position:"sticky",top:60,zIndex:40,background:"#ffffffea",backdropFilter:"blur(8px)",padding:"10px 14px",borderRadius:10,marginBottom:14,border:"1px solid "+T.border,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
-                <div>
-                  <div style={{fontSize:".72rem",color:T.mute}}>Question {testCurrentQ+1} of {qs.length}</div>
-                  <div style={{fontSize:".82rem",fontWeight:700}}>{activeTest.topic}</div>
-                </div>
-                <div style={{fontSize:"1.3rem",fontWeight:700,color:timeLow?T.err:T.teal,fontFamily:"monospace"}}>⏱ {mm}:{ss}</div>
-                <button disabled={answered===0} onClick={()=>{if(!window.confirm(`Submit test now? You've answered ${answered} of ${qs.length} questions.`))return;submitTest(false);}} style={{...T.btn,padding:"7px 14px",fontSize:".78rem",opacity:answered===0?0.5:1}}>Submit</button>
-              </div>
-
-              {/* Question card */}
-              <div style={{...T.card,padding:22,marginBottom:14}}>
-                {q.scenario&&<div style={{padding:"12px 14px",background:T.bg,borderRadius:8,fontSize:".88rem",color:T.txt2,marginBottom:12,lineHeight:1.55,fontStyle:"italic"}}>📋 {q.scenario}</div>}
-                <div style={{fontSize:"1rem",fontWeight:600,color:T.txt,marginBottom:16,lineHeight:1.5}}>{q.question}</div>
-                <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                  {q.options.map((opt,i)=>{
-                    const chosen=testAnswers[testCurrentQ]===i;
-                    return(<button key={i} onClick={()=>setTestAnswers(p=>({...p,[testCurrentQ]:i}))} style={{textAlign:"left",padding:"11px 14px",border:"1.5px solid "+(chosen?T.teal:T.border),borderRadius:10,background:chosen?T.tealBg:"#fff",cursor:"pointer",fontSize:".9rem",color:T.txt,fontFamily:"inherit",display:"flex",alignItems:"center",gap:10,transition:"all .12s"}}>
-                      <div style={{width:24,height:24,borderRadius:"50%",border:"2px solid "+(chosen?T.teal:T.border),background:chosen?T.teal:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:"#fff",fontSize:".72rem",fontWeight:700}}>{chosen?"✓":String.fromCharCode(65+i)}</div>
-                      <span style={{flex:1,lineHeight:1.4}}>{opt}</span>
-                    </button>);
-                  })}
-                </div>
-              </div>
-
-              {/* Navigation footer */}
-              <div style={{display:"flex",gap:10,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",marginBottom:14}}>
-                <button disabled={testCurrentQ===0} onClick={()=>setTestCurrentQ(c=>Math.max(0,c-1))} style={{...T.btnO,padding:"8px 16px",opacity:testCurrentQ===0?0.5:1}}>← Prev</button>
-                <div style={{fontSize:".74rem",color:T.mute}}>{answered}/{qs.length} answered</div>
-                {testCurrentQ===qs.length-1?<button onClick={()=>{if(!window.confirm(`Submit test now? You've answered ${answered} of ${qs.length} questions.`))return;submitTest(false);}} style={{...T.btn,padding:"8px 20px"}}>Submit test</button>:<button onClick={()=>setTestCurrentQ(c=>Math.min(qs.length-1,c+1))} style={{...T.btn,padding:"8px 16px"}}>Next →</button>}
-              </div>
-
-              {/* Question strip navigator */}
-              <div style={{...T.card,padding:12}}>
-                <div style={{fontSize:".7rem",color:T.mute,marginBottom:8,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>Jump to question</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                  {qs.map((_,i)=>{
-                    const isCurrent=i===testCurrentQ;
-                    const isAnswered=testAnswers[i]!==undefined;
-                    return(<button key={i} onClick={()=>setTestCurrentQ(i)} style={{width:32,height:32,borderRadius:8,border:"1.5px solid "+(isCurrent?T.teal:isAnswered?"transparent":T.border),background:isCurrent?T.teal:isAnswered?T.tealBg:"#fff",color:isCurrent?"#fff":isAnswered?T.teal:T.mute,cursor:"pointer",fontSize:".78rem",fontWeight:600,fontFamily:"inherit"}}>{i+1}</button>);
-                  })}
-                </div>
-              </div>
-            </div>);
-          }
-
-          // ── VIEW: result (score + per-question review + sub-area breakdown) ─────
-          if(studyView==="result"&&testResult){
-            const qs=activeTest?.questions||[];
-            const passed=testResult.accuracy>=60;
-            const areas=Object.entries(testResult.subAreaStats||{}).map(([area,st])=>({area,...st,pct:st.total?Math.round((st.right/st.total)*100):0})).sort((a,b)=>a.pct-b.pct);
-            const weak=areas.filter(a=>a.pct<60);
-            return(<div style={{maxWidth:760,margin:"0 auto"}}>
-              {/* Score header */}
-              <div style={{...T.card,padding:28,marginBottom:16,textAlign:"center",background:passed?"linear-gradient(135deg,#e8f5e9,"+T.tealBg+")":"linear-gradient(135deg,#fff3cd,"+T.goldBg+")"}}>
-                <div style={{fontSize:"3rem",marginBottom:8}}>{passed?"🎉":"📚"}</div>
-                <h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0}}>{passed?"Well done!":"Keep learning!"}</h2>
-                <div style={{fontSize:"3.5rem",fontWeight:700,color:passed?"#1a7d42":T.goldD,margin:"12px 0"}}>{testResult.accuracy}%</div>
-                <div style={{fontSize:".95rem",color:T.txt2}}>{testResult.correctAnswers} of {testResult.totalQuestions} correct · {Math.floor(testResult.timeSpentSeconds/60)}m {testResult.timeSpentSeconds%60}s</div>
-                {testResult.wasAutoSubmitted&&<div style={{fontSize:".76rem",color:T.mute,marginTop:6,fontStyle:"italic"}}>Auto-submitted when time ran out</div>}
-              </div>
-
-              {/* Sub-area breakdown */}
-              {areas.length>0&&<div style={{...T.card,marginBottom:14}}>
-                <h4 style={{fontSize:".95rem",fontWeight:700,margin:0,marginBottom:12}}>📊 Performance by area</h4>
-                <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                  {areas.map(a=><div key={a.area}>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:".8rem",marginBottom:3}}>
-                      <span style={{fontWeight:600}}>{a.area}</span>
-                      <span style={{color:a.pct>=70?"#1a7d42":a.pct>=50?T.goldD:T.err,fontWeight:700}}>{a.right}/{a.total} · {a.pct}%</span>
-                    </div>
-                    <div style={{background:T.bg,borderRadius:6,height:8,overflow:"hidden"}}>
-                      <div style={{background:a.pct>=70?"#4caf50":a.pct>=50?T.gold:T.err,height:"100%",width:`${a.pct}%`,transition:"width .4s"}}/>
-                    </div>
-                  </div>)}
-                </div>
-                {weak.length>0&&<div style={{marginTop:14,padding:"10px 14px",background:T.goldBg,borderRadius:8,fontSize:".82rem",color:T.txt2,lineHeight:1.5}}>
-                  💡 <b>Focus areas to strengthen:</b> {weak.map(a=>a.area).join(", ")}. Reviewing SKINARIO's Articles and Videos on these topics is a good next step.
-                </div>}
-              </div>}
-
-              {/* Question-by-question review */}
-              <div style={{...T.card,marginBottom:14}}>
-                <h4 style={{fontSize:".95rem",fontWeight:700,margin:0,marginBottom:12}}>📖 Review answers</h4>
-                <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                  {qs.map((q,i)=>{
-                    const chosen=testResult.answers?.[i];
-                    const right=chosen===q.correctIndex;
-                    return(<div key={i} style={{padding:14,background:T.bg,borderRadius:10,borderLeft:"3px solid "+(right?"#1a7d42":T.err)}}>
-                      <div style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:6}}>
-                        <span style={{fontSize:".72rem",fontWeight:700,color:right?"#1a7d42":T.err,padding:"1px 8px",borderRadius:5,background:right?"#e8f5e9":"#fdecea",flexShrink:0}}>Q{i+1} · {right?"✓":"✕"}</span>
-                        {q.subArea&&<span style={{fontSize:".68rem",color:T.mute,fontStyle:"italic"}}>{q.subArea}</span>}
-                      </div>
-                      {q.scenario&&<div style={{fontSize:".78rem",color:T.mute,fontStyle:"italic",marginBottom:5}}>{q.scenario}</div>}
-                      <div style={{fontSize:".88rem",fontWeight:600,marginBottom:8}}>{q.question}</div>
-                      <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:8}}>
-                        {q.options.map((opt,oi)=>{
-                          const isCorrect=oi===q.correctIndex;
-                          const isChosen=oi===chosen;
-                          return(<div key={oi} style={{padding:"7px 10px",fontSize:".8rem",borderRadius:6,background:isCorrect?"#e8f5e9":isChosen?"#fdecea":"#fff",border:"1px solid "+(isCorrect?"#4caf50":isChosen?"#f0c0c0":T.border),color:isCorrect?"#1a7d42":isChosen?T.err:T.txt2,fontWeight:isCorrect||isChosen?600:400}}>
-                            {String.fromCharCode(65+oi)}. {opt} {isCorrect&&"✓"}{!isCorrect&&isChosen&&" ← your answer"}
-                          </div>);
-                        })}
-                      </div>
-                      {q.explanation&&<div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.55,padding:"8px 10px",background:"#fff",borderRadius:6}} dangerouslySetInnerHTML={{__html:q.explanation}}/>}
-                    </div>);
-                  })}
-                </div>
-              </div>
-
-              {/* Action buttons */}
-              <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
-                <button onClick={()=>{setStudyView("home");setActiveTest(null);setTestResult(null);}} style={T.btnO}>Back to topics</button>
-                <button onClick={()=>{setStudyView("picker");setActiveTest(null);setTestResult(null);}} style={T.btnO}>Try another difficulty</button>
-              </div>
-            </div>);
-          }
-          return null;
-        })()}
       </div>}
 
       {/* FORUM */}
