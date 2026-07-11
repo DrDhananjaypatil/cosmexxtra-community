@@ -93,7 +93,8 @@ service cloud.firestore {
       allow update: if wasOwner('vendorId')
                     || isAdmin()
                     || (isSignedIn() && onlyChangedTo(['likes','updatedAt']))
-                    || (isSignedIn() && onlyChangedTo(['flags','updatedAt']));
+                    || (isSignedIn() && onlyChangedTo(['flags','updatedAt']))
+                    || (isSignedIn() && onlyChangedTo(['comments','updatedAt']));
       allow delete: if isAdmin();
     }
 

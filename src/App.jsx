@@ -2438,6 +2438,8 @@ export default function App(){
   const[flagModalPost,setFlagModalPost]=useState(null); // wall post being flagged
   const[flagReason,setFlagReason]=useState("");
   const[myEnqsOpen,setMyEnqsOpen]=useState(false);
+  const[openCommentsFor,setOpenCommentsFor]=useState(null); // wallPost id whose comments are expanded
+  const[commentDraft,setCommentDraft]=useState({});
   const[profileWallImage,setProfileWallImage]=useState("");
   const[profileWallUploading,setProfileWallUploading]=useState(false);
   const[wallUploading,setWallUploading]=useState(false);
@@ -5433,7 +5435,7 @@ ${forDownload
                     {w.imageUrl&&<img src={w.imageUrl} alt="" onClick={()=>setLightboxImg(w.imageUrl)} style={{width:"100%",maxHeight:360,objectFit:"cover",borderRadius:8,cursor:"zoom-in"}}/>}
                   </>}
 
-                  {!isEditing&&<div style={{display:"flex",gap:6,alignItems:"center",marginTop:10,paddingTop:8,borderTop:"1px solid "+T.border}}>
+                  {!isEditing&&<div style={{display:"flex",gap:6,alignItems:"center",marginTop:10,paddingTop:8,borderTop:"1px solid "+T.border,flexWrap:"wrap"}}>
                     <button onClick={async()=>{
                       if(!au?.uid)return;
                       const newLikes=iLiked?likes.filter(u=>u!==au.uid):[...likes,au.uid];
@@ -5442,8 +5444,55 @@ ${forDownload
                     }} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:4,color:iLiked?T.teal:T.mute,fontSize:".78rem",fontWeight:iLiked?700:500,padding:"4px 10px",borderRadius:6}}>
                       {iLiked?"❤️":"🤍"} {likes.length>0?likes.length:""} {likes.length===0?"Like":likes.length===1?"like":"likes"}
                     </button>
+                    <button onClick={()=>setOpenCommentsFor(openCommentsFor===w.id?null:w.id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:4,color:T.mute,fontSize:".78rem",padding:"4px 10px",borderRadius:6}}>
+                      💬 {(w.comments?.length||0)>0?w.comments.length:""} {(w.comments?.length||0)===0?"Comment":(w.comments?.length||0)===1?"comment":"comments"}
+                    </button>
+                    <button onClick={async()=>{
+                      const shareUrl=`${SITE_URL}/?wallpost=${w.id}`;
+                      const shareText=w.caption?w.caption.slice(0,120):`Post by ${w.vendorName} on SKINARIO`;
+                      if(navigator.share){
+                        try{await navigator.share({title:`${w.vendorName} on SKINARIO`,text:shareText,url:shareUrl});}catch{}
+                      }else if(navigator.clipboard){
+                        try{await navigator.clipboard.writeText(shareUrl);sh("🔗 Link copied to clipboard");}catch{sh("Couldn't copy — long-press to copy manually");}
+                      }
+                    }} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:4,color:T.mute,fontSize:".78rem",padding:"4px 10px",borderRadius:6}}>
+                      🔗 Share
+                    </button>
                     {!isOwner&&<button onClick={()=>{setFlagModalPost(w);setFlagReason("")}} title="Report as inappropriate" style={{background:"none",border:"none",cursor:"pointer",color:T.mute,fontSize:".78rem",padding:"4px 10px",borderRadius:6,marginLeft:"auto"}}>🚩 Report</button>}
                     {isAdm&&flagCount>0&&<span style={{fontSize:".68rem",fontWeight:700,color:T.err,padding:"2px 8px",borderRadius:5,background:"#fdecea",marginLeft:isOwner?"auto":0}}>🚩 {flagCount} flag{flagCount!==1?"s":""}</span>}
+                  </div>}
+
+                  {/* Comments section — expandable */}
+                  {!isEditing&&openCommentsFor===w.id&&<div style={{marginTop:10,paddingTop:10,borderTop:"1px solid "+T.border}}>
+                    {(w.comments||[]).length>0&&<div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:10}}>
+                      {(w.comments||[]).map((c,idx)=><div key={idx} style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+                        {c.photo?<img src={c.photo} style={{width:28,height:28,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(28,T.tealBg,T.teal),fontSize:".7rem",flexShrink:0}}>{(c.name||"?").slice(0,1).toUpperCase()}</div>}
+                        <div style={{flex:1,minWidth:0,background:T.bg,borderRadius:8,padding:"6px 10px"}}>
+                          <div style={{fontSize:".76rem",fontWeight:700,color:T.txt}}>{c.name}</div>
+                          <div style={{fontSize:".8rem",color:T.txt2,lineHeight:1.5,whiteSpace:"pre-wrap"}}>{c.text}</div>
+                        </div>
+                        {(c.uid===au?.uid||isAdm)&&<button onClick={async()=>{
+                          if(!window.confirm("Delete this comment?"))return;
+                          const nextComments=(w.comments||[]).filter((_,i)=>i!==idx);
+                          await fbSet("wallPosts",w.id,{comments:nextComments});
+                          loadData();
+                        }} style={{background:"none",border:"none",cursor:"pointer",color:T.mute,fontSize:".72rem",padding:2}}>✕</button>}
+                      </div>)}
+                    </div>}
+                    <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+                      {(prof?.logo||uPhoto)?<img src={prof?.logo||uPhoto} style={{width:28,height:28,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(28,T.tealBg,T.teal),fontSize:".7rem",flexShrink:0}}>{uIni}</div>}
+                      <input value={commentDraft[w.id]||""} onChange={e=>setCommentDraft(p=>({...p,[w.id]:e.target.value}))} onKeyDown={async e=>{
+                        if(e.key==="Enter"&&!e.shiftKey){
+                          e.preventDefault();
+                          const txt=(commentDraft[w.id]||"").trim();
+                          if(!txt)return;
+                          const nextComments=[...(w.comments||[]),{uid:au.uid,name:prof?.companyName||uName,photo:prof?.logo||uPhoto||"",text:txt,at:Date.now()}];
+                          await fbSet("wallPosts",w.id,{comments:nextComments});
+                          setCommentDraft(p=>({...p,[w.id]:""}));
+                          loadData();
+                        }
+                      }} placeholder="Write a comment…" style={{...T.inp,flex:1,fontSize:".82rem"}}/>
+                    </div>
                   </div>}
                 </div>);
               })}
@@ -5937,8 +5986,16 @@ ${forDownload
             .home-grid { grid-template-columns: 1fr !important; }
             .home-sidebar { order: 2; }
             .me-grid { grid-template-columns: 1fr !important; }
-            .me-info-grid { grid-template-columns: 1fr !important; }
+            .me-grid > div:nth-child(2) { order: 2; }
             .leaderboard-grid { grid-template-columns: 1fr !important; }
+          }
+          @media (max-width: 700px) {
+            .me-info-grid { grid-template-columns: 1fr !important; gap: 16px !important; }
+          }
+          /* Prevent images and long words from pushing their containers wider than the viewport on mobile */
+          @media (max-width: 600px) {
+            .me-grid img, .home-grid img { max-width: 100%; height: auto; }
+            .me-grid, .home-grid { word-wrap: break-word; overflow-wrap: anywhere; }
           }
         `}</style>
       </div>}
