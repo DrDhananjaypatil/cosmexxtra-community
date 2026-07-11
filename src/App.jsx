@@ -2437,6 +2437,7 @@ export default function App(){
   const[editingPostText,setEditingPostText]=useState("");
   const[flagModalPost,setFlagModalPost]=useState(null); // wall post being flagged
   const[flagReason,setFlagReason]=useState("");
+  const[myEnqsOpen,setMyEnqsOpen]=useState(false);
   const[profileWallImage,setProfileWallImage]=useState("");
   const[profileWallUploading,setProfileWallUploading]=useState(false);
   const[wallUploading,setWallUploading]=useState(false);
@@ -8599,12 +8600,15 @@ ${forDownload
           const myEnqs=productEnquiries.filter(e=>e.doctorUid===au?.uid).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
           if(myEnqs.length===0)return null;
           return(<div style={{...T.card,marginBottom:12}}>
-            <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12,display:"flex",alignItems:"center",gap:8}}>📨 My Enquiries {myEnqs.filter(e=>e.status!=="fulfilled").length>0&&<span style={{fontSize:".68rem",fontWeight:700,padding:"2px 8px",borderRadius:6,background:"#fff3cd",color:"#856404"}}>{myEnqs.filter(e=>e.status!=="fulfilled").length} awaiting reply</span>}</h4>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div onClick={()=>setMyEnqsOpen(o=>!o)} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",userSelect:"none"}}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,margin:0,display:"flex",alignItems:"center",gap:8,flex:1}}>📨 My Enquiries <span style={{fontSize:".72rem",color:T.mute,fontWeight:500}}>({myEnqs.length})</span> {myEnqs.filter(e=>e.status!=="fulfilled"&&e.status!=="cancelled").length>0&&<span style={{fontSize:".68rem",fontWeight:700,padding:"2px 8px",borderRadius:6,background:"#fff3cd",color:"#856404"}}>{myEnqs.filter(e=>e.status!=="fulfilled"&&e.status!=="cancelled").length} awaiting reply</span>}</h4>
+              <span style={{fontSize:".8rem",color:T.mute,transition:"transform .15s",transform:myEnqsOpen?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
+            </div>
+            {myEnqsOpen&&<div style={{display:"flex",flexDirection:"column",gap:8,marginTop:12}}>
               {myEnqs.map(e=><div key={e.id} style={{padding:"10px 12px",background:T.bg,borderRadius:8}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:4}}>
                   <span style={{fontSize:".84rem",fontWeight:700}}>{e.productName}</span>
-                  <span style={{fontSize:".68rem",fontWeight:700,padding:"2px 8px",borderRadius:6,background:e.status==="fulfilled"?"#e8f5e9":"#fff3cd",color:e.status==="fulfilled"?"#1a7d42":"#856404"}}>{e.status==="fulfilled"?"✓ Fulfilled":"⏳ Open"}</span>
+                  <span style={{fontSize:".68rem",fontWeight:700,padding:"2px 8px",borderRadius:6,background:e.status==="fulfilled"?"#e8f5e9":e.status==="cancelled"?"#f0f0f0":"#fff3cd",color:e.status==="fulfilled"?"#1a7d42":e.status==="cancelled"?T.mute:"#856404"}}>{e.status==="fulfilled"?"✓ Fulfilled":e.status==="cancelled"?"✕ Cancelled":"⏳ Open"}</span>
                 </div>
                 <div style={{fontSize:".72rem",color:T.mute,marginBottom:4}}>{e.vendorName} · {fD(e.date||"")}</div>
                 <div style={{fontSize:".8rem",color:T.txt2,fontStyle:"italic",lineHeight:1.5}}>"{e.message}"</div>
@@ -8613,7 +8617,7 @@ ${forDownload
                   <div style={{fontSize:".82rem",color:T.txt2,lineHeight:1.5}}>{e.vendorReply}</div>
                 </div>:<div style={{fontSize:".72rem",color:T.mute,marginTop:6,fontStyle:"italic"}}>No reply yet</div>}
               </div>)}
-            </div>
+            </div>}
           </div>);
         })()}
 
@@ -9528,7 +9532,40 @@ ${forDownload
           })}
           </div>
         </div>
-        {aTab==="stats"&&<><div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length],["Events",events.length],["Ads",ads.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>
+        {aTab==="stats"&&<><div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length],["Events",events.length],["Ads",ads.length],["Wall posts",wallPosts.filter(w=>w.active!==false).length],["Products/Courses",products.filter(p=>p.active!==false).length],["Reviews",reviews.filter(r=>r.active!==false).length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>
+
+          {/* User breakdown by account type */}
+          {(()=>{
+            const breakdown={doctor:0,brand:0,vendor:0,institute:0,other:0};
+            const wallBy={doctor:0,brand:0,vendor:0,institute:0,other:0};
+            allUsers.forEach(u=>{
+              const t=normalizeAccountType(u.accountType||"doctor");
+              if(breakdown[t]!==undefined)breakdown[t]++; else breakdown.other++;
+            });
+            wallPosts.filter(w=>w.active!==false).forEach(w=>{
+              const author=allUsers.find(u=>u.id===w.vendorId);
+              const t=author?normalizeAccountType(author.accountType||"doctor"):"other";
+              if(wallBy[t]!==undefined)wallBy[t]++; else wallBy.other++;
+            });
+            const tiles=[
+              {icon:"👨‍⚕️",l:"Doctors",k:"doctor",c:T.teal},
+              {icon:"💊",l:"Brand / Pharma",k:"brand",c:T.goldD},
+              {icon:"🏭",l:"Vendors",k:"vendor",c:"#7a3e9a"},
+              {icon:"🎓",l:"Institutes",k:"institute",c:"#c5392a"},
+            ];
+            return(<div style={{...T.card,marginTop:14}}>
+              <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:12}}>👥 Users & Posts by account type</h4>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10}}>
+                {tiles.map(t=><div key={t.k} style={{padding:14,background:T.bg,borderRadius:10,borderLeft:"3px solid "+t.c}}>
+                  <div style={{fontSize:".72rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>{t.icon} {t.l}</div>
+                  <div style={{fontSize:"1.4rem",fontWeight:700,color:t.c}}>{breakdown[t.k]}</div>
+                  <div style={{fontSize:".68rem",color:T.mute,marginTop:2}}>accounts</div>
+                  <div style={{fontSize:".78rem",fontWeight:600,color:T.txt,marginTop:8,paddingTop:8,borderTop:"1px solid "+T.border}}>{wallBy[t.k]} <span style={{fontSize:".64rem",color:T.mute,fontWeight:400}}>wall posts</span></div>
+                </div>)}
+              </div>
+              {breakdown.other>0&&<div style={{fontSize:".72rem",color:T.mute,marginTop:10}}>+ {breakdown.other} other/unclassified accounts</div>}
+            </div>);
+          })()}
           {/* ═══ ANALYTICS — top viewed content ═══ */}
           <div style={{...T.card,marginTop:14}}>
             <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:10}}>📈 Top viewed content</h4>
@@ -9884,10 +9921,60 @@ ${forDownload
 
         {aTab==="vendors"&&<div>
           <div style={{...T.card,marginBottom:14}}>
-            <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>🏢 Vendor Partners</h4>
+            <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>🏢 Business Accounts</h4>
             <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.55,marginBottom:0}}>
-              Vendors who have applied to offer rewards. Approve to let them propose offerings. Their reward proposals appear in the Submissions tab with type "vendor_reward".
+              Every registered vendor / pharma / institute account. Verify to give them the ✓ Verified Partner badge, or disable to hide their profile, products, and posts from the community.
             </p>
+          </div>
+
+          {/* All registered business accounts (verify/disable, not the application flow) */}
+          {(()=>{
+            const bizAccounts=allUsers.filter(u=>{
+              const t=normalizeAccountType(u.accountType||"");
+              return t==="vendor"||t==="brand"||t==="institute";
+            }).sort((a,b)=>{
+              const aVer=a.verified?1:0,bVer=b.verified?1:0;
+              const aDis=a.disabled?1:0,bDis=b.disabled?1:0;
+              // Unverified first, disabled last
+              if(aDis!==bDis)return aDis-bDis;
+              if(aVer!==bVer)return aVer-bVer;
+              return (a.companyName||a.name||"").localeCompare(b.companyName||b.name||"");
+            });
+            const counts={vendor:0,brand:0,institute:0};
+            bizAccounts.forEach(u=>{const t=normalizeAccountType(u.accountType||"");if(counts[t]!==undefined)counts[t]++;});
+            return(<div style={{marginBottom:24}}>
+              <h5 style={{fontSize:".88rem",fontWeight:700,marginBottom:10}}>All registered business accounts ({bizAccounts.length})</h5>
+              <div style={{fontSize:".76rem",color:T.mute,marginBottom:10}}>🏭 {counts.vendor} Vendors · 💊 {counts.brand} Brands/Pharma · 🎓 {counts.institute} Institutes</div>
+              {bizAccounts.length===0?<p style={{color:T.mute,fontSize:".82rem"}}>No business accounts registered yet.</p>:
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {bizAccounts.map(u=>{
+                  const t=normalizeAccountType(u.accountType||"");
+                  const typeLabel=t==="vendor"?"🏭 Vendor":t==="institute"?"🎓 Institute":"💊 Brand/Pharma";
+                  return(<div key={u.id} style={{...T.card,marginBottom:0,padding:12,borderLeft:"3px solid "+(u.disabled?T.err:u.verified?"#1a7d42":T.warn),opacity:u.disabled?0.65:1}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0,flex:1}}>
+                        {u.logo||u.photo?<img src={u.logo||u.photo} alt="" style={{width:36,height:36,borderRadius:8,objectFit:"cover",flexShrink:0}}/>:<div style={{width:36,height:36,borderRadius:8,background:T.tealBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1rem",flexShrink:0}}>{t==="institute"?"🎓":"🏭"}</div>}
+                        <div style={{minWidth:0}}>
+                          <div style={{fontSize:".9rem",fontWeight:700}}>{u.companyName||u.name}{u.verified&&<span style={{fontSize:".62rem",fontWeight:700,color:"#1a7d42",background:"#e8f5e9",padding:"2px 6px",borderRadius:6,marginLeft:6}}>✓ Verified</span>}{u.disabled&&<span style={{fontSize:".62rem",fontWeight:700,color:T.err,background:"#fdecea",padding:"2px 6px",borderRadius:6,marginLeft:6}}>Disabled</span>}</div>
+                          <div style={{fontSize:".7rem",color:T.mute,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{typeLabel} · {u.email}{u.vendorCategory||u.brandCategory?` · ${u.vendorCategory||u.brandCategory}`:""}</div>
+                        </div>
+                      </div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {!u.verified&&<button onClick={async()=>{await fbSet("users",u.id,{verified:true,verifiedAt:Date.now(),verifiedBy:au.email});sh("✓ Verified");loadData();}} style={{...T.btn,...T.btnSm}}>✓ Verify</button>}
+                        {u.verified&&!u.disabled&&<button onClick={async()=>{if(!window.confirm("Remove verified badge?"))return;await fbSet("users",u.id,{verified:false});sh("Verification removed");loadData();}} style={{...T.btnO,...T.btnSm}}>Unverify</button>}
+                        {!u.disabled?<button onClick={async()=>{if(!window.confirm(`Disable ${u.companyName||u.name}? Their profile, products, and posts will be hidden from the community.`))return;await fbSet("users",u.id,{disabled:true,disabledAt:Date.now(),disabledBy:au.email});sh("Account disabled");loadData();}} style={{...T.btnDanger,...T.btnSm}}>Disable</button>
+                        :<button onClick={async()=>{await fbSet("users",u.id,{disabled:false});sh("Re-enabled");loadData();}} style={{...T.btnO,...T.btnSm}}>Re-enable</button>}
+                      </div>
+                    </div>
+                  </div>);
+                })}
+              </div>}
+            </div>);
+          })()}
+
+          <div style={{padding:"14px 18px",background:T.bg,borderRadius:10,marginBottom:14}}>
+            <h5 style={{fontSize:".88rem",fontWeight:700,margin:0,marginBottom:4}}>Reward Partnership Applications</h5>
+            <p style={{fontSize:".76rem",color:T.txt2,margin:0,lineHeight:1.5}}>Separate from account approval above. Applications submitted by vendors who want to offer rewards on the platform. Approve to let them submit reward proposals (visible in Submissions tab).</p>
           </div>
 
           {(()=>{
