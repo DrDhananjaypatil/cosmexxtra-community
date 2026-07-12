@@ -4426,25 +4426,33 @@ ${forDownload
     setTimeout(()=>res(null),3000);
   });
 
-  // Compress an image file to a base64 data URL — resizes to maxW×maxH and uses JPEG quality
-  const compressImgToData=(file,maxW=800,maxH=600,quality=0.8)=>new Promise((resolve)=>{
-    const reader=new FileReader();
-    reader.onload=()=>{
-      const img=new Image();
-      img.onload=()=>{
-        let w=img.width,h=img.height;
-        if(w>maxW){h=h*(maxW/w);w=maxW;}
-        if(h>maxH){w=w*(maxH/h);h=maxH;}
-        const cv=document.createElement("canvas");cv.width=Math.round(w);cv.height=Math.round(h);
-        const cx=cv.getContext("2d");cx.drawImage(img,0,0,cv.width,cv.height);
-        resolve(cv.toDataURL("image/jpeg",quality));
+  // Compress an image file to a base64 data URL — resizes and uses JPEG compression.
+  // Firestore field limit is ~1MB, so we target well under that.
+  const compressImgToData=async(file,maxW=400,maxH=300,quality=0.7)=>{
+    return new Promise((resolve)=>{
+      const reader=new FileReader();
+      reader.onload=()=>{
+        const img=new Image();
+        img.onload=()=>{
+          let w=img.width,h=img.height;
+          if(w>maxW){h=h*(maxW/w);w=maxW;}
+          if(h>maxH){w=w*(maxH/h);h=maxH;}
+          const cv=document.createElement("canvas");cv.width=Math.round(w);cv.height=Math.round(h);
+          const cx=cv.getContext("2d");cx.drawImage(img,0,0,cv.width,cv.height);
+          let result=cv.toDataURL("image/jpeg",quality);
+          // Safety: if still over 500KB, keep reducing quality
+          let q=quality;
+          while(result.length>500000&&q>0.3){q-=0.1;result=cv.toDataURL("image/jpeg",q);}
+          console.log(`[cert] compressed ${file.name}: ${Math.round(result.length/1024)}KB (q=${q.toFixed(1)}, ${cv.width}×${cv.height})`);
+          resolve(result);
+        };
+        img.onerror=()=>resolve("");
+        img.src=reader.result;
       };
-      img.onerror=()=>resolve("");
-      img.src=reader.result;
-    };
-    reader.onerror=()=>resolve("");
-    reader.readAsDataURL(file);
-  });
+      reader.onerror=()=>resolve("");
+      reader.readAsDataURL(file);
+    });
+  };
 
   const generateCertificate=async(attempt,{userName,difficulty})=>{
     const dt=DIFF_THEME[difficulty||attempt.difficulty]||DIFF_THEME.Easy;
@@ -11782,7 +11790,7 @@ ${forDownload
                       if(f.size>5*1024*1024){sh("Image must be under 5MB");return;}
                       // Compress: template gets larger canvas, logos get smaller
                       const isTemplate=slot.key==="template";
-                      const dataUrl=await compressImgToData(f,isTemplate?1400:400,isTemplate?1050:300,isTemplate?0.85:0.9);
+                      const dataUrl=await compressImgToData(f,isTemplate?1000:200,isTemplate?750:200,isTemplate?0.65:0.8);
                       if(!dataUrl){sh("Failed to process image");return;}
                       setCertConfig(p=>({...p,[slot.field]:dataUrl}));
                       sh("✓ "+slot.label+" uploaded");
@@ -11818,7 +11826,7 @@ ${forDownload
                     📤
                     <input type="file" accept="image/*" style={{display:"none"}} onChange={async e=>{
                       const f=e.target.files?.[0];if(!f)return;
-                      const dataUrl=await compressImgToData(f,200,200,0.9);
+                      const dataUrl=await compressImgToData(f,150,150,0.8);
                       if(!dataUrl){sh("Failed");return;}
                       const next=[...(certConfig.accreditations||[])];next[i]={...acc,logoData:dataUrl};setCertConfig(p=>({...p,accreditations:next}));
                       e.target.value="";
@@ -11849,7 +11857,7 @@ ${forDownload
                       📤 Logo
                       <input type="file" accept="image/*" style={{display:"none"}} onChange={async e=>{
                         const f=e.target.files?.[0];if(!f)return;
-                        const dataUrl=await compressImgToData(f,200,200,0.9);
+                        const dataUrl=await compressImgToData(f,150,150,0.8);
                         if(!dataUrl)return;
                         setCertConfig(p=>({...p,sponsorLogoData:dataUrl}));e.target.value="";
                       }}/>
@@ -11860,15 +11868,18 @@ ${forDownload
               </div>
 
               {/* Save */}
-              <button onClick={async()=>{
-                try{
-                  const json=JSON.stringify(certConfig);
-                  const sizeKB=Math.round(json.length/1024);
-                  if(sizeKB>900){sh(`⚠ Config too large (${sizeKB}KB). Firestore limit is ~1MB. Try smaller images.`);return;}
-                  await fbSet("platformSettings","certConfig",certConfig);
-                  sh(`✓ Saved (${sizeKB}KB)`);loadData();
-                }catch(err){console.error(err);sh("Failed: "+err.message)}
-              }} style={{...T.btn,width:"100%"}}>Save certificate settings</button>
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={async()=>{
+                  try{
+                    const json=JSON.stringify(certConfig);
+                    const sizeKB=Math.round(json.length/1024);
+                    if(sizeKB>900){sh(`⚠ Too large (${sizeKB}KB). Try smaller images or remove some.`);return;}
+                    await fbSet("platformSettings","certConfig",certConfig);
+                    sh(`✓ Saved (${sizeKB}KB)`);loadData();
+                  }catch(err){console.error(err);sh("Failed: "+(err.message||"").slice(0,100))}
+                }} style={{...T.btn,flex:1}}>Save certificate settings</button>
+                <button onClick={()=>{if(window.confirm("Clear all certificate settings? You'll need to re-upload everything.")){setCertConfig({});sh("Cleared — re-upload and save")}}} style={{...T.btnDanger,...T.btnSm,fontSize:".72rem"}}>Reset all</button>
+              </div>
             </div>
 
             <div style={{padding:14,background:T.bg,borderRadius:10,fontSize:".76rem",color:T.mute,textAlign:"center",fontStyle:"italic"}}>More beta programs will appear here as they launch.</div>
