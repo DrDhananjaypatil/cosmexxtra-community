@@ -7581,24 +7581,43 @@ ${forDownload
 
           // ── VIEW: picker (difficulty selection for chosen topic) ─────
           if(studyView==="picker"&&selTestTopic){
+            const monthKey=new Date().toISOString().slice(0,7);
+            // Find which difficulties user has already attempted this month
+            const myTopicAttempts=myAttempts.filter(a=>a.topicId===selTestTopic.id&&a.monthKey===monthKey);
+            const attemptedDiffs=new Set(myTopicAttempts.map(a=>a.difficulty));
+            // Find a suggested "next" difficulty
+            const suggestedNext=!attemptedDiffs.has("Easy")?"Easy":!attemptedDiffs.has("Moderate")?"Moderate":!attemptedDiffs.has("Hard")?"Hard":null;
             return(<div>
               <button onClick={()=>{setStudyView("home");setSelTestTopic(null);}} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back to topics</button>
               <div style={{...T.card,padding:22,marginBottom:16,textAlign:"center"}}>
                 <div style={{fontSize:"2.5rem",marginBottom:6}}>{selTestTopic.icon}</div>
                 <h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0,marginBottom:6}}>{selTestTopic.label}</h2>
                 <p style={{color:T.mute,fontSize:".84rem",margin:0}}>Choose your difficulty level</p>
+                {suggestedNext&&attemptedDiffs.size>0&&<div style={{fontSize:".78rem",color:T.teal,marginTop:8,fontWeight:600}}>💡 You haven't tried {suggestedNext} yet — give it a go!</div>}
               </div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}>
                 {TEST_DIFFICULTIES.map(d=>{
-                  const monthKey=new Date().toISOString().slice(0,7);
                   const avail=testSeries.filter(x=>x.topicId===selTestTopic.id&&x.difficulty===d&&x.monthKey===monthKey).length;
-                  const myBest=myAttempts.filter(a=>a.topicId===selTestTopic.id&&a.difficulty===d);
-                  const best=myBest.length?Math.max(...myBest.map(a=>a.accuracy||0)):null;
+                  const prevAttempts=myTopicAttempts.filter(a=>a.difficulty===d);
+                  const hasTaken=prevAttempts.length>0;
+                  const best=hasTaken?Math.max(...prevAttempts.map(a=>a.accuracy||0)):null;
+                  const latest=hasTaken?prevAttempts.sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt))[0]:null;
                   const dColor=d==="Easy"?"#1a7d42":d==="Moderate"?T.goldD:T.err;
-                  return(<div key={d} onClick={()=>{if(avail>0)startTest(selTestTopic,d);}} style={{...T.card,marginBottom:0,padding:18,cursor:avail>0?"pointer":"default",opacity:avail>0?1:0.5,borderLeft:"3px solid "+dColor,transition:"all .15s"}} onMouseEnter={e=>{if(avail>0){e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 18px rgba(0,0,0,0.08)";}}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
-                    <div style={{fontSize:".95rem",fontWeight:700,color:dColor,marginBottom:4}}>{d}</div>
+                  const isSuggested=d===suggestedNext;
+                  return(<div key={d} onClick={()=>{if(avail>0)startTest(selTestTopic,d);}} style={{...T.card,marginBottom:0,padding:18,cursor:avail>0?"pointer":"default",opacity:avail>0?1:0.5,borderLeft:"3px solid "+dColor,transition:"all .15s",border:isSuggested?"2px solid "+T.teal:undefined}} onMouseEnter={e=>{if(avail>0){e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 18px rgba(0,0,0,0.08)";}}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+                      <div style={{fontSize:".95rem",fontWeight:700,color:dColor}}>{d}</div>
+                      {hasTaken&&<span style={{fontSize:".58rem",fontWeight:700,padding:"2px 7px",borderRadius:5,background:T.bg,color:T.mute}}>✓ TAKEN ({prevAttempts.length}×)</span>}
+                      {isSuggested&&!hasTaken&&<span style={{fontSize:".58rem",fontWeight:700,padding:"2px 7px",borderRadius:5,background:T.tealBg,color:T.teal}}>SUGGESTED</span>}
+                    </div>
                     <div style={{fontSize:".72rem",color:T.mute}}>{avail>0?`${avail} variant${avail!==1?"s":""} · ${TEST_QUESTION_COUNT} Qs · ${TEST_DURATION_SECONDS/60} min`:"Not yet available"}</div>
-                    {best!==null&&<div style={{fontSize:".72rem",color:T.teal,fontWeight:600,marginTop:6}}>Your best: {best}%</div>}
+                    {hasTaken&&<div style={{marginTop:8,padding:"8px 10px",background:T.bg,borderRadius:8}}>
+                      <div style={{fontSize:".76rem",color:T.txt2,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <span>Best: <b style={{color:best>=70?"#1a7d42":best>=50?T.goldD:T.err}}>{best}%</b></span>
+                        <span style={{color:T.mute,fontSize:".68rem"}}>Latest: {latest?.accuracy}% · {fD(tsToDateStr(latest?.createdAt))}</span>
+                      </div>
+                    </div>}
+                    {hasTaken&&<div style={{fontSize:".72rem",color:T.teal,fontWeight:600,marginTop:8}}>🔄 Retake (new variant, saves as practice)</div>}
                   </div>);
                 })}
               </div>
