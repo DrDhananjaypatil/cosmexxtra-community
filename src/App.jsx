@@ -291,7 +291,7 @@ function computeStudyStats(attempts) {
     });
   });
   const areas = Object.values(areaMap)
-    .filter(a => a.total >= 3) // ignore areas with too little data to be meaningful
+    .filter(a => a.total >= 1) // show all areas with at least 1 question
     .map(a => ({ ...a, pct: Math.round((a.right / a.total) * 100) }))
     .sort((a,b) => a.pct - b.pct);
   const weakAreas = areas.filter(a => a.pct < 60).slice(0, 5);
@@ -2528,6 +2528,7 @@ export default function App(){
   const[betaConfig,setBetaConfig]=useState({});
   const[betaEditDraft,setBetaEditDraft]=useState({}); // {cap, enabled} — admin unsaved edits
   const[profileTestsOpen,setProfileTestsOpen]=useState(false); // collapsible test history on admin profile view
+  const[expandedAttempt,setExpandedAttempt]=useState(null); // which test attempt is expanded for question review
   // Test timer — decrements every second while user is taking a test.
   // NOTE: Must live AFTER studyView/activeTest state declarations above,
   // otherwise Vite's minifier triggers a TDZ crash on first render.
@@ -7543,17 +7544,68 @@ ${forDownload
                 })}
               </div>
 
-              {/* Recent attempts list */}
+              {/* Recent test results — expandable with full question review */}
               {myAttempts.length>0&&<div style={{...T.card}}>
-                <h4 style={{fontSize:".92rem",fontWeight:700,margin:0,marginBottom:10}}>Recent attempts</h4>
-                <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                  {myAttempts.slice(0,8).map(a=><div key={a.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",background:T.bg,borderRadius:8,gap:10,flexWrap:"wrap"}}>
-                    <div style={{minWidth:0,flex:1}}>
-                      <div style={{fontSize:".84rem",fontWeight:600,color:T.txt}}>{a.topic} <span style={{color:T.mute,fontWeight:400,fontSize:".72rem"}}>· {a.difficulty}</span></div>
-                      <div style={{fontSize:".68rem",color:T.mute}}>{fD(tsToDateStr(a.createdAt))}</div>
-                    </div>
-                    <div style={{fontSize:".9rem",fontWeight:700,color:a.accuracy>=70?"#1a7d42":a.accuracy>=50?T.goldD:T.err}}>{a.accuracy}% <span style={{fontSize:".7rem",color:T.mute,fontWeight:400}}>({a.correctAnswers}/{a.totalQuestions})</span></div>
-                  </div>)}
+                <h4 style={{fontSize:".92rem",fontWeight:700,margin:0,marginBottom:10}}>📝 My Test Results</h4>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {myAttempts.sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt)).slice(0,8).map(a=>{
+                    const isExpanded=expandedAttempt===a.id;
+                    // Find the test doc so we can show question-level review
+                    const testDoc=testSeries.find(t=>t.id===a.testId);
+                    const areaEntries=Object.entries(a.subAreaStats||{}).map(([area,s])=>({area,...s,pct:s.total?Math.round((s.right/s.total)*100):0})).sort((x,y)=>x.pct-y.pct);
+                    return(<div key={a.id} style={{background:T.bg,borderRadius:10,overflow:"hidden"}}>
+                      <div onClick={()=>setExpandedAttempt(isExpanded?null:a.id)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",gap:10,flexWrap:"wrap",cursor:"pointer",userSelect:"none"}}>
+                        <div style={{minWidth:0,flex:1}}>
+                          <div style={{fontSize:".84rem",fontWeight:600,color:T.txt}}>{a.topic} <span style={{color:T.mute,fontWeight:400,fontSize:".72rem"}}>· {a.difficulty} · {fD(tsToDateStr(a.createdAt))}</span></div>
+                        </div>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <span style={{fontSize:".9rem",fontWeight:700,color:a.accuracy>=70?"#1a7d42":a.accuracy>=50?T.goldD:T.err}}>{a.accuracy}% <span style={{fontSize:".68rem",color:T.mute,fontWeight:400}}>({a.correctAnswers}/{a.totalQuestions})</span></span>
+                          <span style={{fontSize:".75rem",color:T.mute,transition:"transform .15s",transform:isExpanded?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
+                        </div>
+                      </div>
+                      {isExpanded&&<div style={{padding:"0 14px 14px",borderTop:"1px solid "+T.border}}>
+                        {/* Sub-area performance for this test */}
+                        {areaEntries.length>0&&<div style={{marginTop:10,marginBottom:12}}>
+                          <div style={{fontSize:".7rem",fontWeight:700,color:T.mute,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Performance by area</div>
+                          {areaEntries.map(ar=><div key={ar.area} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                            <span style={{fontSize:".76rem",fontWeight:600,flex:1,minWidth:0}}>{ar.area}</span>
+                            <div style={{width:80,height:6,background:"#e0e0e0",borderRadius:3,overflow:"hidden"}}>
+                              <div style={{height:"100%",width:ar.pct+"%",background:ar.pct>=70?"#4caf50":ar.pct>=50?T.gold:T.err}}/>
+                            </div>
+                            <span style={{fontSize:".72rem",fontWeight:700,color:ar.pct>=70?"#1a7d42":ar.pct>=50?T.goldD:T.err,minWidth:48,textAlign:"right"}}>{ar.right}/{ar.total} · {ar.pct}%</span>
+                          </div>)}
+                        </div>}
+                        {/* Question-by-question review (if test doc available) */}
+                        {testDoc&&testDoc.questions?.length>0?<div>
+                          <div style={{fontSize:".7rem",fontWeight:700,color:T.mute,textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>Question review</div>
+                          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                            {testDoc.questions.map((q,qi)=>{
+                              const chosen=a.answers?.[qi];
+                              const right=chosen===q.correctIndex;
+                              return(<div key={qi} style={{padding:10,background:"#fff",borderRadius:8,borderLeft:"3px solid "+(right?"#1a7d42":T.err)}}>
+                                <div style={{display:"flex",gap:6,alignItems:"flex-start",marginBottom:4}}>
+                                  <span style={{fontSize:".66rem",fontWeight:700,color:right?"#1a7d42":T.err,padding:"1px 6px",borderRadius:4,background:right?"#e8f5e9":"#fdecea",flexShrink:0}}>Q{qi+1} {right?"✓":"✕"}</span>
+                                  {q.subArea&&<span style={{fontSize:".64rem",color:T.mute}}>{q.subArea}</span>}
+                                </div>
+                                <div style={{fontSize:".8rem",fontWeight:600,marginBottom:6,lineHeight:1.4}}>{q.question}</div>
+                                <div style={{display:"flex",flexDirection:"column",gap:3,marginBottom:6}}>
+                                  {q.options.map((opt,oi)=>{
+                                    const isCorrect=oi===q.correctIndex;
+                                    const isChosen=oi===chosen;
+                                    if(!isCorrect&&!isChosen)return null; // only show correct + chosen to keep it compact
+                                    return(<div key={oi} style={{padding:"4px 8px",fontSize:".74rem",borderRadius:5,background:isCorrect?"#e8f5e9":"#fdecea",color:isCorrect?"#1a7d42":T.err,fontWeight:600}}>
+                                      {String.fromCharCode(65+oi)}. {opt} {isCorrect?"✓":""}{!isCorrect&&isChosen?" ← your answer":""}
+                                    </div>);
+                                  })}
+                                </div>
+                                {q.explanation&&<div style={{fontSize:".72rem",color:T.txt2,lineHeight:1.5,padding:"6px 8px",background:T.bg,borderRadius:5}} dangerouslySetInnerHTML={{__html:q.explanation}}/>}
+                              </div>);
+                            })}
+                          </div>
+                        </div>:<div style={{fontSize:".78rem",color:T.mute,fontStyle:"italic",marginTop:8}}>Question-level review not available for this attempt.</div>}
+                      </div>}
+                    </div>);
+                  })}
                 </div>
               </div>}
 
@@ -7621,6 +7673,54 @@ ${forDownload
                   </div>);
                 })}
               </div>
+
+              {/* Topic-specific stats + mentor assessment (only shows if user has attempts in this topic) */}
+              {myTopicAttempts.length>0&&(()=>{
+                const topicStats=computeStudyStats(myTopicAttempts);
+                return(<div style={{...T.card,marginTop:16}}>
+                  <h4 style={{fontSize:".92rem",fontWeight:700,margin:0,marginBottom:14}}>📊 Your {selTestTopic.label} Assessment</h4>
+
+                  {/* Summary stats */}
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8,marginBottom:14}}>
+                    {[["Tests",topicStats.totalTests],["Avg",topicStats.avgAccuracy+"%"],["Best",topicStats.bestScore+"%"]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:10,background:T.bg,borderRadius:8}}>
+                      <div style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{v}</div>
+                      <div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>{l}</div>
+                    </div>)}
+                  </div>
+
+                  {/* Strong + Weak areas */}
+                  {(topicStats.strongAreas.length>0||topicStats.weakAreas.length>0)&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}} className="me-info-grid">
+                    {topicStats.strongAreas.length>0&&<div style={{padding:12,background:"#e8f5e9",borderRadius:10}}>
+                      <div style={{fontSize:".68rem",fontWeight:700,color:"#1a7d42",textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>💪 Your strengths</div>
+                      {topicStats.strongAreas.map(a=><div key={a.area} style={{display:"flex",justifyContent:"space-between",fontSize:".78rem",color:T.txt2,marginBottom:3}}>
+                        <span>{a.area}</span>
+                        <span style={{fontWeight:700,color:"#1a7d42"}}>{a.pct}%</span>
+                      </div>)}
+                    </div>}
+                    {topicStats.weakAreas.length>0&&<div style={{padding:12,background:"#fef3cd",borderRadius:10}}>
+                      <div style={{fontSize:".68rem",fontWeight:700,color:T.goldD,textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>📚 Needs more practice</div>
+                      {topicStats.weakAreas.map(a=><div key={a.area} style={{display:"flex",justifyContent:"space-between",fontSize:".78rem",color:T.txt2,marginBottom:3}}>
+                        <span>{a.area}</span>
+                        <span style={{fontWeight:700,color:T.goldD}}>{a.pct}%</span>
+                      </div>)}
+                    </div>}
+                  </div>}
+
+                  {/* Mentor-style suggestion */}
+                  <div style={{padding:"12px 16px",background:"linear-gradient(135deg,"+T.tealBg+","+T.goldBg+"55)",borderRadius:10,borderLeft:"3px solid "+T.teal}}>
+                    <div style={{fontSize:".72rem",fontWeight:700,color:T.teal,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>🎓 Mentor's note</div>
+                    <div style={{fontSize:".84rem",color:T.txt2,lineHeight:1.6}}>
+                      {topicStats.avgAccuracy>=80?"Excellent command of "+selTestTopic.label+"! You're consistently scoring above 80%. Consider testing at a harder difficulty to keep challenging yourself, or explore a different topic to broaden your expertise."
+                      :topicStats.avgAccuracy>=60?"Good foundation in "+selTestTopic.label+". You're above passing but there's room to sharpen your knowledge."+(topicStats.weakAreas.length>0?" Focus on <b>"+topicStats.weakAreas.map(a=>a.area).join(", ")+"</b> — these are the sub-areas pulling your score down. Browse SKINARIO's Articles and Videos on these specific topics before your next attempt.":"")
+                      :"You're building your "+selTestTopic.label+" knowledge — keep at it!"+(topicStats.weakAreas.length>0?" Your biggest opportunities are in <b>"+topicStats.weakAreas.map(a=>a.area).join(", ")+"</b>. We recommend reviewing foundational material on these areas before retaking. SKINARIO's Articles and Videos sections have curated content that can help.":"")}
+                    </div>
+                    <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
+                      <button onClick={()=>go("library")} style={{...T.btnO,...T.btnSm,fontSize:".72rem"}}>📚 Browse Articles</button>
+                      <button onClick={()=>go("videos")} style={{...T.btnO,...T.btnSm,fontSize:".72rem"}}>🎥 Watch Videos</button>
+                    </div>
+                  </div>
+                </div>);
+              })()}
             </div>);
           }
 
