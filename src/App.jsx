@@ -4417,7 +4417,18 @@ ${forDownload
   };
 
   // ══════ CERTIFICATE GENERATION — reusable from result view + sidebar ══════
-  const loadCertImg=(url)=>new Promise(r=>{if(!url){r(null);return}const img=new Image();img.crossOrigin="anonymous";img.onload=()=>r(img);img.onerror=()=>r(null);img.src=url;setTimeout(()=>r(null),4000);});
+  const loadCertImg=async(url)=>{
+    if(!url)return null;
+    try{
+      // Fetch raw bytes → convert to data URL → load as Image.
+      // This bypasses CORS entirely (no crossOrigin attribute needed).
+      const resp=await fetch(url);
+      if(!resp.ok)return null;
+      const blob=await resp.blob();
+      const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(blob);});
+      return new Promise(res=>{const img=new Image();img.onload=()=>res(img);img.onerror=()=>res(null);img.src=dataUrl;setTimeout(()=>res(null),5000);});
+    }catch{return null}
+  };
 
   const generateCertificate=async(attempt,{userName,difficulty})=>{
     const dt=DIFF_THEME[difficulty||attempt.difficulty]||DIFF_THEME.Easy;
