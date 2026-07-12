@@ -2386,7 +2386,7 @@ export default function App(){
 
   // KNOWN_PAGES must match every page condition the app actually renders.
   // If you add a new page (`pg==="xyz"&&...` block), add "xyz" here too.
-  const KNOWN_PAGES=["home","me","quiz","library","forum","cases","rewards","submit","rank","events","videos","admin","profile","ad","consent","vendors","study"];
+  const KNOWN_PAGES=["home","me","quiz","library","forum","cases","rewards","submit","rank","events","videos","admin","profile","ad","consent","vendors","study","articles"];
   const sh=m=>setToast(m);const go=p=>{const safe=KNOWN_PAGES.includes(p)?p:"home";setPg(safe);setSelA(null);setSelV(null);setSelAd(null);setSelE(null);setSelU(null);setSelFP(null);setSelCs(null);setEdForm(null)};
 
   // ─── FOLLOW SYSTEM ────────────────────────────────────────────────────────
@@ -2535,6 +2535,7 @@ export default function App(){
   const[betaEditDraft,setBetaEditDraft]=useState({}); // {cap, enabled} — admin unsaved edits
   const[profileTestsOpen,setProfileTestsOpen]=useState(false); // collapsible test history on admin profile view
   const[expandedAttempt,setExpandedAttempt]=useState(null); // which test attempt is expanded for question review
+  const[certConfig,setCertConfig]=useState({}); // {logoUrl, accreditations:[{name,logoUrl}], sponsorId, sponsorName, sponsorLogo, sponsorTagline}
   // Test timer — decrements every second while user is taking a test.
   // NOTE: Must live AFTER studyView/activeTest state declarations above,
   // otherwise Vite's minifier triggers a TDZ crash on first render.
@@ -2636,6 +2637,8 @@ export default function App(){
   const[broadcastList,setBroadcastList]=useState([]);
   const[announceBusy,setAnnounceBusy]=useState(false);
   const[articleLimit,setArticleLimit]=useState(6);
+  const[articleFilter,setArticleFilter]=useState("all");
+  const[articleSearch,setArticleSearch]=useState("");
   const[videoFilter,setVideoFilter]=useState("all");
   const[videoSearch,setVideoSearch]=useState("");
   const[editingProfile,setEditingProfile]=useState(false);
@@ -2770,7 +2773,7 @@ export default function App(){
     if(!consentDoctorReg)setConsentDoctorReg(prof.doctorRegNumber||prof.regNumber||"");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[pg,prof]);
-  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl,tm,wp,rv,am,ts,ta,bc]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000),fbGetAll("teamMembers","createdAt","desc",2000),fbGetAll("wallPosts","createdAt","desc",500),fbGetAll("reviews","createdAt","desc",2000),fbGetAll("adminMessages","createdAt","desc",500),fbGetAll("testSeries","createdAt","desc",500),fbGetAll("testAttempts","createdAt","desc",500),fbGet("platformSettings","betaConfig")]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl);setTeamMembers(tm);setWallPosts(wp);setReviews(rv);setAdminMessages(am);setTestSeries(ts);setTestAttempts(ta);setBetaConfig(bc||{})},[au?.uid]);
+  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl,tm,wp,rv,am,ts,ta,bc,cc]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000),fbGetAll("teamMembers","createdAt","desc",2000),fbGetAll("wallPosts","createdAt","desc",500),fbGetAll("reviews","createdAt","desc",2000),fbGetAll("adminMessages","createdAt","desc",500),fbGetAll("testSeries","createdAt","desc",500),fbGetAll("testAttempts","createdAt","desc",500),fbGet("platformSettings","betaConfig"),fbGet("platformSettings","certConfig")]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl);setTeamMembers(tm);setWallPosts(wp);setReviews(rv);setAdminMessages(am);setTestSeries(ts);setTestAttempts(ta);setBetaConfig(bc||{});setCertConfig(cc||{})},[au?.uid]);
 
   // Load current user's points-earning history from pointsActivity ledger.
   // Uses where(uid) so the list query satisfies security rules (can't list others' docs).
@@ -5564,7 +5567,7 @@ ${forDownload
             <div style={{fontSize:".52rem",color:T.gold,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>Redeem →</div>
           </div>
           {/* Articles */}
-          {[["📰",articles.length,"Articles",()=>{go("home");setTimeout(()=>document.getElementById("featured-articles")?.scrollIntoView({behavior:"smooth",block:"start"}),200);}],["🔬",cases.length,"Cases",()=>go("cases")],["💬",forumPosts.length,"Forum",()=>go("forum")],["🎥",videos.length,"Videos",()=>go("videos")],["📚",resources.length,"Library",()=>go("library")]].map(([ic,ct,lb,fn])=>
+          {[["📰",articles.length,"Articles",()=>go("articles")],["🔬",cases.length,"Cases",()=>go("cases")],["💬",forumPosts.length,"Forum",()=>go("forum")],["🎥",videos.length,"Videos",()=>go("videos")],["📚",resources.length,"Library",()=>go("library")]].map(([ic,ct,lb,fn])=>
             <div key={lb} onClick={fn} style={{...T.card,textAlign:"center",padding:"12px 4px",marginBottom:0,cursor:"pointer",transition:"transform .12s,box-shadow .12s",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 16px rgba(0,0,0,0.08)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04)"}}>
               <div style={{fontSize:"1rem"}}>{ic}</div>
               <div style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{ct}</div>
@@ -5875,7 +5878,7 @@ ${forDownload
           return(<div style={{...T.card,padding:18,marginBottom:14}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
               <h3 id="featured-articles" style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>📰 Featured Articles</h3>
-              <span onClick={()=>go("library")} style={{fontSize:".78rem",color:T.teal,fontWeight:600,cursor:"pointer"}}>Explore all →</span>
+              <span onClick={()=>go("articles")} style={{fontSize:".78rem",color:T.teal,fontWeight:600,cursor:"pointer"}}>Explore all →</span>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
               {eligible.map(a=><div key={a.id} onClick={()=>{setSelA(a);window.scrollTo(0,0)}} style={{background:"#fff",borderRadius:10,overflow:"hidden",border:"1px solid "+T.border,cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 20px rgba(0,0,0,0.07)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
@@ -6256,8 +6259,56 @@ ${forDownload
         {/* ═══ END RIGHT SIDEBAR ═══ */}
 
       </div>}
-      {pg==="home"&&selA&&<div>
-        <button onClick={()=>setSelA(null)} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back</button>
+      {/* ═══ ARTICLES PAGE ═══ */}
+      {pg==="articles"&&!selA&&<div style={{maxWidth:1100}}>
+        <div style={{...T.card,padding:"20px 22px",marginBottom:16,background:"linear-gradient(135deg,"+T.tealBg+",#fff)",borderLeft:"3px solid "+T.teal}}>
+          <h2 style={{fontSize:"1.3rem",fontWeight:700,margin:0,marginBottom:4}}>📰 Articles</h2>
+          <p style={{fontSize:".84rem",color:T.txt2,margin:0}}>Educational content from the SKINARIO community — case discussions, technique guides, and evidence reviews.</p>
+        </div>
+
+        {/* Category filter + search */}
+        <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+          <input value={articleSearch} onChange={e=>setArticleSearch(e.target.value)} placeholder="Search articles..." style={{...T.inp,flex:1,minWidth:200}}/>
+          {(articleSearch||articleFilter!=="all")&&<button onClick={()=>{setArticleSearch("");setArticleFilter("all")}} style={{...T.btnO,...T.btnSm}}>✕ Clear</button>}
+        </div>
+        <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
+          {["all",...new Set(articles.map(a=>a.cat||"General").filter(Boolean))].map(c=><button key={c} onClick={()=>setArticleFilter(c)} style={{padding:"5px 12px",borderRadius:16,border:"1.5px solid "+(articleFilter===c?T.teal:T.border),background:articleFilter===c?T.tealBg:"#fff",color:articleFilter===c?T.teal:T.mute,cursor:"pointer",fontSize:".76rem",fontWeight:articleFilter===c?600:400,fontFamily:"inherit"}}>{c==="all"?"All":c}</button>)}
+        </div>
+
+        {/* Article grid */}
+        {(()=>{
+          const sq=articleSearch.toLowerCase();
+          const filtered=articles.filter(a=>{
+            const matchCat=articleFilter==="all"||(a.cat||"General")===articleFilter;
+            const matchSearch=!sq||(a.title||"").toLowerCase().includes(sq)||(a.body||"").toLowerCase().includes(sq)||(a.author||"").toLowerCase().includes(sq);
+            return matchCat&&matchSearch;
+          });
+          if(filtered.length===0)return<div style={{...T.card,textAlign:"center",padding:40,color:T.mute}}>No articles found{articleSearch?` for "${articleSearch}"`:""}{articleFilter!=="all"?` in ${articleFilter}`:""}</div>;
+          return(<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>
+            {filtered.map(a=><div key={a.id} onClick={()=>{setSelA(a);bumpView("articles",a.id,a,setArticles)}} style={{...T.card,cursor:"pointer",marginBottom:0,overflow:"hidden",padding:0,position:"relative",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 18px rgba(0,0,0,0.08)";}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
+              {a.cover&&<img src={a.cover} style={{width:"100%",height:160,objectFit:"cover"}}/>}
+              {a.sponsored&&<div style={{position:"absolute",top:8,right:8,background:"rgba(168,128,48,0.95)",color:"#fff",padding:"3px 9px",borderRadius:4,fontSize:".58rem",letterSpacing:1.2,textTransform:"uppercase",fontWeight:600,zIndex:2}}>Sponsored</div>}
+              <div style={{padding:16}}>
+                <div style={{display:"flex",gap:5,marginBottom:6}}><span style={T.tag(T.tealBg,T.teal)}>{a.cat||"General"}</span>{a.feat&&<span style={T.tag(T.goldBg,T.goldD)}>Featured</span>}</div>
+                <h4 style={{fontSize:".95rem",fontWeight:700,lineHeight:1.35,fontFamily:"Georgia, serif",margin:"0 0 6px"}}>{a.title}</h4>
+                <p style={{fontSize:".76rem",color:T.txt2,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden",margin:0}}>{a.body}</p>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:10,paddingTop:10,borderTop:"1px solid "+T.border}}>
+                  {a.authorPhoto?<img src={a.authorPhoto} style={{width:24,height:24,borderRadius:"50%",objectFit:"cover"}}/>:<div style={{...T.av(24,T.tealBg,T.teal),fontSize:".56rem"}}>{(a.author||"?").slice(0,2).toUpperCase()}</div>}
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:".7rem",fontWeight:600,color:T.txt}}>{a.sponsored&&a.sponsor?`by ${a.sponsor}`:a.author||"Admin"}</div>
+                    <div style={{fontSize:".62rem",color:T.mute}}>{fD(a.date)}</div>
+                  </div>
+                  <div style={{display:"flex",gap:6,fontSize:".66rem",color:T.mute}}><span>❤️ {a.likes||0}</span><span>💬 {a.comments?.length||0}</span>{(a.views||0)>0&&<span>👁️ {a.views}</span>}</div>
+                </div>
+              </div>
+            </div>)}
+          </div>);
+        })()}
+      </div>}
+
+      {/* Article detail — works for both pg==="articles" and pg==="home" */}
+      {(pg==="articles"||pg==="home")&&selA&&<div>
+        <button onClick={()=>setSelA(null)} style={{...T.btnO,...T.btnSm,marginBottom:14}}>← Back{pg==="articles"?" to articles":""}</button>
         <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 360px",gap:20,alignItems:"start"}} className="article-grid">
           <div style={{minWidth:0}}>{/* MAIN ARTICLE COLUMN */}
         <ViewTracker trackingKey={`articles_${selA.id}`} onView={()=>{if(selA.authorUid===au?.uid||selA.uid===au?.uid)return;const newCount=(selA.views||0)+1;fbSet("articles",selA.id,{views:newCount});setArticles(prev=>prev.map(x=>x.id===selA.id?{...x,views:newCount}:x));setSelA(p=>({...p,views:newCount}))}}>
@@ -7618,7 +7669,7 @@ ${forDownload
                         {stats.weakAreas.slice(0,4).map(a=><div key={a.area} style={{display:"flex",justifyContent:"space-between",fontSize:".74rem",color:T.txt2,marginBottom:2}}><span>{a.area}</span><span style={{fontWeight:700,color:T.goldD}}>{a.pct}%</span></div>)}
                       </div>}
                       {stats.weakAreas.length>0&&<div style={{fontSize:".76rem",color:T.txt2,lineHeight:1.5,padding:"8px 10px",background:T.tealBg,borderRadius:8}}>
-                        💡 Study more on <b>{stats.weakAreas.slice(0,3).map(a=>a.area).join(", ")}</b> — browse <span style={{color:T.teal,fontWeight:600,cursor:"pointer"}} onClick={()=>go("library")}>Articles</span> or <span style={{color:T.teal,fontWeight:600,cursor:"pointer"}} onClick={()=>go("videos")}>Videos</span>.
+                        💡 Study more on <b>{stats.weakAreas.slice(0,3).map(a=>a.area).join(", ")}</b> — browse <span style={{color:T.teal,fontWeight:600,cursor:"pointer"}} onClick={()=>go("articles")}>Articles</span> or <span style={{color:T.teal,fontWeight:600,cursor:"pointer"}} onClick={()=>go("videos")}>Videos</span>.
                       </div>}
                       {stats.topicStats.length>1&&<div style={{marginTop:10}}>
                         <div style={{fontSize:".64rem",fontWeight:700,color:T.mute,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>By topic</div>
@@ -7736,7 +7787,7 @@ ${forDownload
                       :"You're building your "+selTestTopic.label+" knowledge — keep at it!"+(topicStats.weakAreas.length>0?" Your biggest opportunities are in <b>"+topicStats.weakAreas.map(a=>a.area).join(", ")+"</b>. We recommend reviewing foundational material on these areas before retaking. SKINARIO's Articles and Videos sections have curated content that can help.":"")
                     }}/>
                     <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
-                      <button onClick={()=>go("library")} style={{...T.btnO,...T.btnSm,fontSize:".72rem"}}>📚 Browse Articles</button>
+                      <button onClick={()=>go("articles")} style={{...T.btnO,...T.btnSm,fontSize:".72rem"}}>📚 Browse Articles</button>
                       <button onClick={()=>go("videos")} style={{...T.btnO,...T.btnSm,fontSize:".72rem"}}>🎥 Watch Videos</button>
                     </div>
                   </div>
@@ -7845,74 +7896,120 @@ ${forDownload
             const certId="SK-"+new Date().toISOString().slice(0,10).replace(/-/g,"")+ "-"+(testResult.id||"").slice(-6).toUpperCase();
 
             // Generate & download certificate as PNG via Canvas
-            const downloadCert=()=>{
-              const c=document.createElement("canvas");c.width=1200;c.height=850;
+            // Load an image from URL — returns the Image or null on failure (CORS, 404, etc)
+            const loadImg=(url)=>new Promise(r=>{if(!url){r(null);return}const img=new Image();img.crossOrigin="anonymous";img.onload=()=>r(img);img.onerror=()=>r(null);img.src=url;setTimeout(()=>r(null),4000);});
+
+            const downloadCert=async()=>{
+              // Pre-load all logo images in parallel
+              const [skLogo,sponsorLogo,...accredLogos]=await Promise.all([
+                loadImg(certConfig.logoUrl||""),
+                loadImg(certConfig.sponsorLogo||""),
+                ...(certConfig.accreditations||[]).map(a=>loadImg(a.logoUrl||"")),
+              ]);
+
+              const c=document.createElement("canvas");c.width=1200;c.height=900;
               const ctx=c.getContext("2d");
               // Background
-              ctx.fillStyle="#faf3e7";ctx.fillRect(0,0,1200,850);
+              ctx.fillStyle="#faf3e7";ctx.fillRect(0,0,1200,900);
               // Border frame
-              ctx.strokeStyle="#c8a84e";ctx.lineWidth=4;ctx.strokeRect(20,20,1160,810);
-              ctx.strokeStyle="#0d6b6e";ctx.lineWidth=1.5;ctx.strokeRect(30,30,1140,790);
-              // Header
+              ctx.strokeStyle="#c8a84e";ctx.lineWidth=4;ctx.strokeRect(20,20,1160,860);
+              ctx.strokeStyle="#0d6b6e";ctx.lineWidth=1.5;ctx.strokeRect(30,30,1140,840);
+
+              // SKINARIO logo top-right (or text fallback)
+              if(skLogo){
+                const lh=50;const lw=lh*(skLogo.width/skLogo.height);
+                ctx.drawImage(skLogo,1120-lw,40,lw,lh);
+              }
+              // Header text
               ctx.fillStyle="#0d6b6e";ctx.font="bold 14px system-ui";ctx.textAlign="center";
-              ctx.fillText("SKINARIO — Aesthetic Medicine Community",600,65);
+              ctx.fillText("SKINARIO — Aesthetic Medicine Community",600,70);
               ctx.font="bold 32px system-ui";ctx.fillStyle="#1a1a1a";
-              ctx.fillText("CERTIFICATE OF COMPLETION",600,115);
+              ctx.fillText("CERTIFICATE OF COMPLETION",600,120);
               // Decorative line
-              ctx.strokeStyle="#c8a84e";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(300,130);ctx.lineTo(900,130);ctx.stroke();
+              ctx.strokeStyle="#c8a84e";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(300,135);ctx.lineTo(900,135);ctx.stroke();
               // This certifies
-              ctx.font="16px system-ui";ctx.fillStyle="#555";ctx.fillText("This certifies that",600,175);
+              ctx.font="16px system-ui";ctx.fillStyle="#555";ctx.fillText("This certifies that",600,180);
               // Name
               ctx.font="bold 28px system-ui";ctx.fillStyle="#0d6b6e";
-              ctx.fillText(uName,600,215);
+              ctx.fillText(uName,600,220);
               // has completed
               ctx.font="16px system-ui";ctx.fillStyle="#555";
-              ctx.fillText("has successfully completed the SKINARIO Study & Test Series assessment on",600,255);
+              ctx.fillText("has successfully completed the SKINARIO Study & Test Series assessment on",600,260);
               // Topic + Difficulty
               ctx.font="bold 26px system-ui";ctx.fillStyle="#1a1a1a";
-              ctx.fillText(testResult.topic,600,300);
+              ctx.fillText(testResult.topic,600,305);
               ctx.font="bold 18px system-ui";ctx.fillStyle=dt.color;
-              ctx.fillText(dt.label+" "+testResult.difficulty+" Level",600,335);
-              // Score box
+              ctx.fillText(dt.label+" "+testResult.difficulty+" Level",600,340);
+              // Score
               const scoreColor=testResult.accuracy>=70?"#1a7d42":testResult.accuracy>=50?"#b8860b":"#c0392b";
               ctx.fillStyle=scoreColor;ctx.font="bold 56px system-ui";
-              ctx.fillText(testResult.accuracy+"%",600,415);
+              ctx.fillText(testResult.accuracy+"%",600,420);
               ctx.font="16px system-ui";ctx.fillStyle="#555";
-              ctx.fillText(testResult.correctAnswers+" of "+testResult.totalQuestions+" questions correct · "+Math.floor(testResult.timeSpentSeconds/60)+"m "+testResult.timeSpentSeconds%60+"s",600,445);
+              ctx.fillText(testResult.correctAnswers+" of "+testResult.totalQuestions+" questions correct · "+Math.floor(testResult.timeSpentSeconds/60)+"m "+testResult.timeSpentSeconds%60+"s",600,450);
               // Date + Cert ID
               ctx.font="14px system-ui";ctx.fillStyle="#888";
-              ctx.fillText("Date: "+new Date().toLocaleDateString("en-IN",{dateStyle:"long"})+" · Certificate ID: "+certId,600,490);
+              ctx.fillText("Date: "+new Date().toLocaleDateString("en-IN",{dateStyle:"long"})+" · Certificate ID: "+certId,600,495);
               // Decorative line
-              ctx.strokeStyle="#c8a84e";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(200,510);ctx.lineTo(1000,510);ctx.stroke();
-              // Strong areas
+              ctx.strokeStyle="#c8a84e";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(200,515);ctx.lineTo(1000,515);ctx.stroke();
+              // Strong / Weak areas
               const strong=areas.filter(a=>a.pct>=75).slice(0,4);
               if(strong.length>0){
                 ctx.font="bold 13px system-ui";ctx.fillStyle="#1a7d42";ctx.textAlign="left";
-                ctx.fillText("STRENGTHS:",100,545);
+                ctx.fillText("STRENGTHS:",100,548);
                 ctx.font="13px system-ui";ctx.fillStyle="#333";
-                strong.forEach((a,i)=>ctx.fillText("• "+a.area+" ("+a.pct+"%)",100,565+i*20));
+                strong.forEach((a,i)=>ctx.fillText("• "+a.area+" ("+a.pct+"%)",100,568+i*20));
               }
               if(weak.length>0){
                 ctx.font="bold 13px system-ui";ctx.fillStyle="#b8860b";ctx.textAlign="left";
-                ctx.fillText("AREAS TO DEVELOP:",650,545);
+                ctx.fillText("AREAS TO DEVELOP:",650,548);
                 ctx.font="13px system-ui";ctx.fillStyle="#333";
-                weak.slice(0,4).forEach((a,i)=>ctx.fillText("• "+a.area+" ("+a.pct+"%)",650,565+i*20));
+                weak.slice(0,4).forEach((a,i)=>ctx.fillText("• "+a.area+" ("+a.pct+"%)",650,568+i*20));
               }
               // Powered by AI
               ctx.textAlign="center";ctx.font="11px system-ui";ctx.fillStyle="#888";
-              ctx.fillText("⚡ Questions generated by AI · Verified by SKINARIO",600,680);
-              // Footer
-              ctx.font="bold 13px system-ui";ctx.fillStyle="#0d6b6e";
-              ctx.fillText("skinario.app",600,720);
-              ctx.font="11px system-ui";ctx.fillStyle="#aaa";
-              ctx.fillText("Learn. Discuss. Lead the field.",600,740);
-              // Sponsor slot
-              if(certSponsor){
-                ctx.font="9px system-ui";ctx.fillStyle="#aaa";ctx.fillText("Sponsored by",600,775);
-                ctx.font="bold 14px system-ui";ctx.fillStyle="#555";
-                ctx.fillText(certSponsor.title||certSponsor.vendorName||"",600,795);
-                if(certSponsor.tagline){ctx.font="11px system-ui";ctx.fillStyle="#888";ctx.fillText(certSponsor.tagline.slice(0,80),600,812);}
+              ctx.fillText("⚡ Questions generated by AI · Verified by SKINARIO",600,690);
+
+              // ── Sponsor section (from certConfig) ───────────
+              if(certConfig.sponsorName){
+                ctx.font="9px system-ui";ctx.fillStyle="#aaa";ctx.fillText("Sponsored by",600,720);
+                if(sponsorLogo){
+                  const sh2=28;const sw2=sh2*(sponsorLogo.width/sponsorLogo.height);
+                  ctx.drawImage(sponsorLogo,600-sw2/2,728,sw2,sh2);
+                  ctx.font="bold 12px system-ui";ctx.fillStyle="#555";
+                  ctx.fillText(certConfig.sponsorName,600,770);
+                }else{
+                  ctx.font="bold 14px system-ui";ctx.fillStyle="#555";
+                  ctx.fillText(certConfig.sponsorName,600,740);
+                }
+                if(certConfig.sponsorTagline){ctx.font="11px system-ui";ctx.fillStyle="#888";ctx.fillText(certConfig.sponsorTagline.slice(0,80),600,785);}
               }
+
+              // ── Accreditation logos bottom row ───────────
+              const accreds=certConfig.accreditations||[];
+              if(accreds.length>0){
+                const accY=810;
+                ctx.font="8px system-ui";ctx.fillStyle="#bbb";ctx.textAlign="center";
+                ctx.fillText("ACCREDITED BY",600,accY-10);
+                const totalW=accreds.length*70;
+                let startX=600-totalW/2;
+                accreds.forEach((acc,i)=>{
+                  const logo=accredLogos[i];
+                  if(logo){
+                    const lh2=30;const lw2=Math.min(60,lh2*(logo.width/logo.height));
+                    ctx.drawImage(logo,startX+i*70+(35-lw2/2),accY,lw2,lh2);
+                  }else{
+                    ctx.font="bold 9px system-ui";ctx.fillStyle="#666";ctx.textAlign="center";
+                    ctx.fillText(acc.name.slice(0,10),startX+i*70+35,accY+18);
+                  }
+                });
+              }
+
+              // Footer
+              ctx.textAlign="center";ctx.font="bold 13px system-ui";ctx.fillStyle="#0d6b6e";
+              ctx.fillText("skinario.app",600,accreds.length>0?860:810);
+              ctx.font="11px system-ui";ctx.fillStyle="#aaa";
+              ctx.fillText("Learn. Discuss. Lead the field.",600,accreds.length>0?878:828);
+
               // Download
               const link=document.createElement("a");
               link.download="SKINARIO-Certificate-"+testResult.topic.replace(/[^a-zA-Z0-9]/g,"-")+"-"+testResult.accuracy+"pct.png";
@@ -11563,6 +11660,67 @@ ${forDownload
             </div>
 
             {/* Future beta features hint */}
+            {/* ═══ CERTIFICATE SETTINGS ═══ */}
+            <div style={{...T.card,marginBottom:14,borderLeft:"3px solid "+T.gold}}>
+              <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>🏅 Certificate Settings</h4>
+              <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.55,margin:"0 0 14px"}}>Configure what appears on downloadable certificates. Changes apply immediately to all future certificate downloads.</p>
+
+              {/* SKINARIO Logo */}
+              <div style={{marginBottom:16}}>
+                <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>SKINARIO logo URL</label>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <input value={certConfig.logoUrl||""} onChange={e=>setCertConfig(p=>({...p,logoUrl:e.target.value}))} placeholder="https://skinario.app/logo.png" style={{...T.inp,flex:1}}/>
+                  {certConfig.logoUrl&&<img src={certConfig.logoUrl} alt="" style={{height:32,objectFit:"contain",borderRadius:4,border:"1px solid "+T.border}} onError={e=>{e.target.style.display="none"}}/>}
+                </div>
+                <div style={{fontSize:".66rem",color:T.mute,marginTop:4}}>Displayed top-right on certificates. Use Firebase Storage URL for best compatibility.</div>
+              </div>
+
+              {/* Accreditations */}
+              <div style={{marginBottom:16}}>
+                <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Accreditation logos</label>
+                <div style={{fontSize:".66rem",color:T.mute,marginBottom:8}}>Shown in a row at the bottom of certificates. Add names and logo URLs of accrediting bodies.</div>
+                {(certConfig.accreditations||[]).map((acc,i)=><div key={i} style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
+                  <input value={acc.name} onChange={e=>{const next=[...(certConfig.accreditations||[])];next[i]={...acc,name:e.target.value};setCertConfig(p=>({...p,accreditations:next}));}} placeholder="Name (e.g. IEBDAC)" style={{...T.inp,width:140}}/>
+                  <input value={acc.logoUrl} onChange={e=>{const next=[...(certConfig.accreditations||[])];next[i]={...acc,logoUrl:e.target.value};setCertConfig(p=>({...p,accreditations:next}));}} placeholder="Logo URL" style={{...T.inp,flex:1}}/>
+                  {acc.logoUrl&&<img src={acc.logoUrl} alt="" style={{height:24,objectFit:"contain"}} onError={e=>{e.target.style.display="none"}}/>}
+                  <button onClick={()=>{const next=[...(certConfig.accreditations||[])];next.splice(i,1);setCertConfig(p=>({...p,accreditations:next}));}} style={{background:"none",border:"none",cursor:"pointer",color:T.err,fontSize:".8rem"}}>✕</button>
+                </div>)}
+                <button onClick={()=>setCertConfig(p=>({...p,accreditations:[...(p.accreditations||[]),{name:"",logoUrl:""}]}))} style={{...T.btnO,...T.btnSm,fontSize:".72rem"}}>+ Add accreditation</button>
+              </div>
+
+              {/* Certificate Sponsor */}
+              <div style={{marginBottom:16}}>
+                <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Certificate sponsor</label>
+                <div style={{fontSize:".66rem",color:T.mute,marginBottom:8}}>Select a verified vendor/institute whose branding appears on every certificate. Premium placement — monetize this.</div>
+                <select value={certConfig.sponsorId||""} onChange={e=>{
+                  const uid=e.target.value;
+                  if(!uid){setCertConfig(p=>({...p,sponsorId:"",sponsorName:"",sponsorLogo:"",sponsorTagline:""}));return;}
+                  const vendor=allUsers.find(u=>u.id===uid);
+                  if(vendor){setCertConfig(p=>({...p,sponsorId:uid,sponsorName:vendor.companyName||vendor.name||"",sponsorLogo:vendor.logo||vendor.photo||"",sponsorTagline:""}));}
+                }} style={{...T.inp,marginBottom:8}}>
+                  <option value="">— No sponsor —</option>
+                  {allUsers.filter(u=>{const t=normalizeAccountType(u.accountType||"");return(t==="vendor"||t==="brand"||t==="institute")&&u.verified;}).map(u=><option key={u.id} value={u.id}>{u.companyName||u.name} ({normalizeAccountType(u.accountType||"")})</option>)}
+                </select>
+                {certConfig.sponsorId&&<div style={{display:"flex",gap:10,alignItems:"center",padding:10,background:T.bg,borderRadius:8,marginBottom:8}}>
+                  {certConfig.sponsorLogo&&<img src={certConfig.sponsorLogo} alt="" style={{width:40,height:40,objectFit:"contain",borderRadius:6}} onError={e=>{e.target.style.display="none"}}/>}
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:".84rem",fontWeight:600}}>{certConfig.sponsorName}</div>
+                    <input value={certConfig.sponsorTagline||""} onChange={e=>setCertConfig(p=>({...p,sponsorTagline:e.target.value}))} placeholder="Tagline (optional, shown on cert)" style={{...T.inp,fontSize:".76rem",marginTop:4}}/>
+                  </div>
+                </div>}
+              </div>
+
+              {/* Save */}
+              <button onClick={async()=>{
+                try{
+                  const toSave={logoUrl:certConfig.logoUrl||"",accreditations:certConfig.accreditations||[],sponsorId:certConfig.sponsorId||"",sponsorName:certConfig.sponsorName||"",sponsorLogo:certConfig.sponsorLogo||"",sponsorTagline:certConfig.sponsorTagline||""};
+                  await fbSet("platformSettings","certConfig",toSave);
+                  sh("✓ Certificate settings saved");
+                  loadData();
+                }catch(err){sh("Failed to save — check Firestore rules for platformSettings")}
+              }} style={{...T.btn,width:"100%"}}>Save certificate settings</button>
+            </div>
+
             <div style={{padding:14,background:T.bg,borderRadius:10,fontSize:".76rem",color:T.mute,textAlign:"center",fontStyle:"italic"}}>More beta programs will appear here as they launch.</div>
           </div>);
         })()}
