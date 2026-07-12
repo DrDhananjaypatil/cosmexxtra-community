@@ -4426,6 +4426,26 @@ ${forDownload
     setTimeout(()=>res(null),3000);
   });
 
+  // Compress an image file to a base64 data URL — resizes to maxW×maxH and uses JPEG quality
+  const compressImgToData=(file,maxW=800,maxH=600,quality=0.8)=>new Promise((resolve)=>{
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        let w=img.width,h=img.height;
+        if(w>maxW){h=h*(maxW/w);w=maxW;}
+        if(h>maxH){w=w*(maxH/h);h=maxH;}
+        const cv=document.createElement("canvas");cv.width=Math.round(w);cv.height=Math.round(h);
+        const cx=cv.getContext("2d");cx.drawImage(img,0,0,cv.width,cv.height);
+        resolve(cv.toDataURL("image/jpeg",quality));
+      };
+      img.onerror=()=>resolve("");
+      img.src=reader.result;
+    };
+    reader.onerror=()=>resolve("");
+    reader.readAsDataURL(file);
+  });
+
   const generateCertificate=async(attempt,{userName,difficulty})=>{
     const dt=DIFF_THEME[difficulty||attempt.difficulty]||DIFF_THEME.Easy;
     const areaEntries=Object.entries(attempt.subAreaStats||{}).map(([area,s])=>({area,...s,pct:s.total?Math.round((s.right/s.total)*100):0})).sort((a,b)=>a.pct-b.pct);
@@ -11759,8 +11779,11 @@ ${forDownload
                     📤 Upload
                     <input type="file" accept="image/*" style={{display:"none"}} onChange={async e=>{
                       const f=e.target.files?.[0];if(!f)return;
-                      if(f.size>3*1024*1024){sh("Image must be under 3MB");return;}
-                      const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f);});
+                      if(f.size>5*1024*1024){sh("Image must be under 5MB");return;}
+                      // Compress: template gets larger canvas, logos get smaller
+                      const isTemplate=slot.key==="template";
+                      const dataUrl=await compressImgToData(f,isTemplate?1400:400,isTemplate?1050:300,isTemplate?0.85:0.9);
+                      if(!dataUrl){sh("Failed to process image");return;}
                       setCertConfig(p=>({...p,[slot.field]:dataUrl}));
                       sh("✓ "+slot.label+" uploaded");
                       e.target.value="";
@@ -11795,7 +11818,8 @@ ${forDownload
                     📤
                     <input type="file" accept="image/*" style={{display:"none"}} onChange={async e=>{
                       const f=e.target.files?.[0];if(!f)return;
-                      const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f);});
+                      const dataUrl=await compressImgToData(f,200,200,0.9);
+                      if(!dataUrl){sh("Failed");return;}
                       const next=[...(certConfig.accreditations||[])];next[i]={...acc,logoData:dataUrl};setCertConfig(p=>({...p,accreditations:next}));
                       e.target.value="";
                     }}/>
@@ -11825,7 +11849,8 @@ ${forDownload
                       📤 Logo
                       <input type="file" accept="image/*" style={{display:"none"}} onChange={async e=>{
                         const f=e.target.files?.[0];if(!f)return;
-                        const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f);});
+                        const dataUrl=await compressImgToData(f,200,200,0.9);
+                        if(!dataUrl)return;
                         setCertConfig(p=>({...p,sponsorLogoData:dataUrl}));e.target.value="";
                       }}/>
                     </label>
@@ -11837,9 +11862,12 @@ ${forDownload
               {/* Save */}
               <button onClick={async()=>{
                 try{
+                  const json=JSON.stringify(certConfig);
+                  const sizeKB=Math.round(json.length/1024);
+                  if(sizeKB>900){sh(`⚠ Config too large (${sizeKB}KB). Firestore limit is ~1MB. Try smaller images.`);return;}
                   await fbSet("platformSettings","certConfig",certConfig);
-                  sh("✓ Certificate settings saved");loadData();
-                }catch(err){sh("Failed to save")}
+                  sh(`✓ Saved (${sizeKB}KB)`);loadData();
+                }catch(err){console.error(err);sh("Failed: "+err.message)}
               }} style={{...T.btn,width:"100%"}}>Save certificate settings</button>
             </div>
 
