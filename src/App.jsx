@@ -255,6 +255,12 @@ const TEST_DIFFICULTIES=["Easy","Moderate","Hard"];
 const TEST_DURATION_SECONDS=600; // 10 minutes
 const TEST_QUESTION_COUNT=15;
 const BETA_STUDY_CAP_DEFAULT=25; // Default cap on first-ever load; admin can change from Beta Settings tab.
+// Difficulty-specific theming — used across intro, taking, and result views
+const DIFF_THEME={
+  Easy:{color:"#1a7d42",bg:"#e8f5e9",bgLight:"linear-gradient(135deg,#e8f5e9,#f0faf3)",border:"#4caf50",label:"🟢"},
+  Moderate:{color:"#b8860b",bg:"#fff8e1",bgLight:"linear-gradient(135deg,#fff8e1,#fdf6e3)",border:"#c8a84e",label:"🟡"},
+  Hard:{color:"#c0392b",bg:"#fdecea",bgLight:"linear-gradient(135deg,#fdecea,#fef5f5)",border:"#e57373",label:"🔴"},
+};
 
 // Computes aggregate study stats from a user's attempt history.
 // Returns {totalTests, avgAccuracy, bestScore, topicStats, strongAreas, weakAreas, recentAttempts}.
@@ -7407,19 +7413,32 @@ ${forDownload
               15-question timed MCQ tests across 10 aesthetic medicine topics. Get instant feedback with weak-area analysis and personal progress tracking.
             </p>
 
-            {/* Live scarcity meter */}
-            <div style={{padding:"14px 18px",background:T.bg,borderRadius:10,marginBottom:16,textAlign:"left"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
-                <div style={{fontSize:".76rem",fontWeight:700,color:T.txt,textTransform:"uppercase",letterSpacing:.5}}>Beta spots</div>
-                <div style={{fontSize:".9rem",fontWeight:700,color:spotsLeft===0?T.err:spotsLeft<=5?T.goldD:T.teal}}>
-                  {activeBetaUsers} / {getBetaCap("study")} filled
+            {/* Live scarcity meter — animated ring */}
+            <div style={{padding:"18px",background:T.bg,borderRadius:12,marginBottom:16}}>
+              <div style={{display:"flex",alignItems:"center",gap:18}}>
+                {/* Animated SVG ring */}
+                <div style={{position:"relative",width:90,height:90,flexShrink:0}}>
+                  <svg viewBox="0 0 36 36" style={{width:90,height:90,transform:"rotate(-90deg)"}}>
+                    <circle cx="18" cy="18" r="15.5" fill="none" stroke="#e8e8e8" strokeWidth="3"/>
+                    <circle cx="18" cy="18" r="15.5" fill="none" stroke={spotsLeft===0?"#c0392b":spotsLeft<=5?"#c8a84e":"#0d6b6e"} strokeWidth="3" strokeDasharray={`${pctFull*0.974} 100`} strokeLinecap="round" style={{transition:"stroke-dasharray 1s ease"}}/>
+                  </svg>
+                  <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+                    <div style={{fontSize:"1.1rem",fontWeight:700,color:spotsLeft===0?T.err:spotsLeft<=5?T.goldD:T.teal,lineHeight:1}}>{pctFull}%</div>
+                    <div style={{fontSize:".5rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>filled</div>
+                  </div>
                 </div>
-              </div>
-              <div style={{height:8,background:"#e8e8e8",borderRadius:4,overflow:"hidden",marginBottom:8}}>
-                <div style={{height:"100%",width:pctFull+"%",background:spotsLeft===0?T.err:spotsLeft<=5?"linear-gradient(90deg,"+T.gold+","+T.goldD+")":"linear-gradient(90deg,"+T.teal+",#0d5c52)",transition:"width .4s"}}/>
-              </div>
-              <div style={{fontSize:".72rem",color:T.mute}}>
-                {spotsLeft>0?`${spotsLeft} spot${spotsLeft===1?"":"s"} left`:"All spots filled — join the waitlist"} · {waitlistedUsers.length} on waitlist
+                {/* Stats */}
+                <div style={{flex:1}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                    <div><div style={{fontSize:"1.1rem",fontWeight:700,color:T.teal}}>{activeBetaUsers}</div><div style={{fontSize:".58rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Active testers</div></div>
+                    <div><div style={{fontSize:"1.1rem",fontWeight:700,color:spotsLeft===0?T.err:spotsLeft<=5?T.goldD:T.txt}}>{spotsLeft}</div><div style={{fontSize:".58rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Spots left</div></div>
+                    <div><div style={{fontSize:"1.1rem",fontWeight:700,color:T.goldD}}>{waitlistedUsers.length}</div><div style={{fontSize:".58rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>On waitlist</div></div>
+                    <div><div style={{fontSize:"1.1rem",fontWeight:700,color:T.txt}}>{getBetaCap("study")}</div><div style={{fontSize:".58rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>Total cap</div></div>
+                  </div>
+                  <div style={{fontSize:".72rem",color:T.mute}}>
+                    {spotsLeft>0?`${spotsLeft} spot${spotsLeft===1?"":"s"} remaining`:"All spots filled — join the waitlist"}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -7728,14 +7747,16 @@ ${forDownload
 
           // ── VIEW: intro (before starting the timed test) ─────
           if(studyView==="intro"&&activeTest){
+            const dt=DIFF_THEME[activeTest.difficulty]||DIFF_THEME.Easy;
             return(<div style={{maxWidth:600,margin:"0 auto"}}>
-              <div style={{...T.card,padding:28,textAlign:"center"}}>
+              <div style={{...T.card,padding:28,textAlign:"center",background:dt.bgLight,borderTop:"3px solid "+dt.border}}>
                 <div style={{fontSize:"3rem",marginBottom:10}}>{selTestTopic?.icon||"🎯"}</div>
                 <h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0}}>{activeTest.topic}</h2>
-                <div style={{fontSize:".82rem",color:T.mute,marginTop:4,marginBottom:20}}>{activeTest.difficulty} · Variant {activeTest.variantNum}</div>
+                <div style={{fontSize:".82rem",color:dt.color,marginTop:4,marginBottom:4,fontWeight:600}}>{dt.label} {activeTest.difficulty}</div>
+                <div style={{fontSize:".68rem",color:T.mute,marginBottom:20}}>Variant {activeTest.variantNum} · <span style={{background:T.tealBg,color:T.teal,padding:"1px 6px",borderRadius:4,fontWeight:600,fontSize:".6rem"}}>⚡ Powered by AI</span></div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:20}}>
-                  {[["Questions",activeTest.questions?.length||TEST_QUESTION_COUNT],["Time",`${TEST_DURATION_SECONDS/60} min`],["Format","MCQ"]].map(([l,v])=><div key={l} style={{padding:12,background:T.bg,borderRadius:10}}>
-                    <div style={{fontSize:"1.15rem",fontWeight:700,color:T.teal}}>{v}</div>
+                  {[["Questions",activeTest.questions?.length||TEST_QUESTION_COUNT],["Time",`${TEST_DURATION_SECONDS/60} min`],["Format","MCQ"]].map(([l,v])=><div key={l} style={{padding:12,background:"rgba(255,255,255,0.7)",borderRadius:10}}>
+                    <div style={{fontSize:"1.15rem",fontWeight:700,color:dt.color}}>{v}</div>
                     <div style={{fontSize:".64rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5,marginTop:2}}>{l}</div>
                   </div>)}
                 </div>
@@ -7765,14 +7786,15 @@ ${forDownload
             const ss=(testTimeLeft%60).toString().padStart(2,"0");
             const timeLow=testTimeLeft<=60;
             const answered=Object.keys(testAnswers).length;
+            const dt=DIFF_THEME[activeTest.difficulty]||DIFF_THEME.Easy;
             return(<div style={{maxWidth:760,margin:"0 auto"}}>
               {/* Sticky bar with timer + progress */}
-              <div style={{position:"sticky",top:60,zIndex:40,background:"#ffffffea",backdropFilter:"blur(8px)",padding:"10px 14px",borderRadius:10,marginBottom:14,border:"1px solid "+T.border,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+              <div style={{position:"sticky",top:60,zIndex:40,background:"#ffffffea",backdropFilter:"blur(8px)",padding:"10px 14px",borderRadius:10,marginBottom:14,border:"1px solid "+T.border,borderTop:"3px solid "+(timeLow?T.err:dt.border),display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
                 <div>
                   <div style={{fontSize:".72rem",color:T.mute}}>Question {testCurrentQ+1} of {qs.length}</div>
-                  <div style={{fontSize:".82rem",fontWeight:700}}>{activeTest.topic}</div>
+                  <div style={{fontSize:".82rem",fontWeight:700}}>{activeTest.topic} <span style={{fontSize:".64rem",color:dt.color,fontWeight:600}}>{dt.label} {activeTest.difficulty}</span></div>
                 </div>
-                <div style={{fontSize:"1.3rem",fontWeight:700,color:timeLow?T.err:T.teal,fontFamily:"monospace"}}>⏱ {mm}:{ss}</div>
+                <div style={{fontSize:"1.3rem",fontWeight:700,color:timeLow?T.err:dt.color,fontFamily:"monospace"}}>⏱ {mm}:{ss}</div>
                 <button disabled={answered===0} onClick={()=>{if(!window.confirm(`Submit test now? You've answered ${answered} of ${qs.length} questions.`))return;submitTest(false);}} style={{...T.btn,padding:"7px 14px",fontSize:".78rem",opacity:answered===0?0.5:1}}>Submit</button>
               </div>
 
@@ -7818,14 +7840,106 @@ ${forDownload
             const passed=testResult.accuracy>=60;
             const areas=Object.entries(testResult.subAreaStats||{}).map(([area,st])=>({area,...st,pct:st.total?Math.round((st.right/st.total)*100):0})).sort((a,b)=>a.pct-b.pct);
             const weak=areas.filter(a=>a.pct<60);
+            const dt=DIFF_THEME[testResult.difficulty]||DIFF_THEME.Easy;
+            const certSponsor=sponsorPlacements.find(sp=>sp.status==="active"&&sp.placementType==="study_certificate");
+            const certId="SK-"+new Date().toISOString().slice(0,10).replace(/-/g,"")+ "-"+(testResult.id||"").slice(-6).toUpperCase();
+
+            // Generate & download certificate as PNG via Canvas
+            const downloadCert=()=>{
+              const c=document.createElement("canvas");c.width=1200;c.height=850;
+              const ctx=c.getContext("2d");
+              // Background
+              ctx.fillStyle="#faf3e7";ctx.fillRect(0,0,1200,850);
+              // Border frame
+              ctx.strokeStyle="#c8a84e";ctx.lineWidth=4;ctx.strokeRect(20,20,1160,810);
+              ctx.strokeStyle="#0d6b6e";ctx.lineWidth=1.5;ctx.strokeRect(30,30,1140,790);
+              // Header
+              ctx.fillStyle="#0d6b6e";ctx.font="bold 14px system-ui";ctx.textAlign="center";
+              ctx.fillText("SKINARIO — Aesthetic Medicine Community",600,65);
+              ctx.font="bold 32px system-ui";ctx.fillStyle="#1a1a1a";
+              ctx.fillText("CERTIFICATE OF COMPLETION",600,115);
+              // Decorative line
+              ctx.strokeStyle="#c8a84e";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(300,130);ctx.lineTo(900,130);ctx.stroke();
+              // This certifies
+              ctx.font="16px system-ui";ctx.fillStyle="#555";ctx.fillText("This certifies that",600,175);
+              // Name
+              ctx.font="bold 28px system-ui";ctx.fillStyle="#0d6b6e";
+              ctx.fillText(uName,600,215);
+              // has completed
+              ctx.font="16px system-ui";ctx.fillStyle="#555";
+              ctx.fillText("has successfully completed the SKINARIO Study & Test Series assessment on",600,255);
+              // Topic + Difficulty
+              ctx.font="bold 26px system-ui";ctx.fillStyle="#1a1a1a";
+              ctx.fillText(testResult.topic,600,300);
+              ctx.font="bold 18px system-ui";ctx.fillStyle=dt.color;
+              ctx.fillText(dt.label+" "+testResult.difficulty+" Level",600,335);
+              // Score box
+              const scoreColor=testResult.accuracy>=70?"#1a7d42":testResult.accuracy>=50?"#b8860b":"#c0392b";
+              ctx.fillStyle=scoreColor;ctx.font="bold 56px system-ui";
+              ctx.fillText(testResult.accuracy+"%",600,415);
+              ctx.font="16px system-ui";ctx.fillStyle="#555";
+              ctx.fillText(testResult.correctAnswers+" of "+testResult.totalQuestions+" questions correct · "+Math.floor(testResult.timeSpentSeconds/60)+"m "+testResult.timeSpentSeconds%60+"s",600,445);
+              // Date + Cert ID
+              ctx.font="14px system-ui";ctx.fillStyle="#888";
+              ctx.fillText("Date: "+new Date().toLocaleDateString("en-IN",{dateStyle:"long"})+" · Certificate ID: "+certId,600,490);
+              // Decorative line
+              ctx.strokeStyle="#c8a84e";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(200,510);ctx.lineTo(1000,510);ctx.stroke();
+              // Strong areas
+              const strong=areas.filter(a=>a.pct>=75).slice(0,4);
+              if(strong.length>0){
+                ctx.font="bold 13px system-ui";ctx.fillStyle="#1a7d42";ctx.textAlign="left";
+                ctx.fillText("STRENGTHS:",100,545);
+                ctx.font="13px system-ui";ctx.fillStyle="#333";
+                strong.forEach((a,i)=>ctx.fillText("• "+a.area+" ("+a.pct+"%)",100,565+i*20));
+              }
+              if(weak.length>0){
+                ctx.font="bold 13px system-ui";ctx.fillStyle="#b8860b";ctx.textAlign="left";
+                ctx.fillText("AREAS TO DEVELOP:",650,545);
+                ctx.font="13px system-ui";ctx.fillStyle="#333";
+                weak.slice(0,4).forEach((a,i)=>ctx.fillText("• "+a.area+" ("+a.pct+"%)",650,565+i*20));
+              }
+              // Powered by AI
+              ctx.textAlign="center";ctx.font="11px system-ui";ctx.fillStyle="#888";
+              ctx.fillText("⚡ Questions generated by AI · Verified by SKINARIO",600,680);
+              // Footer
+              ctx.font="bold 13px system-ui";ctx.fillStyle="#0d6b6e";
+              ctx.fillText("skinario.app",600,720);
+              ctx.font="11px system-ui";ctx.fillStyle="#aaa";
+              ctx.fillText("Learn. Discuss. Lead the field.",600,740);
+              // Sponsor slot
+              if(certSponsor){
+                ctx.font="9px system-ui";ctx.fillStyle="#aaa";ctx.fillText("Sponsored by",600,775);
+                ctx.font="bold 14px system-ui";ctx.fillStyle="#555";
+                ctx.fillText(certSponsor.title||certSponsor.vendorName||"",600,795);
+                if(certSponsor.tagline){ctx.font="11px system-ui";ctx.fillStyle="#888";ctx.fillText(certSponsor.tagline.slice(0,80),600,812);}
+              }
+              // Download
+              const link=document.createElement("a");
+              link.download="SKINARIO-Certificate-"+testResult.topic.replace(/[^a-zA-Z0-9]/g,"-")+"-"+testResult.accuracy+"pct.png";
+              link.href=c.toDataURL("image/png");link.click();
+            };
+
             return(<div style={{maxWidth:760,margin:"0 auto"}}>
-              {/* Score header */}
-              <div style={{...T.card,padding:28,marginBottom:16,textAlign:"center",background:passed?"linear-gradient(135deg,#e8f5e9,"+T.tealBg+")":"linear-gradient(135deg,#fff3cd,"+T.goldBg+")"}}>
+              {/* Score header — difficulty themed */}
+              <div style={{...T.card,padding:28,marginBottom:16,textAlign:"center",background:passed?dt.bgLight:"linear-gradient(135deg,#fff3cd,"+T.goldBg+")",borderTop:"3px solid "+dt.border}}>
                 <div style={{fontSize:"3rem",marginBottom:8}}>{passed?"🎉":"📚"}</div>
                 <h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0}}>{passed?"Well done!":"Keep learning!"}</h2>
+                <div style={{fontSize:".68rem",color:dt.color,fontWeight:600,marginTop:4}}>{dt.label} {testResult.difficulty}</div>
                 <div style={{fontSize:"3.5rem",fontWeight:700,color:passed?"#1a7d42":T.goldD,margin:"12px 0"}}>{testResult.accuracy}%</div>
                 <div style={{fontSize:".95rem",color:T.txt2}}>{testResult.correctAnswers} of {testResult.totalQuestions} correct · {Math.floor(testResult.timeSpentSeconds/60)}m {testResult.timeSpentSeconds%60}s</div>
                 {testResult.wasAutoSubmitted&&<div style={{fontSize:".76rem",color:T.mute,marginTop:6,fontStyle:"italic"}}>Auto-submitted when time ran out</div>}
+                {/* Certificate download + share */}
+                {passed&&<div style={{marginTop:16,paddingTop:16,borderTop:"1px solid "+T.border}}>
+                  <div style={{fontSize:".72rem",color:T.mute,marginBottom:8}}>🏅 You earned a certificate!</div>
+                  <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
+                    <button onClick={downloadCert} style={{...T.btn,padding:"9px 18px",fontSize:".84rem"}}>📥 Download Certificate</button>
+                    <button onClick={async()=>{
+                      const shareUrl=`${SITE_URL}/?study=cert&id=${certId}`;
+                      if(navigator.share){try{await navigator.share({title:`I scored ${testResult.accuracy}% on ${testResult.topic} — SKINARIO`,text:`Just completed the ${testResult.difficulty} ${testResult.topic} test on SKINARIO with ${testResult.accuracy}%!`,url:shareUrl});}catch{}}
+                      else if(navigator.clipboard){try{await navigator.clipboard.writeText(`I scored ${testResult.accuracy}% on ${testResult.topic} (${testResult.difficulty}) on SKINARIO! ${shareUrl}`);sh("🔗 Copied to clipboard");}catch{}}
+                    }} style={{...T.btnO,padding:"9px 18px",fontSize:".84rem"}}>🔗 Share result</button>
+                  </div>
+                </div>}
               </div>
 
               {/* Sub-area breakdown */}
@@ -9406,6 +9520,7 @@ ${forDownload
                   <option value="home_banner">🏠 Home spotlight banner</option>
                   <option value="study_sidebar">🎯 Study page sidebar</option>
                   <option value="study_home">🎯 Study page featured</option>
+                  <option value="study_certificate">🏅 Study certificate sponsor</option>
                   <option value="article_sidebar">📰 Article sidebar</option>
                   <option value="quiz_sponsor">🧠 Quiz sponsor label</option>
                   <option value="vendor_featured">🏭 Featured in vendor directory</option>
@@ -10349,6 +10464,7 @@ ${forDownload
                   <option value="home_banner">🏠 Home spotlight banner</option>
                   <option value="study_sidebar">🎯 Study page sidebar</option>
                   <option value="study_home">🎯 Study page featured</option>
+                  <option value="study_certificate">🏅 Study certificate sponsor</option>
                   <option value="article_sidebar">📰 Article sidebar / in-article</option>
                   <option value="quiz_sponsor">🧠 Quiz sponsor label</option>
                   <option value="vendor_featured">🏭 Featured vendor (top of directory)</option>
