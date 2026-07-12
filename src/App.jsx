@@ -4463,7 +4463,6 @@ ${forDownload
     const certId="SK-"+certDate.toISOString().slice(0,10).replace(/-/g,"")+"-"+(attempt.id||"").slice(-6).toUpperCase();
     const name=userName||attempt.uName||"Doctor";
 
-    // Load all images in parallel — template bg + admin-uploaded logos
     const[bgImg,skLogo,sealImg,sigLeftImg,sigRightImg,sponsorLogo,...accredLogos]=await Promise.all([
       loadCertImg(certConfig.templateData||""),
       loadCertImg(certConfig.logoData||""),
@@ -4477,137 +4476,139 @@ ${forDownload
     const W=1400,H=1050;
     const c=document.createElement("canvas");c.width=W;c.height=H;
     const ctx=c.getContext("2d");
+    const cx=W/2; // center x
 
-    // Background — template or fallback solid
+    // Background
     if(bgImg){ctx.drawImage(bgImg,0,0,W,H);}
-    else{ctx.fillStyle="#faf3e7";ctx.fillRect(0,0,W,H);ctx.strokeStyle="#c8a84e";ctx.lineWidth=4;ctx.strokeRect(20,20,W-40,H-40);ctx.strokeStyle="#0d6b6e";ctx.lineWidth=1.5;ctx.strokeRect(30,30,W-60,H-60);}
+    else{ctx.fillStyle="#faf3e7";ctx.fillRect(0,0,W,H);ctx.strokeStyle="#c8a84e";ctx.lineWidth=3;ctx.strokeRect(40,40,W-80,H-80);}
 
-    // ── TOP: SKINARIO logo (centered)
-    if(skLogo){const lh=60;const lw=lh*(skLogo.width/skLogo.height);ctx.drawImage(skLogo,W/2-lw/2,55,lw,lh);}
-
-    // ── SKINARIO text + subtitle
     ctx.textAlign="center";
-    const logoBottom=skLogo?125:70;
-    ctx.font="bold 36px system-ui";ctx.fillStyle="#0d6b6e";
-    ctx.fillText("SKINARIO",W/2,logoBottom);
-    ctx.font="bold 11px system-ui";ctx.fillStyle="#c8a84e";ctx.letterSpacing=3;
-    ctx.fillText("— AESTHETIC MEDICINE COMMUNITY —",W/2,logoBottom+20);
+    let y=60; // running y position
 
-    // ── CERTIFICATE OF COMPLETION
-    ctx.font="bold 48px Georgia, serif";ctx.fillStyle="#1a1a1a";
-    ctx.fillText("CERTIFICATE",W/2,logoBottom+75);
-    ctx.font="italic 20px Georgia, serif";ctx.fillStyle="#c8a84e";
-    ctx.fillText("of Completion",W/2,logoBottom+100);
+    // ── LOGO (no redundant text — logo already has "SKINARIO" in it)
+    if(skLogo){const lh=70;const lw=lh*(skLogo.width/skLogo.height);ctx.drawImage(skLogo,cx-lw/2,y,lw,lh);y+=lh+5;}
+    else{ctx.font="bold 38px system-ui";ctx.fillStyle="#0d6b6e";ctx.fillText("SKINARIO",cx,y+40);y+=50;}
 
-    // ── Decorative line
-    ctx.strokeStyle="#c8a84e";ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(W/2-120,logoBottom+110);ctx.lineTo(W/2+120,logoBottom+110);ctx.stroke();
+    // ── Subtitle
+    ctx.font="bold 11px system-ui";ctx.fillStyle="#c8a84e";
+    ctx.fillText("— AESTHETIC MEDICINE COMMUNITY —",cx,y+15);y+=35;
+
+    // ── CERTIFICATE (large, dominant)
+    ctx.font="bold 72px Georgia, serif";ctx.fillStyle="#1a1a1a";
+    ctx.fillText("CERTIFICATE",cx,y+60);y+=75;
+
+    // ── OF COMPLETION (gold caps)
+    ctx.font="bold 18px system-ui";ctx.fillStyle="#c8a84e";
+    ctx.fillText("OF COMPLETION",cx,y+5);y+=15;
+
+    // ── Gold line
+    ctx.strokeStyle="#c8a84e";ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(cx-130,y+5);ctx.lineTo(cx+130,y+5);ctx.stroke();y+=25;
 
     // ── This certifies that
     ctx.font="16px system-ui";ctx.fillStyle="#555";
-    ctx.fillText("This certifies that",W/2,logoBottom+140);
+    ctx.fillText("This certifies that",cx,y);y+=30;
 
-    // ── Doctor's name — CURSIVE
-    ctx.font="italic 42px 'Great Vibes', cursive, Georgia, serif";ctx.fillStyle="#0d6b6e";
-    ctx.fillText(name,W/2,logoBottom+190);
+    // ── Doctor's name — LARGE CURSIVE
+    ctx.font="italic 58px 'Great Vibes', cursive, Georgia, serif";ctx.fillStyle="#0d6b6e";
+    ctx.fillText(name,cx,y+10);y+=30;
 
-    // ── Decorative line under name
+    // ── Decorative line under name with diamonds
     ctx.strokeStyle="#c8a84e";ctx.lineWidth=1;
-    const nameDots=[W/2-160,W/2+160];
-    ctx.beginPath();ctx.moveTo(nameDots[0],logoBottom+200);ctx.lineTo(nameDots[1],logoBottom+200);ctx.stroke();
-    // Diamond dots
-    [[nameDots[0],logoBottom+200],[nameDots[1],logoBottom+200]].forEach(([x,y])=>{ctx.fillStyle="#c8a84e";ctx.beginPath();ctx.moveTo(x,y-4);ctx.lineTo(x+4,y);ctx.lineTo(x,y+4);ctx.lineTo(x-4,y);ctx.fill();});
+    const nl=200; // name line half-width
+    ctx.beginPath();ctx.moveTo(cx-nl,y);ctx.lineTo(cx+nl,y);ctx.stroke();
+    // Diamond dots at ends
+    [[cx-nl,y],[cx+nl,y]].forEach(([dx,dy])=>{ctx.fillStyle="#c8a84e";ctx.beginPath();ctx.moveTo(dx,dy-4);ctx.lineTo(dx+4,dy);ctx.lineTo(dx,dy+4);ctx.lineTo(dx-4,dy);ctx.fill();});
+    y+=25;
 
     // ── has successfully completed text
     ctx.font="14px system-ui";ctx.fillStyle="#555";
-    ctx.fillText("has successfully completed the SKINARIO Study & Test Series assessment on",W/2,logoBottom+230);
+    ctx.fillText("has successfully completed the SKINARIO Study & Test Series assessment on",cx,y);y+=35;
 
-    // ── Topic name
-    ctx.font="bold 28px system-ui";ctx.fillStyle="#1a1a1a";
-    ctx.fillText(attempt.topic.toUpperCase(),W/2,logoBottom+270);
+    // ── Topic name (bold caps)
+    ctx.font="bold 30px system-ui";ctx.fillStyle="#1a1a1a";
+    ctx.fillText(attempt.topic.toUpperCase(),cx,y);y+=30;
 
     // ── Difficulty badge
     ctx.font="bold 16px system-ui";ctx.fillStyle=dt.color;
-    ctx.fillText(dt.label+" "+attempt.difficulty.toUpperCase()+" LEVEL",W/2,logoBottom+298);
+    ctx.fillText(dt.label+" "+attempt.difficulty.toUpperCase()+" LEVEL",cx,y);y+=35;
 
-    // ── Score section (centered)
-    const scoreY=logoBottom+360;
+    // ── Score section
     const scoreColor=attempt.accuracy>=70?"#1a7d42":attempt.accuracy>=50?"#b8860b":"#c0392b";
-    ctx.font="bold 54px system-ui";ctx.fillStyle=scoreColor;
-    ctx.fillText(attempt.accuracy+"%",W/2-80,scoreY);
-
-    // Right side of score — details
+    ctx.font="bold 58px system-ui";ctx.fillStyle=scoreColor;
+    ctx.fillText(attempt.accuracy+"%",cx-90,y+15);
     ctx.textAlign="left";ctx.font="16px system-ui";ctx.fillStyle="#333";
-    ctx.fillText(attempt.correctAnswers+" of "+attempt.totalQuestions+" correct",W/2+10,scoreY-15);
+    ctx.fillText(attempt.correctAnswers+" of "+attempt.totalQuestions+" correct",cx+10,y-5);
     ctx.font="14px system-ui";ctx.fillStyle="#666";
-    ctx.fillText("Time Taken: "+Math.floor((attempt.timeSpentSeconds||0)/60)+"m "+(attempt.timeSpentSeconds||0)%60+"s",W/2+10,scoreY+8);
+    ctx.fillText("Time Taken: "+Math.floor((attempt.timeSpentSeconds||0)/60)+"m "+(attempt.timeSpentSeconds||0)%60+"s",cx+10,y+18);
+    y+=45;
 
     // ── Date + Cert ID
     ctx.textAlign="center";ctx.font="13px system-ui";ctx.fillStyle="#888";
-    ctx.fillText("Date: "+certDate.toLocaleDateString("en-IN",{dateStyle:"long"})+"  |  Certificate ID: "+certId,W/2,scoreY+50);
+    ctx.fillText("Date: "+certDate.toLocaleDateString("en-IN",{dateStyle:"long"})+"  |  Certificate ID: "+certId,cx,y);y+=25;
 
-    // ── Strengths + Weak areas (horizontal, compact)
-    const areasY=scoreY+80;
+    // ── Strengths (horizontal)
     if(strong.length>0){
       ctx.textAlign="left";ctx.font="bold 11px system-ui";ctx.fillStyle="#1a7d42";
-      ctx.fillText("STRENGTHS:  "+strong.map(a=>a.area+" ("+a.pct+"%)").join("  •  "),100,areasY);
+      const stxt="STRENGTHS:  "+strong.map(a=>a.area+" ("+a.pct+"%)").join("  •  ");
+      ctx.fillText(stxt,80,y);y+=18;
     }
     if(weak.length>0){
       ctx.textAlign="left";ctx.font="bold 11px system-ui";ctx.fillStyle="#b8860b";
-      ctx.fillText("TO DEVELOP:  "+weak.map(a=>a.area+" ("+a.pct+"%)").join("  •  "),100,areasY+20);
+      ctx.fillText("TO DEVELOP:  "+weak.map(a=>a.area+" ("+a.pct+"%)").join("  •  "),80,y);y+=18;
     }
 
-    // ── BOTTOM SECTION: Signatures + Seal ───────────────
-    const bottomY=H-180;
+    // ── BOTTOM: Signatures + Seal (fixed position from bottom)
+    const sigY=H-190;
 
     // Left signature
-    if(sigLeftImg){const sh=55;const sw=sh*(sigLeftImg.width/sigLeftImg.height);ctx.drawImage(sigLeftImg,200-sw/2,bottomY-10,sw,sh);}
-    ctx.textAlign="center";ctx.font="italic 13px system-ui";ctx.fillStyle="#333";
-    ctx.fillText(certConfig.signatureLeftName||"Dr. Dhananjay Patil",200,bottomY+55);
+    if(sigLeftImg){const sh=55;const sw=Math.min(120,sh*(sigLeftImg.width/sigLeftImg.height));ctx.drawImage(sigLeftImg,190-sw/2,sigY,sw,sh);}
+    ctx.textAlign="center";ctx.font="italic 14px system-ui";ctx.fillStyle="#333";
+    ctx.fillText(certConfig.signatureLeftName||"Dr. Dhananjay Patil",190,sigY+65);
     ctx.font="11px system-ui";ctx.fillStyle="#888";
-    ctx.fillText(certConfig.signatureLeftTitle||"Founder & Mentor",200,bottomY+70);
+    ctx.fillText(certConfig.signatureLeftTitle||"Founder & Mentor",190,sigY+80);
 
-    // Center seal/verified emblem
-    if(sealImg){const sh=70;const sw=sh*(sealImg.width/sealImg.height);ctx.drawImage(sealImg,W/2-sw/2,bottomY-10,sw,sh);}
+    // Center seal
+    if(sealImg){const sh=75;const sw=sh*(sealImg.width/sealImg.height);ctx.drawImage(sealImg,cx-sw/2,sigY-5,sw,sh);}
 
     // Right signature
-    if(sigRightImg){const sh=55;const sw=sh*(sigRightImg.width/sigRightImg.height);ctx.drawImage(sigRightImg,W-200-sw/2,bottomY-10,sw,sh);}
-    ctx.textAlign="center";ctx.font="italic 13px system-ui";ctx.fillStyle="#333";
-    ctx.fillText(certConfig.signatureRightName||"Academic Council",W-200,bottomY+55);
+    if(sigRightImg){const sh=55;const sw=Math.min(120,sh*(sigRightImg.width/sigRightImg.height));ctx.drawImage(sigRightImg,W-190-sw/2,sigY,sw,sh);}
+    ctx.textAlign="center";ctx.font="italic 14px system-ui";ctx.fillStyle="#333";
+    ctx.fillText(certConfig.signatureRightName||"Academic Council",W-190,sigY+65);
     ctx.font="11px system-ui";ctx.fillStyle="#888";
-    ctx.fillText(certConfig.signatureRightTitle||"SKINARIO",W-200,bottomY+70);
+    ctx.fillText(certConfig.signatureRightTitle||"SKINARIO",W-190,sigY+80);
 
-    // ── FOOTER ───────────────
-    const footY=H-65;
+    // ── FOOTER (fixed from bottom)
+    const footY=H-70;
 
     // Accreditation logos (bottom-left)
     const accreds=certConfig.accreditations||[];
     if(accreds.length>0){
       ctx.textAlign="left";ctx.font="bold 8px system-ui";ctx.fillStyle="#999";
-      ctx.fillText("ACCREDITED BY",60,footY-15);
-      let ax=60;
+      ctx.fillText("ACCREDITED BY",55,footY-18);
+      let ax=55;
       accreds.forEach((acc,i)=>{
         const logo=accredLogos[i];
-        if(logo){const lh=25;const lw=Math.min(50,lh*(logo.width/logo.height));ctx.drawImage(logo,ax,footY-5,lw,lh);ax+=lw+12;}
-        else{ctx.font="bold 10px system-ui";ctx.fillStyle="#555";ctx.fillText(acc.name,ax,footY+10);ax+=ctx.measureText(acc.name).width+15;}
+        if(logo){const lh=28;const lw=Math.min(55,lh*(logo.width/logo.height));ctx.drawImage(logo,ax,footY-10,lw,lh);ax+=lw+10;}
+        else{ctx.font="bold 11px system-ui";ctx.fillStyle="#555";ctx.textAlign="left";ctx.fillText(acc.name,ax,footY+5);ax+=ctx.measureText(acc.name).width+15;}
       });
     }
 
     // Sponsor (bottom-center)
     if(certConfig.sponsorName){
       ctx.textAlign="center";ctx.font="10px system-ui";ctx.fillStyle="#aaa";
-      ctx.fillText("Powered by",W/2,footY-10);
-      if(sponsorLogo){const sh=22;const sw=sh*(sponsorLogo.width/sponsorLogo.height);ctx.drawImage(sponsorLogo,W/2-sw/2,footY-3,sw,sh);}
-      ctx.font="bold 13px system-ui";ctx.fillStyle="#333";
-      ctx.fillText(certConfig.sponsorName,W/2,sponsorLogo?footY+28:footY+8);
-      if(certConfig.sponsorTagline){ctx.font="10px system-ui";ctx.fillStyle="#888";ctx.fillText(certConfig.sponsorTagline.slice(0,60),W/2,sponsorLogo?footY+42:footY+22);}
+      ctx.fillText("Powered by",cx,footY-22);
+      if(sponsorLogo){const sh=20;const sw=sh*(sponsorLogo.width/sponsorLogo.height);ctx.drawImage(sponsorLogo,cx-sw/2,footY-16,sw,sh);}
+      ctx.font="bold 14px system-ui";ctx.fillStyle="#333";
+      ctx.fillText(certConfig.sponsorName,cx,sponsorLogo?footY+14:footY-2);
+      if(certConfig.sponsorTagline){ctx.font="10px system-ui";ctx.fillStyle="#888";ctx.fillText(certConfig.sponsorTagline.slice(0,60),cx,sponsorLogo?footY+28:footY+14);}
     }
 
     // Tagline + URL (bottom-right)
     ctx.textAlign="right";ctx.font="italic 12px system-ui";ctx.fillStyle="#0d6b6e";
-    ctx.fillText("Learn. Discuss. Lead the Field.",W-80,footY);
+    ctx.fillText("Learn. Discuss. Lead the Field.",W-65,footY-5);
     ctx.font="bold 14px system-ui";ctx.fillStyle="#1a1a1a";
-    ctx.fillText("skinario.app",W-80,footY+20);
+    ctx.fillText("skinario.app",W-65,footY+14);
 
     // Download
     const link=document.createElement("a");
