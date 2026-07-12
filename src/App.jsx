@@ -7458,7 +7458,7 @@ ${forDownload
           </div>
         </div>);
       })()}
-      {pg==="study"&&hasBetaAccess("study")&&<div style={{maxWidth:900}}>
+      {pg==="study"&&hasBetaAccess("study")&&<div style={{maxWidth:1100}}>
         {(()=>{
           const monthKey=new Date().toISOString().slice(0,7);
           const monthLabel=new Date().toLocaleDateString("en-IN",{year:"numeric",month:"long"});
@@ -7466,6 +7466,7 @@ ${forDownload
 
           // ── VIEW: home (topic picker + stats intro) ───────────────────
           if(studyView==="home"){
+            const studyAds=sponsorPlacements.filter(sp=>sp.status==="active"&&(sp.placementType==="study_home"||sp.placementType==="study_sidebar"));
             return(<div>
               <div style={{...T.card,padding:"22px 22px 20px",marginBottom:16,background:"linear-gradient(135deg,"+T.tealBg+","+T.goldBg+"55)",borderLeft:"3px solid "+T.teal}}>
                 <h2 style={{fontSize:"1.35rem",fontWeight:700,margin:0,marginBottom:6}}>🎯 Study & Test Series</h2>
@@ -7475,82 +7476,30 @@ ${forDownload
                 <div style={{fontSize:".72rem",color:T.mute,marginTop:10}}>📅 This month: <b>{monthLabel}</b> · Fresh test variants added each month</div>
               </div>
 
-              {/* Personal quick-stats + weak-area suggestions */}
-              {myAttempts.length>0&&(()=>{
-                const stats=computeStudyStats(myAttempts);
-                return(<div style={{...T.card,marginBottom:16}}>
-                  <h4 style={{fontSize:".95rem",fontWeight:700,margin:0,marginBottom:12}}>📊 Your progress</h4>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:14}}>
-                    {[
-                      ["Tests taken",stats.totalTests],
-                      ["Avg accuracy",stats.avgAccuracy+"%"],
-                      ["Best score",stats.bestScore+"%"],
-                      ["Topics covered",stats.topicStats.length],
-                    ].map(([l,v])=><div key={l} style={{textAlign:"center",padding:12,background:T.bg,borderRadius:10}}>
-                      <div style={{fontSize:"1.35rem",fontWeight:700,color:T.teal}}>{v}</div>
-                      <div style={{fontSize:".62rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5,marginTop:2}}>{l}</div>
-                    </div>)}
+              <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 320px",gap:18,alignItems:"start"}} className="me-grid">
+                {/* LEFT — Topic grid + Test results */}
+                <div style={{minWidth:0}}>
+                  <h4 style={{fontSize:".92rem",fontWeight:700,marginBottom:12}}>Pick a topic to test yourself</h4>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:10,marginBottom:16}}>
+                    {TEST_TOPICS.map(t=>{
+                      const availCount=testSeries.filter(x=>x.topicId===t.id&&x.monthKey===monthKey).length;
+                      const myTopicAttempts=myAttempts.filter(a=>a.topicId===t.id);
+                      const myBest=myTopicAttempts.length?Math.max(...myTopicAttempts.map(a=>a.accuracy||0)):null;
+                      return(<div key={t.id} onClick={()=>{if(availCount>0){setSelTestTopic(t);setStudyView("picker");}}} style={{...T.card,cursor:availCount>0?"pointer":"default",marginBottom:0,padding:14,opacity:availCount>0?1:0.55,transition:"all .15s"}} onMouseEnter={e=>{if(availCount>0){e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 18px rgba(0,0,0,0.08)";}}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
+                        <div style={{fontSize:"1.6rem",marginBottom:4}}>{t.icon}</div>
+                        <div style={{fontSize:".88rem",fontWeight:700,marginBottom:3}}>{t.label}</div>
+                        <div style={{fontSize:".68rem",color:T.mute}}>{availCount>0?`${availCount} test${availCount!==1?"s":""} available`:"Coming soon"}</div>
+                        {myBest!==null&&<div style={{fontSize:".68rem",color:T.teal,fontWeight:600,marginTop:4}}>Your best: {myBest}%</div>}
+                      </div>);
+                    })}
                   </div>
 
-                  {/* Strong + Weak areas side by side */}
-                  {(stats.strongAreas.length>0||stats.weakAreas.length>0)&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}} className="me-info-grid">
-                    {stats.strongAreas.length>0&&<div style={{padding:12,background:"#e8f5e9",borderRadius:10}}>
-                      <div style={{fontSize:".68rem",fontWeight:700,color:"#1a7d42",textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>💪 Strong areas</div>
-                      {stats.strongAreas.map(a=><div key={a.area} style={{display:"flex",justifyContent:"space-between",fontSize:".78rem",color:T.txt2,marginBottom:4}}>
-                        <span>{a.area}</span>
-                        <span style={{fontWeight:700,color:"#1a7d42"}}>{a.pct}%</span>
-                      </div>)}
-                    </div>}
-                    {stats.weakAreas.length>0&&<div style={{padding:12,background:"#fef3cd",borderRadius:10}}>
-                      <div style={{fontSize:".68rem",fontWeight:700,color:T.goldD,textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>📚 Focus areas</div>
-                      {stats.weakAreas.map(a=><div key={a.area} style={{display:"flex",justifyContent:"space-between",fontSize:".78rem",color:T.txt2,marginBottom:4}}>
-                        <span>{a.area}</span>
-                        <span style={{fontWeight:700,color:T.goldD}}>{a.pct}%</span>
-                      </div>)}
-                    </div>}
-                  </div>}
-
-                  {/* Actionable suggestions based on weak areas */}
-                  {stats.weakAreas.length>0&&<div style={{padding:"10px 14px",background:T.tealBg,borderRadius:8,fontSize:".82rem",color:T.txt2,lineHeight:1.6}}>
-                    💡 <b>Suggested next step:</b> You've been scoring below 60% on <b>{stats.weakAreas.map(a=>a.area).join(", ")}</b>. Browse SKINARIO's <span style={{color:T.teal,fontWeight:600,cursor:"pointer"}} onClick={()=>go("library")}>Articles</span> and <span style={{color:T.teal,fontWeight:600,cursor:"pointer"}} onClick={()=>go("videos")}>Videos</span> on these topics, then retake the test to track your improvement.
-                  </div>}
-
-                  {/* Per-topic breakdown (compact) */}
-                  {stats.topicStats.length>1&&<div style={{marginTop:14}}>
-                    <div style={{fontSize:".7rem",fontWeight:700,color:T.mute,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>By topic</div>
-                    {stats.topicStats.map(t=><div key={t.topic} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid "+T.border}}>
-                      <span style={{fontSize:".8rem",fontWeight:600,flex:1}}>{t.topic}</span>
-                      <div style={{width:80,height:6,background:"#e8e8e8",borderRadius:3,overflow:"hidden"}}>
-                        <div style={{height:"100%",width:t.avgAccuracy+"%",background:t.avgAccuracy>=70?"#4caf50":t.avgAccuracy>=50?T.gold:T.err}}/>
-                      </div>
-                      <span style={{fontSize:".76rem",fontWeight:700,color:t.avgAccuracy>=70?"#1a7d42":t.avgAccuracy>=50?T.goldD:T.err,minWidth:32,textAlign:"right"}}>{t.avgAccuracy}%</span>
-                    </div>)}
-                  </div>}
-                </div>);
-              })()}
-
-              <h4 style={{fontSize:".92rem",fontWeight:700,marginBottom:12}}>Pick a topic to test yourself</h4>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10,marginBottom:16}}>
-                {TEST_TOPICS.map(t=>{
-                  const availCount=testSeries.filter(x=>x.topicId===t.id&&x.monthKey===monthKey).length;
-                  const myTopicAttempts=myAttempts.filter(a=>a.topicId===t.id);
-                  const myBest=myTopicAttempts.length?Math.max(...myTopicAttempts.map(a=>a.accuracy||0)):null;
-                  return(<div key={t.id} onClick={()=>{setSelTestTopic(t);setStudyView("picker");}} style={{...T.card,cursor:availCount>0?"pointer":"default",marginBottom:0,padding:16,opacity:availCount>0?1:0.55,transition:"all .15s"}} onMouseEnter={e=>{if(availCount>0){e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 18px rgba(0,0,0,0.08)";}}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
-                    <div style={{fontSize:"1.8rem",marginBottom:6}}>{t.icon}</div>
-                    <div style={{fontSize:".95rem",fontWeight:700,marginBottom:4}}>{t.label}</div>
-                    <div style={{fontSize:".72rem",color:T.mute}}>{availCount>0?`${availCount} test${availCount!==1?"s":""} available`:"Coming soon"}</div>
-                    {myBest!==null&&<div style={{fontSize:".7rem",color:T.teal,fontWeight:600,marginTop:5}}>Your best: {myBest}%</div>}
-                  </div>);
-                })}
-              </div>
-
-              {/* Recent test results — expandable with full question review */}
+                  {/* Test results — expandable with question review */}
               {myAttempts.length>0&&<div style={{...T.card}}>
                 <h4 style={{fontSize:".92rem",fontWeight:700,margin:0,marginBottom:10}}>📝 My Test Results</h4>
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
                   {myAttempts.sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt)).slice(0,8).map(a=>{
                     const isExpanded=expandedAttempt===a.id;
-                    // Find the test doc so we can show question-level review
                     const testDoc=testSeries.find(t=>t.id===a.testId);
                     const areaEntries=Object.entries(a.subAreaStats||{}).map(([area,s])=>({area,...s,pct:s.total?Math.round((s.right/s.total)*100):0})).sort((x,y)=>x.pct-y.pct);
                     return(<div key={a.id} style={{background:T.bg,borderRadius:10,overflow:"hidden"}}>
@@ -7564,7 +7513,6 @@ ${forDownload
                         </div>
                       </div>
                       {isExpanded&&<div style={{padding:"0 14px 14px",borderTop:"1px solid "+T.border}}>
-                        {/* Sub-area performance for this test */}
                         {areaEntries.length>0&&<div style={{marginTop:10,marginBottom:12}}>
                           <div style={{fontSize:".7rem",fontWeight:700,color:T.mute,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Performance by area</div>
                           {areaEntries.map(ar=><div key={ar.area} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
@@ -7575,7 +7523,6 @@ ${forDownload
                             <span style={{fontSize:".72rem",fontWeight:700,color:ar.pct>=70?"#1a7d42":ar.pct>=50?T.goldD:T.err,minWidth:48,textAlign:"right"}}>{ar.right}/{ar.total} · {ar.pct}%</span>
                           </div>)}
                         </div>}
-                        {/* Question-by-question review (if test doc available) */}
                         {testDoc&&testDoc.questions?.length>0?<div>
                           <div style={{fontSize:".7rem",fontWeight:700,color:T.mute,textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>Question review</div>
                           <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -7592,7 +7539,7 @@ ${forDownload
                                   {q.options.map((opt,oi)=>{
                                     const isCorrect=oi===q.correctIndex;
                                     const isChosen=oi===chosen;
-                                    if(!isCorrect&&!isChosen)return null; // only show correct + chosen to keep it compact
+                                    if(!isCorrect&&!isChosen)return null;
                                     return(<div key={oi} style={{padding:"4px 8px",fontSize:".74rem",borderRadius:5,background:isCorrect?"#e8f5e9":"#fdecea",color:isCorrect?"#1a7d42":T.err,fontWeight:600}}>
                                       {String.fromCharCode(65+oi)}. {opt} {isCorrect?"✓":""}{!isCorrect&&isChosen?" ← your answer":""}
                                     </div>);
@@ -7609,25 +7556,80 @@ ${forDownload
                 </div>
               </div>}
 
-              {/* Admin generation panel */}
-              {isAdm&&<div style={{...T.card,marginTop:16,borderLeft:"3px solid "+T.gold}}>
-                <h4 style={{fontSize:".92rem",fontWeight:700,margin:0,marginBottom:8}}>⚙️ Admin — Generate monthly tests</h4>
-                <p style={{fontSize:".76rem",color:T.mute,marginTop:0,marginBottom:12,lineHeight:1.5}}>Generate up to 3 variants per topic × difficulty for {monthLabel}. Uses ~₹6 of AI credit per generation.</p>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:8}}>
-                  {TEST_TOPICS.map(t=>{
-                    return(<div key={t.id} style={{padding:10,background:T.bg,borderRadius:8}}>
-                      <div style={{fontSize:".82rem",fontWeight:600,marginBottom:6}}>{t.icon} {t.label}</div>
-                      <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                        {TEST_DIFFICULTIES.map(d=>{
-                          const count=testSeries.filter(x=>x.topicId===t.id&&x.difficulty===d&&x.monthKey===monthKey).length;
-                          return(<button key={d} disabled={testGenerating||count>=3} onClick={()=>adminGenerateTest(t,d)} style={{...T.btnO,padding:"4px 8px",fontSize:".68rem",opacity:count>=3?0.5:1}}>{d} ({count}/3)</button>);
-                        })}
-                      </div>
-                    </div>);
-                  })}
+                  {/* Admin generation panel */}
+                  {isAdm&&<div style={{...T.card,marginTop:16,borderLeft:"3px solid "+T.gold}}>
+                    <h4 style={{fontSize:".92rem",fontWeight:700,margin:0,marginBottom:8}}>⚙️ Admin — Generate monthly tests</h4>
+                    <p style={{fontSize:".76rem",color:T.mute,marginTop:0,marginBottom:12,lineHeight:1.5}}>Generate up to 3 variants per topic × difficulty for {monthLabel}. Uses ~₹6 of AI credit per generation.</p>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:8}}>
+                      {TEST_TOPICS.map(t=>{
+                        return(<div key={t.id} style={{padding:10,background:T.bg,borderRadius:8}}>
+                          <div style={{fontSize:".82rem",fontWeight:600,marginBottom:6}}>{t.icon} {t.label}</div>
+                          <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                            {TEST_DIFFICULTIES.map(d=>{
+                              const count=testSeries.filter(x=>x.topicId===t.id&&x.difficulty===d&&x.monthKey===monthKey).length;
+                              return(<button key={d} disabled={testGenerating||count>=3} onClick={()=>adminGenerateTest(t,d)} style={{...T.btnO,padding:"4px 8px",fontSize:".68rem",opacity:count>=3?0.5:1}}>{d} ({count}/3)</button>);
+                            })}
+                          </div>
+                        </div>);
+                      })}
+                    </div>
+                    {testGenerating&&<div style={{marginTop:10,fontSize:".78rem",color:T.teal,fontWeight:600}}>⏳ Generating... this takes ~15 seconds.</div>}
+                  </div>}
                 </div>
-                {testGenerating&&<div style={{marginTop:10,fontSize:".78rem",color:T.teal,fontWeight:600}}>⏳ Generating... this takes ~15 seconds.</div>}
-              </div>}
+
+                {/* RIGHT SIDEBAR — Progress stats + Sponsored placements */}
+                <div style={{minWidth:0,display:"flex",flexDirection:"column",gap:14}}>
+                  {/* Progress stats */}
+                  {myAttempts.length>0&&(()=>{
+                    const stats=computeStudyStats(myAttempts);
+                    return(<div style={{...T.card}}>
+                      <h4 style={{fontSize:".92rem",fontWeight:700,margin:0,marginBottom:12}}>📊 Your progress</h4>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+                        {[["Tests",stats.totalTests],["Avg",stats.avgAccuracy+"%"],["Best",stats.bestScore+"%"],["Topics",stats.topicStats.length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:10,background:T.bg,borderRadius:8}}>
+                          <div style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{v}</div>
+                          <div style={{fontSize:".58rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>{l}</div>
+                        </div>)}
+                      </div>
+                      {stats.strongAreas.length>0&&<div style={{padding:10,background:"#e8f5e9",borderRadius:8,marginBottom:8}}>
+                        <div style={{fontSize:".64rem",fontWeight:700,color:"#1a7d42",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>💪 Strong</div>
+                        {stats.strongAreas.slice(0,4).map(a=><div key={a.area} style={{display:"flex",justifyContent:"space-between",fontSize:".74rem",color:T.txt2,marginBottom:2}}><span>{a.area}</span><span style={{fontWeight:700,color:"#1a7d42"}}>{a.pct}%</span></div>)}
+                      </div>}
+                      {stats.weakAreas.length>0&&<div style={{padding:10,background:"#fef3cd",borderRadius:8,marginBottom:8}}>
+                        <div style={{fontSize:".64rem",fontWeight:700,color:T.goldD,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>📚 Focus</div>
+                        {stats.weakAreas.slice(0,4).map(a=><div key={a.area} style={{display:"flex",justifyContent:"space-between",fontSize:".74rem",color:T.txt2,marginBottom:2}}><span>{a.area}</span><span style={{fontWeight:700,color:T.goldD}}>{a.pct}%</span></div>)}
+                      </div>}
+                      {stats.weakAreas.length>0&&<div style={{fontSize:".76rem",color:T.txt2,lineHeight:1.5,padding:"8px 10px",background:T.tealBg,borderRadius:8}}>
+                        💡 Study more on <b>{stats.weakAreas.slice(0,3).map(a=>a.area).join(", ")}</b> — browse <span style={{color:T.teal,fontWeight:600,cursor:"pointer"}} onClick={()=>go("library")}>Articles</span> or <span style={{color:T.teal,fontWeight:600,cursor:"pointer"}} onClick={()=>go("videos")}>Videos</span>.
+                      </div>}
+                      {stats.topicStats.length>1&&<div style={{marginTop:10}}>
+                        <div style={{fontSize:".64rem",fontWeight:700,color:T.mute,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>By topic</div>
+                        {stats.topicStats.map(t=><div key={t.topic} style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                          <span style={{fontSize:".72rem",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.topic}</span>
+                          <div style={{width:50,height:5,background:"#e8e8e8",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:t.avgAccuracy+"%",background:t.avgAccuracy>=70?"#4caf50":t.avgAccuracy>=50?T.gold:T.err}}/></div>
+                          <span style={{fontSize:".68rem",fontWeight:700,color:t.avgAccuracy>=70?"#1a7d42":t.avgAccuracy>=50?T.goldD:T.err,minWidth:28,textAlign:"right"}}>{t.avgAccuracy}%</span>
+                        </div>)}
+                      </div>}
+                    </div>);
+                  })()}
+
+                  {/* Sponsored placements */}
+                  {studyAds.map(sp=><div key={sp.id} style={{...T.card,padding:0,overflow:"hidden",border:"1px solid "+T.goldBg}}>
+                    {sp.logo&&<img src={sp.logo} alt="" style={{width:"100%",height:140,objectFit:"cover"}}/>}
+                    <div style={{padding:14}}>
+                      <div style={{fontSize:".62rem",color:T.mute,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Sponsored</div>
+                      <div style={{fontSize:".88rem",fontWeight:700,marginBottom:4}}>{sp.title}</div>
+                      {sp.tagline&&<div style={{fontSize:".76rem",color:T.txt2,lineHeight:1.5,marginBottom:8}}>{sp.tagline}</div>}
+                      {sp.website&&<a href={sp.website.startsWith("http")?sp.website:`https://${sp.website}`} target="_blank" rel="noopener noreferrer" style={{fontSize:".76rem",color:T.teal,fontWeight:600,textDecoration:"none"}}>Learn more →</a>}
+                    </div>
+                  </div>)}
+
+                  {/* If no sponsored ads, show a placeholder */}
+                  {studyAds.length===0&&<div style={{...T.card,padding:14,textAlign:"center",borderStyle:"dashed",borderColor:T.border}}>
+                    <div style={{fontSize:"1.2rem",marginBottom:4}}>📢</div>
+                    <div style={{fontSize:".76rem",color:T.mute,lineHeight:1.5}}>Sponsor this space — reach aesthetic doctors actively studying. <span style={{color:T.teal,fontWeight:600,cursor:"pointer"}} onClick={()=>go("vendors")}>Partner with SKINARIO →</span></div>
+                  </div>}
+                </div>
+              </div>
             </div>);
           }
 
@@ -7709,11 +7711,11 @@ ${forDownload
                   {/* Mentor-style suggestion */}
                   <div style={{padding:"12px 16px",background:"linear-gradient(135deg,"+T.tealBg+","+T.goldBg+"55)",borderRadius:10,borderLeft:"3px solid "+T.teal}}>
                     <div style={{fontSize:".72rem",fontWeight:700,color:T.teal,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>🎓 Mentor's note</div>
-                    <div style={{fontSize:".84rem",color:T.txt2,lineHeight:1.6}}>
-                      {topicStats.avgAccuracy>=80?"Excellent command of "+selTestTopic.label+"! You're consistently scoring above 80%. Consider testing at a harder difficulty to keep challenging yourself, or explore a different topic to broaden your expertise."
+                    <div style={{fontSize:".84rem",color:T.txt2,lineHeight:1.6}} dangerouslySetInnerHTML={{__html:
+                      topicStats.avgAccuracy>=80?"Excellent command of "+selTestTopic.label+"! You're consistently scoring above 80%. Consider testing at a harder difficulty to keep challenging yourself, or explore a different topic to broaden your expertise."
                       :topicStats.avgAccuracy>=60?"Good foundation in "+selTestTopic.label+". You're above passing but there's room to sharpen your knowledge."+(topicStats.weakAreas.length>0?" Focus on <b>"+topicStats.weakAreas.map(a=>a.area).join(", ")+"</b> — these are the sub-areas pulling your score down. Browse SKINARIO's Articles and Videos on these specific topics before your next attempt.":"")
-                      :"You're building your "+selTestTopic.label+" knowledge — keep at it!"+(topicStats.weakAreas.length>0?" Your biggest opportunities are in <b>"+topicStats.weakAreas.map(a=>a.area).join(", ")+"</b>. We recommend reviewing foundational material on these areas before retaking. SKINARIO's Articles and Videos sections have curated content that can help.":"")}
-                    </div>
+                      :"You're building your "+selTestTopic.label+" knowledge — keep at it!"+(topicStats.weakAreas.length>0?" Your biggest opportunities are in <b>"+topicStats.weakAreas.map(a=>a.area).join(", ")+"</b>. We recommend reviewing foundational material on these areas before retaking. SKINARIO's Articles and Videos sections have curated content that can help.":"")
+                    }}/>
                     <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
                       <button onClick={()=>go("library")} style={{...T.btnO,...T.btnSm,fontSize:".72rem"}}>📚 Browse Articles</button>
                       <button onClick={()=>go("videos")} style={{...T.btnO,...T.btnSm,fontSize:".72rem"}}>🎥 Watch Videos</button>
@@ -9402,6 +9404,8 @@ ${forDownload
               <div id="vendor-placement-form" style={{display:"none",marginTop:12,padding:14,background:T.bg,borderRadius:8,flexDirection:"column",gap:10}}>
                 <select value={spForm.placementType} onChange={e=>setSpForm(p=>({...p,placementType:e.target.value}))} style={T.inp}>
                   <option value="home_banner">🏠 Home spotlight banner</option>
+                  <option value="study_sidebar">🎯 Study page sidebar</option>
+                  <option value="study_home">🎯 Study page featured</option>
                   <option value="article_sidebar">📰 Article sidebar</option>
                   <option value="quiz_sponsor">🧠 Quiz sponsor label</option>
                   <option value="vendor_featured">🏭 Featured in vendor directory</option>
@@ -10343,6 +10347,8 @@ ${forDownload
               <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:10}}>
                 <select value={spForm.placementType} onChange={e=>setSpForm(p=>({...p,placementType:e.target.value}))} style={T.inp}>
                   <option value="home_banner">🏠 Home spotlight banner</option>
+                  <option value="study_sidebar">🎯 Study page sidebar</option>
+                  <option value="study_home">🎯 Study page featured</option>
                   <option value="article_sidebar">📰 Article sidebar / in-article</option>
                   <option value="quiz_sponsor">🧠 Quiz sponsor label</option>
                   <option value="vendor_featured">🏭 Featured vendor (top of directory)</option>
