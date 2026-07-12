@@ -138,7 +138,7 @@ service cloud.firestore {
     //    Each user reads only their own; only they can create their own.
     //    Nothing is editable after submission (attempts are immutable). ─────
     match /testAttempts/{attemptId} {
-      allow read: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow read: if isSignedIn();
       allow create: if isOwner('uid');
       allow update, delete: if isAdmin();
     }

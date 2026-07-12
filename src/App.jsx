@@ -256,6 +256,50 @@ const TEST_DURATION_SECONDS=600; // 10 minutes
 const TEST_QUESTION_COUNT=15;
 const BETA_STUDY_CAP_DEFAULT=25; // Default cap on first-ever load; admin can change from Beta Settings tab.
 
+// Computes aggregate study stats from a user's attempt history.
+// Returns {totalTests, avgAccuracy, bestScore, topicStats, strongAreas, weakAreas, recentAttempts}.
+// topicStats aggregates per-topic totals; strong/weak areas aggregate ACROSS all attempts
+// by subArea (question sub-topic), which is the granular signal we can act on.
+function computeStudyStats(attempts) {
+  const list = Array.isArray(attempts) ? attempts : [];
+  if (list.length === 0) return { totalTests:0, avgAccuracy:0, bestScore:0, topicStats:[], strongAreas:[], weakAreas:[], recentAttempts:[] };
+  const totalTests = list.length;
+  const avgAccuracy = Math.round(list.reduce((s,a) => s + (a.accuracy||0), 0) / totalTests);
+  const bestScore = Math.max(...list.map(a => a.accuracy||0));
+  // Per-topic aggregation
+  const topicMap = {};
+  list.forEach(a => {
+    const t = a.topic || "Unknown";
+    if (!topicMap[t]) topicMap[t] = { topic:t, attempts:0, totalCorrect:0, totalQs:0, bestAcc:0 };
+    topicMap[t].attempts++;
+    topicMap[t].totalCorrect += a.correctAnswers || 0;
+    topicMap[t].totalQs += a.totalQuestions || 0;
+    topicMap[t].bestAcc = Math.max(topicMap[t].bestAcc, a.accuracy || 0);
+  });
+  const topicStats = Object.values(topicMap).map(t => ({
+    ...t,
+    avgAccuracy: t.totalQs ? Math.round((t.totalCorrect / t.totalQs) * 100) : 0,
+  })).sort((a,b) => b.avgAccuracy - a.avgAccuracy);
+  // Sub-area aggregation ACROSS all attempts — this is the truest signal
+  const areaMap = {};
+  list.forEach(a => {
+    const stats = a.subAreaStats || {};
+    Object.entries(stats).forEach(([area, s]) => {
+      if (!areaMap[area]) areaMap[area] = { area, right:0, total:0 };
+      areaMap[area].right += s.right || 0;
+      areaMap[area].total += s.total || 0;
+    });
+  });
+  const areas = Object.values(areaMap)
+    .filter(a => a.total >= 3) // ignore areas with too little data to be meaningful
+    .map(a => ({ ...a, pct: Math.round((a.right / a.total) * 100) }))
+    .sort((a,b) => a.pct - b.pct);
+  const weakAreas = areas.filter(a => a.pct < 60).slice(0, 5);
+  const strongAreas = [...areas].reverse().filter(a => a.pct >= 75).slice(0, 5);
+  const recentAttempts = [...list].sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0)).slice(0, 10);
+  return { totalTests, avgAccuracy, bestScore, topicStats, strongAreas, weakAreas, recentAttempts };
+}
+
 // ═══ CONSENT TEMPLATE CATALOG ═══
 // Two-level structure: category → sub-procedures. Each sub-procedure carries
 // procedure-specific risk content. The legal framework (boilerplate clauses
@@ -2483,6 +2527,7 @@ export default function App(){
   // Shape: { study: { cap, enabled, history: [{by, at, from, to, action}] }, ... }
   const[betaConfig,setBetaConfig]=useState({});
   const[betaEditDraft,setBetaEditDraft]=useState({}); // {cap, enabled} — admin unsaved edits
+  const[profileTestsOpen,setProfileTestsOpen]=useState(false); // collapsible test history on admin profile view
   // Test timer — decrements every second while user is taking a test.
   // NOTE: Must live AFTER studyView/activeTest state declarations above,
   // otherwise Vite's minifier triggers a TDZ crash on first render.
@@ -2718,7 +2763,7 @@ export default function App(){
     if(!consentDoctorReg)setConsentDoctorReg(prof.doctorRegNumber||prof.regNumber||"");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[pg,prof]);
-  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl,tm,wp,rv,am,ts,ta,bc]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000),fbGetAll("teamMembers","createdAt","desc",2000),fbGetAll("wallPosts","createdAt","desc",500),fbGetAll("reviews","createdAt","desc",2000),fbGetAll("adminMessages","createdAt","desc",500),fbGetAll("testSeries","createdAt","desc",500),fbGetAll("testAttempts","createdAt","desc",500),fbGet("platformSettings","betaConfig")]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl);setTeamMembers(tm);setWallPosts(wp);setReviews(rv);setAdminMessages(am);setTestSeries(ts);setTestAttempts(ta.filter(x=>x.uid===au?.uid));setBetaConfig(bc||{})},[au?.uid]);
+  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl,tm,wp,rv,am,ts,ta,bc]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000),fbGetAll("teamMembers","createdAt","desc",2000),fbGetAll("wallPosts","createdAt","desc",500),fbGetAll("reviews","createdAt","desc",2000),fbGetAll("adminMessages","createdAt","desc",500),fbGetAll("testSeries","createdAt","desc",500),fbGetAll("testAttempts","createdAt","desc",500),fbGet("platformSettings","betaConfig")]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl);setTeamMembers(tm);setWallPosts(wp);setReviews(rv);setAdminMessages(am);setTestSeries(ts);setTestAttempts(ta);setBetaConfig(bc||{})},[au?.uid]);
 
   // Load current user's points-earning history from pointsActivity ledger.
   // Uses where(uid) so the list query satisfies security rules (can't list others' docs).
@@ -7429,21 +7474,59 @@ ${forDownload
                 <div style={{fontSize:".72rem",color:T.mute,marginTop:10}}>📅 This month: <b>{monthLabel}</b> · Fresh test variants added each month</div>
               </div>
 
-              {/* Personal quick-stats */}
-              {myAttempts.length>0&&<div style={{...T.card,marginBottom:16}}>
-                <h4 style={{fontSize:".95rem",fontWeight:700,margin:0,marginBottom:12}}>📊 Your progress</h4>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10}}>
-                  {[
-                    ["Tests taken",myAttempts.length],
-                    ["Avg accuracy",Math.round(myAttempts.reduce((s,a)=>s+(a.accuracy||0),0)/myAttempts.length)+"%"],
-                    ["Best score",Math.max(...myAttempts.map(a=>a.accuracy||0))+"%"],
-                    ["Latest topic",myAttempts[0]?.topic||"—"],
-                  ].map(([l,v])=><div key={l} style={{textAlign:"center",padding:12,background:T.bg,borderRadius:10}}>
-                    <div style={{fontSize:"1.35rem",fontWeight:700,color:T.teal}}>{v}</div>
-                    <div style={{fontSize:".62rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5,marginTop:2}}>{l}</div>
-                  </div>)}
-                </div>
-              </div>}
+              {/* Personal quick-stats + weak-area suggestions */}
+              {myAttempts.length>0&&(()=>{
+                const stats=computeStudyStats(myAttempts);
+                return(<div style={{...T.card,marginBottom:16}}>
+                  <h4 style={{fontSize:".95rem",fontWeight:700,margin:0,marginBottom:12}}>📊 Your progress</h4>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:14}}>
+                    {[
+                      ["Tests taken",stats.totalTests],
+                      ["Avg accuracy",stats.avgAccuracy+"%"],
+                      ["Best score",stats.bestScore+"%"],
+                      ["Topics covered",stats.topicStats.length],
+                    ].map(([l,v])=><div key={l} style={{textAlign:"center",padding:12,background:T.bg,borderRadius:10}}>
+                      <div style={{fontSize:"1.35rem",fontWeight:700,color:T.teal}}>{v}</div>
+                      <div style={{fontSize:".62rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5,marginTop:2}}>{l}</div>
+                    </div>)}
+                  </div>
+
+                  {/* Strong + Weak areas side by side */}
+                  {(stats.strongAreas.length>0||stats.weakAreas.length>0)&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}} className="me-info-grid">
+                    {stats.strongAreas.length>0&&<div style={{padding:12,background:"#e8f5e9",borderRadius:10}}>
+                      <div style={{fontSize:".68rem",fontWeight:700,color:"#1a7d42",textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>💪 Strong areas</div>
+                      {stats.strongAreas.map(a=><div key={a.area} style={{display:"flex",justifyContent:"space-between",fontSize:".78rem",color:T.txt2,marginBottom:4}}>
+                        <span>{a.area}</span>
+                        <span style={{fontWeight:700,color:"#1a7d42"}}>{a.pct}%</span>
+                      </div>)}
+                    </div>}
+                    {stats.weakAreas.length>0&&<div style={{padding:12,background:"#fef3cd",borderRadius:10}}>
+                      <div style={{fontSize:".68rem",fontWeight:700,color:T.goldD,textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>📚 Focus areas</div>
+                      {stats.weakAreas.map(a=><div key={a.area} style={{display:"flex",justifyContent:"space-between",fontSize:".78rem",color:T.txt2,marginBottom:4}}>
+                        <span>{a.area}</span>
+                        <span style={{fontWeight:700,color:T.goldD}}>{a.pct}%</span>
+                      </div>)}
+                    </div>}
+                  </div>}
+
+                  {/* Actionable suggestions based on weak areas */}
+                  {stats.weakAreas.length>0&&<div style={{padding:"10px 14px",background:T.tealBg,borderRadius:8,fontSize:".82rem",color:T.txt2,lineHeight:1.6}}>
+                    💡 <b>Suggested next step:</b> You've been scoring below 60% on <b>{stats.weakAreas.map(a=>a.area).join(", ")}</b>. Browse SKINARIO's <span style={{color:T.teal,fontWeight:600,cursor:"pointer"}} onClick={()=>go("library")}>Articles</span> and <span style={{color:T.teal,fontWeight:600,cursor:"pointer"}} onClick={()=>go("videos")}>Videos</span> on these topics, then retake the test to track your improvement.
+                  </div>}
+
+                  {/* Per-topic breakdown (compact) */}
+                  {stats.topicStats.length>1&&<div style={{marginTop:14}}>
+                    <div style={{fontSize:".7rem",fontWeight:700,color:T.mute,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>By topic</div>
+                    {stats.topicStats.map(t=><div key={t.topic} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid "+T.border}}>
+                      <span style={{fontSize:".8rem",fontWeight:600,flex:1}}>{t.topic}</span>
+                      <div style={{width:80,height:6,background:"#e8e8e8",borderRadius:3,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:t.avgAccuracy+"%",background:t.avgAccuracy>=70?"#4caf50":t.avgAccuracy>=50?T.gold:T.err}}/>
+                      </div>
+                      <span style={{fontSize:".76rem",fontWeight:700,color:t.avgAccuracy>=70?"#1a7d42":t.avgAccuracy>=50?T.goldD:T.err,minWidth:32,textAlign:"right"}}>{t.avgAccuracy}%</span>
+                    </div>)}
+                  </div>}
+                </div>);
+              })()}
 
               <h4 style={{fontSize:".92rem",fontWeight:700,marginBottom:12}}>Pick a topic to test yourself</h4>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10,marginBottom:16}}>
@@ -8352,7 +8435,47 @@ ${forDownload
                 </div>
               </div>
 
-              {/* ═══ CONSENT CREDIT GRANT (admin) ═══ */}
+              {/* ═══ STUDY / TEST HISTORY (admin, collapsible) ═══ */}
+              {(()=>{
+                const uAttempts=testAttempts.filter(a=>a.uid===u.id);
+                if(uAttempts.length===0)return null;
+                const stats=computeStudyStats(uAttempts);
+                return(<div style={{marginTop:14,paddingTop:14,borderTop:"1px solid "+T.border}}>
+                  <div onClick={()=>setProfileTestsOpen(o=>!o)} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",userSelect:"none"}}>
+                    <div style={{fontSize:".82rem",fontWeight:700,flex:1,display:"flex",alignItems:"center",gap:6}}>🎯 Study Tests <span style={{fontSize:".72rem",color:T.mute,fontWeight:500}}>({stats.totalTests} taken · avg {stats.avgAccuracy}% · best {stats.bestScore}%)</span></div>
+                    <span style={{fontSize:".8rem",color:T.mute,transition:"transform .15s",transform:profileTestsOpen?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
+                  </div>
+                  {profileTestsOpen&&<div style={{marginTop:12}}>
+                    {/* Strong / weak areas */}
+                    {(stats.strongAreas.length>0||stats.weakAreas.length>0)&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+                      {stats.strongAreas.length>0&&<div style={{padding:10,background:"#e8f5e9",borderRadius:8}}>
+                        <div style={{fontSize:".68rem",fontWeight:700,color:"#1a7d42",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>💪 Strong areas</div>
+                        {stats.strongAreas.map(a=><div key={a.area} style={{fontSize:".76rem",color:T.txt2,marginBottom:3}}>{a.area} <span style={{fontWeight:600,color:"#1a7d42"}}>{a.pct}%</span> <span style={{color:T.mute}}>({a.right}/{a.total})</span></div>)}
+                      </div>}
+                      {stats.weakAreas.length>0&&<div style={{padding:10,background:"#fdecea",borderRadius:8}}>
+                        <div style={{fontSize:".68rem",fontWeight:700,color:T.err,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>📚 Needs work</div>
+                        {stats.weakAreas.map(a=><div key={a.area} style={{fontSize:".76rem",color:T.txt2,marginBottom:3}}>{a.area} <span style={{fontWeight:600,color:T.err}}>{a.pct}%</span> <span style={{color:T.mute}}>({a.right}/{a.total})</span></div>)}
+                      </div>}
+                    </div>}
+                    {/* Per-topic performance */}
+                    {stats.topicStats.length>0&&<div style={{marginBottom:12}}>
+                      <div style={{fontSize:".7rem",fontWeight:700,color:T.mute,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>By topic</div>
+                      {stats.topicStats.map(t=><div key={t.topic} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:"1px solid "+T.border,fontSize:".78rem"}}>
+                        <span style={{fontWeight:600}}>{t.topic}</span>
+                        <span style={{color:t.avgAccuracy>=70?"#1a7d42":t.avgAccuracy>=50?T.goldD:T.err,fontWeight:700}}>{t.avgAccuracy}% <span style={{color:T.mute,fontWeight:400}}>({t.attempts} test{t.attempts!==1?"s":""})</span></span>
+                      </div>)}
+                    </div>}
+                    {/* Recent attempts list */}
+                    <div style={{fontSize:".7rem",fontWeight:700,color:T.mute,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Recent tests</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                      {uAttempts.sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt)).slice(0,10).map(a=><div key={a.id} style={{display:"flex",justifyContent:"space-between",padding:"5px 8px",background:T.bg,borderRadius:6,fontSize:".76rem"}}>
+                        <span>{a.topic} · {a.difficulty} · {fD(tsToDateStr(a.createdAt))}</span>
+                        <span style={{fontWeight:700,color:a.accuracy>=70?"#1a7d42":a.accuracy>=50?T.goldD:T.err}}>{a.accuracy}% ({a.correctAnswers}/{a.totalQuestions})</span>
+                      </div>)}
+                    </div>
+                  </div>}
+                </div>);
+              })()}
               <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid "+T.border}}>
                 <div style={{fontSize:".82rem",fontWeight:600,color:T.teal,marginBottom:6}}>📋 Consent template credits</div>
                 <p style={{fontSize:".72rem",color:T.txt2,lineHeight:1.5,marginBottom:8}}>
