@@ -11232,63 +11232,94 @@ ${forDownload
               </div>
             </div>
 
-            {/* Waitlist — who's asked for access, oldest first */}
+            {/* Waitlist + Active beta users — side by side */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,alignItems:"start"}} className="me-info-grid">
+
+            {/* LEFT — Waitlist */}
             {(()=>{
               const waitlisted=allUsers
                 .filter(u=>Array.isArray(u.betaWaitlist)&&u.betaWaitlist.includes("study"))
                 .sort((a,b)=>(a.betaWaitlistedAt_study||0)-(b.betaWaitlistedAt_study||0));
-              return(<div style={{...T.card,marginBottom:14}}>
+              return(<div style={{...T.card,marginBottom:0}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
                   <h5 style={{fontSize:".95rem",fontWeight:700,margin:0,display:"flex",alignItems:"center",gap:6}}>⏳ Waitlist <span style={{fontSize:".72rem",fontWeight:500,color:T.mute}}>({waitlisted.length})</span></h5>
-                  {waitlisted.length>0&&<div style={{fontSize:".72rem",color:T.mute}}>Oldest requests first</div>}
                 </div>
                 {waitlisted.length===0?<div style={{fontSize:".82rem",color:T.mute,fontStyle:"italic",textAlign:"center",padding:"12px 0"}}>No one waiting right now.</div>:
-                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:500,overflowY:"auto"}}>
                   {waitlisted.map(u=>{
                     const acc=ACCOUNT_TYPES.find(t=>t.id===u.accountType);
                     const requestedAt=u.betaWaitlistedAt_study?new Date(u.betaWaitlistedAt_study).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):"—";
                     const activeCount=allUsers.filter(x=>Array.isArray(x.betaFeatures)&&x.betaFeatures.includes("study")).length;
                     const capNow=getBetaCap("study");
                     const atCap=activeCount>=capNow;
-                    return(<div key={u.id} style={{padding:12,background:T.bg,borderRadius:8,display:"flex",gap:10,alignItems:"flex-start",flexWrap:"wrap"}}>
-                      {u.photo?<img src={u.photo} style={{width:38,height:38,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(38,T.tealBg,T.teal),flexShrink:0}}>{u.initials||"?"}</div>}
-                      <div style={{flex:1,minWidth:220}}>
-                        <div style={{fontSize:".88rem",fontWeight:600,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                          <span onClick={()=>viewProfile(u.id)} style={{cursor:"pointer"}}>{u.name||"Unnamed"}</span>
-                          {u.verified&&<span title="Verified" style={{color:"#1d9bf0"}}>✓</span>}
-                          {acc&&<span style={T.tag(T.bg,T.mute)}>{acc.icon} {acc.label}</span>}
+                    return(<div key={u.id} style={{padding:10,background:T.bg,borderRadius:8}}>
+                      <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:6}}>
+                        {u.photo?<img src={u.photo} style={{width:32,height:32,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(32,T.tealBg,T.teal),flexShrink:0,fontSize:".7rem"}}>{u.initials||"?"}</div>}
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:".82rem",fontWeight:600,display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
+                            <span onClick={()=>viewProfile(u.id)} style={{cursor:"pointer"}}>{u.name||"Unnamed"}</span>
+                            {u.verified&&<span style={{color:"#1d9bf0",fontSize:".7rem"}}>✓</span>}
+                            {acc&&<span style={{fontSize:".58rem",color:T.mute}}>{acc.icon}</span>}
+                          </div>
+                          <div style={{fontSize:".66rem",color:T.mute}}>{u.email} · {u.city||""} · {requestedAt}</div>
                         </div>
-                        <div style={{fontSize:".7rem",color:T.mute,marginTop:2}}>{u.email}{u.clinic?` · ${u.clinic}`:u.companyName?` · ${u.companyName}`:""}{u.city?` · ${u.city}`:""} · requested {requestedAt}</div>
-                        {u.betaWaitlistNote_study&&u.betaWaitlistNote_study!=="(no note)"&&<div style={{fontSize:".78rem",color:T.txt2,marginTop:6,padding:"6px 10px",background:"#fff",borderRadius:6,fontStyle:"italic",lineHeight:1.5,borderLeft:"2px solid "+T.teal}}>💭 "{u.betaWaitlistNote_study}"</div>}
                       </div>
-                      <div style={{display:"flex",gap:6,flexShrink:0}}>
+                      {u.betaWaitlistNote_study&&u.betaWaitlistNote_study!=="(no note)"&&<div style={{fontSize:".74rem",color:T.txt2,padding:"4px 8px",background:"#fff",borderRadius:6,fontStyle:"italic",lineHeight:1.4,marginBottom:6,borderLeft:"2px solid "+T.teal}}>"{u.betaWaitlistNote_study}"</div>}
+                      <div style={{display:"flex",gap:6}}>
                         <button onClick={async()=>{
-                          if(atCap){
-                            if(!window.confirm(`Beta cap is ${capNow} and it's full. Approve anyway? (You may want to revoke an inactive tester first.)`))return;
-                          }
-                          const nextFeatures=[...(u.betaFeatures||[]),"study"];
-                          const nextWaitlist=(u.betaWaitlist||[]).filter(f=>f!=="study");
-                          try{
-                            await fbSet("users",u.id,{betaFeatures:nextFeatures,betaWaitlist:nextWaitlist});
-                            sh(`✓ Approved ${u.name?.split(" ")[0]||"user"} for Study beta`);
-                            loadData();
-                          }catch(err){sh("Failed to approve")}
-                        }} style={{...T.btn,...T.btnSm,fontSize:".72rem",padding:"5px 12px"}}>✓ Approve</button>
+                          if(atCap&&!window.confirm(`Cap is ${capNow} and full. Approve anyway?`))return;
+                          await fbSet("users",u.id,{betaFeatures:[...(u.betaFeatures||[]),"study"],betaWaitlist:(u.betaWaitlist||[]).filter(f=>f!=="study")});
+                          sh(`✓ Approved ${u.name?.split(" ")[0]||"user"}`);loadData();
+                        }} style={{...T.btn,...T.btnSm,fontSize:".68rem",padding:"4px 10px"}}>✓ Approve</button>
                         <button onClick={async()=>{
-                          if(!window.confirm(`Remove ${u.name?.split(" ")[0]||"this user"} from the waitlist? They won't be notified — they'll just see the "join waitlist" screen again if they revisit.`))return;
-                          const nextWaitlist=(u.betaWaitlist||[]).filter(f=>f!=="study");
-                          try{
-                            await fbSet("users",u.id,{betaWaitlist:nextWaitlist});
-                            sh(`Removed from waitlist`);
-                            loadData();
-                          }catch(err){sh("Failed to remove")}
-                        }} style={{...T.btnO,...T.btnSm,fontSize:".72rem",padding:"5px 12px",color:T.mute}}>Reject</button>
+                          if(!window.confirm(`Remove ${u.name?.split(" ")[0]||"user"} from waitlist?`))return;
+                          await fbSet("users",u.id,{betaWaitlist:(u.betaWaitlist||[]).filter(f=>f!=="study")});
+                          sh("Removed");loadData();
+                        }} style={{...T.btnO,...T.btnSm,fontSize:".68rem",padding:"4px 10px",color:T.mute}}>Reject</button>
                       </div>
                     </div>);
                   })}
                 </div>}
               </div>);
             })()}
+
+            {/* RIGHT — Active beta users */}
+            {(()=>{
+              const active=allUsers
+                .filter(u=>Array.isArray(u.betaFeatures)&&u.betaFeatures.includes("study"))
+                .sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+              const capNow=getBetaCap("study");
+              return(<div style={{...T.card,marginBottom:0}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+                  <h5 style={{fontSize:".95rem",fontWeight:700,margin:0,display:"flex",alignItems:"center",gap:6}}>🎯 Active testers <span style={{fontSize:".72rem",fontWeight:500,color:T.mute}}>({active.length}/{capNow})</span></h5>
+                </div>
+                {active.length===0?<div style={{fontSize:".82rem",color:T.mute,fontStyle:"italic",textAlign:"center",padding:"12px 0"}}>No beta users yet — approve someone from the waitlist.</div>:
+                <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:500,overflowY:"auto"}}>
+                  {active.map(u=>{
+                    const uAttempts=testAttempts.filter(a=>a.uid===u.id);
+                    const acc=ACCOUNT_TYPES.find(t=>t.id===u.accountType);
+                    return(<div key={u.id} style={{padding:10,background:T.bg,borderRadius:8,display:"flex",gap:8,alignItems:"center"}}>
+                      {u.photo?<img src={u.photo} style={{width:32,height:32,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(32,T.tealBg,T.teal),flexShrink:0,fontSize:".7rem"}}>{u.initials||"?"}</div>}
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:".82rem",fontWeight:600,display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
+                          <span onClick={()=>viewProfile(u.id)} style={{cursor:"pointer"}}>{u.name||"Unnamed"}</span>
+                          {u.verified&&<span style={{color:"#1d9bf0",fontSize:".7rem"}}>✓</span>}
+                          {acc&&<span style={{fontSize:".58rem",color:T.mute}}>{acc.icon}</span>}
+                        </div>
+                        <div style={{fontSize:".66rem",color:T.mute}}>{u.email}{uAttempts.length>0?` · ${uAttempts.length} test${uAttempts.length!==1?"s":""} · avg ${Math.round(uAttempts.reduce((s,a)=>s+(a.accuracy||0),0)/uAttempts.length)}%`:""}</div>
+                      </div>
+                      <button onClick={async()=>{
+                        if(!window.confirm(`Revoke Study beta for ${u.name?.split(" ")[0]||"user"}?`))return;
+                        await fbSet("users",u.id,{betaFeatures:(u.betaFeatures||[]).filter(f=>f!=="study")});
+                        sh(`Revoked`);loadData();
+                      }} style={{...T.btnDanger,...T.btnSm,fontSize:".64rem",padding:"3px 8px",flexShrink:0}}>✕</button>
+                    </div>);
+                  })}
+                </div>}
+              </div>);
+            })()}
+
+            </div>
 
             {/* Future beta features hint */}
             <div style={{padding:14,background:T.bg,borderRadius:10,fontSize:".76rem",color:T.mute,textAlign:"center",fontStyle:"italic"}}>More beta programs will appear here as they launch.</div>
