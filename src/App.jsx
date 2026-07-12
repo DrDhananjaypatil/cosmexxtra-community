@@ -4417,72 +4417,171 @@ ${forDownload
   };
 
   // ══════ CERTIFICATE GENERATION — reusable from result view + sidebar ══════
-  const loadCertImg=async(url)=>{
-    if(!url)return null;
-    try{
-      // Fetch raw bytes → convert to data URL → load as Image.
-      // This bypasses CORS entirely (no crossOrigin attribute needed).
-      const resp=await fetch(url);
-      if(!resp.ok)return null;
-      const blob=await resp.blob();
-      const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(blob);});
-      return new Promise(res=>{const img=new Image();img.onload=()=>res(img);img.onerror=()=>res(null);img.src=dataUrl;setTimeout(()=>res(null),5000);});
-    }catch{return null}
-  };
+  const loadCertImg=(url)=>new Promise(res=>{
+    if(!url){res(null);return}
+    const img=new Image();
+    img.onload=()=>res(img);
+    img.onerror=()=>res(null);
+    img.src=url; // works with data: URLs (base64) — no CORS issues
+    setTimeout(()=>res(null),3000);
+  });
 
   const generateCertificate=async(attempt,{userName,difficulty})=>{
     const dt=DIFF_THEME[difficulty||attempt.difficulty]||DIFF_THEME.Easy;
     const areaEntries=Object.entries(attempt.subAreaStats||{}).map(([area,s])=>({area,...s,pct:s.total?Math.round((s.right/s.total)*100):0})).sort((a,b)=>a.pct-b.pct);
-    const strong=areaEntries.filter(a=>a.pct>=75).slice(0,4);
-    const weak=areaEntries.filter(a=>a.pct<60).slice(0,4);
-    const certId="SK-"+new Date(attempt.createdAt?.seconds?attempt.createdAt.seconds*1000:Date.now()).toISOString().slice(0,10).replace(/-/g,"")+"-"+(attempt.id||"").slice(-6).toUpperCase();
+    const strong=areaEntries.filter(a=>a.pct>=75).slice(0,5);
+    const weak=areaEntries.filter(a=>a.pct<60).slice(0,5);
+    const certDate=attempt.createdAt?.seconds?new Date(attempt.createdAt.seconds*1000):new Date();
+    const certId="SK-"+certDate.toISOString().slice(0,10).replace(/-/g,"")+"-"+(attempt.id||"").slice(-6).toUpperCase();
+    const name=userName||attempt.uName||"Doctor";
 
-    const[skLogo,sponsorLogo,...accredLogos]=await Promise.all([
-      loadCertImg(certConfig.logoUrl||""),
-      loadCertImg(certConfig.sponsorLogo||""),
-      ...(certConfig.accreditations||[]).map(a=>loadCertImg(a.logoUrl||"")),
+    // Load all images in parallel — template bg + admin-uploaded logos
+    const[bgImg,skLogo,sealImg,sigLeftImg,sigRightImg,sponsorLogo,...accredLogos]=await Promise.all([
+      loadCertImg(certConfig.templateData||""),
+      loadCertImg(certConfig.logoData||""),
+      loadCertImg(certConfig.sealData||""),
+      loadCertImg(certConfig.signatureLeftData||""),
+      loadCertImg(certConfig.signatureRightData||""),
+      loadCertImg(certConfig.sponsorLogoData||""),
+      ...(certConfig.accreditations||[]).map(a=>loadCertImg(a.logoData||"")),
     ]);
 
-    const c=document.createElement("canvas");c.width=1200;c.height=900;
+    const W=1400,H=1050;
+    const c=document.createElement("canvas");c.width=W;c.height=H;
     const ctx=c.getContext("2d");
-    ctx.fillStyle="#faf3e7";ctx.fillRect(0,0,1200,900);
-    ctx.strokeStyle="#c8a84e";ctx.lineWidth=4;ctx.strokeRect(20,20,1160,860);
-    ctx.strokeStyle="#0d6b6e";ctx.lineWidth=1.5;ctx.strokeRect(30,30,1140,840);
-    if(skLogo){const lh=50;const lw=lh*(skLogo.width/skLogo.height);ctx.drawImage(skLogo,1120-lw,40,lw,lh);}
-    ctx.fillStyle="#0d6b6e";ctx.font="bold 14px system-ui";ctx.textAlign="center";
-    ctx.fillText("SKINARIO — Aesthetic Medicine Community",600,70);
-    ctx.font="bold 32px system-ui";ctx.fillStyle="#1a1a1a";
-    ctx.fillText("CERTIFICATE OF COMPLETION",600,120);
-    ctx.strokeStyle="#c8a84e";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(300,135);ctx.lineTo(900,135);ctx.stroke();
-    ctx.font="16px system-ui";ctx.fillStyle="#555";ctx.fillText("This certifies that",600,180);
-    ctx.font="bold 28px system-ui";ctx.fillStyle="#0d6b6e";
-    ctx.fillText(userName||attempt.uName||"Doctor",600,220);
+
+    // Background — template or fallback solid
+    if(bgImg){ctx.drawImage(bgImg,0,0,W,H);}
+    else{ctx.fillStyle="#faf3e7";ctx.fillRect(0,0,W,H);ctx.strokeStyle="#c8a84e";ctx.lineWidth=4;ctx.strokeRect(20,20,W-40,H-40);ctx.strokeStyle="#0d6b6e";ctx.lineWidth=1.5;ctx.strokeRect(30,30,W-60,H-60);}
+
+    // ── TOP: SKINARIO logo (centered)
+    if(skLogo){const lh=60;const lw=lh*(skLogo.width/skLogo.height);ctx.drawImage(skLogo,W/2-lw/2,55,lw,lh);}
+
+    // ── SKINARIO text + subtitle
+    ctx.textAlign="center";
+    const logoBottom=skLogo?125:70;
+    ctx.font="bold 36px system-ui";ctx.fillStyle="#0d6b6e";
+    ctx.fillText("SKINARIO",W/2,logoBottom);
+    ctx.font="bold 11px system-ui";ctx.fillStyle="#c8a84e";ctx.letterSpacing=3;
+    ctx.fillText("— AESTHETIC MEDICINE COMMUNITY —",W/2,logoBottom+20);
+
+    // ── CERTIFICATE OF COMPLETION
+    ctx.font="bold 48px Georgia, serif";ctx.fillStyle="#1a1a1a";
+    ctx.fillText("CERTIFICATE",W/2,logoBottom+75);
+    ctx.font="italic 20px Georgia, serif";ctx.fillStyle="#c8a84e";
+    ctx.fillText("of Completion",W/2,logoBottom+100);
+
+    // ── Decorative line
+    ctx.strokeStyle="#c8a84e";ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(W/2-120,logoBottom+110);ctx.lineTo(W/2+120,logoBottom+110);ctx.stroke();
+
+    // ── This certifies that
     ctx.font="16px system-ui";ctx.fillStyle="#555";
-    ctx.fillText("has successfully completed the SKINARIO Study & Test Series assessment on",600,260);
-    ctx.font="bold 26px system-ui";ctx.fillStyle="#1a1a1a";
-    ctx.fillText(attempt.topic,600,305);
-    ctx.font="bold 18px system-ui";ctx.fillStyle=dt.color;
-    ctx.fillText(dt.label+" "+attempt.difficulty+" Level",600,340);
+    ctx.fillText("This certifies that",W/2,logoBottom+140);
+
+    // ── Doctor's name — CURSIVE
+    ctx.font="italic 42px 'Great Vibes', cursive, Georgia, serif";ctx.fillStyle="#0d6b6e";
+    ctx.fillText(name,W/2,logoBottom+190);
+
+    // ── Decorative line under name
+    ctx.strokeStyle="#c8a84e";ctx.lineWidth=1;
+    const nameDots=[W/2-160,W/2+160];
+    ctx.beginPath();ctx.moveTo(nameDots[0],logoBottom+200);ctx.lineTo(nameDots[1],logoBottom+200);ctx.stroke();
+    // Diamond dots
+    [[nameDots[0],logoBottom+200],[nameDots[1],logoBottom+200]].forEach(([x,y])=>{ctx.fillStyle="#c8a84e";ctx.beginPath();ctx.moveTo(x,y-4);ctx.lineTo(x+4,y);ctx.lineTo(x,y+4);ctx.lineTo(x-4,y);ctx.fill();});
+
+    // ── has successfully completed text
+    ctx.font="14px system-ui";ctx.fillStyle="#555";
+    ctx.fillText("has successfully completed the SKINARIO Study & Test Series assessment on",W/2,logoBottom+230);
+
+    // ── Topic name
+    ctx.font="bold 28px system-ui";ctx.fillStyle="#1a1a1a";
+    ctx.fillText(attempt.topic.toUpperCase(),W/2,logoBottom+270);
+
+    // ── Difficulty badge
+    ctx.font="bold 16px system-ui";ctx.fillStyle=dt.color;
+    ctx.fillText(dt.label+" "+attempt.difficulty.toUpperCase()+" LEVEL",W/2,logoBottom+298);
+
+    // ── Score section (centered)
+    const scoreY=logoBottom+360;
     const scoreColor=attempt.accuracy>=70?"#1a7d42":attempt.accuracy>=50?"#b8860b":"#c0392b";
-    ctx.fillStyle=scoreColor;ctx.font="bold 56px system-ui";
-    ctx.fillText(attempt.accuracy+"%",600,420);
-    ctx.font="16px system-ui";ctx.fillStyle="#555";
-    ctx.fillText(attempt.correctAnswers+" of "+attempt.totalQuestions+" correct · "+Math.floor((attempt.timeSpentSeconds||0)/60)+"m "+(attempt.timeSpentSeconds||0)%60+"s",600,450);
-    ctx.font="14px system-ui";ctx.fillStyle="#888";
-    const certDate=attempt.createdAt?.seconds?new Date(attempt.createdAt.seconds*1000):new Date();
-    ctx.fillText("Date: "+certDate.toLocaleDateString("en-IN",{dateStyle:"long"})+" · Certificate ID: "+certId,600,495);
-    ctx.strokeStyle="#c8a84e";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(200,515);ctx.lineTo(1000,515);ctx.stroke();
-    if(strong.length>0){ctx.font="bold 13px system-ui";ctx.fillStyle="#1a7d42";ctx.textAlign="left";ctx.fillText("STRENGTHS:",100,548);ctx.font="13px system-ui";ctx.fillStyle="#333";ctx.fillText(strong.map(a=>a.area+" ("+a.pct+"%)").join("  •  "),100,568);}
-    if(weak.length>0){ctx.font="bold 13px system-ui";ctx.fillStyle="#b8860b";ctx.textAlign="left";ctx.fillText("AREAS TO DEVELOP:",100,strong.length>0?598:548);ctx.font="13px system-ui";ctx.fillStyle="#333";ctx.fillText(weak.map(a=>a.area+" ("+a.pct+"%)").join("  •  "),100,strong.length>0?618:568);}
-    ctx.textAlign="center";ctx.font="11px system-ui";ctx.fillStyle="#888";
-    ctx.fillText("⚡ Questions generated by AI · Verified by SKINARIO",600,690);
-    if(certConfig.sponsorName){ctx.font="9px system-ui";ctx.fillStyle="#aaa";ctx.fillText("Sponsored by",600,720);if(sponsorLogo){const sh2=28;const sw2=sh2*(sponsorLogo.width/sponsorLogo.height);ctx.drawImage(sponsorLogo,600-sw2/2,728,sw2,sh2);ctx.font="bold 12px system-ui";ctx.fillStyle="#555";ctx.fillText(certConfig.sponsorName,600,770);}else{ctx.font="bold 14px system-ui";ctx.fillStyle="#555";ctx.fillText(certConfig.sponsorName,600,740);}if(certConfig.sponsorTagline){ctx.font="11px system-ui";ctx.fillStyle="#888";ctx.fillText(certConfig.sponsorTagline.slice(0,80),600,785);}}
+    ctx.font="bold 54px system-ui";ctx.fillStyle=scoreColor;
+    ctx.fillText(attempt.accuracy+"%",W/2-80,scoreY);
+
+    // Right side of score — details
+    ctx.textAlign="left";ctx.font="16px system-ui";ctx.fillStyle="#333";
+    ctx.fillText(attempt.correctAnswers+" of "+attempt.totalQuestions+" correct",W/2+10,scoreY-15);
+    ctx.font="14px system-ui";ctx.fillStyle="#666";
+    ctx.fillText("Time Taken: "+Math.floor((attempt.timeSpentSeconds||0)/60)+"m "+(attempt.timeSpentSeconds||0)%60+"s",W/2+10,scoreY+8);
+
+    // ── Date + Cert ID
+    ctx.textAlign="center";ctx.font="13px system-ui";ctx.fillStyle="#888";
+    ctx.fillText("Date: "+certDate.toLocaleDateString("en-IN",{dateStyle:"long"})+"  |  Certificate ID: "+certId,W/2,scoreY+50);
+
+    // ── Strengths + Weak areas (horizontal, compact)
+    const areasY=scoreY+80;
+    if(strong.length>0){
+      ctx.textAlign="left";ctx.font="bold 11px system-ui";ctx.fillStyle="#1a7d42";
+      ctx.fillText("STRENGTHS:  "+strong.map(a=>a.area+" ("+a.pct+"%)").join("  •  "),100,areasY);
+    }
+    if(weak.length>0){
+      ctx.textAlign="left";ctx.font="bold 11px system-ui";ctx.fillStyle="#b8860b";
+      ctx.fillText("TO DEVELOP:  "+weak.map(a=>a.area+" ("+a.pct+"%)").join("  •  "),100,areasY+20);
+    }
+
+    // ── BOTTOM SECTION: Signatures + Seal ───────────────
+    const bottomY=H-180;
+
+    // Left signature
+    if(sigLeftImg){const sh=55;const sw=sh*(sigLeftImg.width/sigLeftImg.height);ctx.drawImage(sigLeftImg,200-sw/2,bottomY-10,sw,sh);}
+    ctx.textAlign="center";ctx.font="italic 13px system-ui";ctx.fillStyle="#333";
+    ctx.fillText(certConfig.signatureLeftName||"Dr. Dhananjay Patil",200,bottomY+55);
+    ctx.font="11px system-ui";ctx.fillStyle="#888";
+    ctx.fillText(certConfig.signatureLeftTitle||"Founder & Mentor",200,bottomY+70);
+
+    // Center seal/verified emblem
+    if(sealImg){const sh=70;const sw=sh*(sealImg.width/sealImg.height);ctx.drawImage(sealImg,W/2-sw/2,bottomY-10,sw,sh);}
+
+    // Right signature
+    if(sigRightImg){const sh=55;const sw=sh*(sigRightImg.width/sigRightImg.height);ctx.drawImage(sigRightImg,W-200-sw/2,bottomY-10,sw,sh);}
+    ctx.textAlign="center";ctx.font="italic 13px system-ui";ctx.fillStyle="#333";
+    ctx.fillText(certConfig.signatureRightName||"Academic Council",W-200,bottomY+55);
+    ctx.font="11px system-ui";ctx.fillStyle="#888";
+    ctx.fillText(certConfig.signatureRightTitle||"SKINARIO",W-200,bottomY+70);
+
+    // ── FOOTER ───────────────
+    const footY=H-65;
+
+    // Accreditation logos (bottom-left)
     const accreds=certConfig.accreditations||[];
-    if(accreds.length>0){const accY=810;ctx.font="8px system-ui";ctx.fillStyle="#bbb";ctx.textAlign="center";ctx.fillText("ACCREDITED BY",600,accY-10);const totalW=accreds.length*70;let startX=600-totalW/2;accreds.forEach((acc,i)=>{const logo=accredLogos[i];if(logo){const lh2=30;const lw2=Math.min(60,lh2*(logo.width/logo.height));ctx.drawImage(logo,startX+i*70+(35-lw2/2),accY,lw2,lh2);}else{ctx.font="bold 9px system-ui";ctx.fillStyle="#666";ctx.textAlign="center";ctx.fillText(acc.name.slice(0,10),startX+i*70+35,accY+18);}});}
-    ctx.textAlign="center";ctx.font="bold 13px system-ui";ctx.fillStyle="#0d6b6e";
-    ctx.fillText("skinario.app",600,accreds.length>0?860:810);
-    ctx.font="11px system-ui";ctx.fillStyle="#aaa";
-    ctx.fillText("Learn. Discuss. Lead the field.",600,accreds.length>0?878:828);
+    if(accreds.length>0){
+      ctx.textAlign="left";ctx.font="bold 8px system-ui";ctx.fillStyle="#999";
+      ctx.fillText("ACCREDITED BY",60,footY-15);
+      let ax=60;
+      accreds.forEach((acc,i)=>{
+        const logo=accredLogos[i];
+        if(logo){const lh=25;const lw=Math.min(50,lh*(logo.width/logo.height));ctx.drawImage(logo,ax,footY-5,lw,lh);ax+=lw+12;}
+        else{ctx.font="bold 10px system-ui";ctx.fillStyle="#555";ctx.fillText(acc.name,ax,footY+10);ax+=ctx.measureText(acc.name).width+15;}
+      });
+    }
+
+    // Sponsor (bottom-center)
+    if(certConfig.sponsorName){
+      ctx.textAlign="center";ctx.font="10px system-ui";ctx.fillStyle="#aaa";
+      ctx.fillText("Powered by",W/2,footY-10);
+      if(sponsorLogo){const sh=22;const sw=sh*(sponsorLogo.width/sponsorLogo.height);ctx.drawImage(sponsorLogo,W/2-sw/2,footY-3,sw,sh);}
+      ctx.font="bold 13px system-ui";ctx.fillStyle="#333";
+      ctx.fillText(certConfig.sponsorName,W/2,sponsorLogo?footY+28:footY+8);
+      if(certConfig.sponsorTagline){ctx.font="10px system-ui";ctx.fillStyle="#888";ctx.fillText(certConfig.sponsorTagline.slice(0,60),W/2,sponsorLogo?footY+42:footY+22);}
+    }
+
+    // Tagline + URL (bottom-right)
+    ctx.textAlign="right";ctx.font="italic 12px system-ui";ctx.fillStyle="#0d6b6e";
+    ctx.fillText("Learn. Discuss. Lead the Field.",W-80,footY);
+    ctx.font="bold 14px system-ui";ctx.fillStyle="#1a1a1a";
+    ctx.fillText("skinario.app",W-80,footY+20);
+
+    // Download
     const link=document.createElement("a");
     link.download="SKINARIO-Certificate-"+attempt.topic.replace(/[^a-zA-Z0-9]/g,"-")+"-"+attempt.accuracy+"pct.png";
     link.href=c.toDataURL("image/png");link.click();
@@ -5255,6 +5354,7 @@ ${forDownload
   return(
     <div style={{minHeight:"100vh",background:T.bg,fontFamily:"system-ui",color:T.txt}}>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap');
         .nav-more-row:hover{background:#f5fafa}
         .nav-more-row:hover *{color:#0d6b6e}
 
@@ -11638,81 +11738,108 @@ ${forDownload
             {/* Future beta features hint */}
             {/* ═══ CERTIFICATE SETTINGS ═══ */}
             <div style={{...T.card,marginBottom:14,borderLeft:"3px solid "+T.gold}}>
-              <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>🏅 Certificate Settings</h4>
-              <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.55,margin:"0 0 14px"}}>Configure what appears on downloadable certificates. Changes apply immediately to all future certificate downloads.</p>
+              <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6}}>🏅 Certificate Settings</h4>
+              <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.55,margin:"0 0 14px"}}>All images are stored as embedded data — no external URL dependencies. Changes apply to all future certificate downloads.</p>
 
-              {/* SKINARIO Logo — upload to Firebase Storage */}
-              <div style={{marginBottom:16}}>
-                <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>SKINARIO logo</label>
-                <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-                  {certConfig.logoUrl?<div style={{position:"relative"}}>
-                    <img src={certConfig.logoUrl} alt="" style={{height:48,objectFit:"contain",borderRadius:6,border:"1px solid "+T.border,padding:4,background:"#fff"}}/>
-                    <button onClick={()=>setCertConfig(p=>({...p,logoUrl:""}))} style={{position:"absolute",top:-6,right:-6,width:18,height:18,borderRadius:"50%",border:"none",background:T.err,color:"#fff",cursor:"pointer",fontSize:".6rem"}}>✕</button>
-                  </div>:<div style={{height:48,width:80,border:"2px dashed "+T.border,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",fontSize:".68rem",color:T.mute}}>No logo</div>}
-                  <label style={{...T.btnO,...T.btnSm,cursor:"pointer",fontSize:".72rem"}}>
-                    📤 Upload logo
+              {/* Helper: upload row with preview */}
+              {[
+                {key:"template",label:"Background Template",desc:"The decorative background (teal corners, gold border). 1400×1050px recommended.",field:"templateData",previewH:80},
+                {key:"logo",label:"SKINARIO Logo",desc:"Centered at top of certificate.",field:"logoData",previewH:40},
+                {key:"seal",label:"Verified Seal / Emblem",desc:"Center bottom between signatures.",field:"sealData",previewH:50},
+                {key:"sigLeft",label:"Left Signature",desc:"Bottom-left signature image.",field:"signatureLeftData",previewH:40},
+                {key:"sigRight",label:"Right Signature",desc:"Bottom-right signature image.",field:"signatureRightData",previewH:40},
+              ].map(slot=><div key={slot.key} style={{marginBottom:14,padding:12,background:T.bg,borderRadius:8}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                  {certConfig[slot.field]?<img src={certConfig[slot.field]} alt="" style={{height:slot.previewH,maxWidth:160,objectFit:"contain",borderRadius:4,border:"1px solid "+T.border,background:"#fff",padding:2}}/>:<div style={{height:slot.previewH,width:80,border:"2px dashed "+T.border,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",fontSize:".6rem",color:T.mute}}>Empty</div>}
+                  <div style={{flex:1,minWidth:120}}>
+                    <div style={{fontSize:".78rem",fontWeight:600,marginBottom:2}}>{slot.label}</div>
+                    <div style={{fontSize:".62rem",color:T.mute}}>{slot.desc}</div>
+                  </div>
+                  <label style={{...T.btnO,...T.btnSm,cursor:"pointer",fontSize:".7rem",flexShrink:0}}>
+                    📤 Upload
                     <input type="file" accept="image/*" style={{display:"none"}} onChange={async e=>{
                       const f=e.target.files?.[0];if(!f)return;
-                      if(f.size>2*1024*1024){sh("Logo must be under 2MB");return;}
-                      try{const path=`certLogos/skinario_${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;const sRef=ref(storage,path);await uploadBytes(sRef,f);const url=await getDownloadURL(sRef);setCertConfig(p=>({...p,logoUrl:url}));sh("✓ Logo uploaded");}catch(err){sh("Upload failed");}
+                      if(f.size>3*1024*1024){sh("Image must be under 3MB");return;}
+                      const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f);});
+                      setCertConfig(p=>({...p,[slot.field]:dataUrl}));
+                      sh("✓ "+slot.label+" uploaded");
                       e.target.value="";
                     }}/>
                   </label>
+                  {certConfig[slot.field]&&<button onClick={()=>setCertConfig(p=>({...p,[slot.field]:""}))} style={{background:"none",border:"none",color:T.err,cursor:"pointer",fontSize:".8rem"}}>✕</button>}
                 </div>
-                <div style={{fontSize:".66rem",color:T.mute,marginTop:4}}>Displayed top-right on certificates. Stored in Firebase Storage for reliable loading.</div>
+              </div>)}
+
+              {/* Signature names + titles */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+                <div>
+                  <label style={{fontSize:".66rem",color:T.mute,fontWeight:600}}>Left signature name</label>
+                  <input value={certConfig.signatureLeftName||""} onChange={e=>setCertConfig(p=>({...p,signatureLeftName:e.target.value}))} placeholder="Dr. Dhananjay Patil" style={{...T.inp,fontSize:".78rem"}}/>
+                  <input value={certConfig.signatureLeftTitle||""} onChange={e=>setCertConfig(p=>({...p,signatureLeftTitle:e.target.value}))} placeholder="Founder & Mentor" style={{...T.inp,fontSize:".72rem",marginTop:4}}/>
+                </div>
+                <div>
+                  <label style={{fontSize:".66rem",color:T.mute,fontWeight:600}}>Right signature name</label>
+                  <input value={certConfig.signatureRightName||""} onChange={e=>setCertConfig(p=>({...p,signatureRightName:e.target.value}))} placeholder="Academic Council" style={{...T.inp,fontSize:".78rem"}}/>
+                  <input value={certConfig.signatureRightTitle||""} onChange={e=>setCertConfig(p=>({...p,signatureRightTitle:e.target.value}))} placeholder="SKINARIO" style={{...T.inp,fontSize:".72rem",marginTop:4}}/>
+                </div>
               </div>
 
-              {/* Accreditations — each with name + uploaded logo */}
-              <div style={{marginBottom:16}}>
-                <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Accreditation logos</label>
-                <div style={{fontSize:".66rem",color:T.mute,marginBottom:8}}>Shown in a row at the bottom of certificates. Upload logos for each accrediting body.</div>
-                {(certConfig.accreditations||[]).map((acc,i)=><div key={i} style={{display:"flex",gap:6,alignItems:"center",marginBottom:8,padding:8,background:T.bg,borderRadius:8}}>
-                  {acc.logoUrl?<img src={acc.logoUrl} alt="" style={{height:32,width:32,objectFit:"contain",borderRadius:4,border:"1px solid "+T.border,background:"#fff",flexShrink:0}}/>:<div style={{height:32,width:32,border:"1px dashed "+T.border,borderRadius:4,flexShrink:0}}/>}
-                  <input value={acc.name} onChange={e=>{const next=[...(certConfig.accreditations||[])];next[i]={...acc,name:e.target.value};setCertConfig(p=>({...p,accreditations:next}));}} placeholder="Name (e.g. IEBDAC)" style={{...T.inp,flex:1,fontSize:".78rem"}}/>
-                  <label style={{...T.btnO,...T.btnSm,cursor:"pointer",fontSize:".64rem",padding:"4px 8px",flexShrink:0}}>
+              {/* Accreditations */}
+              <div style={{marginBottom:14}}>
+                <label style={{fontSize:".7rem",color:T.teal,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Accreditation logos</label>
+                <div style={{fontSize:".62rem",color:T.mute,marginBottom:6}}>Shown bottom-left on certificates.</div>
+                {(certConfig.accreditations||[]).map((acc,i)=><div key={i} style={{display:"flex",gap:6,alignItems:"center",marginBottom:6,padding:6,background:T.bg,borderRadius:6}}>
+                  {acc.logoData?<img src={acc.logoData} alt="" style={{height:26,objectFit:"contain",borderRadius:3,border:"1px solid "+T.border}}/>:<div style={{width:26,height:26,border:"1px dashed "+T.border,borderRadius:3}}/>}
+                  <input value={acc.name} onChange={e=>{const next=[...(certConfig.accreditations||[])];next[i]={...acc,name:e.target.value};setCertConfig(p=>({...p,accreditations:next}));}} placeholder="Name" style={{...T.inp,flex:1,fontSize:".74rem"}}/>
+                  <label style={{cursor:"pointer",fontSize:".6rem",color:T.teal}}>
                     📤
                     <input type="file" accept="image/*" style={{display:"none"}} onChange={async e=>{
                       const f=e.target.files?.[0];if(!f)return;
-                      if(f.size>1*1024*1024){sh("Logo must be under 1MB");return;}
-                      try{const path=`certLogos/accred_${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;const sRef=ref(storage,path);await uploadBytes(sRef,f);const url=await getDownloadURL(sRef);const next=[...(certConfig.accreditations||[])];next[i]={...acc,logoUrl:url};setCertConfig(p=>({...p,accreditations:next}));sh("✓ Uploaded");}catch(err){sh("Upload failed");}
+                      const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f);});
+                      const next=[...(certConfig.accreditations||[])];next[i]={...acc,logoData:dataUrl};setCertConfig(p=>({...p,accreditations:next}));
                       e.target.value="";
                     }}/>
                   </label>
-                  <button onClick={()=>{const next=[...(certConfig.accreditations||[])];next.splice(i,1);setCertConfig(p=>({...p,accreditations:next}));}} style={{background:"none",border:"none",cursor:"pointer",color:T.err,fontSize:".8rem",flexShrink:0}}>✕</button>
+                  <button onClick={()=>{const next=[...(certConfig.accreditations||[])];next.splice(i,1);setCertConfig(p=>({...p,accreditations:next}));}} style={{background:"none",border:"none",cursor:"pointer",color:T.err,fontSize:".8rem"}}>✕</button>
                 </div>)}
-                <button onClick={()=>setCertConfig(p=>({...p,accreditations:[...(p.accreditations||[]),{name:"",logoUrl:""}]}))} style={{...T.btnO,...T.btnSm,fontSize:".72rem"}}>+ Add accreditation</button>
+                <button onClick={()=>setCertConfig(p=>({...p,accreditations:[...(p.accreditations||[]),{name:"",logoData:""}]}))} style={{...T.btnO,...T.btnSm,fontSize:".7rem"}}>+ Add</button>
               </div>
 
-              {/* Certificate Sponsor */}
-              <div style={{marginBottom:16}}>
-                <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Certificate sponsor</label>
-                <div style={{fontSize:".66rem",color:T.mute,marginBottom:8}}>Select a verified vendor/institute whose branding appears on every certificate. Premium placement — monetize this.</div>
+              {/* Sponsor */}
+              <div style={{marginBottom:14}}>
+                <label style={{fontSize:".7rem",color:T.teal,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Certificate sponsor</label>
                 <select value={certConfig.sponsorId||""} onChange={e=>{
                   const uid=e.target.value;
-                  if(!uid){setCertConfig(p=>({...p,sponsorId:"",sponsorName:"",sponsorLogo:"",sponsorTagline:""}));return;}
+                  if(!uid){setCertConfig(p=>({...p,sponsorId:"",sponsorName:"",sponsorLogoData:"",sponsorTagline:""}));return;}
                   const vendor=allUsers.find(u=>u.id===uid);
-                  if(vendor){setCertConfig(p=>({...p,sponsorId:uid,sponsorName:vendor.companyName||vendor.name||"",sponsorLogo:vendor.logo||vendor.photo||"",sponsorTagline:""}));}
-                }} style={{...T.inp,marginBottom:8}}>
+                  if(vendor)setCertConfig(p=>({...p,sponsorId:uid,sponsorName:vendor.companyName||vendor.name||"",sponsorTagline:""}));
+                }} style={{...T.inp,marginBottom:6}}>
                   <option value="">— No sponsor —</option>
-                  {allUsers.filter(u=>{const t=normalizeAccountType(u.accountType||"");return(t==="vendor"||t==="brand"||t==="institute")&&u.verified;}).map(u=><option key={u.id} value={u.id}>{u.companyName||u.name} ({normalizeAccountType(u.accountType||"")})</option>)}
+                  {allUsers.filter(u=>{const t=normalizeAccountType(u.accountType||"");return(t==="vendor"||t==="brand"||t==="institute")&&u.verified;}).map(u=><option key={u.id} value={u.id}>{u.companyName||u.name}</option>)}
                 </select>
-                {certConfig.sponsorId&&<div style={{display:"flex",gap:10,alignItems:"center",padding:10,background:T.bg,borderRadius:8,marginBottom:8}}>
-                  {certConfig.sponsorLogo&&<img src={certConfig.sponsorLogo} alt="" style={{width:40,height:40,objectFit:"contain",borderRadius:6}} onError={e=>{e.target.style.display="none"}}/>}
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:".84rem",fontWeight:600}}>{certConfig.sponsorName}</div>
-                    <input value={certConfig.sponsorTagline||""} onChange={e=>setCertConfig(p=>({...p,sponsorTagline:e.target.value}))} placeholder="Tagline (optional, shown on cert)" style={{...T.inp,fontSize:".76rem",marginTop:4}}/>
+                {certConfig.sponsorId&&<div style={{padding:8,background:T.bg,borderRadius:6}}>
+                  <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:6}}>
+                    {certConfig.sponsorLogoData?<img src={certConfig.sponsorLogoData} alt="" style={{height:28,objectFit:"contain"}}/>:null}
+                    <span style={{fontSize:".82rem",fontWeight:600}}>{certConfig.sponsorName}</span>
+                    <label style={{...T.btnO,...T.btnSm,cursor:"pointer",fontSize:".6rem",marginLeft:"auto"}}>
+                      📤 Logo
+                      <input type="file" accept="image/*" style={{display:"none"}} onChange={async e=>{
+                        const f=e.target.files?.[0];if(!f)return;
+                        const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f);});
+                        setCertConfig(p=>({...p,sponsorLogoData:dataUrl}));e.target.value="";
+                      }}/>
+                    </label>
                   </div>
+                  <input value={certConfig.sponsorTagline||""} onChange={e=>setCertConfig(p=>({...p,sponsorTagline:e.target.value}))} placeholder="Tagline (optional)" style={{...T.inp,fontSize:".74rem"}}/>
                 </div>}
               </div>
 
               {/* Save */}
               <button onClick={async()=>{
                 try{
-                  const toSave={logoUrl:certConfig.logoUrl||"",accreditations:certConfig.accreditations||[],sponsorId:certConfig.sponsorId||"",sponsorName:certConfig.sponsorName||"",sponsorLogo:certConfig.sponsorLogo||"",sponsorTagline:certConfig.sponsorTagline||""};
-                  await fbSet("platformSettings","certConfig",toSave);
-                  sh("✓ Certificate settings saved");
-                  loadData();
-                }catch(err){sh("Failed to save — check Firestore rules for platformSettings")}
+                  await fbSet("platformSettings","certConfig",certConfig);
+                  sh("✓ Certificate settings saved");loadData();
+                }catch(err){sh("Failed to save")}
               }} style={{...T.btn,width:"100%"}}>Save certificate settings</button>
             </div>
 
