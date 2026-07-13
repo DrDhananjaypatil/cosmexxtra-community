@@ -4477,22 +4477,18 @@ ${forDownload
     ctx.font="bold 11px system-ui";ctx.fillStyle="#c8a84e";
     ctx.fillText("\u2014 AESTHETIC MEDICINE COMMUNITY \u2014",cx,y+10);y+=10+sp;
 
-    // CERTIFICATE (largest text)
+    // CERTIFICATE
     ctx.font="bold 80px Georgia, serif";ctx.fillStyle="#1a1a1a";
     ctx.fillText("CERTIFICATE",cx,y+55);y+=55+sp-5;
 
     // ═══ Gold line ─── OF COMPLETION ─── Gold line ═══
-    // Line spans full width with OF COMPLETION text in the center gap
     ctx.strokeStyle="#c8a84e";ctx.lineWidth=1.5;
     ctx.font="bold 26px system-ui";ctx.fillStyle="#c8a84e";
     const ocText="OF COMPLETION";
     const ocWidth=ctx.measureText(ocText).width;
-    const lineLeft=180;const lineRight=W-180;const ocGap=20;
-    // Left line segment
+    const lineLeft=180,lineRight=W-180,ocGap=20;
     ctx.beginPath();ctx.moveTo(lineLeft,y+10);ctx.lineTo(cx-ocWidth/2-ocGap,y+10);ctx.stroke();
-    // Right line segment
     ctx.beginPath();ctx.moveTo(cx+ocWidth/2+ocGap,y+10);ctx.lineTo(lineRight,y+10);ctx.stroke();
-    // OF COMPLETION text between
     ctx.fillText(ocText,cx,y+18);
     y+=18+sp;
 
@@ -4500,11 +4496,11 @@ ${forDownload
     ctx.font="16px system-ui";ctx.fillStyle="#555";
     ctx.fillText("This certifies that",cx,y);y+=sp+2;
 
-    // Doctor name — LARGE CURSIVE
+    // Doctor name
     ctx.font="65px 'Great Vibes', 'Brush Script MT', cursive";ctx.fillStyle="#0d6b6e";
     ctx.fillText(name,cx,y+35);y+=35+sp/2-4;
 
-    // Decorative line under name with diamonds
+    // Decorative line under name
     ctx.strokeStyle="#c8a84e";ctx.lineWidth=1;const nl=220;
     ctx.beginPath();ctx.moveTo(cx-nl,y);ctx.lineTo(cx+nl,y);ctx.stroke();
     [[cx-nl,y],[cx+nl,y]].forEach(([dx,dy])=>{ctx.fillStyle="#c8a84e";ctx.beginPath();ctx.moveTo(dx,dy-5);ctx.lineTo(dx+5,dy);ctx.lineTo(dx,dy+5);ctx.lineTo(dx-5,dy);ctx.fill();});
@@ -4512,47 +4508,49 @@ ${forDownload
 
     // has successfully completed
     ctx.font="14px system-ui";ctx.fillStyle="#555";
-    ctx.fillText("has successfully completed the SKINARIO Study & Test Series assessment on",cx,y);y+=sp+8;
+    ctx.fillText("has successfully completed the SKINARIO Study & Test Series assessment on",cx,y);y+=sp+10;
 
-    // Topic name (extra gap before)
+    // Topic name
     ctx.font="bold 32px system-ui";ctx.fillStyle="#1a1a1a";
     ctx.fillText(attempt.topic.toUpperCase(),cx,y+5);y+=5+sp+5;
 
     // Difficulty
     ctx.font="bold 16px system-ui";ctx.fillStyle=dt.color;
-    ctx.fillText(dt.label+" "+attempt.difficulty.toUpperCase()+" LEVEL",cx,y);y+=sp+12;
+    ctx.fillText(dt.label+" "+attempt.difficulty.toUpperCase()+" LEVEL",cx,y);y+=sp+15;
 
-    // Score with decorative laurel — spread out more
+    // ═══ SCORE — no leaves, clean gold decorative brackets instead ═══
     const scoreColor=attempt.accuracy>=70?"#1a7d42":attempt.accuracy>=50?"#b8860b":"#c0392b";
-    const scoreX=cx-90;
-    // Left laurel — wider spread (80px from center instead of 50)
-    ctx.save();ctx.fillStyle="#c8a84e";
-    for(let i=0;i<7;i++){ctx.save();ctx.translate(scoreX-75,y-20+i*9);ctx.rotate(-0.25-i*0.07);ctx.beginPath();ctx.ellipse(0,0,5,12,0,0,Math.PI*2);ctx.fill();ctx.restore();}
-    // Right laurel
-    for(let i=0;i<7;i++){ctx.save();ctx.translate(scoreX+75,y-20+i*9);ctx.rotate(0.25+i*0.07);ctx.beginPath();ctx.ellipse(0,0,5,12,0,0,Math.PI*2);ctx.fill();ctx.restore();}
-    ctx.restore();
+    const scoreX=cx-120; // more gap from details
+    // Gold decorative bracket left of score
+    ctx.strokeStyle="#c8a84e";ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(scoreX-65,y-25);ctx.quadraticCurveTo(scoreX-75,y+10,scoreX-65,y+45);ctx.stroke();
+    // Gold decorative bracket right of score
+    ctx.beginPath();ctx.moveTo(scoreX+65,y-25);ctx.quadraticCurveTo(scoreX+75,y+10,scoreX+65,y+45);ctx.stroke();
+    // Small diamond at top and bottom of brackets
+    [[scoreX-65,y-25],[scoreX-65,y+45],[scoreX+65,y-25],[scoreX+65,y+45]].forEach(([dx,dy])=>{ctx.fillStyle="#c8a84e";ctx.beginPath();ctx.moveTo(dx,dy-3);ctx.lineTo(dx+3,dy);ctx.lineTo(dx,dy+3);ctx.lineTo(dx-3,dy);ctx.fill();});
     // Score number
     ctx.font="bold 60px system-ui";ctx.fillStyle=scoreColor;ctx.textAlign="center";
-    ctx.fillText(attempt.accuracy+"%",scoreX,y+15);
-    // Details right
-    ctx.textAlign="left";ctx.font="16px system-ui";ctx.fillStyle="#333";
-    ctx.fillText(attempt.correctAnswers+" of "+attempt.totalQuestions+" correct",cx+15,y-5);
-    ctx.font="14px system-ui";ctx.fillStyle="#666";
-    ctx.fillText("Time Taken: "+Math.floor((attempt.timeSpentSeconds||0)/60)+"m "+(attempt.timeSpentSeconds||0)%60+"s",cx+15,y+18);
-    y+=15+sp;
+    ctx.fillText(attempt.accuracy+"%",scoreX,y+18);
+
+    // Details — more gap to the right, shifted down
+    const detailX=cx+60; // wider horizontal gap
+    ctx.textAlign="left";ctx.font="18px system-ui";ctx.fillStyle="#333";
+    ctx.fillText(attempt.correctAnswers+" of "+attempt.totalQuestions+" correct",detailX,y+2);
+    ctx.font="15px system-ui";ctx.fillStyle="#666";
+    ctx.fillText("Time Taken: "+Math.floor((attempt.timeSpentSeconds||0)/60)+"m "+(attempt.timeSpentSeconds||0)%60+"s",detailX,y+28);
+    y+=45+sp;
 
     // Date + Cert ID
     ctx.textAlign="center";ctx.font="13px system-ui";ctx.fillStyle="#888";
-    ctx.fillText("Date: "+certDate.toLocaleDateString("en-IN",{dateStyle:"long"})+"  |  Certificate ID: "+certId,cx,y);y+=sp-8;
+    ctx.fillText("Date: "+certDate.toLocaleDateString("en-IN",{dateStyle:"long"})+"  |  Certificate ID: "+certId,cx,y);y+=sp;
 
-    // Strengths
-    if(strong.length>0){ctx.textAlign="left";ctx.font="bold 11px system-ui";ctx.fillStyle="#1a7d42";ctx.fillText("STRENGTHS:  "+strong.map(a=>a.area+" ("+a.pct+"%)").join("  \u2022  "),80,y);y+=16;}
-    if(weak.length>0){ctx.textAlign="left";ctx.font="bold 11px system-ui";ctx.fillStyle="#b8860b";ctx.fillText("TO DEVELOP:  "+weak.map(a=>a.area+" ("+a.pct+"%)").join("  \u2022  "),80,y);y+=16;}
+    // Strengths — centered
+    if(strong.length>0){ctx.textAlign="center";ctx.font="bold 11px system-ui";ctx.fillStyle="#1a7d42";ctx.fillText("STRENGTHS:  "+strong.map(a=>a.area+" ("+a.pct+"%)").join("  \u2022  "),cx,y);y+=16;}
+    if(weak.length>0){ctx.textAlign="center";ctx.font="bold 11px system-ui";ctx.fillStyle="#b8860b";ctx.fillText("TO DEVELOP:  "+weak.map(a=>a.area+" ("+a.pct+"%)").join("  \u2022  "),cx,y);y+=16;}
 
-    // ═══ SIGNATURES — closer to center seal, equidistant ═══
-    const sigY=Math.max(y+10,H-250);
-    const sigLeftX=320;  // moved inward (was 220)
-    const sigRightX=W-320; // moved inward (was W-220)
+    // ═══ SIGNATURES — seal shifted up ═══
+    const sigY=Math.max(y+10,H-245);
+    const sigLeftX=320,sigRightX=W-320;
 
     // Left signature
     if(sigLeftImg){const sh=110,sw=Math.min(180,sh*(sigLeftImg.width/sigLeftImg.height));ctx.drawImage(sigLeftImg,sigLeftX-sw/2,sigY-15,sw,sh);}
@@ -4561,8 +4559,8 @@ ${forDownload
     ctx.font="12px system-ui";ctx.fillStyle="#888";
     ctx.fillText(certConfig.signatureLeftTitle||"Founder & Mentor",sigLeftX,sigY+122);
 
-    // Center seal — large
-    if(sealImg){const sh=150,sw=sh*(sealImg.width/sealImg.height);ctx.drawImage(sealImg,cx-sw/2,sigY-25,sw,sh);}
+    // Center seal — shifted UP by 35px
+    if(sealImg){const sh=150,sw=sh*(sealImg.width/sealImg.height);ctx.drawImage(sealImg,cx-sw/2,sigY-55,sw,sh);}
 
     // Right signature
     if(sigRightImg){const sh=110,sw=Math.min(180,sh*(sigRightImg.width/sigRightImg.height));ctx.drawImage(sigRightImg,sigRightX-sw/2,sigY-15,sw,sh);}
@@ -4571,20 +4569,25 @@ ${forDownload
     ctx.font="12px system-ui";ctx.fillStyle="#888";
     ctx.fillText(certConfig.signatureRightTitle||"SKINARIO",sigRightX,sigY+122);
 
-    // ═══ FOOTER — accreditations 3x bigger, skinario.app moved left of corner ═══
-    const fY=H-80;
+    // ═══ FOOTER — bigger accreditation + bigger sponsor ═══
+    const fY=H-75;
     const accreds=certConfig.accreditations||[];
     if(accreds.length>0){
-      ctx.textAlign="left";ctx.font="bold 10px system-ui";ctx.fillStyle="#999";ctx.fillText("ACCREDITED BY",55,fY-28);
+      ctx.textAlign="left";ctx.font="bold 11px system-ui";ctx.fillStyle="#888";ctx.fillText("ACCREDITED BY",55,fY-38);
       let ax=55;
       accreds.forEach((acc,i)=>{
         const logo=accredLogos[i];
-        if(logo){const lh=45,lw=Math.min(90,lh*(logo.width/logo.height));ctx.drawImage(logo,ax,fY-20,lw,lh);ax+=lw+15;}
-        else{ctx.font="bold 14px system-ui";ctx.fillStyle="#555";ctx.textAlign="left";ctx.fillText(acc.name,ax,fY+8);ax+=ctx.measureText(acc.name).width+20;}
+        if(logo){const lh=55,lw=Math.min(110,lh*(logo.width/logo.height));ctx.drawImage(logo,ax,fY-28,lw,lh);ax+=lw+18;}
+        else{ctx.font="bold 16px system-ui";ctx.fillStyle="#444";ctx.textAlign="left";ctx.fillText(acc.name,ax,fY+5);ax+=ctx.measureText(acc.name).width+22;}
       });
     }
-    if(certConfig.sponsorName){ctx.textAlign="center";ctx.font="10px system-ui";ctx.fillStyle="#aaa";ctx.fillText("Powered by",cx,fY-26);if(sponsorLogo){const sh=24,sw=sh*(sponsorLogo.width/sponsorLogo.height);ctx.drawImage(sponsorLogo,cx-sw/2,fY-20,sw,sh);}ctx.font="bold 14px system-ui";ctx.fillStyle="#333";ctx.fillText(certConfig.sponsorName,cx,sponsorLogo?fY+14:fY);if(certConfig.sponsorTagline){ctx.font="10px system-ui";ctx.fillStyle="#888";ctx.fillText(certConfig.sponsorTagline.slice(0,60),cx,sponsorLogo?fY+28:fY+14);}}
-    // skinario.app + tagline — moved left to avoid green corner
+    // Sponsor — bigger font + logo to match accreditation level
+    if(certConfig.sponsorName){
+      ctx.textAlign="center";ctx.font="12px system-ui";ctx.fillStyle="#999";ctx.fillText("Powered by",cx,fY-32);
+      if(sponsorLogo){const sh=35,sw=sh*(sponsorLogo.width/sponsorLogo.height);ctx.drawImage(sponsorLogo,cx-sw/2,fY-24,sw,sh);}
+      ctx.font="bold 18px system-ui";ctx.fillStyle="#222";ctx.fillText(certConfig.sponsorName,cx,sponsorLogo?fY+22:fY+2);
+      if(certConfig.sponsorTagline){ctx.font="12px system-ui";ctx.fillStyle="#777";ctx.fillText(certConfig.sponsorTagline.slice(0,60),cx,sponsorLogo?fY+40:fY+20);}
+    }
     ctx.textAlign="right";ctx.font="italic 12px system-ui";ctx.fillStyle="#0d6b6e";ctx.fillText("Learn. Discuss. Lead the Field.",W-120,fY-5);
     ctx.font="bold 14px system-ui";ctx.fillStyle="#1a1a1a";ctx.fillText("skinario.app",W-120,fY+14);
 
