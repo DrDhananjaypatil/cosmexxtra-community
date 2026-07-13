@@ -4467,119 +4467,126 @@ ${forDownload
     const W=1400,H=1050,c=document.createElement("canvas");c.width=W;c.height=H;const ctx=c.getContext("2d");const cx=W/2;
     if(bgImg){ctx.drawImage(bgImg,0,0,W,H);}else{ctx.fillStyle="#faf3e7";ctx.fillRect(0,0,W,H);ctx.strokeStyle="#c8a84e";ctx.lineWidth=3;ctx.strokeRect(40,40,W-80,H-80);}
     ctx.textAlign="center";
-    const gap=28; // consistent gap between elements
-    let y=50;
+    const sp=26;
+    let y=48;
 
-    // ── LOGO
-    if(skLogo){const lh=75,lw=lh*(skLogo.width/skLogo.height);ctx.drawImage(skLogo,cx-lw/2,y,lw,lh);y+=lh+6;}
+    // LOGO
+    if(skLogo){const lh=70,lw=lh*(skLogo.width/skLogo.height);ctx.drawImage(skLogo,cx-lw/2,y,lw,lh);y+=lh+4;}
 
-    // ── AESTHETIC MEDICINE COMMUNITY
+    // AESTHETIC MEDICINE COMMUNITY
     ctx.font="bold 11px system-ui";ctx.fillStyle="#c8a84e";
-    ctx.fillText("\u2014 AESTHETIC MEDICINE COMMUNITY \u2014",cx,y+10);y+=10+gap;
+    ctx.fillText("\u2014 AESTHETIC MEDICINE COMMUNITY \u2014",cx,y+10);y+=10+sp;
 
-    // ── CERTIFICATE
+    // CERTIFICATE (largest text)
     ctx.font="bold 80px Georgia, serif";ctx.fillStyle="#1a1a1a";
-    ctx.fillText("CERTIFICATE",cx,y+55);y+=55+gap;
+    ctx.fillText("CERTIFICATE",cx,y+55);y+=55+sp-5;
 
-    // ── Gold line ABOVE "OF COMPLETION"
+    // ═══ Gold line ─── OF COMPLETION ─── Gold line ═══
+    // Line spans full width with OF COMPLETION text in the center gap
     ctx.strokeStyle="#c8a84e";ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.moveTo(cx-130,y);ctx.lineTo(cx+130,y);ctx.stroke();y+=gap/2;
+    ctx.font="bold 26px system-ui";ctx.fillStyle="#c8a84e";
+    const ocText="OF COMPLETION";
+    const ocWidth=ctx.measureText(ocText).width;
+    const lineLeft=180;const lineRight=W-180;const ocGap=20;
+    // Left line segment
+    ctx.beginPath();ctx.moveTo(lineLeft,y+10);ctx.lineTo(cx-ocWidth/2-ocGap,y+10);ctx.stroke();
+    // Right line segment
+    ctx.beginPath();ctx.moveTo(cx+ocWidth/2+ocGap,y+10);ctx.lineTo(lineRight,y+10);ctx.stroke();
+    // OF COMPLETION text between
+    ctx.fillText(ocText,cx,y+18);
+    y+=18+sp;
 
-    // ── OF COMPLETION (centered between two gold lines)
-    ctx.font="bold 18px system-ui";ctx.fillStyle="#c8a84e";
-    ctx.fillText("OF COMPLETION",cx,y+6);y+=6+gap/2;
-
-    // ── Gold line BELOW "OF COMPLETION"
-    ctx.beginPath();ctx.moveTo(cx-130,y);ctx.lineTo(cx+130,y);ctx.stroke();y+=gap;
-
-    // ── This certifies that
+    // This certifies that
     ctx.font="16px system-ui";ctx.fillStyle="#555";
-    ctx.fillText("This certifies that",cx,y);y+=gap;
+    ctx.fillText("This certifies that",cx,y);y+=sp+2;
 
-    // ── Doctor's name — LARGE CURSIVE
+    // Doctor name — LARGE CURSIVE
     ctx.font="65px 'Great Vibes', 'Brush Script MT', cursive";ctx.fillStyle="#0d6b6e";
-    ctx.fillText(name,cx,y+35);y+=35+gap/2;
+    ctx.fillText(name,cx,y+35);y+=35+sp/2-4;
 
-    // ── Decorative line under name with diamonds
+    // Decorative line under name with diamonds
     ctx.strokeStyle="#c8a84e";ctx.lineWidth=1;const nl=220;
     ctx.beginPath();ctx.moveTo(cx-nl,y);ctx.lineTo(cx+nl,y);ctx.stroke();
     [[cx-nl,y],[cx+nl,y]].forEach(([dx,dy])=>{ctx.fillStyle="#c8a84e";ctx.beginPath();ctx.moveTo(dx,dy-5);ctx.lineTo(dx+5,dy);ctx.lineTo(dx,dy+5);ctx.lineTo(dx-5,dy);ctx.fill();});
-    y+=gap;
+    y+=sp;
 
-    // ── has successfully completed
+    // has successfully completed
     ctx.font="14px system-ui";ctx.fillStyle="#555";
-    ctx.fillText("has successfully completed the SKINARIO Study & Test Series assessment on",cx,y);y+=gap;
+    ctx.fillText("has successfully completed the SKINARIO Study & Test Series assessment on",cx,y);y+=sp+8;
 
-    // ── Topic name
+    // Topic name (extra gap before)
     ctx.font="bold 32px system-ui";ctx.fillStyle="#1a1a1a";
-    ctx.fillText(attempt.topic.toUpperCase(),cx,y+5);y+=5+gap;
+    ctx.fillText(attempt.topic.toUpperCase(),cx,y+5);y+=5+sp+5;
 
-    // ── Difficulty
+    // Difficulty
     ctx.font="bold 16px system-ui";ctx.fillStyle=dt.color;
-    ctx.fillText(dt.label+" "+attempt.difficulty.toUpperCase()+" LEVEL",cx,y);y+=gap+5;
+    ctx.fillText(dt.label+" "+attempt.difficulty.toUpperCase()+" LEVEL",cx,y);y+=sp+12;
 
-    // ── Score with laurel wreath
+    // Score with decorative laurel — spread out more
     const scoreColor=attempt.accuracy>=70?"#1a7d42":attempt.accuracy>=50?"#b8860b":"#c0392b";
     const scoreX=cx-90;
-    // Draw laurel leaves on both sides of score
+    // Left laurel — wider spread (80px from center instead of 50)
     ctx.save();ctx.fillStyle="#c8a84e";
-    // Left laurel (6 leaves curving left)
-    for(let i=0;i<6;i++){
-      ctx.save();ctx.translate(scoreX-50,y-15+i*8);ctx.rotate(-0.3-i*0.08);
-      ctx.beginPath();ctx.ellipse(0,0,4,10,0,0,Math.PI*2);ctx.fill();ctx.restore();
-    }
-    // Right laurel (6 leaves curving right)
-    for(let i=0;i<6;i++){
-      ctx.save();ctx.translate(scoreX+50,y-15+i*8);ctx.rotate(0.3+i*0.08);
-      ctx.beginPath();ctx.ellipse(0,0,4,10,0,0,Math.PI*2);ctx.fill();ctx.restore();
-    }
+    for(let i=0;i<7;i++){ctx.save();ctx.translate(scoreX-75,y-20+i*9);ctx.rotate(-0.25-i*0.07);ctx.beginPath();ctx.ellipse(0,0,5,12,0,0,Math.PI*2);ctx.fill();ctx.restore();}
+    // Right laurel
+    for(let i=0;i<7;i++){ctx.save();ctx.translate(scoreX+75,y-20+i*9);ctx.rotate(0.25+i*0.07);ctx.beginPath();ctx.ellipse(0,0,5,12,0,0,Math.PI*2);ctx.fill();ctx.restore();}
     ctx.restore();
     // Score number
     ctx.font="bold 60px system-ui";ctx.fillStyle=scoreColor;ctx.textAlign="center";
     ctx.fillText(attempt.accuracy+"%",scoreX,y+15);
-    // Details to the right
+    // Details right
     ctx.textAlign="left";ctx.font="16px system-ui";ctx.fillStyle="#333";
-    ctx.fillText(attempt.correctAnswers+" of "+attempt.totalQuestions+" correct",cx+10,y-5);
+    ctx.fillText(attempt.correctAnswers+" of "+attempt.totalQuestions+" correct",cx+15,y-5);
     ctx.font="14px system-ui";ctx.fillStyle="#666";
-    ctx.fillText("Time Taken: "+Math.floor((attempt.timeSpentSeconds||0)/60)+"m "+(attempt.timeSpentSeconds||0)%60+"s",cx+10,y+18);
-    y+=15+gap;
+    ctx.fillText("Time Taken: "+Math.floor((attempt.timeSpentSeconds||0)/60)+"m "+(attempt.timeSpentSeconds||0)%60+"s",cx+15,y+18);
+    y+=15+sp;
 
-    // ── Date + Cert ID
+    // Date + Cert ID
     ctx.textAlign="center";ctx.font="13px system-ui";ctx.fillStyle="#888";
-    ctx.fillText("Date: "+certDate.toLocaleDateString("en-IN",{dateStyle:"long"})+"  |  Certificate ID: "+certId,cx,y);y+=gap-6;
+    ctx.fillText("Date: "+certDate.toLocaleDateString("en-IN",{dateStyle:"long"})+"  |  Certificate ID: "+certId,cx,y);y+=sp-8;
 
-    // ── Strengths
+    // Strengths
     if(strong.length>0){ctx.textAlign="left";ctx.font="bold 11px system-ui";ctx.fillStyle="#1a7d42";ctx.fillText("STRENGTHS:  "+strong.map(a=>a.area+" ("+a.pct+"%)").join("  \u2022  "),80,y);y+=16;}
     if(weak.length>0){ctx.textAlign="left";ctx.font="bold 11px system-ui";ctx.fillStyle="#b8860b";ctx.fillText("TO DEVELOP:  "+weak.map(a=>a.area+" ("+a.pct+"%)").join("  \u2022  "),80,y);y+=16;}
 
-    // ── SIGNATURES (3x bigger than before: sig=150px, seal=200px)
-    const footerStart=H-90;
-    const sigY=Math.max(y+15,footerStart-180);
+    // ═══ SIGNATURES — closer to center seal, equidistant ═══
+    const sigY=Math.max(y+10,H-250);
+    const sigLeftX=320;  // moved inward (was 220)
+    const sigRightX=W-320; // moved inward (was W-220)
 
-    // Left signature — 3x size
-    if(sigLeftImg){const sh=120,sw=Math.min(200,sh*(sigLeftImg.width/sigLeftImg.height));ctx.drawImage(sigLeftImg,220-sw/2,sigY-20,sw,sh);}
+    // Left signature
+    if(sigLeftImg){const sh=110,sw=Math.min(180,sh*(sigLeftImg.width/sigLeftImg.height));ctx.drawImage(sigLeftImg,sigLeftX-sw/2,sigY-15,sw,sh);}
     ctx.textAlign="center";ctx.font="italic 15px 'Great Vibes', cursive";ctx.fillStyle="#333";
-    ctx.fillText(certConfig.signatureLeftName||"Dr. Dhananjay Patil",220,sigY+110);
+    ctx.fillText(certConfig.signatureLeftName||"Dr. Dhananjay Patil",sigLeftX,sigY+105);
     ctx.font="12px system-ui";ctx.fillStyle="#888";
-    ctx.fillText(certConfig.signatureLeftTitle||"Founder & Mentor",220,sigY+128);
+    ctx.fillText(certConfig.signatureLeftTitle||"Founder & Mentor",sigLeftX,sigY+122);
 
-    // Center seal — 3x size
-    if(sealImg){const sh=160,sw=sh*(sealImg.width/sealImg.height);ctx.drawImage(sealImg,cx-sw/2,sigY-30,sw,sh);}
+    // Center seal — large
+    if(sealImg){const sh=150,sw=sh*(sealImg.width/sealImg.height);ctx.drawImage(sealImg,cx-sw/2,sigY-25,sw,sh);}
 
-    // Right signature — 3x size
-    if(sigRightImg){const sh=120,sw=Math.min(200,sh*(sigRightImg.width/sigRightImg.height));ctx.drawImage(sigRightImg,W-220-sw/2,sigY-20,sw,sh);}
+    // Right signature
+    if(sigRightImg){const sh=110,sw=Math.min(180,sh*(sigRightImg.width/sigRightImg.height));ctx.drawImage(sigRightImg,sigRightX-sw/2,sigY-15,sw,sh);}
     ctx.textAlign="center";ctx.font="italic 15px 'Great Vibes', cursive";ctx.fillStyle="#333";
-    ctx.fillText(certConfig.signatureRightName||"Academic Council",W-220,sigY+110);
+    ctx.fillText(certConfig.signatureRightName||"Academic Council",sigRightX,sigY+105);
     ctx.font="12px system-ui";ctx.fillStyle="#888";
-    ctx.fillText(certConfig.signatureRightTitle||"SKINARIO",W-220,sigY+128);
+    ctx.fillText(certConfig.signatureRightTitle||"SKINARIO",sigRightX,sigY+122);
 
-    // ── FOOTER
-    const fY=footerStart;
+    // ═══ FOOTER — accreditations 3x bigger, skinario.app moved left of corner ═══
+    const fY=H-80;
     const accreds=certConfig.accreditations||[];
-    if(accreds.length>0){ctx.textAlign="left";ctx.font="bold 9px system-ui";ctx.fillStyle="#999";ctx.fillText("ACCREDITED BY",55,fY-20);let ax=55;accreds.forEach((acc,i)=>{const logo=accredLogos[i];if(logo){const lh=30,lw=Math.min(60,lh*(logo.width/logo.height));ctx.drawImage(logo,ax,fY-12,lw,lh);ax+=lw+12;}else{ctx.font="bold 12px system-ui";ctx.fillStyle="#555";ctx.textAlign="left";ctx.fillText(acc.name,ax,fY+5);ax+=ctx.measureText(acc.name).width+15;}});}
-    if(certConfig.sponsorName){ctx.textAlign="center";ctx.font="10px system-ui";ctx.fillStyle="#aaa";ctx.fillText("Powered by",cx,fY-24);if(sponsorLogo){const sh=22,sw=sh*(sponsorLogo.width/sponsorLogo.height);ctx.drawImage(sponsorLogo,cx-sw/2,fY-18,sw,sh);}ctx.font="bold 14px system-ui";ctx.fillStyle="#333";ctx.fillText(certConfig.sponsorName,cx,sponsorLogo?fY+12:fY);if(certConfig.sponsorTagline){ctx.font="10px system-ui";ctx.fillStyle="#888";ctx.fillText(certConfig.sponsorTagline.slice(0,60),cx,sponsorLogo?fY+26:fY+14);}}
-    ctx.textAlign="right";ctx.font="italic 12px system-ui";ctx.fillStyle="#0d6b6e";ctx.fillText("Learn. Discuss. Lead the Field.",W-60,fY-5);
-    ctx.font="bold 14px system-ui";ctx.fillStyle="#1a1a1a";ctx.fillText("skinario.app",W-60,fY+14);
+    if(accreds.length>0){
+      ctx.textAlign="left";ctx.font="bold 10px system-ui";ctx.fillStyle="#999";ctx.fillText("ACCREDITED BY",55,fY-28);
+      let ax=55;
+      accreds.forEach((acc,i)=>{
+        const logo=accredLogos[i];
+        if(logo){const lh=45,lw=Math.min(90,lh*(logo.width/logo.height));ctx.drawImage(logo,ax,fY-20,lw,lh);ax+=lw+15;}
+        else{ctx.font="bold 14px system-ui";ctx.fillStyle="#555";ctx.textAlign="left";ctx.fillText(acc.name,ax,fY+8);ax+=ctx.measureText(acc.name).width+20;}
+      });
+    }
+    if(certConfig.sponsorName){ctx.textAlign="center";ctx.font="10px system-ui";ctx.fillStyle="#aaa";ctx.fillText("Powered by",cx,fY-26);if(sponsorLogo){const sh=24,sw=sh*(sponsorLogo.width/sponsorLogo.height);ctx.drawImage(sponsorLogo,cx-sw/2,fY-20,sw,sh);}ctx.font="bold 14px system-ui";ctx.fillStyle="#333";ctx.fillText(certConfig.sponsorName,cx,sponsorLogo?fY+14:fY);if(certConfig.sponsorTagline){ctx.font="10px system-ui";ctx.fillStyle="#888";ctx.fillText(certConfig.sponsorTagline.slice(0,60),cx,sponsorLogo?fY+28:fY+14);}}
+    // skinario.app + tagline — moved left to avoid green corner
+    ctx.textAlign="right";ctx.font="italic 12px system-ui";ctx.fillStyle="#0d6b6e";ctx.fillText("Learn. Discuss. Lead the Field.",W-120,fY-5);
+    ctx.font="bold 14px system-ui";ctx.fillStyle="#1a1a1a";ctx.fillText("skinario.app",W-120,fY+14);
 
     const link=document.createElement("a");link.download="SKINARIO-Certificate-"+attempt.topic.replace(/[^a-zA-Z0-9]/g,"-")+"-"+attempt.accuracy+"pct.png";
     link.href=c.toDataURL("image/png");link.click();
