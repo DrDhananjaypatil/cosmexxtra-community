@@ -5348,6 +5348,7 @@ ${forDownload
     {id:"library",ic:"📚",l:"Library"},
     {id:"videos",ic:"🎥",l:"Videos"},
     {id:"events",ic:"📅",l:"Events"},
+    {id:"articles",ic:"📰",l:"Articles"},
     // Study nav is visible to everyone (buzz), but the page itself is beta-gated.
     // Non-beta users clicking it land on the "join waitlist" screen.
     {id:"study",ic:"🎯",l:"Study & Test",beta:true},
@@ -5721,6 +5722,7 @@ ${forDownload
             <button onClick={()=>{setDirTab("institutes");go("vendors");}} style={T.btnO}>🎓 Institutes</button>
             {(()=>{const aType=prof?.accountType||"";const showConsent=isAdm||aType==="doctor"||aType===""||aType===undefined;return showConsent?<button onClick={()=>go("consent")} style={{background:"#fdf6e3",color:"#785f1e",border:"1.5px solid #c8a84e",borderRadius:8,padding:"9px 18px 9px 28px",fontSize:".88rem",fontWeight:500,fontFamily:"inherit",cursor:"pointer",position:"relative",overflow:"hidden"}}><span style={{position:"absolute",top:3,left:6,fontSize:".52rem",background:"#c8a84e",color:"#fff",padding:"1px 6px",borderRadius:5,fontWeight:700,letterSpacing:.6}}>NEW</span>📋 Generate consent</button>:null;})()}
             <button onClick={()=>go("study")} style={{background:"linear-gradient(135deg,"+T.tealBg+","+T.goldBg+")",color:T.teal,border:"1.5px solid "+T.teal,borderRadius:8,padding:"9px 18px 9px 30px",fontSize:".88rem",fontWeight:600,fontFamily:"inherit",cursor:"pointer",position:"relative",overflow:"hidden"}}><span style={{position:"absolute",top:3,left:6,fontSize:".52rem",background:T.goldD,color:"#fff",padding:"1px 6px",borderRadius:5,fontWeight:700,letterSpacing:.6}}>BETA</span>🎯 Try Study</button>
+            <button onClick={()=>go("articles")} style={{background:"#fff",color:T.teal,border:"1.5px solid "+T.teal,borderRadius:8,padding:"9px 18px",fontSize:".88rem",fontWeight:500,fontFamily:"inherit",cursor:"pointer"}}>📰 Articles</button>
           </div>
         </div>
 
@@ -10915,7 +10917,27 @@ ${forDownload
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{quizzes.length} questions</span><button onClick={genQuiz} style={T.btn}>🤖 Generate today</button></div>
           {quizzes.map(q=><div key={q.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border,gap:10}}><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,fontSize:".88rem"}}>{q.cat} — {q.diff} {q.sponsored&&<span style={{...T.tag(T.goldBg,T.goldD),marginLeft:6}}>📢 {q.sponsor||"Sponsored"}</span>}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(q.date)} · {Object.keys(q.answers||{}).length} answers · ❤️ {q.likes||0}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>{setSelD(q.date);go("quiz")}} style={{...T.btnO,...T.btnSm}}>View</button><button onClick={()=>setIgPost({item:q,type:"quiz"})} style={{...T.btnO,...T.btnSm}} title="Generate Instagram post">📸 IG</button><button onClick={()=>setEdForm({type:"quizzes",data:{...q},editing:true})} style={{...T.btnO,...T.btnSm}}>📢 Sponsor</button><button onClick={()=>deleteContent("quizzes",q.id,q.cat)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
         {aTab==="articles"&&<div style={T.card}>{edForm?.type==="articles"?<AdminForm type="Article" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["subtitle","Subtitle / Tagline (italic, shown below title — optional)"],["cat","Category","select"],["author","Author name (e.g. 'Dr. Dhananjay Patil, MD')"],["authorPhoto","Author profile photo","image"],["authorAffiliation","Author affiliation (e.g. 'Absolute Institute of Aesthetic Medicine, Pune')"],["date","Publication date","date"],["cover","Cover image","image"],["abstract","Abstract / Summary (italic boxed quote — optional)","textarea"],["blocks","Article body (block editor — add paragraphs, headings, images)","blocks"],["refs","References (optional)","textarea"],["authorBio","Author bio (shown at end of article — optional)","textarea"],["sponsored","Sponsored content (paid editorial)","check"],["sponsor","Sponsored by — brand name (e.g. 'Sun Pharma') — only if Sponsored is checked"],["sponsorLogo","Sponsor logo","image"],["sponsorUrl","Sponsor website URL (optional — makes sponsor name clickable)"],["feat","Featured","check"]]} onSave={()=>saveContent("articles")}/>
-          :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{articles.length}</span><button onClick={()=>setEdForm({type:"articles",data:{date:today,author:uName,cat:TOPICS[0]},editing:false})} style={T.btn}>+ New</button></div>
+          :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+            <span style={{color:T.mute}}>{articles.length} articles</span>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+              <select id="articlePublisher" style={{...T.inp,fontSize:".76rem",maxWidth:220}}>
+                <option value="">Post as myself ({uName})</option>
+                {allUsers.filter(u=>(u.accountType||"")==="doctor"||!u.accountType).map(u=><option key={u.id} value={u.id}>{u.name||"Unnamed"} ({u.email})</option>)}
+              </select>
+              <button onClick={()=>{
+                const sel=document.getElementById("articlePublisher");
+                const pubId=sel?.value||"";
+                const pubUser=pubId?allUsers.find(u=>u.id===pubId):null;
+                setEdForm({type:"articles",data:{
+                  date:today,
+                  author:pubUser?pubUser.name:uName,
+                  authorPhoto:pubUser?pubUser.photo||"":uPhoto||"",
+                  authorUid:pubUser?pubUser.id:au?.uid,
+                  cat:TOPICS[0]
+                },editing:false});
+              }} style={T.btn}>+ New article</button>
+            </div>
+          </div>
           {articles.map(a=><div key={a.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div style={{display:"flex",gap:10,alignItems:"center"}}>{a.cover&&<img src={a.cover} style={{width:50,height:36,objectFit:"cover",borderRadius:6}}/>}<div><div style={{fontWeight:500,fontSize:".88rem"}}>{a.title}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(a.date)}</div></div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setIgPost({item:a,type:"article"})} style={{...T.btnO,...T.btnSm}} title="Generate Instagram post">📸 IG</button><button onClick={()=>setEdForm({type:"articles",data:{...a},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("articles",a.id,a.title)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
         {aTab==="resources"&&<div style={T.card}>{edForm?.type==="resources"?<AdminForm type="Resource" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["url","Download URL"],["pages","Pages"],["size","Size"],["icon","Emoji (fallback)"],["thumb","Thumbnail image","image"],["free","Free","check"]]} onSave={()=>saveContent("resources")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{resources.length}</span><button onClick={()=>setEdForm({type:"resources",data:{icon:"📄",free:true},editing:false})} style={T.btn}>+ New</button></div>
