@@ -2477,8 +2477,6 @@ export default function App(){
     }
   };
   useEffect(()=>{if(toast){const t=setTimeout(()=>setToast(null),3000);return()=>clearTimeout(t)}},[toast]);
-  // Auto-refresh data every 60 seconds so admin sees new users/messages immediately
-  useEffect(()=>{if(scr!=="main")return;const iv=setInterval(()=>{loadData()},60000);return()=>clearInterval(iv)},[scr,loadData]);
 
   const[ads,setAds]=useState([]);
   const[newsPosts,setNewsPosts]=useState([]); // admin-curated news
@@ -2776,6 +2774,8 @@ export default function App(){
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[pg,prof]);
   const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl,tm,wp,rv,am,ts,ta,bc,cc]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000),fbGetAll("teamMembers","createdAt","desc",2000),fbGetAll("wallPosts","createdAt","desc",500),fbGetAll("reviews","createdAt","desc",2000),fbGetAll("adminMessages","createdAt","desc",500),fbGetAll("testSeries","createdAt","desc",500),fbGetAll("testAttempts","createdAt","desc",500),fbGet("platformSettings","betaConfig"),fbGet("platformSettings","certConfig")]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl);setTeamMembers(tm);setWallPosts(wp);setReviews(rv);setAdminMessages(am);setTestSeries(ts);setTestAttempts(ta);setBetaConfig(bc||{});setCertConfig(cc||{})},[au?.uid]);
+  // Auto-refresh data every 60 seconds — MUST be after loadData declaration to avoid TDZ
+  useEffect(()=>{if(scr!=="main")return;const iv=setInterval(()=>{loadData()},60000);return()=>clearInterval(iv)},[scr,loadData]);
 
   // Load current user's points-earning history from pointsActivity ledger.
   // Uses where(uid) so the list query satisfies security rules (can't list others' docs).
