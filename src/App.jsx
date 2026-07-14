@@ -8818,38 +8818,44 @@ ${forDownload
 
               {/* ═══ MANUAL POINTS ADJUSTMENT (admin) ═══ */}
               <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid "+T.border}}>
-                <div style={{fontSize:".82rem",fontWeight:600,color:T.err,marginBottom:6}}>⚠️ Manual points adjustment</div>
-                <p style={{fontSize:".72rem",color:T.txt2,lineHeight:1.5,marginBottom:8}}>Use sparingly — for correcting gaming exploits or one-off issues. The new value REPLACES the lifetime total. Also updates this month's monthlyPoints proportionally so leaderboards reconcile.</p>
+                <div style={{fontSize:".82rem",fontWeight:600,color:T.teal,marginBottom:6}}>🎯 Adjust points</div>
+                <p style={{fontSize:".72rem",color:T.txt2,lineHeight:1.5,marginBottom:8}}>Add or deduct points. Enter a positive number and click + or −. Current total: <b>{u.points||0} pts</b></p>
                 <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-                  <input id={`adj-${u.id}`} type="number" placeholder={`Current: ${u.points||0}`} style={{...T.inp,width:140,padding:"6px 10px",fontSize:".82rem"}}/>
+                  <input id={`adj-${u.id}`} type="number" min="1" placeholder="Amount (e.g. 50)" style={{...T.inp,width:160,padding:"6px 10px",fontSize:".82rem"}}/>
                   <button onClick={async()=>{
-                    const newVal=parseInt(document.getElementById(`adj-${u.id}`).value);
-                    if(isNaN(newVal)||newVal<0){sh("Enter a valid non-negative number");return}
-                    if(!confirm(`Set ${u.name}'s lifetime points to ${newVal}? (Currently ${u.points||0})`))return;
+                    const amt=parseInt(document.getElementById(`adj-${u.id}`).value);
+                    if(isNaN(amt)||amt<=0){sh("Enter a positive number");return}
+                    const current=u.points||0;
+                    const newVal=current+amt;
+                    if(!confirm(`Add ${amt} points to ${u.name}? (${current} → ${newVal})`))return;
                     try{
                       const monthKey=todayIST_YMD().slice(0,7);
                       const curMonthly=(u.monthlyPoints||{})[monthKey]||0;
-                      // Cap monthly at the new total — if newVal < curMonthly, monthly drops to newVal
-                      const newMonthly=Math.min(curMonthly,newVal);
-                      const monthlyPoints={...(u.monthlyPoints||{}),[monthKey]:newMonthly};
+                      const monthlyPoints={...(u.monthlyPoints||{}),[monthKey]:curMonthly+amt};
                       await fbSet("users",u.id,{points:newVal,monthlyPoints});
-                      // Log the adjustment to the ledger for audit trail
-                      const adjId=`${u.id}_adj_${Date.now()}`;
-                      await fbSet("pointsActivity",adjId,{
-                        uid:u.id,
-                        date:todayIST_YMD(),
-                        month:monthKey,
-                        action:"admin_adjustment",
-                        label:`Admin set total to ${newVal} (was ${u.points||0})`,
-                        pointsEarned:newVal-(u.points||0),
-                        createdAt:Date.now(),
-                        adminUid:au.uid,
-                      });
-                      sh(`✅ ${u.name}: ${u.points||0} → ${newVal}`);
+                      await fbSet("pointsActivity",`${u.id}_adj_${Date.now()}`,{uid:u.id,date:todayIST_YMD(),month:monthKey,action:"admin_add",label:`Admin added ${amt} points (${current} → ${newVal})`,pointsEarned:amt,createdAt:Date.now(),adminUid:au.uid});
+                      sh(`✅ +${amt} → ${u.name} now has ${newVal} pts`);
                       document.getElementById(`adj-${u.id}`).value="";
                       await loadData();
-                    }catch(err){console.error("adjustment failed:",err);sh("❌ Adjustment failed")}
-                  }} style={{...T.btnDanger,padding:"6px 14px",fontSize:".78rem"}}>Set new total</button>
+                    }catch(err){sh("❌ Failed")}
+                  }} style={{...T.btn,padding:"6px 14px",fontSize:".82rem"}}>+ Add</button>
+                  <button onClick={async()=>{
+                    const amt=parseInt(document.getElementById(`adj-${u.id}`).value);
+                    if(isNaN(amt)||amt<=0){sh("Enter a positive number");return}
+                    const current=u.points||0;
+                    const newVal=Math.max(0,current-amt);
+                    if(!confirm(`Deduct ${amt} points from ${u.name}? (${current} → ${newVal})`))return;
+                    try{
+                      const monthKey=todayIST_YMD().slice(0,7);
+                      const curMonthly=(u.monthlyPoints||{})[monthKey]||0;
+                      const monthlyPoints={...(u.monthlyPoints||{}),[monthKey]:Math.max(0,curMonthly-amt)};
+                      await fbSet("users",u.id,{points:newVal,monthlyPoints});
+                      await fbSet("pointsActivity",`${u.id}_adj_${Date.now()}`,{uid:u.id,date:todayIST_YMD(),month:monthKey,action:"admin_deduct",label:`Admin deducted ${amt} points (${current} → ${newVal})`,pointsEarned:-amt,createdAt:Date.now(),adminUid:au.uid});
+                      sh(`✅ −${amt} → ${u.name} now has ${newVal} pts`);
+                      document.getElementById(`adj-${u.id}`).value="";
+                      await loadData();
+                    }catch(err){sh("❌ Failed")}
+                  }} style={{...T.btnDanger,padding:"6px 14px",fontSize:".82rem"}}>− Deduct</button>
                 </div>
               </div>
 
