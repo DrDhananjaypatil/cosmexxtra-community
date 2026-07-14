@@ -2477,6 +2477,8 @@ export default function App(){
     }
   };
   useEffect(()=>{if(toast){const t=setTimeout(()=>setToast(null),3000);return()=>clearTimeout(t)}},[toast]);
+  // Auto-refresh data every 60 seconds so admin sees new users/messages immediately
+  useEffect(()=>{if(scr!=="main")return;const iv=setInterval(()=>{loadData()},60000);return()=>clearInterval(iv)},[scr,loadData]);
 
   const[ads,setAds]=useState([]);
   const[newsPosts,setNewsPosts]=useState([]); // admin-curated news
@@ -8819,40 +8821,41 @@ ${forDownload
               {/* ═══ MANUAL POINTS ADJUSTMENT (admin) ═══ */}
               <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid "+T.border}}>
                 <div style={{fontSize:".82rem",fontWeight:600,color:T.teal,marginBottom:6}}>🎯 Adjust points</div>
-                <p style={{fontSize:".72rem",color:T.txt2,lineHeight:1.5,marginBottom:8}}>Add or deduct points. Enter a positive number and click + or −. Current total: <b>{u.points||0} pts</b></p>
-                <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-                  <input id={`adj-${u.id}`} type="number" min="1" placeholder="Amount (e.g. 50)" style={{...T.inp,width:160,padding:"6px 10px",fontSize:".82rem"}}/>
+                <p style={{fontSize:".72rem",color:T.txt2,lineHeight:1.5,marginBottom:8}}>Add or deduct points. Current total: <b>{u.points||0} pts</b></p>
+                <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:6}}>
+                  <input id={`adj-${u.id}`} type="number" min="1" placeholder="Amount" style={{...T.inp,width:100,padding:"6px 10px",fontSize:".82rem"}}/>
+                  <input id={`adjr-${u.id}`} type="text" placeholder="Reason (e.g. bonus for article)" style={{...T.inp,flex:1,minWidth:160,padding:"6px 10px",fontSize:".82rem"}}/>
+                </div>
+                <div style={{display:"flex",gap:6}}>
                   <button onClick={async()=>{
                     const amt=parseInt(document.getElementById(`adj-${u.id}`).value);
+                    const reason=(document.getElementById(`adjr-${u.id}`).value||"").trim();
                     if(isNaN(amt)||amt<=0){sh("Enter a positive number");return}
-                    const current=u.points||0;
-                    const newVal=current+amt;
-                    if(!confirm(`Add ${amt} points to ${u.name}? (${current} → ${newVal})`))return;
+                    if(!reason){sh("Please enter a reason");return}
+                    const current=u.points||0;const newVal=current+amt;
+                    if(!confirm(`Add ${amt} pts to ${u.name}? (${current} → ${newVal})\nReason: ${reason}`))return;
                     try{
-                      const monthKey=todayIST_YMD().slice(0,7);
-                      const curMonthly=(u.monthlyPoints||{})[monthKey]||0;
-                      const monthlyPoints={...(u.monthlyPoints||{}),[monthKey]:curMonthly+amt};
-                      await fbSet("users",u.id,{points:newVal,monthlyPoints});
-                      await fbSet("pointsActivity",`${u.id}_adj_${Date.now()}`,{uid:u.id,date:todayIST_YMD(),month:monthKey,action:"admin_add",label:`Admin added ${amt} points (${current} → ${newVal})`,pointsEarned:amt,createdAt:Date.now(),adminUid:au.uid});
+                      const monthKey=todayIST_YMD().slice(0,7);const curMonthly=(u.monthlyPoints||{})[monthKey]||0;
+                      await fbSet("users",u.id,{points:newVal,monthlyPoints:{...(u.monthlyPoints||{}),[monthKey]:curMonthly+amt}});
+                      await fbSet("pointsActivity",`${u.id}_adj_${Date.now()}`,{uid:u.id,date:todayIST_YMD(),month:monthKey,action:"admin_add",label:`+${amt}: ${reason}`,pointsEarned:amt,reason,createdAt:Date.now(),adminUid:au.uid,adminEmail:au.email});
                       sh(`✅ +${amt} → ${u.name} now has ${newVal} pts`);
-                      document.getElementById(`adj-${u.id}`).value="";
+                      document.getElementById(`adj-${u.id}`).value="";document.getElementById(`adjr-${u.id}`).value="";
                       await loadData();
                     }catch(err){sh("❌ Failed")}
                   }} style={{...T.btn,padding:"6px 14px",fontSize:".82rem"}}>+ Add</button>
                   <button onClick={async()=>{
                     const amt=parseInt(document.getElementById(`adj-${u.id}`).value);
+                    const reason=(document.getElementById(`adjr-${u.id}`).value||"").trim();
                     if(isNaN(amt)||amt<=0){sh("Enter a positive number");return}
-                    const current=u.points||0;
-                    const newVal=Math.max(0,current-amt);
-                    if(!confirm(`Deduct ${amt} points from ${u.name}? (${current} → ${newVal})`))return;
+                    if(!reason){sh("Please enter a reason");return}
+                    const current=u.points||0;const newVal=Math.max(0,current-amt);
+                    if(!confirm(`Deduct ${amt} pts from ${u.name}? (${current} → ${newVal})\nReason: ${reason}`))return;
                     try{
-                      const monthKey=todayIST_YMD().slice(0,7);
-                      const curMonthly=(u.monthlyPoints||{})[monthKey]||0;
-                      const monthlyPoints={...(u.monthlyPoints||{}),[monthKey]:Math.max(0,curMonthly-amt)};
-                      await fbSet("users",u.id,{points:newVal,monthlyPoints});
-                      await fbSet("pointsActivity",`${u.id}_adj_${Date.now()}`,{uid:u.id,date:todayIST_YMD(),month:monthKey,action:"admin_deduct",label:`Admin deducted ${amt} points (${current} → ${newVal})`,pointsEarned:-amt,createdAt:Date.now(),adminUid:au.uid});
+                      const monthKey=todayIST_YMD().slice(0,7);const curMonthly=(u.monthlyPoints||{})[monthKey]||0;
+                      await fbSet("users",u.id,{points:newVal,monthlyPoints:{...(u.monthlyPoints||{}),[monthKey]:Math.max(0,curMonthly-amt)}});
+                      await fbSet("pointsActivity",`${u.id}_adj_${Date.now()}`,{uid:u.id,date:todayIST_YMD(),month:monthKey,action:"admin_deduct",label:`-${amt}: ${reason}`,pointsEarned:-amt,reason,createdAt:Date.now(),adminUid:au.uid,adminEmail:au.email});
                       sh(`✅ −${amt} → ${u.name} now has ${newVal} pts`);
-                      document.getElementById(`adj-${u.id}`).value="";
+                      document.getElementById(`adj-${u.id}`).value="";document.getElementById(`adjr-${u.id}`).value="";
                       await loadData();
                     }catch(err){sh("❌ Failed")}
                   }} style={{...T.btnDanger,padding:"6px 14px",fontSize:".82rem"}}>− Deduct</button>
@@ -10808,9 +10811,20 @@ ${forDownload
             const flagCount=wallPosts.filter(w=>w.active!==false&&Array.isArray(w.flags)&&w.flags.length>0).length;
             const lowRev=reviews.filter(r=>r.active!==false&&r.rating<=2).length;
             const unreadMsg=adminMessages.filter(m=>m.status!=="replied").length;
+            // Check for "new" items since admin last viewed this tab
+            const lastSeen=parseInt(localStorage.getItem("adm_seen_"+id)||"0");
+            const tabDataMap={
+              users:allUsers,articles,quiz:quizzes,resources,videos,events,forum:forumPosts,cases,
+              ads,news:newsPosts,rewards,vendors:vendorApplications,messages:adminMessages,
+              submissions,roles:roleApplications,referrals:redemptions,flagged:wallPosts.filter(w=>Array.isArray(w.flags)&&w.flags.length>0),
+              lowreviews:reviews.filter(r=>r.rating<=2),placements:sponsorPlacements,
+            };
+            const tabData=tabDataMap[id]||[];
+            const hasNew=tabData.some(item=>{const ts=item.createdAt?.seconds?item.createdAt.seconds*1000:item.createdAt?.toMillis?item.createdAt.toMillis():typeof item.createdAt==="number"?item.createdAt:0;return ts>lastSeen;});
             const badge=id==="messages"&&unreadMsg>0?` (${unreadMsg})`:id==="flagged"&&flagCount>0?` (${flagCount})`:id==="lowreviews"&&lowRev>0?` (${lowRev})`:"";
-            return<button key={id} onClick={()=>{setATab(id);setEdForm(null);window.scrollTo({top:0,behavior:"smooth"})}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit"}}>{l}{badge}</button>;
+            return<button key={id} onClick={()=>{setATab(id);setEdForm(null);localStorage.setItem("adm_seen_"+id,String(Date.now()));window.scrollTo({top:0,behavior:"smooth"})}} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${aTab===id?T.teal:T.border}`,background:aTab===id?T.tealBg:"#fff",color:aTab===id?T.teal:T.mute,cursor:"pointer",fontSize:".8rem",fontWeight:aTab===id?600:400,fontFamily:"inherit",position:"relative"}}>{l}{badge}{hasNew&&aTab!==id&&<span style={{position:"absolute",top:4,right:4,width:7,height:7,borderRadius:"50%",background:T.err}}/>}</button>;
           })}
+          <button onClick={()=>{loadData();sh("✓ Refreshed")}} title="Refresh all data" style={{padding:"8px 12px",borderRadius:10,border:"1.5px solid "+T.border,background:"#fff",color:T.teal,cursor:"pointer",fontSize:".8rem",fontFamily:"inherit"}}>🔄</button>
           </div>
         </div>
         {aTab==="stats"&&<><div style={T.card}><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>{[["Articles",articles.length],["Resources",resources.length],["Videos",videos.length],["Forum",forumPosts.length],["Cases",cases.length],["Quizzes",quizzes.length],["Users",allUsers.length],["Events",events.length],["Ads",ads.length],["Wall posts",wallPosts.filter(w=>w.active!==false).length],["Products/Courses",products.filter(p=>p.active!==false).length],["Reviews",reviews.filter(r=>r.active!==false).length]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:14,background:T.bg,borderRadius:10}}><div style={{fontSize:"1.4rem",fontWeight:700,color:T.teal}}>{v}</div><div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div></div>)}</div></div>
