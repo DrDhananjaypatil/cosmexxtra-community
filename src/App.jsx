@@ -5340,13 +5340,13 @@ ${forDownload
   // Resolve current cap for a beta feature from the Firestore config doc,
   // falling back to hardcoded default if the doc hasn't been created yet.
   const getBetaCap=(feature)=>{
-    if(feature==="study")return betaConfig?.study?.cap??BETA_STUDY_CAP_DEFAULT;
-    return 25;
+    const fc=betaConfig?.[feature];
+    if(fc?.cap)return fc.cap;
+    return BETA_STUDY_CAP_DEFAULT;
   };
-  // Is the beta program open for new signups (not-yet-approved users)?
-  // Admin can flip this off to pause the waitlist without changing the cap.
   const isBetaOpen=(feature)=>{
-    if(feature==="study"){const v=betaConfig?.study?.enabled;return v===undefined?true:!!v;}
+    const fc=betaConfig?.[feature];
+    if(fc&&fc.enabled!==undefined)return !!fc.enabled;
     return true;
   };
   const overflowNavs=[
@@ -6509,7 +6509,7 @@ ${forDownload
               <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
                 <div style={{width:48,height:48,borderRadius:12,background:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.6rem"}}>🧠</div>
                 <div>
-                  <h2 style={{fontSize:"1.3rem",fontWeight:700,margin:0}}>AI Clinic Growth Advisor</h2>
+                  <h2 style={{fontSize:"1.3rem",fontWeight:700,margin:0}}>AI Clinic Growth Advisor <span style={{fontSize:".52rem",fontWeight:700,color:"#fff",background:"rgba(255,255,255,0.3)",padding:"2px 8px",borderRadius:5,letterSpacing:.6,verticalAlign:"middle",marginLeft:4}}>BETA</span></h2>
                   <div style={{fontSize:".78rem",opacity:0.8}}>Powered by AI · Tailored for Indian aesthetic medicine</div>
                 </div>
               </div>
