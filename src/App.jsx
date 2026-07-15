@@ -2386,7 +2386,7 @@ export default function App(){
 
   // KNOWN_PAGES must match every page condition the app actually renders.
   // If you add a new page (`pg==="xyz"&&...` block), add "xyz" here too.
-  const KNOWN_PAGES=["home","me","quiz","library","forum","cases","rewards","submit","rank","events","videos","admin","profile","ad","consent","vendors","study","articles"];
+  const KNOWN_PAGES=["home","me","quiz","library","forum","cases","rewards","submit","rank","events","videos","admin","profile","ad","consent","vendors","study","articles","advisor"];
   const sh=m=>setToast(m);const go=p=>{const safe=KNOWN_PAGES.includes(p)?p:"home";setPg(safe);setSelA(null);setSelV(null);setSelAd(null);setSelE(null);setSelU(null);setSelFP(null);setSelCs(null);setEdForm(null)};
 
   // ─── FOLLOW SYSTEM ────────────────────────────────────────────────────────
@@ -2534,7 +2534,10 @@ export default function App(){
   const[betaConfig,setBetaConfig]=useState({});
   const[betaEditDraft,setBetaEditDraft]=useState({}); // {cap, enabled} — admin unsaved edits
   const[profileTestsOpen,setProfileTestsOpen]=useState(false); // collapsible test history on admin profile view
-  const[expandedAttempt,setExpandedAttempt]=useState(null); // which test attempt is expanded for question review
+  const[expandedAttempt,setExpandedAttempt]=useState(null);
+  const[advisorMsgs,setAdvisorMsgs]=useState([]); // [{role:"user"|"assistant",content:"..."}]
+  const[advisorInput,setAdvisorInput]=useState("");
+  const[advisorLoading,setAdvisorLoading]=useState(false); // which test attempt is expanded for question review
   const[certConfig,setCertConfig]=useState({}); // {logoUrl, accreditations:[{name,logoUrl}], sponsorId, sponsorName, sponsorLogo, sponsorTagline}
   // Test timer — decrements every second while user is taking a test.
   // NOTE: Must live AFTER studyView/activeTest state declarations above,
@@ -5351,6 +5354,7 @@ ${forDownload
     {id:"videos",ic:"🎥",l:"Videos"},
     {id:"events",ic:"📅",l:"Events"},
     {id:"articles",ic:"📰",l:"Articles"},
+    {id:"advisor",ic:"🧠",l:"AI Advisor",beta:true},
     // Study nav is visible to everyone (buzz), but the page itself is beta-gated.
     // Non-beta users clicking it land on the "join waitlist" screen.
     {id:"study",ic:"🎯",l:"Study & Test",beta:true},
@@ -5725,6 +5729,7 @@ ${forDownload
             {(()=>{const aType=prof?.accountType||"";const showConsent=isAdm||aType==="doctor"||aType===""||aType===undefined;return showConsent?<button onClick={()=>go("consent")} style={{background:"#fdf6e3",color:"#785f1e",border:"1.5px solid #c8a84e",borderRadius:8,padding:"9px 18px 9px 28px",fontSize:".88rem",fontWeight:500,fontFamily:"inherit",cursor:"pointer",position:"relative",overflow:"hidden"}}><span style={{position:"absolute",top:3,left:6,fontSize:".52rem",background:"#c8a84e",color:"#fff",padding:"1px 6px",borderRadius:5,fontWeight:700,letterSpacing:.6}}>NEW</span>📋 Generate consent</button>:null;})()}
             <button onClick={()=>go("study")} style={{background:"linear-gradient(135deg,"+T.tealBg+","+T.goldBg+")",color:T.teal,border:"1.5px solid "+T.teal,borderRadius:8,padding:"9px 18px 9px 30px",fontSize:".88rem",fontWeight:600,fontFamily:"inherit",cursor:"pointer",position:"relative",overflow:"hidden"}}><span style={{position:"absolute",top:3,left:6,fontSize:".52rem",background:T.goldD,color:"#fff",padding:"1px 6px",borderRadius:5,fontWeight:700,letterSpacing:.6}}>BETA</span>🎯 Try Study</button>
             <button onClick={()=>go("articles")} style={{background:"#fff",color:T.teal,border:"1.5px solid "+T.teal,borderRadius:8,padding:"9px 18px",fontSize:".88rem",fontWeight:500,fontFamily:"inherit",cursor:"pointer"}}>📰 Articles</button>
+            <button onClick={()=>go("advisor")} style={{background:"linear-gradient(135deg,#0d6b6e,#0a5c5f)",color:"#fff",border:"none",borderRadius:8,padding:"9px 18px",fontSize:".88rem",fontWeight:600,fontFamily:"inherit",cursor:"pointer"}}>🧠 AI Advisor</button>
           </div>
         </div>
 
@@ -6443,6 +6448,171 @@ ${forDownload
         {/* ═══ END RIGHT SIDEBAR ═══ */}
 
       </div>}
+      {/* ═══ AI ADVISOR — BETA GATE ═══ */}
+      {pg==="advisor"&&!hasBetaAccess("advisor")&&(()=>{
+        const activeBetaUsers=allUsers.filter(u=>Array.isArray(u.betaFeatures)&&u.betaFeatures.includes("advisor")).length;
+        const capNow=getBetaCap("advisor");
+        const spotsLeft=Math.max(0,capNow-activeBetaUsers);
+        const pctFull=capNow>0?Math.round((activeBetaUsers/capNow)*100):0;
+        const waitlistedUsers=allUsers.filter(u=>Array.isArray(u.betaWaitlist)&&u.betaWaitlist.includes("advisor"));
+        const amWaiting=Array.isArray(me?.betaWaitlist)&&me.betaWaitlist.includes("advisor");
+        const betaOpen=isBetaOpen("advisor");
+        return(<div style={{maxWidth:560,margin:"0 auto",textAlign:"center"}}>
+          <div style={{...T.card,padding:30}}>
+            <div style={{fontSize:"3rem",marginBottom:10}}>🧠</div>
+            <h2 style={{fontSize:"1.4rem",fontWeight:700,margin:0,marginBottom:6}}>AI Clinic Growth Advisor</h2>
+            <div style={{display:"inline-flex",alignItems:"center",gap:6,marginBottom:14}}><span style={{fontSize:".6rem",background:T.goldD,color:"#fff",padding:"2px 8px",borderRadius:5,fontWeight:700,letterSpacing:.6}}>BETA</span></div>
+            <p style={{fontSize:".9rem",color:T.txt2,lineHeight:1.6,marginBottom:20}}>Get AI-powered business advice for your aesthetic practice — pricing strategy, marketing plans, treatment expansion, competition analysis, and revenue planning. Tailored for Indian aesthetic medicine.</p>
+            {/* Scarcity ring */}
+            <div style={{padding:"18px",background:T.bg,borderRadius:12,marginBottom:16}}>
+              <div style={{display:"flex",alignItems:"center",gap:18,justifyContent:"center"}}>
+                <div style={{position:"relative",width:80,height:80,flexShrink:0}}>
+                  <svg viewBox="0 0 36 36" style={{width:80,height:80,transform:"rotate(-90deg)"}}>
+                    <circle cx="18" cy="18" r="15.5" fill="none" stroke="#e8e8e8" strokeWidth="3"/>
+                    <circle cx="18" cy="18" r="15.5" fill="none" stroke={spotsLeft===0?"#c0392b":spotsLeft<=5?"#c8a84e":"#0d6b6e"} strokeWidth="3" strokeDasharray={`${pctFull*0.974} 100`} strokeLinecap="round" style={{transition:"stroke-dasharray 1s ease"}}/>
+                  </svg>
+                  <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+                    <div style={{fontSize:"1rem",fontWeight:700,color:spotsLeft===0?T.err:T.teal}}>{pctFull}%</div>
+                    <div style={{fontSize:".45rem",color:T.mute,textTransform:"uppercase"}}>filled</div>
+                  </div>
+                </div>
+                <div style={{textAlign:"left"}}>
+                  <div style={{fontSize:".88rem",fontWeight:600}}>{activeBetaUsers}/{capNow} testers</div>
+                  <div style={{fontSize:".72rem",color:T.mute}}>{spotsLeft>0?`${spotsLeft} spots left`:"All spots filled"} · {waitlistedUsers.length} waiting</div>
+                </div>
+              </div>
+            </div>
+            {!betaOpen?<div style={{fontSize:".88rem",color:T.mute,padding:"12px",background:T.bg,borderRadius:8}}>⏸ New signups are paused. Check back soon!</div>
+            :amWaiting?<div>
+              <div style={{fontSize:".88rem",color:T.teal,fontWeight:600,marginBottom:8}}>✓ You're on the waitlist!</div>
+              <button onClick={async()=>{if(!window.confirm("Leave the waitlist?"))return;await fbSet("users",me.id,{betaWaitlist:(me.betaWaitlist||[]).filter(f=>f!=="advisor")});sh("Removed");loadData();}} style={{...T.btnO,...T.btnSm}}>Leave waitlist</button>
+            </div>
+            :<div>
+              <textarea id="advisor-waitnote" rows={2} placeholder="Tell us about your clinic (optional)" style={{...T.txa,marginBottom:10,fontSize:".84rem"}}/>
+              <button onClick={async()=>{
+                const note=(document.getElementById("advisor-waitnote")?.value||"").trim()||(("(no note)"));
+                await fbSet("users",me.id,{betaWaitlist:[...(me.betaWaitlist||[]),"advisor"],betaWaitlistedAt_advisor:Date.now(),betaWaitlistNote_advisor:note});
+                sh("🎉 You're on the list!");loadData();
+              }} style={{...T.btn,padding:"11px 28px"}}>Join waitlist</button>
+            </div>}
+          </div>
+        </div>);
+      })()}
+
+      {/* ═══ AI ADVISOR — FULL PAGE (beta users only) ═══ */}
+      {pg==="advisor"&&hasBetaAccess("advisor")&&<div style={{maxWidth:1100}}>
+        <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 320px",gap:18,alignItems:"start"}} className="me-grid">
+          {/* LEFT — Chat interface */}
+          <div style={{minWidth:0}}>
+            {/* Header */}
+            <div style={{...T.card,padding:"20px 22px",marginBottom:14,background:"linear-gradient(135deg,#0d6b6e,#0a5c5f)",color:"#fff",borderRadius:14}}>
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
+                <div style={{width:48,height:48,borderRadius:12,background:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.6rem"}}>🧠</div>
+                <div>
+                  <h2 style={{fontSize:"1.3rem",fontWeight:700,margin:0}}>AI Clinic Growth Advisor</h2>
+                  <div style={{fontSize:".78rem",opacity:0.8}}>Powered by AI · Tailored for Indian aesthetic medicine</div>
+                </div>
+              </div>
+              <p style={{fontSize:".84rem",lineHeight:1.55,margin:0,opacity:0.9}}>Ask me anything about growing your aesthetic practice — pricing strategy, marketing, adding treatments, competing locally, or scaling your clinic.</p>
+            </div>
+
+            {/* Chat messages */}
+            <div style={{...T.card,padding:0,marginBottom:14,minHeight:400,display:"flex",flexDirection:"column"}}>
+              <div style={{flex:1,padding:"16px 18px",overflowY:"auto",maxHeight:"55vh"}}>
+                {advisorMsgs.length===0&&<div style={{textAlign:"center",padding:"40px 20px",color:T.mute}}>
+                  <div style={{fontSize:"2.5rem",marginBottom:12}}>💬</div>
+                  <div style={{fontSize:".92rem",fontWeight:600,color:T.txt,marginBottom:6}}>Start a conversation</div>
+                  <div style={{fontSize:".82rem",lineHeight:1.5}}>Ask about pricing, marketing, treatment planning, competition, or any business challenge you're facing in your clinic.</div>
+                </div>}
+                {advisorMsgs.map((msg,i)=><div key={i} style={{display:"flex",gap:10,marginBottom:14,flexDirection:msg.role==="user"?"row-reverse":"row"}}>
+                  <div style={{width:34,height:34,borderRadius:"50%",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:".9rem",...(msg.role==="user"?{background:T.tealBg,color:T.teal}:{background:"linear-gradient(135deg,#0d6b6e,#0a5c5f)",color:"#fff"})}}>{msg.role==="user"?"👤":"🧠"}</div>
+                  <div style={{maxWidth:"80%",padding:"12px 16px",borderRadius:msg.role==="user"?"14px 14px 4px 14px":"14px 14px 14px 4px",background:msg.role==="user"?T.tealBg:"#fff",border:"1px solid "+(msg.role==="user"?T.teal+"33":T.border),fontSize:".88rem",color:T.txt,lineHeight:1.6}}>
+                    <MarkdownView text={msg.content} style={{fontSize:".88rem"}}/>
+                  </div>
+                </div>)}
+                {advisorLoading&&<div style={{display:"flex",gap:10,marginBottom:14}}>
+                  <div style={{width:34,height:34,borderRadius:"50%",flexShrink:0,background:"linear-gradient(135deg,#0d6b6e,#0a5c5f)",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:".9rem"}}>🧠</div>
+                  <div style={{padding:"12px 16px",background:"#fff",border:"1px solid "+T.border,borderRadius:"14px 14px 14px 4px",fontSize:".88rem",color:T.mute}}>
+                    <span style={{display:"inline-block",animation:"pulse 1.5s infinite"}}>Thinking</span>
+                    <span style={{display:"inline-block",animation:"pulse 1.5s infinite",animationDelay:".2s"}}>.</span>
+                    <span style={{display:"inline-block",animation:"pulse 1.5s infinite",animationDelay:".4s"}}>.</span>
+                    <span style={{display:"inline-block",animation:"pulse 1.5s infinite",animationDelay:".6s"}}>.</span>
+                  </div>
+                </div>}
+              </div>
+
+              {/* Input area */}
+              <div style={{padding:"12px 16px",borderTop:"1px solid "+T.border,display:"flex",gap:8,alignItems:"flex-end"}}>
+                <textarea value={advisorInput} onChange={e=>setAdvisorInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();document.getElementById("advisor-send")?.click();}}} placeholder="Ask about pricing, marketing, growth strategy..." rows={2} style={{...T.txa,flex:1,resize:"none",fontSize:".88rem"}}/>
+                <button id="advisor-send" disabled={!advisorInput.trim()||advisorLoading} onClick={async()=>{
+                  const text=advisorInput.trim();if(!text)return;
+                  const newMsgs=[...advisorMsgs,{role:"user",content:text}];
+                  setAdvisorMsgs(newMsgs);setAdvisorInput("");setAdvisorLoading(true);
+                  try{
+                    const r=await fetch("/api/advisor",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:newMsgs})});
+                    const data=await r.json();
+                    if(data.ok&&data.reply){setAdvisorMsgs([...newMsgs,{role:"assistant",content:data.reply}]);}
+                    else{setAdvisorMsgs([...newMsgs,{role:"assistant",content:"Sorry, I couldn't process that. Please try again or rephrase your question."}]);}
+                  }catch(err){setAdvisorMsgs([...newMsgs,{role:"assistant",content:"Connection error — please check your internet and try again."}]);}
+                  setAdvisorLoading(false);
+                  setTimeout(()=>{const el=document.querySelector("[data-advisor-scroll]");if(el)el.scrollTop=el.scrollHeight;},100);
+                }} style={{...T.btn,padding:"10px 18px",fontSize:".88rem",opacity:(!advisorInput.trim()||advisorLoading)?0.5:1,flexShrink:0}}>Send</button>
+              </div>
+            </div>
+
+            {advisorMsgs.length>0&&<button onClick={()=>{if(window.confirm("Clear this conversation and start fresh?"))setAdvisorMsgs([])}} style={{...T.btnO,...T.btnSm,fontSize:".72rem"}}>🗑️ Clear conversation</button>}
+          </div>
+
+          {/* RIGHT SIDEBAR — Quick prompts + tips */}
+          <div style={{minWidth:0,display:"flex",flexDirection:"column",gap:14}}>
+            {/* Quick-start prompts */}
+            <div style={{...T.card}}>
+              <h4 style={{fontSize:".88rem",fontWeight:700,margin:0,marginBottom:10}}>⚡ Quick prompts</h4>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {[
+                  ["💰","How should I price Botox in a Tier 2 city?"],
+                  ["📱","Create an Instagram content plan for my clinic"],
+                  ["📈","I want to add laser services — what's the ROI?"],
+                  ["🏥","How do I increase my consultation-to-treatment conversion?"],
+                  ["🎯","Marketing strategy for a new aesthetic clinic"],
+                  ["💊","Which filler brand gives the best margin in India?"],
+                  ["👥","How to hire and train my first aesthetic nurse?"],
+                  ["⭐","How to get more Google reviews for my clinic?"],
+                  ["📊","Help me plan revenue targets for next quarter"],
+                  ["🔍","How to differentiate from 5 competing clinics nearby?"],
+                ].map(([ic,prompt])=><button key={prompt} onClick={()=>{setAdvisorInput(prompt);}} style={{textAlign:"left",padding:"8px 12px",background:T.bg,border:"1px solid "+T.border,borderRadius:8,cursor:"pointer",fontSize:".78rem",color:T.txt2,fontFamily:"inherit",display:"flex",gap:8,alignItems:"center",transition:"all .1s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.background=T.tealBg;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background=T.bg;}}>
+                  <span style={{fontSize:"1rem",flexShrink:0}}>{ic}</span>
+                  <span style={{lineHeight:1.4}}>{prompt}</span>
+                </button>)}
+              </div>
+            </div>
+
+            {/* What it can help with */}
+            <div style={{...T.card}}>
+              <h4 style={{fontSize:".88rem",fontWeight:700,margin:0,marginBottom:10}}>🎯 What I can help with</h4>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {[
+                  ["Pricing strategy","Get city-tier-specific pricing benchmarks for any treatment"],
+                  ["Marketing plans","Instagram content, Google Ads, referral programs tailored to aesthetic clinics"],
+                  ["Treatment expansion","Which services to add next based on your equipment and market"],
+                  ["Competition analysis","How to position against local competitors"],
+                  ["Patient conversion","Turn more consultations into booked treatments"],
+                  ["Revenue planning","Monthly targets, treatment mix optimization, cost analysis"],
+                ].map(([title,desc])=><div key={title} style={{padding:"8px 10px",background:T.bg,borderRadius:8}}>
+                  <div style={{fontSize:".78rem",fontWeight:600,color:T.teal}}>{title}</div>
+                  <div style={{fontSize:".7rem",color:T.mute,lineHeight:1.4}}>{desc}</div>
+                </div>)}
+              </div>
+            </div>
+
+            {/* Disclaimer */}
+            <div style={{padding:12,background:T.bg,borderRadius:8,fontSize:".68rem",color:T.mute,lineHeight:1.5,textAlign:"center"}}>
+              💡 AI advice is directional, not definitive. Consult your CA for tax/legal questions. Pricing suggestions are market estimates — always validate locally.
+            </div>
+          </div>
+        </div>
+      </div>}
+
       {/* ═══ ARTICLES PAGE ═══ */}
       {pg==="articles"&&!selA&&<div style={{maxWidth:1100}}>
         <div style={{...T.card,padding:"20px 22px",marginBottom:16,background:"linear-gradient(135deg,"+T.tealBg+",#fff)",borderLeft:"3px solid "+T.teal}}>
@@ -11785,7 +11955,53 @@ ${forDownload
 
             </div>
 
-            {/* Future beta features hint */}
+            {/* ═══ AI ADVISOR BETA ═══ */}
+            <div style={{...T.card,marginBottom:14,borderLeft:"3px solid #0d6b6e"}}>
+              <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6}}>🧠 AI Advisor Beta</h4>
+              <p style={{fontSize:".78rem",color:T.txt2,margin:"0 0 12px"}}>Control access to the AI Clinic Growth Advisor.</p>
+              {(()=>{
+                const bc2=betaConfig?.advisor||{};
+                const cap2=bc2.cap||BETA_STUDY_CAP_DEFAULT;
+                const enabled2=bc2.enabled!==false;
+                const active2=allUsers.filter(u=>Array.isArray(u.betaFeatures)&&u.betaFeatures.includes("advisor"));
+                const waiting2=allUsers.filter(u=>Array.isArray(u.betaWaitlist)&&u.betaWaitlist.includes("advisor"));
+                return(<div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
+                    <div style={{textAlign:"center",padding:10,background:T.bg,borderRadius:8}}><div style={{fontSize:"1.2rem",fontWeight:700,color:T.teal}}>{active2.length}</div><div style={{fontSize:".58rem",color:T.mute,textTransform:"uppercase"}}>Active</div></div>
+                    <div style={{textAlign:"center",padding:10,background:T.bg,borderRadius:8}}><div style={{fontSize:"1.2rem",fontWeight:700,color:T.goldD}}>{waiting2.length}</div><div style={{fontSize:".58rem",color:T.mute,textTransform:"uppercase"}}>Waitlist</div></div>
+                    <div style={{textAlign:"center",padding:10,background:T.bg,borderRadius:8}}><div style={{fontSize:"1.2rem",fontWeight:700,color:T.txt}}>{cap2}</div><div style={{fontSize:".58rem",color:T.mute,textTransform:"uppercase"}}>Cap</div></div>
+                  </div>
+                  <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12,flexWrap:"wrap"}}>
+                    <label style={{fontSize:".76rem",fontWeight:600}}>Cap:</label>
+                    <input type="number" min="1" defaultValue={cap2} style={{...T.inp,width:80}} onChange={e=>{const v=parseInt(e.target.value);if(!isNaN(v)&&v>0)setBetaConfig(p=>({...p,advisor:{...(p.advisor||{}),cap:v}}));}}/>
+                    <label style={{display:"flex",alignItems:"center",gap:4,fontSize:".76rem",cursor:"pointer"}}>
+                      <input type="checkbox" checked={enabled2} onChange={e=>setBetaConfig(p=>({...p,advisor:{...(p.advisor||{}),enabled:e.target.checked}}))}/>
+                      {enabled2?"Open":"Paused"}
+                    </label>
+                    <button onClick={async()=>{await fbSet("platformSettings","betaConfig",betaConfig);sh("✓ Advisor beta saved");loadData();}} style={{...T.btn,...T.btnSm,fontSize:".72rem",marginLeft:"auto"}}>Save</button>
+                  </div>
+                  {/* Waitlist + Active side by side */}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}} className="me-info-grid">
+                    <div style={{background:T.bg,borderRadius:8,padding:10}}>
+                      <div style={{fontSize:".76rem",fontWeight:700,marginBottom:6}}>⏳ Waitlist ({waiting2.length})</div>
+                      {waiting2.length===0?<div style={{fontSize:".72rem",color:T.mute,fontStyle:"italic"}}>None</div>:waiting2.map(u=><div key={u.id} style={{display:"flex",gap:6,alignItems:"center",marginBottom:4}}>
+                        <span style={{fontSize:".74rem",flex:1,cursor:"pointer"}} onClick={()=>viewProfile(u.id)}>{u.name||"?"}</span>
+                        <button onClick={async()=>{await fbSet("users",u.id,{betaFeatures:[...(u.betaFeatures||[]),"advisor"],betaWaitlist:(u.betaWaitlist||[]).filter(f=>f!=="advisor")});sh("✓ Approved");loadData();}} style={{...T.btn,...T.btnSm,fontSize:".6rem",padding:"2px 6px"}}>✓</button>
+                        <button onClick={async()=>{await fbSet("users",u.id,{betaWaitlist:(u.betaWaitlist||[]).filter(f=>f!=="advisor")});sh("Removed");loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".6rem",padding:"2px 6px",color:T.mute}}>✕</button>
+                      </div>)}
+                    </div>
+                    <div style={{background:T.bg,borderRadius:8,padding:10}}>
+                      <div style={{fontSize:".76rem",fontWeight:700,marginBottom:6}}>🧠 Active ({active2.length})</div>
+                      {active2.length===0?<div style={{fontSize:".72rem",color:T.mute,fontStyle:"italic"}}>None yet</div>:active2.map(u=><div key={u.id} style={{display:"flex",gap:6,alignItems:"center",marginBottom:4}}>
+                        <span style={{fontSize:".74rem",flex:1,cursor:"pointer"}} onClick={()=>viewProfile(u.id)}>{u.name||"?"}</span>
+                        <button onClick={async()=>{if(!window.confirm("Revoke?"))return;await fbSet("users",u.id,{betaFeatures:(u.betaFeatures||[]).filter(f=>f!=="advisor")});sh("Revoked");loadData();}} style={{...T.btnDanger,...T.btnSm,fontSize:".6rem",padding:"2px 6px"}}>✕</button>
+                      </div>)}
+                    </div>
+                  </div>
+                </div>);
+              })()}
+            </div>
+
             {/* ═══ CERTIFICATE SETTINGS ═══ */}
             <div style={{...T.card,marginBottom:14,borderLeft:"3px solid "+T.gold}}>
               <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6}}>🏅 Certificate Settings</h4>
