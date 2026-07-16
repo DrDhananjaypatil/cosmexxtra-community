@@ -2551,6 +2551,8 @@ export default function App(){
   const[advisorViewChat,setAdvisorViewChat]=useState(null); // viewing a saved conversation
   const[advisorDailyCount,setAdvisorDailyCount]=useState(0);
   const[advisorDailyDate,setAdvisorDailyDate]=useState("");
+  const[competitors,setCompetitors]=useState(null); // {competitors:[], summary:{}}
+  const[competitorLoading,setCompetitorLoading]=useState(false);
   const[certConfig,setCertConfig]=useState({}); // {logoUrl, accreditations:[{name,logoUrl}], sponsorId, sponsorName, sponsorLogo, sponsorTagline}
   // Test timer — decrements every second while user is taking a test.
   // NOTE: Must live AFTER studyView/activeTest state declarations above,
@@ -4644,6 +4646,17 @@ ${forDownload
     // Account age
     if(prof.joined){const d=new Date(prof.joined);lines.push("Member since: "+d.toLocaleDateString("en-IN",{month:"long",year:"numeric"}));}
     lines.push("\nUse this context to give SPECIFIC advice. Reference their city, clinic name, services, and challenges by name. Don't give generic advice — make it personal.");
+    // Competitor data if available
+    if(competitors?.competitors?.length>0){
+      lines.push("\nLOCAL COMPETITION DATA (from Google Places, "+competitors.competitors.length+" clinics found within 15km):");
+      lines.push("Area average rating: "+competitors.summary.avgRating+"/5 ("+competitors.summary.avgReviews+" avg reviews)");
+      lines.push("Within 5km: "+competitors.summary.within5km+" clinics | Within 10km: "+competitors.summary.within10km);
+      lines.push("Top competitors:");
+      competitors.competitors.slice(0,8).forEach(c=>{
+        lines.push("- "+c.name+" ("+c.distanceKm+"km away, "+c.rating+"★, "+c.reviewCount+" reviews)");
+      });
+      lines.push("Use this competitive data to give specific positioning advice.");
+    }
     return lines.join("\n");
   };
 
@@ -6608,6 +6621,52 @@ ${forDownload
                 {advisorMsgs.length>=2&&<button onClick={saveToHistory} style={{...T.btnO,...T.btnSm,fontSize:".68rem"}}>💾 Save chat</button>}
                 <button onClick={()=>{loadHistory();setAdvisorViewChat(null);setAdvisorHistoryOpen(!advisorHistoryOpen)}} style={{...T.btnO,...T.btnSm,fontSize:".68rem"}}>📂 History</button>
               </div>
+            </div>
+
+            {/* Local Competition Scanner */}
+            <div style={{...T.card,padding:14,marginBottom:14}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+                <div>
+                  <div style={{fontSize:".88rem",fontWeight:700}}>📍 Local competition</div>
+                  <div style={{fontSize:".68rem",color:T.mute}}>{competitors?`${competitors.summary.totalFound} clinics found near ${prof?.city||"your area"}`:"Scan to discover competitors within 15km"}</div>
+                </div>
+                <button disabled={competitorLoading} onClick={async()=>{
+                  setCompetitorLoading(true);
+                  try{
+                    const city=prof?.city||"Pune";
+                    const r=await fetch("/api/competitors",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({city,radius:15000})});
+                    const data=await r.json();
+                    if(data.ok){setCompetitors(data);sh("✅ Found "+data.summary.totalFound+" nearby clinics");}
+                    else{sh("⚠ "+( data.error||"Scan failed"));}
+                  }catch(e){sh("Connection error")}
+                  setCompetitorLoading(false);
+                }} style={{...T.btn,...T.btnSm,fontSize:".74rem",opacity:competitorLoading?0.5:1}}>{competitorLoading?"Scanning...":"🔍 Scan my area"}</button>
+              </div>
+              {competitors&&<div style={{marginTop:12}}>
+                {/* Summary stats */}
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(90px,1fr))",gap:6,marginBottom:10}}>
+                  {[["Nearby",competitors.summary.totalFound],["Avg ★",competitors.summary.avgRating],["Avg reviews",competitors.summary.avgReviews],["Within 5km",competitors.summary.within5km],["Top rated",competitors.summary.topRated]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:8,background:T.bg,borderRadius:6}}>
+                    <div style={{fontSize:"1rem",fontWeight:700,color:T.teal}}>{v}</div>
+                    <div style={{fontSize:".56rem",color:T.mute,textTransform:"uppercase"}}>{l}</div>
+                  </div>)}
+                </div>
+                {/* Competitor list (top 6) */}
+                <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:180,overflowY:"auto"}}>
+                  {competitors.competitors.slice(0,6).map(c=><div key={c.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",background:T.bg,borderRadius:6,fontSize:".76rem"}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</div>
+                      <div style={{fontSize:".64rem",color:T.mute}}>{c.distanceKm}km · {c.address?.split(",").slice(0,2).join(",")}</div>
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontWeight:700,color:c.rating>=4.5?"#1a7d42":c.rating>=4?T.goldD:T.err}}>{c.rating}★</div>
+                      <div style={{fontSize:".6rem",color:T.mute}}>{c.reviewCount} rev</div>
+                    </div>
+                  </div>)}
+                </div>
+                {competitors.competitors.length>6&&<div style={{fontSize:".68rem",color:T.mute,textAlign:"center",marginTop:6}}>+{competitors.competitors.length-6} more · Ask the AI to analyze them</div>}
+                {/* Quick AI analysis prompt */}
+                <button onClick={()=>setAdvisorInput("Analyze my local competition. I can see "+competitors.summary.totalFound+" clinics nearby with avg "+competitors.summary.avgRating+"★ rating. The closest is "+competitors.competitors[0]?.name+" at "+competitors.competitors[0]?.distanceKm+"km with "+competitors.competitors[0]?.rating+"★. How should I position myself?")} style={{...T.btnO,...T.btnSm,width:"100%",marginTop:8,fontSize:".72rem"}}>🧠 Ask AI to analyze this competition</button>
+              </div>}
             </div>
 
             {/* Viewing a saved conversation */}
