@@ -6615,7 +6615,9 @@ ${forDownload
                 <div style={{fontSize:".88rem",fontWeight:700,color:T.goldD,marginBottom:6}}>📊 Daily limit reached ({ADVISOR_DAILY_MSG_LIMIT} messages)</div>
                 <p style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5,margin:"0 0 10px"}}>Your free tier includes {ADVISOR_DAILY_MSG_LIMIT} messages per day. Upgrade for more, or come back tomorrow!</p>
                 <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>{const subj=encodeURIComponent("AI Advisor — Upgrade Request");const body=encodeURIComponent("Hi SKINARIO team,\n\nI'd like to upgrade my AI Advisor plan. Please share the details.\n\nDoctor: "+uName+"\nEmail: "+(au?.email||"")+"\n\nThanks!");window.open("mailto:drjpatil@gmail.com?subject="+subj+"&body="+body)}} style={{...T.btn,fontSize:".78rem",padding:"8px 16px"}}>✉️ Contact admin to upgrade</button>
+                  <button onClick={async()=>{
+                    try{await fbAdd("adminMessages",{uid:au?.uid,name:uName,email:au?.email||"",subject:"AI Advisor — Upgrade Request",message:"I'd like to upgrade my AI Advisor plan. I've reached the daily limit of "+ADVISOR_DAILY_MSG_LIMIT+" messages and would like more access.",type:"advisor_upgrade",status:"pending",createdAt:Date.now()});sh("✅ Request sent! Admin will contact you soon.");}catch(e){sh("Failed to send")}
+                  }} style={{...T.btn,fontSize:".78rem",padding:"8px 16px"}}>📩 Request upgrade from admin</button>
                 </div>
               </div>}
 
@@ -6688,7 +6690,9 @@ ${forDownload
                   <span style={{fontSize:".82rem",fontWeight:700}}>{tier.price}</span>
                 </div>
                 <div style={{fontSize:".66rem",color:T.txt2,lineHeight:1.5}}>{tier.features.slice(0,3).join(" · ")}</div>
-                {tier.id!=="free"&&<button onClick={()=>{const subj=encodeURIComponent("AI Advisor — "+tier.label+" Plan Inquiry");const body=encodeURIComponent("Hi SKINARIO,\n\nI'm interested in the "+tier.label+" plan ("+tier.price+") for AI Advisor.\n\nDoctor: "+uName+"\nEmail: "+(au?.email||"")+"\n\nPlease share details.\n\nThanks!");window.open("mailto:drjpatil@gmail.com?subject="+subj+"&body="+body)}} style={{...T.btnO,...T.btnSm,fontSize:".66rem",marginTop:6,width:"100%",color:tier.id==="pro"?T.teal:T.goldD,borderColor:tier.id==="pro"?T.teal:T.goldD}}>Upgrade to {tier.label}</button>}
+                {tier.id!=="free"&&<button onClick={async()=>{
+                  try{await fbAdd("adminMessages",{uid:au?.uid,name:uName,email:au?.email||"",subject:"AI Advisor — "+tier.label+" Plan ("+tier.price+")",message:"I'm interested in upgrading to the "+tier.label+" plan ("+tier.price+") for AI Advisor. Please share details and payment options.",type:"advisor_upgrade",tier:tier.id,status:"pending",createdAt:Date.now()});sh("✅ Upgrade request sent!");}catch(e){sh("Failed")}
+                }} style={{...T.btnO,...T.btnSm,fontSize:".66rem",marginTop:6,width:"100%",color:tier.id==="pro"?T.teal:T.goldD,borderColor:tier.id==="pro"?T.teal:T.goldD}}>Upgrade to {tier.label}</button>}
               </div>)}
             </div>
 
