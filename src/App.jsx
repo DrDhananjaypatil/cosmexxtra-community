@@ -4613,6 +4613,40 @@ ${forDownload
     link.href=c.toDataURL("image/png");link.click();
   };
 
+  // Build personalized clinic context for AI Advisor — sent with every API call
+  const buildClinicContext=()=>{
+    if(!prof)return "";
+    const lines=["DOCTOR'S PROFILE (use this to personalize every answer):"];
+    if(prof.name)lines.push("Name: "+prof.name);
+    if(prof.city)lines.push("City: "+prof.city+(prof.state?" , "+prof.state:""));
+    if(prof.clinic)lines.push("Clinic: "+prof.clinic);
+    if(prof.specialization)lines.push("Specialization: "+prof.specialization);
+    if(prof.experience)lines.push("Experience: "+prof.experience+" years");
+    if(prof.qualification)lines.push("Qualification: "+prof.qualification);
+    // Clinic details (user-provided extras)
+    const cd=prof.clinicDetails||{};
+    if(cd.services)lines.push("Services offered: "+cd.services);
+    if(cd.equipment)lines.push("Equipment: "+cd.equipment);
+    if(cd.monthlyPatients)lines.push("Monthly patient volume: ~"+cd.monthlyPatients);
+    if(cd.avgTicket)lines.push("Average treatment ticket: ₹"+cd.avgTicket);
+    if(cd.teamSize)lines.push("Team size: "+cd.teamSize);
+    if(cd.topTreatments)lines.push("Top treatments: "+cd.topTreatments);
+    if(cd.challenges)lines.push("Current challenges: "+cd.challenges);
+    if(cd.goals)lines.push("Growth goals: "+cd.goals);
+    // Study stats (shows their knowledge areas)
+    const myAttempts=testAttempts.filter(a=>a.uid===au?.uid);
+    if(myAttempts.length>0){
+      const stats=computeStudyStats(myAttempts);
+      lines.push("Study performance: "+stats.totalTests+" tests taken, "+stats.avgAccuracy+"% avg accuracy");
+      if(stats.strongAreas.length>0)lines.push("Strong knowledge areas: "+stats.strongAreas.map(a=>a.area).join(", "));
+      if(stats.weakAreas.length>0)lines.push("Weak knowledge areas: "+stats.weakAreas.map(a=>a.area).join(", "));
+    }
+    // Account age
+    if(prof.joined){const d=new Date(prof.joined);lines.push("Member since: "+d.toLocaleDateString("en-IN",{month:"long",year:"numeric"}));}
+    lines.push("\nUse this context to give SPECIFIC advice. Reference their city, clinic name, services, and challenges by name. Don't give generic advice — make it personal.");
+    return lines.join("\n");
+  };
+
   const postCase=async()=>{
     if(!ccT.trim()){sh("Title required");return}
     if(caseBlocks.length===0){sh("Add at least one section (History, Before/After, etc.)");return}
@@ -6639,7 +6673,8 @@ ${forDownload
                   setAdvisorMsgs(newMsgs);setAdvisorInput("");setAdvisorLoading(true);
                   setAdvisorDailyCount(c=>c+1);
                   try{
-                    const r=await fetch("/api/advisor",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:newMsgs})});
+                    const clinicCtx=buildClinicContext();
+                    const r=await fetch("/api/advisor",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:newMsgs,clinicContext:clinicCtx})});
                     const data=await r.json();
                     if(data.ok&&data.reply){setAdvisorMsgs([...newMsgs,{role:"assistant",content:data.reply}]);}
                     else{setAdvisorMsgs([...newMsgs,{role:"assistant",content:"Sorry, I couldn't process that. Please try again."}]);}
@@ -6668,6 +6703,31 @@ ${forDownload
                 </div>)}
               </div>}
             </div>}
+
+            {/* My Clinic Profile — personalizes AI advice */}
+            <div style={{...T.card,borderLeft:"3px solid "+T.teal}}>
+              <h4 style={{fontSize:".88rem",fontWeight:700,margin:0,marginBottom:4}}>🏥 My clinic profile</h4>
+              <p style={{fontSize:".66rem",color:T.mute,margin:"0 0 10px"}}>Fill this once — the AI will use it to give you hyper-personalized advice for YOUR clinic.</p>
+              {[
+                {key:"services",label:"Services offered",ph:"e.g. Botox, Fillers, Chemical Peels, PRP, Laser hair removal"},
+                {key:"equipment",label:"Equipment I have",ph:"e.g. Q-Switch laser, Diode laser, RF machine, Hydrafacial"},
+                {key:"monthlyPatients",label:"Monthly patients",ph:"e.g. 80-100"},
+                {key:"avgTicket",label:"Avg treatment ticket (₹)",ph:"e.g. 5000"},
+                {key:"teamSize",label:"Team size",ph:"e.g. 2 doctors, 3 nurses, 1 receptionist"},
+                {key:"topTreatments",label:"Top revenue treatments",ph:"e.g. Botox (40%), Fillers (25%), Peels (20%)"},
+                {key:"challenges",label:"Current challenges",ph:"e.g. Low conversion from consultations, high competition nearby"},
+                {key:"goals",label:"Growth goals",ph:"e.g. Double revenue in 6 months, add laser services"},
+              ].map(f=><div key={f.key} style={{marginBottom:6}}>
+                <label style={{fontSize:".64rem",color:T.mute,fontWeight:600}}>{f.label}</label>
+                <input value={(prof?.clinicDetails||{})[f.key]||""} onChange={e=>{
+                  const cd={...(prof?.clinicDetails||{}),[f.key]:e.target.value};
+                  setProf(p=>({...p,clinicDetails:cd}));
+                }} placeholder={f.ph} style={{...T.inp,fontSize:".74rem",padding:"5px 8px"}}/>
+              </div>)}
+              <button onClick={async()=>{
+                try{await fbSet("users",prof.id,{clinicDetails:prof.clinicDetails||{}});sh("✅ Clinic profile saved — AI will now personalize answers!");}catch(e){sh("Failed")}
+              }} style={{...T.btn,...T.btnSm,width:"100%",fontSize:".74rem",marginTop:4}}>Save clinic profile</button>
+            </div>
 
             {/* Quick prompts */}
             <div style={{...T.card}}>

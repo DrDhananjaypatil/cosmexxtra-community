@@ -45,7 +45,7 @@ export default async function handler(req, res) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return res.status(500).json({ ok: false, error: "GEMINI_API_KEY not configured" });
 
-    const { messages } = req.body || {};
+    const { messages, clinicContext } = req.body || {};
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ ok: false, error: "messages array required" });
     }
@@ -53,10 +53,11 @@ export default async function handler(req, res) {
     // Convert chat history to Gemini format
     const geminiContents = [];
     
-    // Add system instruction as first user message context
+    // Add system instruction + clinic context as first user message
+    const fullSystemPrompt = SYSTEM_PROMPT + (clinicContext ? "\n\n" + clinicContext : "");
     geminiContents.push({
       role: "user",
-      parts: [{ text: SYSTEM_PROMPT + "\n\nThe doctor's first message follows:" }],
+      parts: [{ text: fullSystemPrompt + "\n\nThe doctor's first message follows:" }],
     });
     geminiContents.push({
       role: "model",
