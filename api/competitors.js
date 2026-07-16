@@ -24,6 +24,18 @@ export default async function handler(req, res) {
       if (geoData.results?.[0]) {
         searchLat = geoData.results[0].geometry.location.lat;
         searchLng = geoData.results[0].geometry.location.lng;
+      } else {
+        // Return the actual Google error so we can debug
+        return res.status(400).json({ 
+          ok: false, 
+          error: geoData.status === "REQUEST_DENIED" 
+            ? "Google API denied — enable Geocoding API in Google Cloud Console for this key"
+            : geoData.status === "ZERO_RESULTS"
+            ? "City not found: '" + city + "'. Try a larger city name (e.g. 'Pune' instead of 'Bhosari')"
+            : "Geocoding failed: " + (geoData.status || "unknown") + " — " + (geoData.error_message || ""),
+          googleStatus: geoData.status,
+          googleError: geoData.error_message,
+        });
       }
     }
 
