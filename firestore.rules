@@ -143,6 +143,13 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // ── advisorChats — saved AI Advisor conversations per user ──────
+    match /advisorChats/{chatId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
     // ── sponsorPlacements — vendor requests; admin approves/activates ──────
     match /sponsorPlacements/{placementId} {
       allow read: if isSignedIn();

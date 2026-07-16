@@ -254,7 +254,15 @@ const TEST_TOPICS=[
 const TEST_DIFFICULTIES=["Easy","Moderate","Hard"];
 const TEST_DURATION_SECONDS=600; // 10 minutes
 const TEST_QUESTION_COUNT=15;
-const BETA_STUDY_CAP_DEFAULT=25; // Default cap on first-ever load; admin can change from Beta Settings tab.
+const BETA_STUDY_CAP_DEFAULT=25;
+// AI Advisor limits
+const ADVISOR_DAILY_MSG_LIMIT=10; // free tier: messages per day
+const ADVISOR_CONV_LENGTH_LIMIT=15; // max messages per conversation before forced new chat
+const ADVISOR_PREMIUM_TIERS=[
+  {id:"free",label:"Free",price:"₹0",daily:10,convLen:15,history:3,features:["Basic clinic growth advice","10 messages/day","15 messages per conversation","3 saved conversations"]},
+  {id:"pro",label:"Pro",price:"₹499/mo",daily:50,convLen:50,history:25,features:["Advanced strategy & analytics","50 messages/day","50 messages per conversation","25 saved conversations","Priority AI responses","Market intelligence reports"]},
+  {id:"clinic",label:"Clinic+",price:"₹1,499/mo",daily:200,convLen:100,history:100,features:["Unlimited strategy sessions","200 messages/day","100 messages per conversation","Unlimited history","Dedicated clinic growth plan","Monthly strategy review","Competition dashboard"]},
+]; // Default cap on first-ever load; admin can change from Beta Settings tab.
 // Difficulty-specific theming — used across intro, taking, and result views
 const DIFF_THEME={
   Easy:{color:"#1a7d42",bg:"#e8f5e9",bgLight:"linear-gradient(135deg,#e8f5e9,#f0faf3)",border:"#4caf50",label:"🟢"},
@@ -2537,7 +2545,11 @@ export default function App(){
   const[expandedAttempt,setExpandedAttempt]=useState(null);
   const[advisorMsgs,setAdvisorMsgs]=useState([]); // [{role:"user"|"assistant",content:"..."}]
   const[advisorInput,setAdvisorInput]=useState("");
-  const[advisorLoading,setAdvisorLoading]=useState(false); // which test attempt is expanded for question review
+  const[advisorLoading,setAdvisorLoading]=useState(false);
+  const[advisorHistory,setAdvisorHistory]=useState([]); // saved past conversations
+  const[advisorViewChat,setAdvisorViewChat]=useState(null); // viewing a saved conversation
+  const[advisorDailyCount,setAdvisorDailyCount]=useState(0);
+  const[advisorDailyDate,setAdvisorDailyDate]=useState("");
   const[certConfig,setCertConfig]=useState({}); // {logoUrl, accreditations:[{name,logoUrl}], sponsorId, sponsorName, sponsorLogo, sponsorTagline}
   // Test timer — decrements every second while user is taking a test.
   // NOTE: Must live AFTER studyView/activeTest state declarations above,
@@ -6064,7 +6076,19 @@ ${forDownload
             return db-da;
           }).slice(0,4);
           if(eligible.length<2)return null;
-          return(<div style={{...T.card,padding:18,marginBottom:14}}>
+          return(<div>
+          {/* AI Advisor promo banner */}
+          <div onClick={()=>go("advisor")} style={{...T.card,padding:0,marginBottom:14,overflow:"hidden",cursor:"pointer",background:"linear-gradient(135deg,#0d6b6e,#0a5c5f)",color:"#fff",borderRadius:14,transition:"transform .15s"}} onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"} onMouseLeave={e=>e.currentTarget.style.transform=""}>
+            <div style={{padding:"20px 22px",display:"flex",alignItems:"center",gap:14}}>
+              <div style={{width:52,height:52,borderRadius:12,background:"rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.6rem",flexShrink:0}}>🧠</div>
+              <div style={{flex:1}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3,flexWrap:"wrap"}}><span style={{fontSize:"1.05rem",fontWeight:700}}>AI Clinic Growth Advisor</span><span style={{fontSize:".48rem",fontWeight:700,background:"rgba(200,168,78,0.9)",color:"#fff",padding:"2px 7px",borderRadius:4,letterSpacing:.8}}>AI POWERED</span><span style={{fontSize:".48rem",fontWeight:700,background:"rgba(255,255,255,0.2)",padding:"2px 7px",borderRadius:4,letterSpacing:.6}}>BETA</span></div>
+                <div style={{fontSize:".8rem",opacity:0.9,lineHeight:1.5}}>Pricing strategy, marketing plans, growth advice — tailored for Indian aesthetic practice.</div>
+              </div>
+              <div style={{fontSize:"1.3rem",opacity:0.5,flexShrink:0}}>→</div>
+            </div>
+          </div>
+          <div style={{...T.card,padding:18,marginBottom:14}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
               <h3 id="featured-articles" style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>📰 Featured Articles</h3>
               <span onClick={()=>go("articles")} style={{fontSize:".78rem",color:T.teal,fontWeight:600,cursor:"pointer"}}>Explore all →</span>
@@ -6348,6 +6372,8 @@ ${forDownload
         {articles.length>articleLimit&&<div style={{textAlign:"center",marginTop:18}}>
           <button onClick={()=>setArticleLimit(p=>p+6)} style={{...T.btnO,padding:"11px 28px"}}>Load more articles ({articles.length-articleLimit} remaining) ↓</button>
         </div>}
+        </div>);
+        })()}
         </div>{/* END MAIN COLUMN */}
 
         {/* ═══ RIGHT SIDEBAR ═══ */}
@@ -6500,9 +6526,32 @@ ${forDownload
       })()}
 
       {/* ═══ AI ADVISOR — FULL PAGE (beta users only) ═══ */}
-      {pg==="advisor"&&hasBetaAccess("advisor")&&<div style={{maxWidth:1100}}>
+      {pg==="advisor"&&hasBetaAccess("advisor")&&(()=>{
+        const today_=todayIST_YMD();
+        // Reset daily counter if new day
+        if(advisorDailyDate!==today_){setAdvisorDailyCount(0);setAdvisorDailyDate(today_);}
+        const dailyLeft=ADVISOR_DAILY_MSG_LIMIT-advisorDailyCount;
+        const convLeft=ADVISOR_CONV_LENGTH_LIMIT-advisorMsgs.filter(m=>m.role==="user").length;
+        const atDailyLimit=dailyLeft<=0;
+        const atConvLimit=convLeft<=0;
+
+        // Load chat history on first visit
+        const loadHistory=async()=>{
+          try{const h=await fbGetAll("advisorChats","createdAt","desc",20);
+          setAdvisorHistory(h.filter(c=>c.uid===au?.uid));}catch(e){}
+        };
+
+        // Save current conversation to history
+        const saveToHistory=async()=>{
+          if(advisorMsgs.length<2)return;
+          const title=advisorMsgs[0]?.content?.slice(0,60)||"Conversation";
+          try{await fbAdd("advisorChats",{uid:au?.uid,title,messages:advisorMsgs,messageCount:advisorMsgs.length,createdAt:Date.now()});
+          sh("💾 Conversation saved");loadHistory();}catch(e){sh("Failed to save");}
+        };
+
+        return(<div style={{maxWidth:1100}}>
         <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 320px",gap:18,alignItems:"start"}} className="me-grid">
-          {/* LEFT — Chat interface */}
+          {/* LEFT — Chat */}
           <div style={{minWidth:0}}>
             {/* Header */}
             <div style={{...T.card,padding:"20px 22px",marginBottom:14,background:"linear-gradient(135deg,#0d6b6e,#0a5c5f)",color:"#fff",borderRadius:14}}>
@@ -6513,16 +6562,40 @@ ${forDownload
                   <div style={{fontSize:".78rem",opacity:0.8}}>Powered by AI · Tailored for Indian aesthetic medicine</div>
                 </div>
               </div>
-              <p style={{fontSize:".84rem",lineHeight:1.55,margin:0,opacity:0.9}}>Ask me anything about growing your aesthetic practice — pricing strategy, marketing, adding treatments, competing locally, or scaling your clinic.</p>
+              <p style={{fontSize:".84rem",lineHeight:1.55,margin:0,opacity:0.9}}>Ask me anything about growing your aesthetic practice — pricing, marketing, treatment planning, competition, or scaling your clinic.</p>
             </div>
 
-            {/* Chat messages */}
-            <div style={{...T.card,padding:0,marginBottom:14,minHeight:400,display:"flex",flexDirection:"column"}}>
-              <div style={{flex:1,padding:"16px 18px",overflowY:"auto",maxHeight:"55vh"}}>
+            {/* Usage bar */}
+            <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+              <div style={{fontSize:".72rem",color:atDailyLimit?T.err:T.mute,fontWeight:600}}>📊 {advisorDailyCount}/{ADVISOR_DAILY_MSG_LIMIT} messages today</div>
+              <div style={{fontSize:".72rem",color:atConvLimit?T.err:T.mute}}>💬 {advisorMsgs.filter(m=>m.role==="user").length}/{ADVISOR_CONV_LENGTH_LIMIT} in this chat</div>
+              <div style={{marginLeft:"auto",display:"flex",gap:6}}>
+                {advisorMsgs.length>=2&&<button onClick={saveToHistory} style={{...T.btnO,...T.btnSm,fontSize:".68rem"}}>💾 Save chat</button>}
+                <button onClick={()=>{loadHistory();setAdvisorViewChat(null);setAdvisorHistoryOpen(!advisorHistoryOpen)}} style={{...T.btnO,...T.btnSm,fontSize:".68rem"}}>📂 History</button>
+              </div>
+            </div>
+
+            {/* Viewing a saved conversation */}
+            {advisorViewChat&&<div style={{...T.card,marginBottom:14}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                <div><div style={{fontSize:".88rem",fontWeight:600}}>{advisorViewChat.title}</div><div style={{fontSize:".66rem",color:T.mute}}>{fD(tsToDateStr(advisorViewChat.createdAt))} · {advisorViewChat.messageCount} messages</div></div>
+                <button onClick={()=>setAdvisorViewChat(null)} style={{...T.btnO,...T.btnSm,fontSize:".68rem"}}>← Back to chat</button>
+              </div>
+              {(advisorViewChat.messages||[]).map((msg,i)=><div key={i} style={{display:"flex",gap:10,marginBottom:10,flexDirection:msg.role==="user"?"row-reverse":"row"}}>
+                <div style={{width:30,height:30,borderRadius:"50%",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:".8rem",...(msg.role==="user"?{background:T.tealBg,color:T.teal}:{background:"#0d6b6e",color:"#fff"})}}>{msg.role==="user"?"👤":"🧠"}</div>
+                <div style={{maxWidth:"80%",padding:"10px 14px",borderRadius:12,background:msg.role==="user"?T.tealBg:"#fff",border:"1px solid "+(msg.role==="user"?T.teal+"33":T.border),fontSize:".84rem",lineHeight:1.6}}>
+                  <MarkdownView text={msg.content}/>
+                </div>
+              </div>)}
+            </div>}
+
+            {/* Active chat (hidden when viewing history) */}
+            {!advisorViewChat&&<div style={{...T.card,padding:0,marginBottom:14,minHeight:380,display:"flex",flexDirection:"column"}}>
+              <div data-advisor-scroll style={{flex:1,padding:"16px 18px",overflowY:"auto",maxHeight:"55vh"}}>
                 {advisorMsgs.length===0&&<div style={{textAlign:"center",padding:"40px 20px",color:T.mute}}>
                   <div style={{fontSize:"2.5rem",marginBottom:12}}>💬</div>
                   <div style={{fontSize:".92rem",fontWeight:600,color:T.txt,marginBottom:6}}>Start a conversation</div>
-                  <div style={{fontSize:".82rem",lineHeight:1.5}}>Ask about pricing, marketing, treatment planning, competition, or any business challenge you're facing in your clinic.</div>
+                  <div style={{fontSize:".82rem",lineHeight:1.5}}>Ask about pricing, marketing, treatment planning, competition, or any business challenge.</div>
                 </div>}
                 {advisorMsgs.map((msg,i)=><div key={i} style={{display:"flex",gap:10,marginBottom:14,flexDirection:msg.role==="user"?"row-reverse":"row"}}>
                   <div style={{width:34,height:34,borderRadius:"50%",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:".9rem",...(msg.role==="user"?{background:T.tealBg,color:T.teal}:{background:"linear-gradient(135deg,#0d6b6e,#0a5c5f)",color:"#fff"})}}>{msg.role==="user"?"👤":"🧠"}</div>
@@ -6531,87 +6604,101 @@ ${forDownload
                   </div>
                 </div>)}
                 {advisorLoading&&<div style={{display:"flex",gap:10,marginBottom:14}}>
-                  <div style={{width:34,height:34,borderRadius:"50%",flexShrink:0,background:"linear-gradient(135deg,#0d6b6e,#0a5c5f)",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:".9rem"}}>🧠</div>
-                  <div style={{padding:"12px 16px",background:"#fff",border:"1px solid "+T.border,borderRadius:"14px 14px 14px 4px",fontSize:".88rem",color:T.mute}}>
-                    <span style={{display:"inline-block",animation:"pulse 1.5s infinite"}}>Thinking</span>
-                    <span style={{display:"inline-block",animation:"pulse 1.5s infinite",animationDelay:".2s"}}>.</span>
-                    <span style={{display:"inline-block",animation:"pulse 1.5s infinite",animationDelay:".4s"}}>.</span>
-                    <span style={{display:"inline-block",animation:"pulse 1.5s infinite",animationDelay:".6s"}}>.</span>
-                  </div>
+                  <div style={{width:34,height:34,borderRadius:"50%",flexShrink:0,background:"#0d6b6e",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:".9rem"}}>🧠</div>
+                  <div style={{padding:"12px 16px",background:"#fff",border:"1px solid "+T.border,borderRadius:"14px 14px 14px 4px",fontSize:".88rem",color:T.mute}}>Thinking...</div>
                 </div>}
               </div>
 
-              {/* Input area */}
-              <div style={{padding:"12px 16px",borderTop:"1px solid "+T.border,display:"flex",gap:8,alignItems:"flex-end"}}>
+              {/* Daily limit reached */}
+              {atDailyLimit&&<div style={{padding:"16px 20px",borderTop:"1px solid "+T.border,background:"linear-gradient(135deg,#fef3cd,#fff8e1)"}}>
+                <div style={{fontSize:".88rem",fontWeight:700,color:T.goldD,marginBottom:6}}>📊 Daily limit reached ({ADVISOR_DAILY_MSG_LIMIT} messages)</div>
+                <p style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5,margin:"0 0 10px"}}>Your free tier includes {ADVISOR_DAILY_MSG_LIMIT} messages per day. Upgrade for more, or come back tomorrow!</p>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>{const subj=encodeURIComponent("AI Advisor — Upgrade Request");const body=encodeURIComponent("Hi SKINARIO team,\n\nI'd like to upgrade my AI Advisor plan. Please share the details.\n\nDoctor: "+uName+"\nEmail: "+(au?.email||"")+"\n\nThanks!");window.open("mailto:drjpatil@gmail.com?subject="+subj+"&body="+body)}} style={{...T.btn,fontSize:".78rem",padding:"8px 16px"}}>✉️ Contact admin to upgrade</button>
+                </div>
+              </div>}
+
+              {/* Conversation limit reached */}
+              {!atDailyLimit&&atConvLimit&&<div style={{padding:"16px 20px",borderTop:"1px solid "+T.border,background:"linear-gradient(135deg,#e8f5e9,#f0faf3)"}}>
+                <div style={{fontSize:".88rem",fontWeight:700,color:T.teal,marginBottom:6}}>💬 Conversation length limit ({ADVISOR_CONV_LENGTH_LIMIT} messages)</div>
+                <p style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5,margin:"0 0 10px"}}>Save this conversation and start a new one to continue chatting.</p>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={async()=>{await saveToHistory();setAdvisorMsgs([]);}} style={{...T.btn,fontSize:".78rem",padding:"8px 16px"}}>💾 Save & start new</button>
+                </div>
+              </div>}
+
+              {/* Input area (hidden when at limits) */}
+              {!atDailyLimit&&!atConvLimit&&<div style={{padding:"12px 16px",borderTop:"1px solid "+T.border,display:"flex",gap:8,alignItems:"flex-end"}}>
                 <textarea value={advisorInput} onChange={e=>setAdvisorInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();document.getElementById("advisor-send")?.click();}}} placeholder="Ask about pricing, marketing, growth strategy..." rows={2} style={{...T.txa,flex:1,resize:"none",fontSize:".88rem"}}/>
                 <button id="advisor-send" disabled={!advisorInput.trim()||advisorLoading} onClick={async()=>{
                   const text=advisorInput.trim();if(!text)return;
                   const newMsgs=[...advisorMsgs,{role:"user",content:text}];
                   setAdvisorMsgs(newMsgs);setAdvisorInput("");setAdvisorLoading(true);
+                  setAdvisorDailyCount(c=>c+1);
                   try{
                     const r=await fetch("/api/advisor",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:newMsgs})});
                     const data=await r.json();
                     if(data.ok&&data.reply){setAdvisorMsgs([...newMsgs,{role:"assistant",content:data.reply}]);}
-                    else{setAdvisorMsgs([...newMsgs,{role:"assistant",content:"Sorry, I couldn't process that. Please try again or rephrase your question."}]);}
+                    else{setAdvisorMsgs([...newMsgs,{role:"assistant",content:"Sorry, I couldn't process that. Please try again."}]);}
                   }catch(err){setAdvisorMsgs([...newMsgs,{role:"assistant",content:"Connection error — please check your internet and try again."}]);}
                   setAdvisorLoading(false);
                   setTimeout(()=>{const el=document.querySelector("[data-advisor-scroll]");if(el)el.scrollTop=el.scrollHeight;},100);
                 }} style={{...T.btn,padding:"10px 18px",fontSize:".88rem",opacity:(!advisorInput.trim()||advisorLoading)?0.5:1,flexShrink:0}}>Send</button>
-              </div>
-            </div>
+              </div>}
+            </div>}
 
-            {advisorMsgs.length>0&&<button onClick={()=>{if(window.confirm("Clear this conversation and start fresh?"))setAdvisorMsgs([])}} style={{...T.btnO,...T.btnSm,fontSize:".72rem"}}>🗑️ Clear conversation</button>}
+            {advisorMsgs.length>0&&!advisorViewChat&&<div style={{display:"flex",gap:8}}>
+              <button onClick={async()=>{if(advisorMsgs.length>=2)await saveToHistory();setAdvisorMsgs([])}} style={{...T.btnO,...T.btnSm,fontSize:".72rem"}}>{advisorMsgs.length>=2?"💾 Save & clear":"🗑️ Clear"}</button>
+            </div>}
           </div>
 
-          {/* RIGHT SIDEBAR — Quick prompts + tips */}
+          {/* RIGHT SIDEBAR */}
           <div style={{minWidth:0,display:"flex",flexDirection:"column",gap:14}}>
-            {/* Quick-start prompts */}
+            {/* Chat history */}
+            {advisorHistoryOpen&&<div style={{...T.card}}>
+              <h4 style={{fontSize:".88rem",fontWeight:700,margin:0,marginBottom:10}}>📂 Saved conversations</h4>
+              {advisorHistory.length===0?<div style={{fontSize:".78rem",color:T.mute,fontStyle:"italic"}}>No saved conversations yet. Click "Save chat" to keep a conversation for later.</div>
+              :<div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {advisorHistory.slice(0,10).map(ch=><div key={ch.id} onClick={()=>setAdvisorViewChat(ch)} style={{padding:"8px 10px",background:T.bg,borderRadius:8,cursor:"pointer",transition:"all .1s",borderLeft:"3px solid "+T.teal}} onMouseEnter={e=>e.currentTarget.style.background=T.tealBg} onMouseLeave={e=>e.currentTarget.style.background=T.bg}>
+                  <div style={{fontSize:".78rem",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ch.title}</div>
+                  <div style={{fontSize:".64rem",color:T.mute}}>{fD(tsToDateStr(ch.createdAt))} · {ch.messageCount} msgs</div>
+                </div>)}
+              </div>}
+            </div>}
+
+            {/* Quick prompts */}
             <div style={{...T.card}}>
               <h4 style={{fontSize:".88rem",fontWeight:700,margin:0,marginBottom:10}}>⚡ Quick prompts</h4>
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                {[
-                  ["💰","How should I price Botox in a Tier 2 city?"],
-                  ["📱","Create an Instagram content plan for my clinic"],
-                  ["📈","I want to add laser services — what's the ROI?"],
-                  ["🏥","How do I increase my consultation-to-treatment conversion?"],
-                  ["🎯","Marketing strategy for a new aesthetic clinic"],
-                  ["💊","Which filler brand gives the best margin in India?"],
-                  ["👥","How to hire and train my first aesthetic nurse?"],
-                  ["⭐","How to get more Google reviews for my clinic?"],
-                  ["📊","Help me plan revenue targets for next quarter"],
-                  ["🔍","How to differentiate from 5 competing clinics nearby?"],
-                ].map(([ic,prompt])=><button key={prompt} onClick={()=>{setAdvisorInput(prompt);}} style={{textAlign:"left",padding:"8px 12px",background:T.bg,border:"1px solid "+T.border,borderRadius:8,cursor:"pointer",fontSize:".78rem",color:T.txt2,fontFamily:"inherit",display:"flex",gap:8,alignItems:"center",transition:"all .1s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.background=T.tealBg;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background=T.bg;}}>
+                {[["💰","How should I price Botox in a Tier 2 city?"],["📱","Create an Instagram content plan for my clinic"],["📈","I want to add laser services — what's the ROI?"],["🏥","How do I increase my consultation-to-treatment conversion?"],["🎯","Marketing strategy for a new aesthetic clinic"],["⭐","How to get more Google reviews for my clinic?"],["📊","Help me plan revenue targets for next quarter"],["🔍","How to differentiate from 5 competing clinics nearby?"]].map(([ic,prompt])=><button key={prompt} onClick={()=>{if(!atDailyLimit&&!atConvLimit)setAdvisorInput(prompt);}} style={{textAlign:"left",padding:"8px 12px",background:T.bg,border:"1px solid "+T.border,borderRadius:8,cursor:atDailyLimit?"not-allowed":"pointer",fontSize:".78rem",color:T.txt2,fontFamily:"inherit",display:"flex",gap:8,alignItems:"center",opacity:atDailyLimit?0.5:1}} onMouseEnter={e=>{if(!atDailyLimit){e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.background=T.tealBg;}}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background=T.bg;}}>
                   <span style={{fontSize:"1rem",flexShrink:0}}>{ic}</span>
                   <span style={{lineHeight:1.4}}>{prompt}</span>
                 </button>)}
               </div>
             </div>
 
-            {/* What it can help with */}
-            <div style={{...T.card}}>
-              <h4 style={{fontSize:".88rem",fontWeight:700,margin:0,marginBottom:10}}>🎯 What I can help with</h4>
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {[
-                  ["Pricing strategy","Get city-tier-specific pricing benchmarks for any treatment"],
-                  ["Marketing plans","Instagram content, Google Ads, referral programs tailored to aesthetic clinics"],
-                  ["Treatment expansion","Which services to add next based on your equipment and market"],
-                  ["Competition analysis","How to position against local competitors"],
-                  ["Patient conversion","Turn more consultations into booked treatments"],
-                  ["Revenue planning","Monthly targets, treatment mix optimization, cost analysis"],
-                ].map(([title,desc])=><div key={title} style={{padding:"8px 10px",background:T.bg,borderRadius:8}}>
-                  <div style={{fontSize:".78rem",fontWeight:600,color:T.teal}}>{title}</div>
-                  <div style={{fontSize:".7rem",color:T.mute,lineHeight:1.4}}>{desc}</div>
-                </div>)}
-              </div>
+            {/* Premium plans */}
+            <div style={{...T.card,background:"linear-gradient(135deg,#0d6b6e08,#c8a84e08)",border:"1.5px solid "+T.gold}}>
+              <h4 style={{fontSize:".88rem",fontWeight:700,margin:0,marginBottom:4}}>💎 Advisor plans</h4>
+              <p style={{fontSize:".68rem",color:T.mute,margin:"0 0 10px"}}>Get more from your AI advisor</p>
+              {ADVISOR_PREMIUM_TIERS.map(tier=><div key={tier.id} style={{padding:10,background:tier.id==="free"?"transparent":"#fff",borderRadius:8,marginBottom:6,border:tier.id==="pro"?"1.5px solid "+T.teal:tier.id==="clinic"?"1.5px solid "+T.gold:"1px solid "+T.border}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                  <span style={{fontSize:".82rem",fontWeight:700,color:tier.id==="free"?T.mute:tier.id==="pro"?T.teal:T.goldD}}>{tier.label}</span>
+                  <span style={{fontSize:".82rem",fontWeight:700}}>{tier.price}</span>
+                </div>
+                <div style={{fontSize:".66rem",color:T.txt2,lineHeight:1.5}}>{tier.features.slice(0,3).join(" · ")}</div>
+                {tier.id!=="free"&&<button onClick={()=>{const subj=encodeURIComponent("AI Advisor — "+tier.label+" Plan Inquiry");const body=encodeURIComponent("Hi SKINARIO,\n\nI'm interested in the "+tier.label+" plan ("+tier.price+") for AI Advisor.\n\nDoctor: "+uName+"\nEmail: "+(au?.email||"")+"\n\nPlease share details.\n\nThanks!");window.open("mailto:drjpatil@gmail.com?subject="+subj+"&body="+body)}} style={{...T.btnO,...T.btnSm,fontSize:".66rem",marginTop:6,width:"100%",color:tier.id==="pro"?T.teal:T.goldD,borderColor:tier.id==="pro"?T.teal:T.goldD}}>Upgrade to {tier.label}</button>}
+              </div>)}
             </div>
 
             {/* Disclaimer */}
             <div style={{padding:12,background:T.bg,borderRadius:8,fontSize:".68rem",color:T.mute,lineHeight:1.5,textAlign:"center"}}>
-              💡 AI advice is directional, not definitive. Consult your CA for tax/legal questions. Pricing suggestions are market estimates — always validate locally.
+              💡 AI advice is directional, not definitive. Consult your CA for tax/legal questions.
             </div>
           </div>
         </div>
-      </div>}
+      </div>);
+      })()}
 
       {/* ═══ ARTICLES PAGE ═══ */}
       {pg==="articles"&&!selA&&<div style={{maxWidth:1100}}>
