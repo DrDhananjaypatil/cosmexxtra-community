@@ -2547,6 +2547,7 @@ export default function App(){
   const[advisorInput,setAdvisorInput]=useState("");
   const[advisorLoading,setAdvisorLoading]=useState(false);
   const[advisorHistory,setAdvisorHistory]=useState([]); // saved past conversations
+  const[advisorHistoryOpen,setAdvisorHistoryOpen]=useState(false);
   const[advisorViewChat,setAdvisorViewChat]=useState(null); // viewing a saved conversation
   const[advisorDailyCount,setAdvisorDailyCount]=useState(0);
   const[advisorDailyDate,setAdvisorDailyDate]=useState("");
