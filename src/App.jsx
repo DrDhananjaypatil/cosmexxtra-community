@@ -6626,22 +6626,23 @@ ${forDownload
             {/* Local Competition Scanner */}
             <div style={{...T.card,padding:14,marginBottom:14}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-                <div>
+                <div style={{flex:1}}>
                   <div style={{fontSize:".88rem",fontWeight:700}}>📍 Local competition</div>
-                  <div style={{fontSize:".68rem",color:T.mute}}>{competitors?`${competitors.summary.totalFound} clinics found near ${prof?.city||"your area"}`:"Scan to discover competitors within 15km"}</div>
+                  <div style={{fontSize:".68rem",color:T.mute}}>{competitors?`${competitors.summary.totalFound} clinics found`:"Scan to discover competitors within 15km"}</div>
                 </div>
+                <input id="scan-city-input" defaultValue={prof?.clinicDetails?.city||prof?.city||""} placeholder="Your city (e.g. Pune)" style={{...T.inp,width:140,fontSize:".78rem",padding:"5px 8px"}}/>
                 <button disabled={competitorLoading} onClick={async()=>{
                   setCompetitorLoading(true);
+                  const cityInput=document.getElementById("scan-city-input")?.value?.trim();
+                  if(!cityInput){sh("Type your city name first");setCompetitorLoading(false);return;}
                   try{
-                    const city=prof?.clinicDetails?.city||prof?.city||prof?.location||(prof?.clinic?prof.clinic+", India":"")||prompt("Enter your city name:")||"";
-                    if(!city){sh("Please enter your city");setCompetitorLoading(false);return;}
-                    const r=await fetch("/api/competitors",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({city,radius:15000})});
+                    const r=await fetch("/api/competitors",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({city:cityInput,radius:15000})});
                     const data=await r.json();
-                    if(data.ok){setCompetitors(data);sh("✅ Found "+data.summary.totalFound+" nearby clinics");}
-                    else{sh("⚠ "+( data.error||"Scan failed"));}
+                    if(data.ok){setCompetitors(data);sh("✅ Found "+data.summary.totalFound+" clinics near "+cityInput);}
+                    else{sh("⚠ "+(data.error||"Scan failed — check GOOGLE_PLACES_API_KEY in Vercel env"));}
                   }catch(e){sh("Connection error")}
                   setCompetitorLoading(false);
-                }} style={{...T.btn,...T.btnSm,fontSize:".74rem",opacity:competitorLoading?0.5:1}}>{competitorLoading?"Scanning...":"🔍 Scan my area"}</button>
+                }} style={{...T.btn,...T.btnSm,fontSize:".74rem",opacity:competitorLoading?0.5:1}}>{competitorLoading?"Scanning...":"🔍 Scan"}</button>
               </div>
               {competitors&&<div style={{marginTop:12}}>
                 {/* Summary stats */}
