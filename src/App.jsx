@@ -6633,7 +6633,8 @@ ${forDownload
                 <button disabled={competitorLoading} onClick={async()=>{
                   setCompetitorLoading(true);
                   try{
-                    const city=prof?.city||"Pune";
+                    const city=prof?.clinicDetails?.city||prof?.city||prof?.location||(prof?.clinic?prof.clinic+", India":"")||prompt("Enter your city name:")||"";
+                    if(!city){sh("Please enter your city");setCompetitorLoading(false);return;}
                     const r=await fetch("/api/competitors",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({city,radius:15000})});
                     const data=await r.json();
                     if(data.ok){setCompetitors(data);sh("✅ Found "+data.summary.totalFound+" nearby clinics");}
@@ -6768,6 +6769,7 @@ ${forDownload
               <h4 style={{fontSize:".88rem",fontWeight:700,margin:0,marginBottom:4}}>🏥 My clinic profile</h4>
               <p style={{fontSize:".66rem",color:T.mute,margin:"0 0 10px"}}>Fill this once — the AI will use it to give you hyper-personalized advice for YOUR clinic.</p>
               {[
+                {key:"city",label:"Clinic city",ph:"e.g. Pune, Nashik, Mumbai"},
                 {key:"services",label:"Services offered",ph:"e.g. Botox, Fillers, Chemical Peels, PRP, Laser hair removal"},
                 {key:"equipment",label:"Equipment I have",ph:"e.g. Q-Switch laser, Diode laser, RF machine, Hydrafacial"},
                 {key:"monthlyPatients",label:"Monthly patients",ph:"e.g. 80-100"},
