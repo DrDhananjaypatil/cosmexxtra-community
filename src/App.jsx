@@ -262,7 +262,13 @@ const ADVISOR_PREMIUM_TIERS=[
   {id:"free",label:"Free",price:"₹0",daily:10,convLen:15,history:3,features:["Basic clinic growth advice","10 messages/day","15 messages per conversation","3 saved conversations"]},
   {id:"pro",label:"Pro",price:"₹499/mo",daily:50,convLen:50,history:25,features:["Advanced strategy & analytics","50 messages/day","50 messages per conversation","25 saved conversations","Priority AI responses","Market intelligence reports"]},
   {id:"clinic",label:"Clinic+",price:"₹1,499/mo",daily:200,convLen:100,history:100,features:["Unlimited strategy sessions","200 messages/day","100 messages per conversation","Unlimited history","Dedicated clinic growth plan","Monthly strategy review","Competition dashboard"]},
-]; // Default cap on first-ever load; admin can change from Beta Settings tab.
+];
+// Predefined options for multi-select profile fields
+const CLINIC_SERVICES=["Botox","Dermal Fillers","Chemical Peels","PRP Therapy","Laser Hair Removal","Skin Rejuvenation","Thread Lifts","Microneedling","Hydrafacial","Body Contouring","Cryolipolysis","Hair Restoration","Mesotherapy","Carbon Peel","Skin Tightening","Tattoo Removal","Pigmentation Treatment","Acne Treatment","Anti-Aging","IV Therapy"];
+const CLINIC_EQUIPMENT=["Q-Switch Laser","Diode Laser","Pico Laser","CO2 Fractional Laser","RF Machine","HIFU","Hydrafacial Machine","Microneedling Pen","Cryolipolysis Machine","IPL Machine","LED Therapy Panel","OxyGeneo","Dermapen","PRP Centrifuge","Electrocautery","Autoclave","Dermatoscope"];
+const INSTITUTE_COURSES=["Fellowship in Aesthetic Medicine","Botox & Fillers Certification","Laser Training","Chemical Peel Workshop","PRP Therapy Course","Thread Lift Training","Advanced Dermatology","Trichology Course","Cosmetology Diploma","Skin Care Formulation","Practice Management","Medical Aesthetics MBA","Hands-on Cadaver Workshop","Online CME Credits"];
+const VENDOR_PRODUCTS=["Botulinum Toxin","Dermal Fillers (HA)","Dermal Fillers (CaHA)","Chemical Peel Solutions","PRP Kits","Mesotherapy Cocktails","Skin Boosters","Thread Lift PDO","Laser Machines","RF Devices","HIFU Machines","Microneedling Devices","Skincare Range","Topical Anesthetics","Surgical Instruments","Consumables & Disposables"];
+const VENDOR_MACHINES=["Q-Switch Nd:YAG","Diode 810nm","Alexandrite Laser","Pico Laser","CO2 Fractional","Er:YAG Laser","IPL Platform","RF Monopolar","RF Bipolar","HIFU","Cryolipolysis","Body Sculpting","LED Panel","Hydrafacial Platform","Microneedling RF","Plasma Pen"]; // Default cap on first-ever load; admin can change from Beta Settings tab.
 // Difficulty-specific theming — used across intro, taking, and result views
 const DIFF_THEME={
   Easy:{color:"#1a7d42",bg:"#e8f5e9",bgLight:"linear-gradient(135deg,#e8f5e9,#f0faf3)",border:"#4caf50",label:"🟢"},
@@ -6837,57 +6843,56 @@ ${forDownload
             {/* My Clinic Profile — personalizes AI advice */}
             <div style={{...T.card,borderLeft:"3px solid "+T.teal}}>
               <h4 style={{fontSize:".88rem",fontWeight:700,margin:0,marginBottom:4}}>🏥 My {normalizeAccountType(prof?.accountType||"")==="vendor"||normalizeAccountType(prof?.accountType||"")==="brand"?"business":normalizeAccountType(prof?.accountType||"")==="institute"?"institute":"clinic"} profile</h4>
-              <p style={{fontSize:".66rem",color:T.mute,margin:"0 0 10px"}}>Fill this once — the AI will use it to give you hyper-personalized advice for YOUR clinic.</p>
+              <p style={{fontSize:".66rem",color:T.mute,margin:"0 0 10px"}}>Fill this once — AI personalizes every answer.</p>
               {(()=>{
                 const acType=normalizeAccountType(prof?.accountType||"");
                 const isVendor=acType==="vendor"||acType==="brand";
                 const isInstitute=acType==="institute";
-                const fields=isVendor?[
-                  {key:"city",label:"HQ location",ph:"e.g. Mumbai, Delhi"},
-                  {key:"services",label:"Products / services",ph:"e.g. Botulinum toxin, Dermal fillers, Laser machines, Skincare range"},
-                  {key:"targetAudience",label:"Target audience",ph:"e.g. Dermatologists, Aesthetic clinics, Plastic surgeons"},
-                  {key:"distribution",label:"Distribution model",ph:"e.g. Direct to clinic, Distributor network, Online"},
-                  {key:"monthlyPatients",label:"Monthly clinic clients",ph:"e.g. 50 clinics"},
-                  {key:"avgTicket",label:"Avg order value (₹)",ph:"e.g. 25000"},
-                  {key:"teamSize",label:"Sales team size",ph:"e.g. 5 field reps, 2 key account managers"},
-                  {key:"topTreatments",label:"Top selling products",ph:"e.g. Botox 40%, Fillers 30%, Devices 20%"},
-                  {key:"coverage",label:"Geographic coverage",ph:"e.g. Maharashtra, Gujarat, Karnataka"},
-                  {key:"challenges",label:"Current challenges",ph:"e.g. Losing market share to competitor X, low repeat orders"},
-                  {key:"goals",label:"Growth goals",ph:"e.g. Expand to South India, launch training academy"},
-                ]:isInstitute?[
-                  {key:"city",label:"Institute location",ph:"e.g. Pune, Mumbai"},
-                  {key:"services",label:"Courses offered",ph:"e.g. Fellowship in Aesthetic Medicine, Botox certification, Laser training"},
-                  {key:"courseFormat",label:"Course format",ph:"e.g. Online, Offline, Hybrid, Weekend workshops"},
-                  {key:"monthlyPatients",label:"Monthly student intake",ph:"e.g. 20-30 per batch"},
-                  {key:"avgTicket",label:"Avg course fee (₹)",ph:"e.g. 75000"},
-                  {key:"teamSize",label:"Faculty & staff",ph:"e.g. 5 faculty, 3 coordinators"},
-                  {key:"topTreatments",label:"Most popular courses",ph:"e.g. Aesthetic Dermatology (60%), Laser Physics (25%)"},
-                  {key:"accreditations",label:"Accreditations",ph:"e.g. MUHS, IEBDAC, IEB affiliated"},
-                  {key:"placements",label:"Placement support",ph:"e.g. Clinic tie-ups, job board, mentorship"},
-                  {key:"challenges",label:"Current challenges",ph:"e.g. Low enrollment, competition from online courses"},
-                  {key:"goals",label:"Growth goals",ph:"e.g. Launch online platform, partner with 50 clinics"},
-                ]:[
-                  {key:"city",label:"Location",ph:"e.g. Pune, Nashik, Mumbai"},
-                  {key:"services",label:"Services offered",ph:"e.g. Botox, Fillers, Chemical Peels, PRP, Laser"},
-                  {key:"equipment",label:"Equipment I have",ph:"e.g. Q-Switch, Diode laser, RF machine, Hydrafacial"},
-                  {key:"monthlyPatients",label:"Monthly patients",ph:"e.g. 80-100"},
-                  {key:"avgTicket",label:"Avg treatment ticket (₹)",ph:"e.g. 5000"},
-                  {key:"teamSize",label:"Team size",ph:"e.g. 2 doctors, 3 nurses, 1 receptionist"},
-                  {key:"topTreatments",label:"Top revenue treatments",ph:"e.g. Botox (40%), Fillers (25%), Peels (20%)"},
-                  {key:"challenges",label:"Current challenges",ph:"e.g. Low conversion, high competition nearby"},
-                  {key:"goals",label:"Growth goals",ph:"e.g. Double revenue in 6 months, add laser services"},
-                ];
-                return fields.map(f=><div key={f.key} style={{marginBottom:6}}>
-                <label style={{fontSize:".64rem",color:T.mute,fontWeight:600}}>{f.label}</label>
-                <input value={(prof?.clinicDetails||{})[f.key]||""} onChange={e=>{
-                  const cd={...(prof?.clinicDetails||{}),[f.key]:e.target.value};
-                  setProf(p=>({...p,clinicDetails:cd}));
-                }} placeholder={f.ph} style={{...T.inp,fontSize:".74rem",padding:"5px 8px"}}/>
-              </div>);
+                const cd=prof?.clinicDetails||{};
+                const updateCD=(key,val)=>setProf(p=>({...p,clinicDetails:{...(p?.clinicDetails||{}),[key]:val}}));
+                // Toggle a chip in an array field
+                const toggleChip=(key,val)=>{
+                  const arr=Array.isArray(cd[key])?cd[key]:((cd[key]||"").split(",").map(s=>s.trim()).filter(Boolean));
+                  const next=arr.includes(val)?arr.filter(v=>v!==val):[...arr,val];
+                  updateCD(key,next);
+                };
+                const renderChips=(key,options,label)=><div style={{marginBottom:8}}>
+                  <label style={{fontSize:".64rem",color:T.mute,fontWeight:600,marginBottom:4,display:"block"}}>{label}</label>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                    {options.map(opt=>{
+                      const arr=Array.isArray(cd[key])?cd[key]:((cd[key]||"").split(",").map(s=>s.trim()).filter(Boolean));
+                      const on=arr.includes(opt);
+                      return<button key={opt} onClick={()=>toggleChip(key,opt)} style={{padding:"3px 8px",borderRadius:12,border:"1px solid "+(on?T.teal:T.border),background:on?T.tealBg:"#fff",color:on?T.teal:T.mute,cursor:"pointer",fontSize:".64rem",fontFamily:"inherit",fontWeight:on?600:400,transition:"all .1s"}}>{opt}</button>;
+                    })}
+                  </div>
+                  <div style={{fontSize:".58rem",color:T.teal,marginTop:2}}>{(Array.isArray(cd[key])?cd[key]:(cd[key]||"").split(",").filter(Boolean)).length} selected</div>
+                </div>;
+                const renderInput=(key,label,ph)=><div style={{marginBottom:6}}>
+                  <label style={{fontSize:".64rem",color:T.mute,fontWeight:600}}>{label}</label>
+                  <input value={cd[key]||""} onChange={e=>updateCD(key,e.target.value)} placeholder={ph} style={{...T.inp,fontSize:".74rem",padding:"5px 8px"}}/>
+                </div>;
+
+                return(<>
+                  {renderInput("city",isVendor?"HQ location":isInstitute?"Institute location":"Clinic location","e.g. Pune, Mumbai")}
+                  {isVendor?renderChips("services",VENDOR_PRODUCTS.length?VENDOR_PRODUCTS:[],"Products you sell"):isInstitute?renderChips("services",INSTITUTE_COURSES.length?INSTITUTE_COURSES:[],"Courses offered"):renderChips("services",CLINIC_SERVICES.length?CLINIC_SERVICES:[],"Services offered")}
+                  {!isVendor&&!isInstitute&&renderChips("equipment",CLINIC_EQUIPMENT.length?CLINIC_EQUIPMENT:[],"Equipment I have")}
+                  {isVendor&&renderChips("machines",VENDOR_MACHINES.length?VENDOR_MACHINES:[],"Machines you sell")}
+                  {isVendor&&renderInput("targetAudience","Target audience","e.g. Dermatologists, Aesthetic clinics")}
+                  {isVendor&&renderInput("distribution","Distribution model","e.g. Direct to clinic, Distributor network")}
+                  {isVendor&&renderInput("coverage","Geographic coverage","e.g. Maharashtra, Gujarat")}
+                  {isInstitute&&renderInput("courseFormat","Course format","e.g. Online, Offline, Hybrid, Weekends")}
+                  {isInstitute&&renderInput("accreditations","Accreditations","e.g. MUHS, IEBDAC, IEB")}
+                  {isInstitute&&renderInput("placements","Placement support","e.g. Clinic tie-ups, mentorship")}
+                  {renderInput("monthlyPatients",isVendor?"Monthly clinic clients":isInstitute?"Monthly student intake":"Monthly patients","e.g. "+(isVendor?"50 clinics":isInstitute?"20-30":"80-100"))}
+                  {renderInput("avgTicket",isVendor?"Avg order value (₹)":isInstitute?"Avg course fee (₹)":"Avg treatment ticket (₹)","e.g. "+(isVendor?"25000":isInstitute?"75000":"5000"))}
+                  {renderInput("teamSize",isVendor?"Sales team size":isInstitute?"Faculty & staff":"Team size","e.g. "+(isVendor?"5 reps, 2 managers":isInstitute?"5 faculty, 3 staff":"2 doctors, 3 nurses"))}
+                  {renderInput("challenges","Current challenges","e.g. "+(isVendor?"Market share loss":"Low conversion"))}
+                  {renderInput("goals","Growth goals","e.g. "+(isVendor?"Expand to South India":"Double revenue"))}
+                </>);
               })()}
               <button onClick={async()=>{
-                try{await fbSet("users",prof.id,{clinicDetails:prof.clinicDetails||{}});sh("✅ Clinic profile saved — AI will now personalize answers!");}catch(e){sh("Failed")}
-              }} style={{...T.btn,...T.btnSm,width:"100%",fontSize:".74rem",marginTop:4}}>Save clinic profile</button>
+                try{await fbSet("users",prof.id,{clinicDetails:prof.clinicDetails||{}});sh("✅ Profile saved — AI will now personalize answers!");}catch(e){sh("Failed")}
+              }} style={{...T.btn,...T.btnSm,width:"100%",fontSize:".74rem",marginTop:4}}>Save profile</button>
             </div>
 
             {/* Quick prompts */}

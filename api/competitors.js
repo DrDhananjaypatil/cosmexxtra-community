@@ -45,8 +45,8 @@ export default async function handler(req, res) {
     // Account-type-specific search queries
     const searchQueriesMap = {
       doctor: ["aesthetic clinic", "skin clinic dermatologist", "cosmetology clinic", "laser skin clinic"],
-      vendor: ["aesthetic medical equipment supplier", "dermatology product distributor", "cosmetic medicine supplies", "skincare brand distributor"],
-      institute: ["aesthetic medicine training institute", "cosmetology course academy", "dermatology training center", "beauty academy cosmetology"],
+      vendor: ["medical equipment dealer", "pharmaceutical distributor", "surgical instrument supplier", "medical device company", "cosmetic product wholesaler"],
+      institute: ["aesthetic medicine training", "cosmetology course academy", "dermatology training center", "beauty academy"],
     };
     const searchQueries = searchQueriesMap[businessType] || searchQueriesMap.doctor;
 
