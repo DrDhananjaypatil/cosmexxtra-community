@@ -77,6 +77,8 @@ export default async function handler(req, res) {
             priceLevel: place.price_level,
             types: place.types || [],
             isOpen: place.opening_hours?.open_now,
+            photoCount: place.photos?.length || 0,
+            businessStatus: place.business_status || "OPERATIONAL",
             distanceKm: distKm,
             lat: place.geometry.location.lat,
             lng: place.geometry.location.lng,
@@ -99,6 +101,19 @@ export default async function handler(req, res) {
       topRated: filtered.filter(p => p.rating >= 4.5).length,
       within5km: filtered.filter(p => p.distanceKm <= 5).length,
       within10km: filtered.filter(p => p.distanceKm <= 10).length,
+      avgPhotos: filtered.length > 0 ? Math.round(filtered.reduce((s, p) => s + p.photoCount, 0) / filtered.length) : 0,
+      withWebsite: filtered.filter(p => p.types?.includes("establishment")).length,
+      // Category frequency — what Google categories competitors use
+      categoryFrequency: Object.entries(
+        filtered.reduce((acc, p) => {
+          (p.types || []).forEach(t => {
+            if (!["point_of_interest", "establishment", "health", "store"].includes(t)) {
+              acc[t] = (acc[t] || 0) + 1;
+            }
+          });
+          return acc;
+        }, {})
+      ).sort((a, b) => b[1] - a[1]).slice(0, 15),
     };
 
     return res.status(200).json({ ok: true, competitors: filtered, summary, searchCenter: { lat: searchLat, lng: searchLng } });

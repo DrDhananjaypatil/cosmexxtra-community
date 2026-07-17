@@ -4660,7 +4660,7 @@ ${forDownload
     if(myAttempts.length>0){const stats=computeStudyStats(myAttempts);lines.push("Study: "+stats.totalTests+" tests, "+stats.avgAccuracy+"% avg");if(stats.strongAreas.length)lines.push("Strong: "+stats.strongAreas.map(a=>a.area).join(", "));if(stats.weakAreas.length)lines.push("Weak: "+stats.weakAreas.map(a=>a.area).join(", "));}
     if(prof.joined)lines.push("Member since: "+new Date(prof.joined).toLocaleDateString("en-IN",{month:"long",year:"numeric"}));
     lines.push("\nGive SPECIFIC advice referencing their details by name. Not generic.");
-    if(competitors?.competitors?.length>0){lines.push("\nLOCAL COMPETITION ("+competitors.competitors.length+" nearby):");lines.push("Avg: "+competitors.summary.avgRating+"\u2605 | Within 5km: "+competitors.summary.within5km);competitors.competitors.slice(0,8).forEach(c=>lines.push("- "+c.name+" ("+c.distanceKm+"km, "+c.rating+"\u2605, "+c.reviewCount+" rev)"));}
+    if(competitors?.competitors?.length>0){lines.push("\nLOCAL COMPETITION ("+competitors.competitors.length+" nearby):");lines.push("Avg: "+competitors.summary.avgRating+"\u2605 | Within 5km: "+competitors.summary.within5km+" | Avg photos: "+(competitors.summary.avgPhotos||0));if(competitors.summary.categoryFrequency?.length)lines.push("Top Google categories: "+competitors.summary.categoryFrequency.slice(0,8).map(c=>c[0].replace(/_/g," ")).join(", "));competitors.competitors.slice(0,10).forEach(c=>lines.push("- "+c.name+" ("+c.distanceKm+"km, "+c.rating+"\u2605, "+c.reviewCount+" rev, "+c.photoCount+" photos)"));}
     return lines.join("\n");
   };
 
@@ -6816,8 +6816,46 @@ ${forDownload
                           </>);
                         })()}
                       </div>
+                      {/* Google Categories — what your competitors are listed as */}
+                      {competitors.summary.categoryFrequency?.length>0&&<div style={{marginTop:10,padding:10,background:"#fff",borderRadius:8}}>
+                        <div style={{fontSize:".68rem",fontWeight:700,color:T.mute,textTransform:"uppercase",marginBottom:6}}>🏷️ Google business categories in your area</div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>
+                          {competitors.summary.categoryFrequency.map(([cat,count])=><span key={cat} style={{padding:"3px 8px",borderRadius:10,background:T.tealBg,color:T.teal,fontSize:".62rem",fontWeight:600,border:"1px solid "+T.teal+"33"}}>{cat.replace(/_/g," ")} ({count})</span>)}
+                        </div>
+                        <div style={{fontSize:".6rem",color:T.mute,lineHeight:1.4}}>💡 Make sure YOUR Google My Business profile uses these same categories — they help you show up in the same searches as your competitors.</div>
+                      </div>}
+
+                      {/* Photo Presence Analysis */}
+                      <div style={{marginTop:10,padding:10,background:"#fff",borderRadius:8}}>
+                        <div style={{fontSize:".68rem",fontWeight:700,color:T.mute,textTransform:"uppercase",marginBottom:6}}>📸 Photo presence (GMB listing strength)</div>
+                        {comps.sort((a,b)=>(b.photoCount||0)-(a.photoCount||0)).slice(0,5).map((c,i)=><div key={c.id+"ph"} style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                          <span style={{fontSize:".6rem",width:14,textAlign:"right",color:T.mute}}>{i+1}</span>
+                          <div style={{flex:1,fontSize:".68rem",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</div>
+                          <div style={{width:80,height:7,background:"#e8e8e8",borderRadius:3,overflow:"hidden"}}>
+                            <div style={{height:"100%",width:Math.min(100,(c.photoCount||0)/10*100)+"%",background:c.photoCount>=10?"#1a7d42":c.photoCount>=5?"#c8a84e":"#c0392b",borderRadius:3}}/>
+                          </div>
+                          <span style={{fontSize:".6rem",fontWeight:700,minWidth:25,textAlign:"right"}}>{c.photoCount||0}</span>
+                        </div>)}
+                        <div style={{fontSize:".6rem",color:T.mute,marginTop:4}}>Avg photos: {competitors.summary.avgPhotos} · Top performers have 10+ photos. Google shows photo-rich listings higher.</div>
+                      </div>
                     </>);
                   })()}
+                </div>
+
+                {/* ═══ AI-POWERED MARKETING INSIGHTS — uses existing Gemini, zero extra ═══ */}
+                <div style={{marginBottom:10,padding:10,background:"linear-gradient(135deg,#0d6b6e05,#c8a84e10)",borderRadius:8,border:"1px solid "+T.gold+"33"}}>
+                  <div style={{fontSize:".72rem",fontWeight:700,color:T.goldD,marginBottom:8}}>🎯 AI MARKETING INSIGHTS (no extra cost)</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                    {[
+                      ["🔑 Keyword strategy","Based on my "+competitors.competitors.length+" competitors in "+(prof?.clinicDetails?.city||"my area")+", suggest the top 20 Google keywords I should target for my GMB profile, Google Ads, and website SEO. Include long-tail keywords specific to my services and location. Format as a table with keyword, search intent, and competition level."],
+                      ["📱 GMB optimization plan","Analyze my competitors' Google presence. Based on the categories they use ("+((competitors.summary.categoryFrequency||[]).slice(0,5).map(c=>c[0]).join(", "))+"), their avg "+competitors.summary.avgRating+"★ rating and "+competitors.summary.avgReviews+" avg reviews, give me a step-by-step GMB optimization plan to outrank them. Include: categories to add, posting schedule, review strategy, photo strategy."],
+                      ["💻 Digital marketing strategy","Create a complete digital marketing plan for my area with "+competitors.competitors.length+" competitors. Include: Google Ads budget recommendation, Instagram strategy, Facebook targeting, WhatsApp marketing, and local SEO tactics specific to "+(prof?.clinicDetails?.city||"my city")+"."],
+                      ["📝 Content calendar","Create a 4-week social media content calendar for my clinic. Include specific post ideas for Instagram, Facebook, and Google Posts that target the same audience my "+competitors.summary.within5km+" nearby competitors are reaching."],
+                      ["🏆 How to get to #1","My strongest nearby competitor has "+competitors.competitors[0]?.rating+"★ with "+competitors.competitors[0]?.reviewCount+" reviews. Create a 90-day action plan to overtake them in local Google search results. Be specific with weekly targets."],
+                    ].map(([label,prompt])=><button key={label} onClick={()=>setAdvisorInput(prompt)} style={{textAlign:"left",padding:"7px 10px",background:"#fff",border:"1px solid "+T.gold+"44",borderRadius:6,cursor:"pointer",fontSize:".7rem",color:T.txt2,fontFamily:"inherit",lineHeight:1.4}} onMouseEnter={e=>{e.currentTarget.style.borderColor=T.goldD;e.currentTarget.style.background=T.goldBg}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.gold+"44";e.currentTarget.style.background="#fff"}}>
+                      {label}
+                    </button>)}
+                  </div>
                 </div>
 
                 {/* AI Deep Analysis buttons — uses existing Gemini API, no extra cost */}
