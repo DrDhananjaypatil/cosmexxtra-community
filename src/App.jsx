@@ -6649,28 +6649,68 @@ ${forDownload
               </div>
               {competitors&&<div style={{marginTop:12}}>
                 {/* Summary stats */}
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(90px,1fr))",gap:6,marginBottom:10}}>
-                  {[["Nearby",competitors.summary.totalFound],["Avg ★",competitors.summary.avgRating],["Avg reviews",competitors.summary.avgReviews],["Within 5km",competitors.summary.within5km],["Top rated",competitors.summary.topRated]].map(([l,v])=><div key={l} style={{textAlign:"center",padding:8,background:T.bg,borderRadius:6}}>
-                    <div style={{fontSize:"1rem",fontWeight:700,color:T.teal}}>{v}</div>
-                    <div style={{fontSize:".56rem",color:T.mute,textTransform:"uppercase"}}>{l}</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(80px,1fr))",gap:6,marginBottom:10}}>
+                  {[["Total",competitors.summary.totalFound,"#0d6b6e"],["Avg ★",competitors.summary.avgRating,"#c8a84e"],["Avg Rev",competitors.summary.avgReviews,"#555"],["<5km",competitors.summary.within5km,"#c0392b"],["4.5+★",competitors.summary.topRated,"#1a7d42"]].map(([l,v,c])=><div key={l} style={{textAlign:"center",padding:7,background:T.bg,borderRadius:6}}>
+                    <div style={{fontSize:".95rem",fontWeight:700,color:c}}>{v}</div>
+                    <div style={{fontSize:".52rem",color:T.mute,textTransform:"uppercase"}}>{l}</div>
                   </div>)}
                 </div>
-                {/* Competitor list (top 6) */}
-                <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:180,overflowY:"auto"}}>
-                  {competitors.competitors.slice(0,6).map(c=><div key={c.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",background:T.bg,borderRadius:6,fontSize:".76rem"}}>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</div>
-                      <div style={{fontSize:".64rem",color:T.mute}}>{c.distanceKm}km · {c.address?.split(",").slice(0,2).join(",")}</div>
+
+                {/* Rating distribution bar chart */}
+                <div style={{marginBottom:10,padding:10,background:T.bg,borderRadius:8}}>
+                  <div style={{fontSize:".7rem",fontWeight:700,color:T.mute,marginBottom:6}}>RATING DISTRIBUTION</div>
+                  {[["4.5-5.0★",competitors.competitors.filter(c=>c.rating>=4.5).length,"#1a7d42"],["4.0-4.4★",competitors.competitors.filter(c=>c.rating>=4&&c.rating<4.5).length,"#4caf50"],["3.5-3.9★",competitors.competitors.filter(c=>c.rating>=3.5&&c.rating<4).length,"#c8a84e"],["<3.5★",competitors.competitors.filter(c=>c.rating<3.5&&c.rating>0).length,"#c0392b"],["No rating",competitors.competitors.filter(c=>!c.rating||c.rating===0).length,"#999"]].map(([label,count,color])=>count>0&&<div key={label} style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                    <span style={{fontSize:".64rem",width:55,textAlign:"right",color:T.mute}}>{label}</span>
+                    <div style={{flex:1,height:12,background:"#e8e8e8",borderRadius:3,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:Math.round(count/competitors.competitors.length*100)+"%",background:color,borderRadius:3,minWidth:count>0?8:0}}/>
                     </div>
-                    <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontWeight:700,color:c.rating>=4.5?"#1a7d42":c.rating>=4?T.goldD:T.err}}>{c.rating}★</div>
-                      <div style={{fontSize:".6rem",color:T.mute}}>{c.reviewCount} rev</div>
-                    </div>
+                    <span style={{fontSize:".64rem",fontWeight:700,width:20,color}}>{count}</span>
                   </div>)}
                 </div>
-                {competitors.competitors.length>6&&<div style={{fontSize:".68rem",color:T.mute,textAlign:"center",marginTop:6}}>+{competitors.competitors.length-6} more · Ask the AI to analyze them</div>}
-                {/* Quick AI analysis prompt */}
-                <button onClick={()=>setAdvisorInput("Analyze my local competition. I can see "+competitors.summary.totalFound+" clinics nearby with avg "+competitors.summary.avgRating+"★ rating. The closest is "+competitors.competitors[0]?.name+" at "+competitors.competitors[0]?.distanceKm+"km with "+competitors.competitors[0]?.rating+"★. How should I position myself?")} style={{...T.btnO,...T.btnSm,width:"100%",marginTop:8,fontSize:".72rem"}}>🧠 Ask AI to analyze this competition</button>
+
+                {/* Distance distribution */}
+                <div style={{marginBottom:10,padding:10,background:T.bg,borderRadius:8}}>
+                  <div style={{fontSize:".7rem",fontWeight:700,color:T.mute,marginBottom:6}}>DISTANCE BREAKDOWN</div>
+                  {[["0-2 km",competitors.competitors.filter(c=>c.distanceKm<=2).length,"#c0392b"],["2-5 km",competitors.competitors.filter(c=>c.distanceKm>2&&c.distanceKm<=5).length,"#e67e22"],["5-10 km",competitors.competitors.filter(c=>c.distanceKm>5&&c.distanceKm<=10).length,"#c8a84e"],["10-15 km",competitors.competitors.filter(c=>c.distanceKm>10).length,"#1a7d42"]].map(([label,count,color])=><div key={label} style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                    <span style={{fontSize:".64rem",width:55,textAlign:"right",color:T.mute}}>{label}</span>
+                    <div style={{flex:1,height:12,background:"#e8e8e8",borderRadius:3,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:Math.max(count>0?8:0,Math.round(count/Math.max(1,competitors.competitors.length)*100))+"%",background:color,borderRadius:3}}/>
+                    </div>
+                    <span style={{fontSize:".64rem",fontWeight:700,width:20,color}}>{count}</span>
+                  </div>)}
+                </div>
+
+                {/* Full competitor list — ALL of them, scrollable */}
+                <div style={{marginBottom:10}}>
+                  <div style={{fontSize:".7rem",fontWeight:700,color:T.mute,marginBottom:6}}>ALL COMPETITORS ({competitors.competitors.length})</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:300,overflowY:"auto"}}>
+                    {competitors.competitors.map((c,i)=><div key={c.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",background:i%2===0?T.bg:"#fff",borderRadius:6,fontSize:".76rem",borderLeft:"3px solid "+(c.rating>=4.5?"#1a7d42":c.rating>=4?"#4caf50":c.rating>=3.5?"#c8a84e":"#c0392b")}}>
+                      <span style={{fontSize:".64rem",color:T.mute,width:18,textAlign:"right"}}>{i+1}</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</div>
+                        <div style={{fontSize:".62rem",color:T.mute}}>{c.distanceKm}km · {c.address?.split(",").slice(0,2).join(",")}</div>
+                      </div>
+                      <div style={{textAlign:"right",flexShrink:0}}>
+                        <div style={{fontWeight:700,color:c.rating>=4.5?"#1a7d42":c.rating>=4?"#4caf50":c.rating>=3.5?"#c8a84e":"#c0392b"}}>{c.rating||"—"}★</div>
+                        <div style={{fontSize:".58rem",color:T.mute}}>{c.reviewCount} reviews</div>
+                      </div>
+                    </div>)}
+                  </div>
+                </div>
+
+                {/* AI Deep Analysis buttons — uses existing Gemini API, no extra cost */}
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  <div style={{fontSize:".7rem",fontWeight:700,color:T.teal,marginBottom:2}}>🧠 AI ANALYSIS (no extra cost)</div>
+                  {[
+                    ["📊 Full competitive analysis","Analyze all "+competitors.competitors.length+" competitors near me in detail. Top 5 threats by rating and reviews. My positioning opportunities. Pricing strategy based on this competitive density. What gaps exist that I can fill?"],
+                    ["🎯 My top 5 threats","Who are my top 5 most dangerous competitors based on rating, reviews, and proximity? What makes them strong? How can I differentiate from each?"],
+                    ["💰 Pricing strategy","Based on "+competitors.summary.totalFound+" competitors with avg "+competitors.summary.avgRating+"★ rating in my area, what should my pricing strategy be? Should I go premium or competitive?"],
+                    ["📈 Growth opportunities","What untapped opportunities exist in my area given this competitive landscape? Are there service gaps? Underserved patient segments?"],
+                    ["⭐ Review strategy","I have "+competitors.summary.totalFound+" competitors. The top rated has "+competitors.competitors[0]?.rating+"★ with "+competitors.competitors[0]?.reviewCount+" reviews. How do I build reviews to beat them?"],
+                  ].map(([label,prompt])=><button key={label} onClick={()=>setAdvisorInput(prompt)} style={{textAlign:"left",padding:"7px 10px",background:T.bg,border:"1px solid "+T.border,borderRadius:6,cursor:"pointer",fontSize:".72rem",color:T.txt2,fontFamily:"inherit"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.background=T.tealBg}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background=T.bg}}>
+                    {label}
+                  </button>)}
+                </div>
               </div>}
             </div>
 
@@ -6772,23 +6812,53 @@ ${forDownload
             <div style={{...T.card,borderLeft:"3px solid "+T.teal}}>
               <h4 style={{fontSize:".88rem",fontWeight:700,margin:0,marginBottom:4}}>🏥 My {normalizeAccountType(prof?.accountType||"")==="vendor"||normalizeAccountType(prof?.accountType||"")==="brand"?"business":normalizeAccountType(prof?.accountType||"")==="institute"?"institute":"clinic"} profile</h4>
               <p style={{fontSize:".66rem",color:T.mute,margin:"0 0 10px"}}>Fill this once — the AI will use it to give you hyper-personalized advice for YOUR clinic.</p>
-              {[
-                {key:"city",label:"Location",ph:"e.g. Pune, Nashik, Mumbai"},
-                {key:"services",label:"Services offered",ph:"e.g. Botox, Fillers, Chemical Peels, PRP, Laser hair removal"},
-                {key:"equipment",label:"Equipment I have",ph:"e.g. Q-Switch laser, Diode laser, RF machine, Hydrafacial"},
-                {key:"monthlyPatients",label:"Monthly patients",ph:"e.g. 80-100"},
-                {key:"avgTicket",label:"Avg treatment ticket (₹)",ph:"e.g. 5000"},
-                {key:"teamSize",label:"Team size",ph:"e.g. 2 doctors, 3 nurses, 1 receptionist"},
-                {key:"topTreatments",label:"Top revenue treatments",ph:"e.g. Botox (40%), Fillers (25%), Peels (20%)"},
-                {key:"challenges",label:"Current challenges",ph:"e.g. Low conversion from consultations, high competition nearby"},
-                {key:"goals",label:"Growth goals",ph:"e.g. Double revenue in 6 months, add laser services"},
-              ].map(f=><div key={f.key} style={{marginBottom:6}}>
+              {(()=>{
+                const acType=normalizeAccountType(prof?.accountType||"");
+                const isVendor=acType==="vendor"||acType==="brand";
+                const isInstitute=acType==="institute";
+                const fields=isVendor?[
+                  {key:"city",label:"HQ location",ph:"e.g. Mumbai, Delhi"},
+                  {key:"services",label:"Products / services",ph:"e.g. Botulinum toxin, Dermal fillers, Laser machines, Skincare range"},
+                  {key:"targetAudience",label:"Target audience",ph:"e.g. Dermatologists, Aesthetic clinics, Plastic surgeons"},
+                  {key:"distribution",label:"Distribution model",ph:"e.g. Direct to clinic, Distributor network, Online"},
+                  {key:"monthlyPatients",label:"Monthly clinic clients",ph:"e.g. 50 clinics"},
+                  {key:"avgTicket",label:"Avg order value (₹)",ph:"e.g. 25000"},
+                  {key:"teamSize",label:"Sales team size",ph:"e.g. 5 field reps, 2 key account managers"},
+                  {key:"topTreatments",label:"Top selling products",ph:"e.g. Botox 40%, Fillers 30%, Devices 20%"},
+                  {key:"coverage",label:"Geographic coverage",ph:"e.g. Maharashtra, Gujarat, Karnataka"},
+                  {key:"challenges",label:"Current challenges",ph:"e.g. Losing market share to competitor X, low repeat orders"},
+                  {key:"goals",label:"Growth goals",ph:"e.g. Expand to South India, launch training academy"},
+                ]:isInstitute?[
+                  {key:"city",label:"Institute location",ph:"e.g. Pune, Mumbai"},
+                  {key:"services",label:"Courses offered",ph:"e.g. Fellowship in Aesthetic Medicine, Botox certification, Laser training"},
+                  {key:"courseFormat",label:"Course format",ph:"e.g. Online, Offline, Hybrid, Weekend workshops"},
+                  {key:"monthlyPatients",label:"Monthly student intake",ph:"e.g. 20-30 per batch"},
+                  {key:"avgTicket",label:"Avg course fee (₹)",ph:"e.g. 75000"},
+                  {key:"teamSize",label:"Faculty & staff",ph:"e.g. 5 faculty, 3 coordinators"},
+                  {key:"topTreatments",label:"Most popular courses",ph:"e.g. Aesthetic Dermatology (60%), Laser Physics (25%)"},
+                  {key:"accreditations",label:"Accreditations",ph:"e.g. MUHS, IEBDAC, IEB affiliated"},
+                  {key:"placements",label:"Placement support",ph:"e.g. Clinic tie-ups, job board, mentorship"},
+                  {key:"challenges",label:"Current challenges",ph:"e.g. Low enrollment, competition from online courses"},
+                  {key:"goals",label:"Growth goals",ph:"e.g. Launch online platform, partner with 50 clinics"},
+                ]:[
+                  {key:"city",label:"Location",ph:"e.g. Pune, Nashik, Mumbai"},
+                  {key:"services",label:"Services offered",ph:"e.g. Botox, Fillers, Chemical Peels, PRP, Laser"},
+                  {key:"equipment",label:"Equipment I have",ph:"e.g. Q-Switch, Diode laser, RF machine, Hydrafacial"},
+                  {key:"monthlyPatients",label:"Monthly patients",ph:"e.g. 80-100"},
+                  {key:"avgTicket",label:"Avg treatment ticket (₹)",ph:"e.g. 5000"},
+                  {key:"teamSize",label:"Team size",ph:"e.g. 2 doctors, 3 nurses, 1 receptionist"},
+                  {key:"topTreatments",label:"Top revenue treatments",ph:"e.g. Botox (40%), Fillers (25%), Peels (20%)"},
+                  {key:"challenges",label:"Current challenges",ph:"e.g. Low conversion, high competition nearby"},
+                  {key:"goals",label:"Growth goals",ph:"e.g. Double revenue in 6 months, add laser services"},
+                ];
+                return fields.map(f=><div key={f.key} style={{marginBottom:6}}>
                 <label style={{fontSize:".64rem",color:T.mute,fontWeight:600}}>{f.label}</label>
                 <input value={(prof?.clinicDetails||{})[f.key]||""} onChange={e=>{
                   const cd={...(prof?.clinicDetails||{}),[f.key]:e.target.value};
                   setProf(p=>({...p,clinicDetails:cd}));
                 }} placeholder={f.ph} style={{...T.inp,fontSize:".74rem",padding:"5px 8px"}}/>
-              </div>)}
+              </div>);
+              })()}
               <button onClick={async()=>{
                 try{await fbSet("users",prof.id,{clinicDetails:prof.clinicDetails||{}});sh("✅ Clinic profile saved — AI will now personalize answers!");}catch(e){sh("Failed")}
               }} style={{...T.btn,...T.btnSm,width:"100%",fontSize:".74rem",marginTop:4}}>Save clinic profile</button>
