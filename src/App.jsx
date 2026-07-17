@@ -2553,6 +2553,9 @@ export default function App(){
   const[advisorDailyDate,setAdvisorDailyDate]=useState("");
   const[competitors,setCompetitors]=useState(null); // {competitors:[], summary:{}}
   const[competitorLoading,setCompetitorLoading]=useState(false);
+  // Load saved competitor scan from user profile when visiting advisor page
+  const competitorLoadedRef=useRef(false);
+  useEffect(()=>{if(pg==="advisor"&&prof?.competitorScan&&!competitorLoadedRef.current){setCompetitors(prof.competitorScan);competitorLoadedRef.current=true;}},[pg]);
   const[certConfig,setCertConfig]=useState({}); // {logoUrl, accreditations:[{name,logoUrl}], sponsorId, sponsorName, sponsorLogo, sponsorTagline}
   // Test timer — decrements every second while user is taking a test.
   // NOTE: Must live AFTER studyView/activeTest state declarations above,
@@ -4618,45 +4621,40 @@ ${forDownload
   // Build personalized clinic context for AI Advisor — sent with every API call
   const buildClinicContext=()=>{
     if(!prof)return "";
-    const lines=["DOCTOR'S PROFILE (use this to personalize every answer):"];
+    const acType=normalizeAccountType(prof.accountType||"");
+    const isDoc=!acType||acType==="doctor";
+    const isVendor=acType==="vendor"||acType==="brand";
+    const isInstitute=acType==="institute";
+    const roleLabel=isDoc?"DOCTOR":isVendor?"VENDOR/BRAND":isInstitute?"INSTITUTE":"PROFESSIONAL";
+    const lines=[roleLabel+"'S PROFILE (personalize every answer to this):"];
     if(prof.name)lines.push("Name: "+prof.name);
-    if(prof.city)lines.push("City: "+prof.city+(prof.state?" , "+prof.state:""));
-    if(prof.clinic)lines.push("Clinic: "+prof.clinic);
+    if(prof.companyName)lines.push((isVendor?"Company":isInstitute?"Institute":"Organization")+": "+prof.companyName);
+    if(prof.city)lines.push("City: "+prof.city+(prof.state?", "+prof.state:""));
+    if(prof.clinic&&isDoc)lines.push("Clinic: "+prof.clinic);
     if(prof.specialization)lines.push("Specialization: "+prof.specialization);
     if(prof.experience)lines.push("Experience: "+prof.experience+" years");
     if(prof.qualification)lines.push("Qualification: "+prof.qualification);
-    // Clinic details (user-provided extras)
     const cd=prof.clinicDetails||{};
-    if(cd.services)lines.push("Services offered: "+cd.services);
-    if(cd.equipment)lines.push("Equipment: "+cd.equipment);
-    if(cd.monthlyPatients)lines.push("Monthly patient volume: ~"+cd.monthlyPatients);
-    if(cd.avgTicket)lines.push("Average treatment ticket: ₹"+cd.avgTicket);
+    if(cd.city)lines.push("Location: "+cd.city);
+    if(cd.services)lines.push((isDoc?"Services":"Products/services")+": "+cd.services);
+    if(cd.equipment&&isDoc)lines.push("Equipment: "+cd.equipment);
+    if(cd.monthlyPatients)lines.push((isDoc?"Monthly patients":"Monthly clients")+": ~"+cd.monthlyPatients);
+    if(cd.avgTicket)lines.push((isDoc?"Avg treatment ticket":"Avg order value")+": \u20b9"+cd.avgTicket);
     if(cd.teamSize)lines.push("Team size: "+cd.teamSize);
-    if(cd.topTreatments)lines.push("Top treatments: "+cd.topTreatments);
+    if(cd.topTreatments)lines.push((isDoc?"Top treatments":"Top products/services")+": "+cd.topTreatments);
     if(cd.challenges)lines.push("Current challenges: "+cd.challenges);
     if(cd.goals)lines.push("Growth goals: "+cd.goals);
-    // Study stats (shows their knowledge areas)
+    if(isVendor){
+      const cats=prof.brandCategories||prof.vendorCategories;
+      if(Array.isArray(cats)&&cats.length)lines.push("Product categories: "+cats.join(", "));
+      lines.push("\nAs a VENDOR/BRAND in Indian aesthetic medicine, tailor advice for: distribution, doctor outreach, product positioning, pricing for clinics, training programs, marketing to aesthetic professionals.");
+    }
+    if(isInstitute){lines.push("\nAs an INSTITUTE, tailor advice for: student acquisition, course design, certification programs, clinic partnerships, online vs offline training, marketing to practitioners.");}
     const myAttempts=testAttempts.filter(a=>a.uid===au?.uid);
-    if(myAttempts.length>0){
-      const stats=computeStudyStats(myAttempts);
-      lines.push("Study performance: "+stats.totalTests+" tests taken, "+stats.avgAccuracy+"% avg accuracy");
-      if(stats.strongAreas.length>0)lines.push("Strong knowledge areas: "+stats.strongAreas.map(a=>a.area).join(", "));
-      if(stats.weakAreas.length>0)lines.push("Weak knowledge areas: "+stats.weakAreas.map(a=>a.area).join(", "));
-    }
-    // Account age
-    if(prof.joined){const d=new Date(prof.joined);lines.push("Member since: "+d.toLocaleDateString("en-IN",{month:"long",year:"numeric"}));}
-    lines.push("\nUse this context to give SPECIFIC advice. Reference their city, clinic name, services, and challenges by name. Don't give generic advice — make it personal.");
-    // Competitor data if available
-    if(competitors?.competitors?.length>0){
-      lines.push("\nLOCAL COMPETITION DATA (from Google Places, "+competitors.competitors.length+" clinics found within 15km):");
-      lines.push("Area average rating: "+competitors.summary.avgRating+"/5 ("+competitors.summary.avgReviews+" avg reviews)");
-      lines.push("Within 5km: "+competitors.summary.within5km+" clinics | Within 10km: "+competitors.summary.within10km);
-      lines.push("Top competitors:");
-      competitors.competitors.slice(0,8).forEach(c=>{
-        lines.push("- "+c.name+" ("+c.distanceKm+"km away, "+c.rating+"★, "+c.reviewCount+" reviews)");
-      });
-      lines.push("Use this competitive data to give specific positioning advice.");
-    }
+    if(myAttempts.length>0){const stats=computeStudyStats(myAttempts);lines.push("Study: "+stats.totalTests+" tests, "+stats.avgAccuracy+"% avg");if(stats.strongAreas.length)lines.push("Strong: "+stats.strongAreas.map(a=>a.area).join(", "));if(stats.weakAreas.length)lines.push("Weak: "+stats.weakAreas.map(a=>a.area).join(", "));}
+    if(prof.joined)lines.push("Member since: "+new Date(prof.joined).toLocaleDateString("en-IN",{month:"long",year:"numeric"}));
+    lines.push("\nGive SPECIFIC advice referencing their details by name. Not generic.");
+    if(competitors?.competitors?.length>0){lines.push("\nLOCAL COMPETITION ("+competitors.competitors.length+" nearby):");lines.push("Avg: "+competitors.summary.avgRating+"\u2605 | Within 5km: "+competitors.summary.within5km);competitors.competitors.slice(0,8).forEach(c=>lines.push("- "+c.name+" ("+c.distanceKm+"km, "+c.rating+"\u2605, "+c.reviewCount+" rev)"));}
     return lines.join("\n");
   };
 
@@ -6628,9 +6626,9 @@ ${forDownload
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
                 <div style={{flex:1}}>
                   <div style={{fontSize:".88rem",fontWeight:700}}>📍 Local competition</div>
-                  <div style={{fontSize:".68rem",color:T.mute}}>{competitors?`${competitors.summary.totalFound} clinics found`:"Scan to discover competitors within 15km"}</div>
+                  <div style={{fontSize:".68rem",color:T.mute}}>{competitors?`${competitors.summary.totalFound} clinics found${prof?.competitorScanCity?" near "+prof.competitorScanCity:""}${prof?.competitorScanDate?" · scanned "+fD(new Date(prof.competitorScanDate).toISOString().slice(0,10)):""}`:"Scan to discover competitors within 15km"}</div>
                 </div>
-                <input id="scan-city-input" defaultValue={prof?.clinicDetails?.city||prof?.city||""} placeholder="Your city (e.g. Pune)" style={{...T.inp,width:140,fontSize:".78rem",padding:"5px 8px"}}/>
+                <input id="scan-city-input" defaultValue={prof?.clinicDetails?.city||prof?.city||""} placeholder="Your location (e.g. Pune)" style={{...T.inp,width:140,fontSize:".78rem",padding:"5px 8px"}}/>
                 <button disabled={competitorLoading} onClick={async()=>{
                   setCompetitorLoading(true);
                   const cityInput=document.getElementById("scan-city-input")?.value?.trim();
@@ -6638,7 +6636,12 @@ ${forDownload
                   try{
                     const r=await fetch("/api/competitors",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({city:cityInput,radius:15000})});
                     const data=await r.json();
-                    if(data.ok){setCompetitors(data);sh("✅ Found "+data.summary.totalFound+" clinics near "+cityInput);}
+                    if(data.ok){
+                      setCompetitors(data);
+                      sh("✅ Found "+data.summary.totalFound+" clinics near "+cityInput);
+                      // Save to user profile so results persist across visits
+                      try{await fbSet("users",prof.id,{competitorScan:data,competitorScanDate:Date.now(),competitorScanCity:cityInput});}catch(e){}
+                    }
                     else{sh("⚠ "+(data.error||"Scan failed — check GOOGLE_PLACES_API_KEY in Vercel env"));}
                   }catch(e){sh("Connection error")}
                   setCompetitorLoading(false);
@@ -6767,10 +6770,10 @@ ${forDownload
 
             {/* My Clinic Profile — personalizes AI advice */}
             <div style={{...T.card,borderLeft:"3px solid "+T.teal}}>
-              <h4 style={{fontSize:".88rem",fontWeight:700,margin:0,marginBottom:4}}>🏥 My clinic profile</h4>
+              <h4 style={{fontSize:".88rem",fontWeight:700,margin:0,marginBottom:4}}>🏥 My {normalizeAccountType(prof?.accountType||"")==="vendor"||normalizeAccountType(prof?.accountType||"")==="brand"?"business":normalizeAccountType(prof?.accountType||"")==="institute"?"institute":"clinic"} profile</h4>
               <p style={{fontSize:".66rem",color:T.mute,margin:"0 0 10px"}}>Fill this once — the AI will use it to give you hyper-personalized advice for YOUR clinic.</p>
               {[
-                {key:"city",label:"Clinic city",ph:"e.g. Pune, Nashik, Mumbai"},
+                {key:"city",label:"Location",ph:"e.g. Pune, Nashik, Mumbai"},
                 {key:"services",label:"Services offered",ph:"e.g. Botox, Fillers, Chemical Peels, PRP, Laser hair removal"},
                 {key:"equipment",label:"Equipment I have",ph:"e.g. Q-Switch laser, Diode laser, RF machine, Hydrafacial"},
                 {key:"monthlyPatients",label:"Monthly patients",ph:"e.g. 80-100"},
