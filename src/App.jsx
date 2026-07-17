@@ -6712,6 +6712,114 @@ ${forDownload
                   </div>
                 </div>
 
+                {/* ═══ MARKET INTELLIGENCE DASHBOARD — all client-side, zero extra cost ═══ */}
+                <div style={{marginBottom:12,padding:12,background:"linear-gradient(135deg,#0d6b6e08,#c8a84e08)",borderRadius:10,border:"1px solid "+T.teal+"22"}}>
+                  <div style={{fontSize:".82rem",fontWeight:700,color:T.teal,marginBottom:10}}>📊 Market Intelligence Report</div>
+
+                  {/* YOUR POSITION vs MARKET */}
+                  {(()=>{
+                    const cd=prof?.clinicDetails||{};
+                    const myMonthly=parseInt(cd.monthlyPatients)||0;
+                    const myTicket=parseInt(cd.avgTicket)||0;
+                    const myRevenue=myMonthly*myTicket;
+                    const comps=competitors.competitors;
+                    const avgRating=competitors.summary.avgRating;
+                    const topRating=comps.length?Math.max(...comps.map(c=>c.rating||0)):0;
+                    const topReviews=comps.length?Math.max(...comps.map(c=>c.reviewCount||0)):0;
+                    const avgReviews=competitors.summary.avgReviews;
+                    const within2km=comps.filter(c=>c.distanceKm<=2).length;
+                    const marketDensity=within2km>=5?"🔴 Very High":within2km>=3?"🟡 High":within2km>=1?"🟢 Moderate":"💚 Low";
+
+                    return(<>
+                      {/* Revenue Potential */}
+                      {myRevenue>0&&<div style={{marginBottom:10,padding:10,background:"#fff",borderRadius:8}}>
+                        <div style={{fontSize:".68rem",fontWeight:700,color:T.mute,textTransform:"uppercase",marginBottom:6}}>💰 Revenue snapshot</div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                          <div style={{textAlign:"center"}}><div style={{fontSize:"1.1rem",fontWeight:700,color:T.teal}}>₹{(myRevenue/1000).toFixed(0)}K</div><div style={{fontSize:".56rem",color:T.mute}}>Monthly est.</div></div>
+                          <div style={{textAlign:"center"}}><div style={{fontSize:"1.1rem",fontWeight:700,color:"#c8a84e"}}>₹{(myRevenue*12/100000).toFixed(1)}L</div><div style={{fontSize:".56rem",color:T.mute}}>Annual est.</div></div>
+                        </div>
+                        <div style={{marginTop:8,fontSize:".66rem",color:T.txt2}}>
+                          If you increase avg ticket by 20%: <b style={{color:"#1a7d42"}}>₹{(myRevenue*1.2/1000).toFixed(0)}K/mo</b> (+₹{(myRevenue*0.2/1000).toFixed(0)}K)
+                        </div>
+                        <div style={{fontSize:".66rem",color:T.txt2}}>
+                          If you increase patients by 20%: <b style={{color:"#1a7d42"}}>₹{(myRevenue*1.2/1000).toFixed(0)}K/mo</b> (+₹{(myRevenue*0.2/1000).toFixed(0)}K)
+                        </div>
+                      </div>}
+
+                      {/* Market Density & Position */}
+                      <div style={{marginBottom:10,padding:10,background:"#fff",borderRadius:8}}>
+                        <div style={{fontSize:".68rem",fontWeight:700,color:T.mute,textTransform:"uppercase",marginBottom:6}}>🎯 Your competitive position</div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                          <div style={{padding:6,background:T.bg,borderRadius:6,textAlign:"center"}}>
+                            <div style={{fontSize:".88rem",fontWeight:700}}>{marketDensity}</div>
+                            <div style={{fontSize:".54rem",color:T.mute}}>Market density (2km)</div>
+                          </div>
+                          <div style={{padding:6,background:T.bg,borderRadius:6,textAlign:"center"}}>
+                            <div style={{fontSize:".88rem",fontWeight:700,color:T.teal}}>{comps.length} clinics</div>
+                            <div style={{fontSize:".54rem",color:T.mute}}>In 15km radius</div>
+                          </div>
+                        </div>
+                        {/* Rating benchmark bar */}
+                        <div style={{marginTop:8}}>
+                          <div style={{fontSize:".62rem",color:T.mute,marginBottom:3}}>Area rating benchmark</div>
+                          <div style={{position:"relative",height:20,background:"linear-gradient(90deg,#c0392b,#e67e22,#f1c40f,#27ae60,#1a7d42)",borderRadius:4,overflow:"hidden"}}>
+                            <div style={{position:"absolute",left:`${Math.min(95,(avgRating/5)*100)}%`,top:0,width:2,height:20,background:"#fff",boxShadow:"0 0 4px rgba(0,0,0,.5)"}} title={"Avg: "+avgRating}/>
+                            <div style={{position:"absolute",left:`${Math.min(95,(topRating/5)*100)}%`,top:0,width:2,height:20,background:"#000"}} title={"Top: "+topRating}/>
+                          </div>
+                          <div style={{display:"flex",justifyContent:"space-between",fontSize:".54rem",color:T.mute,marginTop:2}}>
+                            <span>1★</span><span>Avg: {avgRating}★</span><span>Top: {topRating}★</span><span>5★</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Review Leaders — top 5 by review count */}
+                      <div style={{marginBottom:10,padding:10,background:"#fff",borderRadius:8}}>
+                        <div style={{fontSize:".68rem",fontWeight:700,color:T.mute,textTransform:"uppercase",marginBottom:6}}>⭐ Review leaders (who dominates mindshare)</div>
+                        {comps.sort((a,b)=>(b.reviewCount||0)-(a.reviewCount||0)).slice(0,5).map((c,i)=><div key={c.id} style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                          <span style={{fontSize:".6rem",fontWeight:700,color:T.mute,width:14}}>{i+1}</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:".7rem",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</div>
+                          </div>
+                          <div style={{width:100,height:8,background:"#e8e8e8",borderRadius:3,overflow:"hidden"}}>
+                            <div style={{height:"100%",width:Math.round((c.reviewCount/topReviews)*100)+"%",background:i===0?"#c8a84e":i<3?"#0d6b6e":"#aaa",borderRadius:3}}/>
+                          </div>
+                          <span style={{fontSize:".62rem",fontWeight:700,minWidth:40,textAlign:"right"}}>{c.reviewCount}</span>
+                        </div>)}
+                        <div style={{fontSize:".6rem",color:T.mute,marginTop:4}}>Avg reviews in area: {avgReviews} · You need {Math.max(0,avgReviews+50)} reviews to stand out</div>
+                      </div>
+
+                      {/* Opportunity Score */}
+                      <div style={{padding:10,background:"#fff",borderRadius:8}}>
+                        <div style={{fontSize:".68rem",fontWeight:700,color:T.mute,textTransform:"uppercase",marginBottom:6}}>🚀 Market opportunity score</div>
+                        {(()=>{
+                          const lowRated=comps.filter(c=>c.rating<4).length;
+                          const lowReview=comps.filter(c=>c.reviewCount<50).length;
+                          const farAway=comps.filter(c=>c.distanceKm>5).length;
+                          const score=Math.min(100,Math.round((lowRated/Math.max(1,comps.length)*30)+(lowReview/Math.max(1,comps.length)*30)+(farAway/Math.max(1,comps.length)*40)));
+                          const scoreColor=score>=60?"#1a7d42":score>=40?"#c8a84e":"#c0392b";
+                          return(<>
+                            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                              <div style={{fontSize:"1.5rem",fontWeight:700,color:scoreColor}}>{score}/100</div>
+                              <div style={{flex:1}}>
+                                <div style={{height:10,background:"#e8e8e8",borderRadius:5,overflow:"hidden"}}>
+                                  <div style={{height:"100%",width:score+"%",background:scoreColor,borderRadius:5}}/>
+                                </div>
+                              </div>
+                            </div>
+                            <div style={{fontSize:".62rem",color:T.txt2,lineHeight:1.5}}>
+                              {lowRated>0&&<div>✅ {lowRated} competitors rated below 4★ — quality gap you can fill</div>}
+                              {lowReview>0&&<div>✅ {lowReview} have fewer than 50 reviews — weak online presence</div>}
+                              {within2km<3&&<div>✅ Low density within 2km — less direct competition</div>}
+                              {within2km>=5&&<div>⚠️ {within2km} competitors within 2km — high density, differentiation critical</div>}
+                              {lowRated===0&&<div>⚠️ All competitors are 4+★ — you need exceptional service to compete</div>}
+                            </div>
+                          </>);
+                        })()}
+                      </div>
+                    </>);
+                  })()}
+                </div>
+
                 {/* AI Deep Analysis buttons — uses existing Gemini API, no extra cost */}
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
                   <div style={{fontSize:".7rem",fontWeight:700,color:T.teal,marginBottom:2}}>🧠 AI ANALYSIS (no extra cost)</div>
