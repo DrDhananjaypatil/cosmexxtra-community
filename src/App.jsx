@@ -6847,14 +6847,35 @@ ${forDownload
                   <div style={{fontSize:".72rem",fontWeight:700,color:T.goldD,marginBottom:8}}>🎯 AI MARKETING INSIGHTS (no extra cost)</div>
                   <div style={{display:"flex",flexDirection:"column",gap:5}}>
                     {[
-                      ["🔑 Keyword strategy","Based on my "+competitors.competitors.length+" competitors in "+(prof?.clinicDetails?.city||"my area")+", suggest the top 20 Google keywords I should target for my GMB profile, Google Ads, and website SEO. Include long-tail keywords specific to my services and location. Format as a table with keyword, search intent, and competition level."],
-                      ["📱 GMB optimization plan","Analyze my competitors' Google presence. Based on the categories they use ("+((competitors.summary.categoryFrequency||[]).slice(0,5).map(c=>c[0]).join(", "))+"), their avg "+competitors.summary.avgRating+"★ rating and "+competitors.summary.avgReviews+" avg reviews, give me a step-by-step GMB optimization plan to outrank them. Include: categories to add, posting schedule, review strategy, photo strategy."],
-                      ["💻 Digital marketing strategy","Create a complete digital marketing plan for my area with "+competitors.competitors.length+" competitors. Include: Google Ads budget recommendation, Instagram strategy, Facebook targeting, WhatsApp marketing, and local SEO tactics specific to "+(prof?.clinicDetails?.city||"my city")+"."],
-                      ["📝 Content calendar","Create a 4-week social media content calendar for my clinic. Include specific post ideas for Instagram, Facebook, and Google Posts that target the same audience my "+competitors.summary.within5km+" nearby competitors are reaching."],
-                      ["🏆 How to get to #1","My strongest nearby competitor has "+competitors.competitors[0]?.rating+"★ with "+competitors.competitors[0]?.reviewCount+" reviews. Create a 90-day action plan to overtake them in local Google search results. Be specific with weekly targets."],
-                    ].map(([label,prompt])=><button key={label} onClick={()=>setAdvisorInput(prompt)} style={{textAlign:"left",padding:"7px 10px",background:"#fff",border:"1px solid "+T.gold+"44",borderRadius:6,cursor:"pointer",fontSize:".7rem",color:T.txt2,fontFamily:"inherit",lineHeight:1.4}} onMouseEnter={e=>{e.currentTarget.style.borderColor=T.goldD;e.currentTarget.style.background=T.goldBg}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.gold+"44";e.currentTarget.style.background="#fff"}}>
-                      {label}
+                      ["🔑 Keyword strategy","Based on my "+competitors.competitors.length+" competitors in "+(prof?.clinicDetails?.city||"my area")+", suggest the top 20 Google keywords I should target for my GMB profile, Google Ads, and website SEO. Include long-tail keywords specific to my services and location. Format as a table with keyword, search intent, and competition level.",false],
+                      ["📱 GMB optimization plan","Analyze my competitors' Google presence. Based on the categories they use ("+((competitors.summary.categoryFrequency||[]).slice(0,5).map(c=>c[0]).join(", "))+"), their avg "+competitors.summary.avgRating+"★ rating and "+competitors.summary.avgReviews+" avg reviews, give me a step-by-step GMB optimization plan to outrank them. Include: categories to add, posting schedule, review strategy, photo strategy.",false],
+                      ["💻 Digital marketing strategy","Create a complete digital marketing plan for my area with "+competitors.competitors.length+" competitors. Include: Google Ads budget recommendation, Instagram strategy, Facebook targeting, WhatsApp marketing, and local SEO tactics specific to "+(prof?.clinicDetails?.city||"my city")+".",true],
+                      ["📝 Content calendar","Create a 4-week social media content calendar for my clinic. Include specific post ideas for Instagram, Facebook, and Google Posts that target the same audience my "+competitors.summary.within5km+" nearby competitors are reaching.",true],
+                      ["🏆 How to get to #1","My strongest nearby competitor has "+competitors.competitors[0]?.rating+"★ with "+competitors.competitors[0]?.reviewCount+" reviews. Create a 90-day action plan to overtake them in local Google search results. Be specific with weekly targets.",true],
+                    ].map(([label,prompt,locked])=><button key={label} onClick={async()=>{
+                      if(locked){
+                        if(window.confirm("🔒 Premium insight — ₹100 to unlock.\n\nThis generates a detailed "+label.slice(2)+" customized for your market.\n\nSend unlock request to admin?")){
+                          try{await fbAdd("adminMessages",{uid:au?.uid,name:uName,email:au?.email||"",subject:"🔓 Unlock: "+label.slice(2),message:"I want to unlock the premium AI insight: "+label+"\nPlease share payment details (₹100).",type:"advisor_unlock",status:"pending",createdAt:Date.now()});sh("✅ Request sent! Admin will share payment details.");}catch(e){sh("Failed")}
+                        }
+                        return;
+                      }
+                      setAdvisorInput(prompt);
+                    }} style={{textAlign:"left",padding:"7px 10px",background:locked?"#f9f9f9":"#fff",border:"1px solid "+(locked?"#ddd":T.gold+"44"),borderRadius:6,cursor:"pointer",fontSize:".7rem",color:locked?T.mute:T.txt2,fontFamily:"inherit",lineHeight:1.4,position:"relative",opacity:locked?0.85:1}} onMouseEnter={e=>{if(!locked){e.currentTarget.style.borderColor=T.goldD;e.currentTarget.style.background=T.goldBg}}} onMouseLeave={e=>{if(!locked){e.currentTarget.style.borderColor=T.gold+"44";e.currentTarget.style.background="#fff"}}}>
+                      <span style={{display:"flex",alignItems:"center",gap:6}}>
+                        {label}
+                        {locked&&<span style={{marginLeft:"auto",fontSize:".58rem",fontWeight:700,background:"linear-gradient(135deg,#c8a84e,#a88832)",color:"#fff",padding:"2px 8px",borderRadius:4,flexShrink:0}}>🔒 ₹100</span>}
+                      </span>
                     </button>)}
+                  </div>
+                  {/* Bundle offer */}
+                  <div style={{marginTop:8,padding:"10px 12px",background:"linear-gradient(135deg,#c8a84e15,#c8a84e08)",borderRadius:8,border:"1.5px solid "+T.gold,textAlign:"center"}}>
+                    <div style={{fontSize:".74rem",fontWeight:700,color:T.goldD,marginBottom:2}}>🎁 Unlock all 3 — <span style={{textDecoration:"line-through",opacity:0.6}}>₹300</span> ₹200</div>
+                    <div style={{fontSize:".6rem",color:T.mute,marginBottom:6}}>Digital strategy + Content calendar + #1 plan — save ₹100</div>
+                    <button onClick={async()=>{
+                      if(window.confirm("🎁 Unlock ALL 3 premium insights for ₹200 (save ₹100).\n\nSend request to admin?")){
+                        try{await fbAdd("adminMessages",{uid:au?.uid,name:uName,email:au?.email||"",subject:"🎁 Bundle: All 3 premium insights (₹200)",message:"I want the complete marketing bundle:\n• Digital marketing strategy\n• Content calendar\n• How to get to #1\n\nBundle: ₹200 (save ₹100). Please share payment details.",type:"advisor_unlock_bundle",status:"pending",createdAt:Date.now()});sh("✅ Bundle request sent!");}catch(e){sh("Failed")}
+                      }
+                    }} style={{background:"linear-gradient(135deg,#c8a84e,#a88832)",color:"#fff",border:"none",borderRadius:6,padding:"7px 20px",fontSize:".76rem",fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Unlock bundle — ₹200</button>
                   </div>
                 </div>
 
