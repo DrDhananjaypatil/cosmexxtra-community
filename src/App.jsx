@@ -6846,12 +6846,14 @@ ${forDownload
                 <div style={{marginBottom:10,padding:10,background:"linear-gradient(135deg,#0d6b6e05,#c8a84e10)",borderRadius:8,border:"1px solid "+T.gold+"33"}}>
                   <div style={{fontSize:".72rem",fontWeight:700,color:T.goldD,marginBottom:8}}>🎯 AI MARKETING INSIGHTS (no extra cost)</div>
                   <div style={{display:"flex",flexDirection:"column",gap:5}}>
-                    {[
+                    {(()=>{
+                      const hasPremium=Array.isArray(prof?.premiumFeatures)&&prof.premiumFeatures.includes("advisor_marketing");
+                      return[
                       ["🔑 Keyword strategy","Based on my "+competitors.competitors.length+" competitors in "+(prof?.clinicDetails?.city||"my area")+", suggest the top 20 Google keywords I should target for my GMB profile, Google Ads, and website SEO. Include long-tail keywords specific to my services and location. Format as a table with keyword, search intent, and competition level.",false],
                       ["📱 GMB optimization plan","Analyze my competitors' Google presence. Based on the categories they use ("+((competitors.summary.categoryFrequency||[]).slice(0,5).map(c=>c[0]).join(", "))+"), their avg "+competitors.summary.avgRating+"★ rating and "+competitors.summary.avgReviews+" avg reviews, give me a step-by-step GMB optimization plan to outrank them. Include: categories to add, posting schedule, review strategy, photo strategy.",false],
-                      ["💻 Digital marketing strategy","Create a complete digital marketing plan for my area with "+competitors.competitors.length+" competitors. Include: Google Ads budget recommendation, Instagram strategy, Facebook targeting, WhatsApp marketing, and local SEO tactics specific to "+(prof?.clinicDetails?.city||"my city")+".",true],
-                      ["📝 Content calendar","Create a 4-week social media content calendar for my clinic. Include specific post ideas for Instagram, Facebook, and Google Posts that target the same audience my "+competitors.summary.within5km+" nearby competitors are reaching.",true],
-                      ["🏆 How to get to #1","My strongest nearby competitor has "+competitors.competitors[0]?.rating+"★ with "+competitors.competitors[0]?.reviewCount+" reviews. Create a 90-day action plan to overtake them in local Google search results. Be specific with weekly targets.",true],
+                      ["💻 Digital marketing strategy","Create a complete digital marketing plan for my area with "+competitors.competitors.length+" competitors. Include: Google Ads budget recommendation, Instagram strategy, Facebook targeting, WhatsApp marketing, and local SEO tactics specific to "+(prof?.clinicDetails?.city||"my city")+".",!hasPremium],
+                      ["📝 Content calendar","Create a 4-week social media content calendar for my clinic. Include specific post ideas for Instagram, Facebook, and Google Posts that target the same audience my "+competitors.summary.within5km+" nearby competitors are reaching.",!hasPremium],
+                      ["🏆 How to get to #1","My strongest nearby competitor has "+competitors.competitors[0]?.rating+"★ with "+competitors.competitors[0]?.reviewCount+" reviews. Create a 90-day action plan to overtake them in local Google search results. Be specific with weekly targets.",!hasPremium],
                     ].map(([label,prompt,locked])=><button key={label} onClick={async()=>{
                       if(locked){
                         if(window.confirm("🔒 Premium insight — ₹100 to unlock.\n\nThis generates a detailed "+label.slice(2)+" customized for your market.\n\nSend unlock request to admin?")){
@@ -6860,15 +6862,20 @@ ${forDownload
                         return;
                       }
                       setAdvisorInput(prompt);
+                      // Log premium usage for admin tracking
+                      if(hasPremium&&["💻","📝","🏆"].some(ic=>label.startsWith(ic))){
+                        try{await fbAdd("adminMessages",{uid:au?.uid,name:uName,email:au?.email||"",subject:"📊 Premium used: "+label.slice(2),message:uName+" used premium insight: "+label,type:"premium_usage_log",status:"replied",createdAt:Date.now()});}catch(e){}
+                      }
                     }} style={{textAlign:"left",padding:"7px 10px",background:locked?"#f9f9f9":"#fff",border:"1px solid "+(locked?"#ddd":T.gold+"44"),borderRadius:6,cursor:"pointer",fontSize:".7rem",color:locked?T.mute:T.txt2,fontFamily:"inherit",lineHeight:1.4,position:"relative",opacity:locked?0.85:1}} onMouseEnter={e=>{if(!locked){e.currentTarget.style.borderColor=T.goldD;e.currentTarget.style.background=T.goldBg}}} onMouseLeave={e=>{if(!locked){e.currentTarget.style.borderColor=T.gold+"44";e.currentTarget.style.background="#fff"}}}>
                       <span style={{display:"flex",alignItems:"center",gap:6}}>
                         {label}
                         {locked&&<span style={{marginLeft:"auto",fontSize:".58rem",fontWeight:700,background:"linear-gradient(135deg,#c8a84e,#a88832)",color:"#fff",padding:"2px 8px",borderRadius:4,flexShrink:0}}>🔒 ₹100</span>}
                       </span>
-                    </button>)}
+                    </button>);
+                    })()}
                   </div>
-                  {/* Bundle offer */}
-                  <div style={{marginTop:8,padding:"10px 12px",background:"linear-gradient(135deg,#c8a84e15,#c8a84e08)",borderRadius:8,border:"1.5px solid "+T.gold,textAlign:"center"}}>
+                  {/* Bundle offer — hidden if already premium */}
+                  {!(Array.isArray(prof?.premiumFeatures)&&prof.premiumFeatures.includes("advisor_marketing"))&&<div style={{marginTop:8,padding:"10px 12px",background:"linear-gradient(135deg,#c8a84e15,#c8a84e08)",borderRadius:8,border:"1.5px solid "+T.gold,textAlign:"center"}}>
                     <div style={{fontSize:".74rem",fontWeight:700,color:T.goldD,marginBottom:2}}>🎁 Unlock all 3 — <span style={{textDecoration:"line-through",opacity:0.6}}>₹300</span> ₹200</div>
                     <div style={{fontSize:".6rem",color:T.mute,marginBottom:6}}>Digital strategy + Content calendar + #1 plan — save ₹100</div>
                     <button onClick={async()=>{
@@ -6876,7 +6883,7 @@ ${forDownload
                         try{await fbAdd("adminMessages",{uid:au?.uid,name:uName,email:au?.email||"",subject:"🎁 Bundle: All 3 premium insights (₹200)",message:"I want the complete marketing bundle:\n• Digital marketing strategy\n• Content calendar\n• How to get to #1\n\nBundle: ₹200 (save ₹100). Please share payment details.",type:"advisor_unlock_bundle",status:"pending",createdAt:Date.now()});sh("✅ Bundle request sent!");}catch(e){sh("Failed")}
                       }
                     }} style={{background:"linear-gradient(135deg,#c8a84e,#a88832)",color:"#fff",border:"none",borderRadius:6,padding:"7px 20px",fontSize:".76rem",fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Unlock bundle — ₹200</button>
-                  </div>
+                  </div>}
                 </div>
 
                 {/* AI Deep Analysis buttons — uses existing Gemini API, no extra cost */}
@@ -12645,6 +12652,22 @@ ${forDownload
             <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>✉️ Messages to Admin</h4>
             <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.55}}>Every "Contact Admin" message, who sent it, and our reply trail.</p>
           </div>
+          {/* Premium users summary */}
+          {(()=>{
+            const premUsers=allUsers.filter(u=>Array.isArray(u.premiumFeatures)&&u.premiumFeatures.includes("advisor_marketing"));
+            const pendingUnlocks=adminMessages.filter(m=>(m.type==="advisor_unlock"||m.type==="advisor_unlock_bundle")&&m.status!=="replied");
+            const usageLogs=adminMessages.filter(m=>m.type==="premium_usage_log");
+            if(premUsers.length===0&&pendingUnlocks.length===0)return null;
+            return(<div style={{...T.card,marginBottom:14,borderLeft:"3px solid "+T.gold}}>
+              <div style={{fontSize:".88rem",fontWeight:700,marginBottom:8}}>💎 Premium insights</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8,marginBottom:8}}>
+                <div style={{textAlign:"center",padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:"1.1rem",fontWeight:700,color:T.goldD}}>{premUsers.length}</div><div style={{fontSize:".56rem",color:T.mute}}>Active premium</div></div>
+                <div style={{textAlign:"center",padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:"1.1rem",fontWeight:700,color:T.err}}>{pendingUnlocks.length}</div><div style={{fontSize:".56rem",color:T.mute}}>Pending requests</div></div>
+                <div style={{textAlign:"center",padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:"1.1rem",fontWeight:700,color:T.teal}}>{usageLogs.length}</div><div style={{fontSize:".56rem",color:T.mute}}>Total uses</div></div>
+              </div>
+              {premUsers.length>0&&<div style={{fontSize:".72rem",color:T.txt2}}>Active: {premUsers.map(u=>u.name||u.email).join(", ")}</div>}
+            </div>);
+          })()}
           {adminMessages.length===0?<p style={{color:T.mute}}>No messages yet.</p>:
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             {[...adminMessages].sort((a,b)=>(a.status==="replied"?1:0)-(b.status==="replied"?1:0)||tsToMillis(b.createdAt)-tsToMillis(a.createdAt)).map(m=>(
@@ -12652,11 +12675,38 @@ ${forDownload
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
                   <div>
                     <div style={{fontSize:".92rem",fontWeight:700}}>{m.subject}</div>
-                    <div style={{fontSize:".76rem",color:T.mute,marginTop:2}}>{m.senderName} · {m.senderEmail}</div>
+                    <div style={{fontSize:".76rem",color:T.mute,marginTop:2}}>{m.name||m.senderName||"Unknown"} · {m.email||m.senderEmail||""} · {fD(tsToDateStr(m.createdAt))}</div>
                   </div>
-                  <span style={{fontSize:".68rem",fontWeight:700,padding:"3px 10px",borderRadius:8,background:m.status==="replied"?"#e8f5e9":"#fff3cd",color:m.status==="replied"?"#1a7d42":"#856404"}}>{m.status==="replied"?"✓ Replied":"⏳ Open"}</span>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    {(m.type==="advisor_unlock"||m.type==="advisor_unlock_bundle"||m.type==="advisor_upgrade")&&<span style={{fontSize:".62rem",fontWeight:700,padding:"2px 8px",borderRadius:5,background:"linear-gradient(135deg,#c8a84e,#a88832)",color:"#fff"}}>💎 Premium</span>}
+                    <span style={{fontSize:".68rem",fontWeight:700,padding:"3px 10px",borderRadius:8,background:m.status==="replied"?"#e8f5e9":"#fff3cd",color:m.status==="replied"?"#1a7d42":"#856404"}}>{m.status==="replied"?"✓ Replied":"⏳ Open"}</span>
+                  </div>
                 </div>
-                <div style={{fontSize:".84rem",color:T.txt2,marginTop:8,lineHeight:1.55}}>{m.message}</div>
+                <div style={{fontSize:".84rem",color:T.txt2,marginTop:8,lineHeight:1.55,whiteSpace:"pre-line"}}>{m.message}</div>
+                {/* Grant Premium Access button for unlock requests */}
+                {(m.type==="advisor_unlock"||m.type==="advisor_unlock_bundle"||m.type==="advisor_upgrade")&&m.uid&&(()=>{
+                  const targetUser=allUsers.find(u=>u.id===m.uid);
+                  const alreadyGranted=targetUser&&Array.isArray(targetUser.premiumFeatures)&&targetUser.premiumFeatures.includes("advisor_marketing");
+                  return(<div style={{marginTop:8,padding:"8px 12px",background:alreadyGranted?"#e8f5e9":"#fff8e1",borderRadius:8,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                    {alreadyGranted?<span style={{fontSize:".78rem",color:"#1a7d42",fontWeight:600}}>✅ Premium already granted to {targetUser?.name}</span>
+                    :<>
+                      <span style={{fontSize:".78rem",color:T.goldD,fontWeight:600}}>💎 Grant premium marketing insights to {targetUser?.name||"user"}?</span>
+                      <button onClick={async()=>{
+                        if(!window.confirm("Grant premium AI marketing insights to "+(targetUser?.name||"this user")+"?\n\nThis unlocks: Digital strategy, Content calendar, #1 plan"))return;
+                        const nextFeatures=[...(targetUser?.premiumFeatures||[]),"advisor_marketing"];
+                        await fbSet("users",m.uid,{premiumFeatures:nextFeatures,premiumGrantedAt:Date.now(),premiumGrantedBy:au.email});
+                        await fbSet("adminMessages",m.id,{status:"replied",adminReply:"✅ Premium marketing insights activated!",repliedAt:Date.now(),repliedBy:au.email});
+                        // Log the grant for audit
+                        await fbAdd("adminMessages",{uid:m.uid,name:"SYSTEM",email:"system",subject:"💎 Premium granted: "+m.type,message:"Admin ("+au.email+") granted advisor_marketing premium to "+(targetUser?.name||m.uid)+" at "+new Date().toLocaleString("en-IN"),type:"premium_grant_log",status:"replied",createdAt:Date.now()});
+                        sh("✅ Premium granted to "+(targetUser?.name||"user"));loadData();
+                      }} style={{...T.btn,...T.btnSm,fontSize:".72rem",background:"linear-gradient(135deg,#c8a84e,#a88832)",border:"none"}}>✓ Grant access</button>
+                      <button onClick={async()=>{
+                        await fbSet("adminMessages",m.id,{status:"replied",adminReply:"Payment pending — will activate after confirmation.",repliedAt:Date.now(),repliedBy:au.email});
+                        sh("Marked as pending");loadData();
+                      }} style={{...T.btnO,...T.btnSm,fontSize:".72rem",color:T.mute}}>Mark pending</button>
+                    </>}
+                  </div>);
+                })()}
                 {m.adminReply&&<div style={{marginTop:10,padding:"8px 12px",background:T.tealBg,borderRadius:8,borderLeft:"2px solid "+T.teal}}>
                   <div style={{fontSize:".68rem",fontWeight:700,color:T.teal,marginBottom:2}}>Our reply</div>
                   <div style={{fontSize:".82rem",color:T.txt2,lineHeight:1.5}}>{m.adminReply}</div>
