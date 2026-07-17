@@ -258,6 +258,15 @@ const BETA_STUDY_CAP_DEFAULT=25;
 // AI Advisor limits
 const ADVISOR_DAILY_MSG_LIMIT=10; // free tier: messages per day
 const ADVISOR_CONV_LENGTH_LIMIT=15; // max messages per conversation before forced new chat
+// ═══ SUBSCRIPTION PLANS ═══
+const SUB_PLANS=[
+  {id:"free",label:"Free",monthly:0,quarterly:0,annual:0,limits:{advisorDaily:10,convLength:15,savedChats:3,competitorScans:1,premiumInsights:false,studyAccess:false}},
+  {id:"pro",label:"Pro",monthly:499,quarterly:1347,annual:4491,limits:{advisorDaily:50,convLength:50,savedChats:25,competitorScans:5,premiumInsights:true,studyAccess:true}},
+  {id:"clinic_plus",label:"Clinic+",monthly:1499,quarterly:4047,annual:13491,limits:{advisorDaily:200,convLength:100,savedChats:999,competitorScans:999,premiumInsights:true,studyAccess:true}},
+  {id:"enterprise",label:"Enterprise",monthly:4999,quarterly:13497,annual:44991,limits:{advisorDaily:9999,convLength:9999,savedChats:9999,competitorScans:9999,premiumInsights:true,studyAccess:true}},
+];
+const SUB_CYCLES=[{id:"monthly",label:"Monthly",months:1},{id:"quarterly",label:"Quarterly (10% off)",months:3},{id:"annual",label:"Annual (25% off)",months:12}];
+
 const ADVISOR_PREMIUM_TIERS=[
   {id:"free",label:"Free",price:"₹0",daily:10,convLen:15,history:3,features:["Basic clinic growth advice","10 messages/day","15 messages per conversation","3 saved conversations"]},
   {id:"pro",label:"Pro",price:"₹499/mo",daily:50,convLen:50,history:25,features:["Advanced strategy & analytics","50 messages/day","50 messages per conversation","25 saved conversations","Priority AI responses","Market intelligence reports"]},
@@ -2562,7 +2571,8 @@ export default function App(){
   // Load saved competitor scan from user profile when visiting advisor page
   const competitorLoadedRef=useRef(false);
   useEffect(()=>{if(pg==="advisor"&&prof?.competitorScan&&!competitorLoadedRef.current){setCompetitors(prof.competitorScan);competitorLoadedRef.current=true;}},[pg]);
-  const[certConfig,setCertConfig]=useState({}); // {logoUrl, accreditations:[{name,logoUrl}], sponsorId, sponsorName, sponsorLogo, sponsorTagline}
+  const[certConfig,setCertConfig]=useState({});
+  const[revenueEntries,setRevenueEntries]=useState([]); // {logoUrl, accreditations:[{name,logoUrl}], sponsorId, sponsorName, sponsorLogo, sponsorTagline}
   // Test timer — decrements every second while user is taking a test.
   // NOTE: Must live AFTER studyView/activeTest state declarations above,
   // otherwise Vite's minifier triggers a TDZ crash on first render.
@@ -2800,7 +2810,7 @@ export default function App(){
     if(!consentDoctorReg)setConsentDoctorReg(prof.doctorRegNumber||prof.regNumber||"");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[pg,prof]);
-  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl,tm,wp,rv,am,ts,ta,bc,cc]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000),fbGetAll("teamMembers","createdAt","desc",2000),fbGetAll("wallPosts","createdAt","desc",500),fbGetAll("reviews","createdAt","desc",2000),fbGetAll("adminMessages","createdAt","desc",500),fbGetAll("testSeries","createdAt","desc",500),fbGetAll("testAttempts","createdAt","desc",500),fbGet("platformSettings","betaConfig"),fbGet("platformSettings","certConfig")]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl);setTeamMembers(tm);setWallPosts(wp);setReviews(rv);setAdminMessages(am);setTestSeries(ts);setTestAttempts(ta);setBetaConfig(bc||{});setCertConfig(cc||{})},[au?.uid]);
+  const loadData=useCallback(async()=>{const[q,a,r,v,f,cs,u,ad,ev,n,rw,rd,ra,ml,sub,va,pr,sp,pe,fl,tm,wp,rv,am,ts,ta,bc,cc,rev]=await Promise.all([fbGetAll("quizzes","date","desc",500),fbGetAll("articles","date","desc",300),fbGetAll("resources","order","asc"),fbGetAll("videos","order","asc"),fbGetAll("forum","createdAt","desc",500),fbGetAll("cases","createdAt","desc",500),fbGetAll("users","joined","desc",2000),fbGetAll("ads","createdAt","desc"),fbGetAll("events","date","asc",200),fbGetAll("news","createdAt","desc",30),fbGetAll("rewards","createdAt","desc",100),fbGetAll("redemptions","createdAt","desc",200),fbGetAll("roleApplications","createdAt","desc",100),fbGetAll("moderationLog","createdAt","desc",200),fbGetAll("submissions","createdAt","desc",200),fbGetAll("vendorApplications","createdAt","desc",100),fbGetAll("products","createdAt","desc",500),fbGetAll("sponsorPlacements","createdAt","desc",100),fbGetAll("productEnquiries","createdAt","desc",500),fbGetAll("follows","createdAt","desc",5000),fbGetAll("teamMembers","createdAt","desc",2000),fbGetAll("wallPosts","createdAt","desc",500),fbGetAll("reviews","createdAt","desc",2000),fbGetAll("adminMessages","createdAt","desc",500),fbGetAll("testSeries","createdAt","desc",500),fbGetAll("testAttempts","createdAt","desc",500),fbGet("platformSettings","betaConfig"),fbGet("platformSettings","certConfig"),fbGetAll("revenue","createdAt","desc",500)]);setQuizzes(q);setArticles(a);setResources(r);setVideos(v);setForumPosts(f);setCases(cs);setAllUsers(u);setAds(ad);setEvents(ev);setNewsPosts(n);setRewards(rw);setRedemptions(rd);setRoleApplications(ra);setModerationLog(ml);setSubmissions(sub);setVendorApplications(va);setProducts(pr);setSponsorPlacements(sp);setProductEnquiries(pe);setFollows(fl);setTeamMembers(tm);setWallPosts(wp);setReviews(rv);setAdminMessages(am);setTestSeries(ts);setTestAttempts(ta);setBetaConfig(bc||{});setCertConfig(cc||{});setRevenueEntries(rev)},[au?.uid]);
   // Auto-refresh data every 60 seconds — MUST be after loadData declaration to avoid TDZ
   useEffect(()=>{if(scr!=="main")return;const iv=setInterval(()=>{loadData()},60000);return()=>clearInterval(iv)},[scr,loadData]);
 
@@ -5401,6 +5411,27 @@ ${forDownload
   //    whose profile has the feature key in prof.betaFeatures. Admins can grant
   //    access from the Users admin tab. ──────────────────────────────────
   const hasBetaAccess=(feature)=>isAdm||(Array.isArray(prof?.betaFeatures)&&prof.betaFeatures.includes(feature));
+
+  // ═══ SUBSCRIPTION HELPERS ═══
+  const getActiveSub=()=>{
+    const sub=prof?.subscription;
+    if(!sub||!sub.plan||sub.plan==="free")return{plan:"free",active:false,expired:false};
+    const now=Date.now();
+    const end=sub.endDate||0;
+    if(end<now)return{...sub,plan:sub.plan,active:false,expired:true};
+    return{...sub,active:true,expired:false,daysLeft:Math.ceil((end-now)/(1000*60*60*24))};
+  };
+  const getPlanLimits=()=>{
+    const sub=getActiveSub();
+    const plan=SUB_PLANS.find(p=>p.id===sub.plan&&sub.active)||SUB_PLANS[0];
+    return plan.limits;
+  };
+  const isSubscribed=(minPlan)=>{
+    const sub=getActiveSub();
+    if(!sub.active)return minPlan==="free";
+    const order=["free","pro","clinic_plus","enterprise"];
+    return order.indexOf(sub.plan)>=order.indexOf(minPlan);
+  };
   // Resolve current cap for a beta feature from the Firestore config doc,
   // falling back to hardcoded default if the doc hasn't been created yet.
   const getBetaCap=(feature)=>{
@@ -9524,6 +9555,115 @@ ${forDownload
                 </div>
               </div>
 
+              {/* ═══ SUBSCRIPTION MANAGEMENT ═══ */}
+              <div style={{...T.card,borderLeft:"3px solid "+T.gold,marginBottom:14}}>
+                <div style={{fontSize:".88rem",fontWeight:700,marginBottom:8}}>💎 Subscription</div>
+                {(()=>{
+                  const sub=u.subscription||{};
+                  const isActive=sub.plan&&sub.plan!=="free"&&(sub.endDate||0)>Date.now();
+                  const isExpired=sub.plan&&sub.plan!=="free"&&(sub.endDate||0)<=Date.now();
+                  const daysLeft=isActive?Math.ceil(((sub.endDate||0)-Date.now())/(1000*60*60*24)):0;
+                  const planInfo=SUB_PLANS.find(p=>p.id===sub.plan);
+                  return(<div>
+                    {/* Current status */}
+                    <div style={{padding:10,background:isActive?"#e8f5e9":isExpired?"#fdecea":T.bg,borderRadius:8,marginBottom:10}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <div>
+                          <span style={{fontSize:".82rem",fontWeight:700,color:isActive?"#1a7d42":isExpired?T.err:T.mute}}>{isActive?"✅ Active":isExpired?"❌ Expired":"No subscription"}</span>
+                          {planInfo&&<span style={{fontSize:".72rem",color:T.txt2,marginLeft:8}}>{planInfo.label} ({sub.billingCycle||"—"})</span>}
+                        </div>
+                        {isActive&&<span style={{fontSize:".72rem",fontWeight:600,color:daysLeft<=7?T.err:daysLeft<=30?T.goldD:"#1a7d42"}}>{daysLeft} days left</span>}
+                      </div>
+                      {sub.startDate&&<div style={{fontSize:".66rem",color:T.mute,marginTop:4}}>{new Date(sub.startDate).toLocaleDateString("en-IN",{dateStyle:"medium"})} → {new Date(sub.endDate).toLocaleDateString("en-IN",{dateStyle:"medium"})}</div>}
+                    </div>
+
+                    {/* Grant / Change subscription */}
+                    <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginBottom:8}}>
+                      <select id={`sub-plan-${u.id}`} defaultValue={sub.plan||"free"} style={{...T.inp,fontSize:".78rem",flex:1}}>
+                        {SUB_PLANS.map(p=><option key={p.id} value={p.id}>{p.label}{p.monthly>0?` (₹${p.monthly}/mo)`:""}</option>)}
+                      </select>
+                      <select id={`sub-cycle-${u.id}`} defaultValue={sub.billingCycle||"monthly"} style={{...T.inp,fontSize:".78rem",flex:1}}>
+                        {SUB_CYCLES.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
+                      </select>
+                    </div>
+                    <div style={{display:"flex",gap:6}}>
+                      <button onClick={async()=>{
+                        const planId=document.getElementById(`sub-plan-${u.id}`).value;
+                        const cycleId=document.getElementById(`sub-cycle-${u.id}`).value;
+                        const plan=SUB_PLANS.find(p=>p.id===planId);
+                        const cycle=SUB_CYCLES.find(c=>c.id===cycleId);
+                        if(!plan||planId==="free"){sh("Select a paid plan");return}
+                        const startDate=Date.now();
+                        const endDate=startDate+(cycle.months*30*24*60*60*1000);
+                        const amount=plan[cycleId]||plan.monthly*cycle.months;
+                        if(!window.confirm(`Activate ${plan.label} (${cycle.label}) for ${u.name}?\n\nAmount: ₹${amount}\nPeriod: ${cycle.months} month(s)\nExpires: ${new Date(endDate).toLocaleDateString("en-IN",{dateStyle:"long"})}`))return;
+                        const newSub={plan:planId,billingCycle:cycleId,startDate,endDate,status:"active",grantedBy:au.email,grantedAt:Date.now(),amount,usage:{advisorMessages:0,competitorScans:0,premiumInsights:0}};
+                        const history=[...(u.subscription?.history||[]),{plan:planId,cycle:cycleId,start:startDate,end:endDate,amount,grantedBy:au.email}];
+                        // Also grant premiumFeatures if pro+
+                        const premFeat=[...(u.premiumFeatures||[])];
+                        if(!premFeat.includes("advisor_marketing"))premFeat.push("advisor_marketing");
+                        const betaFeat=[...(u.betaFeatures||[])];
+                        if(!betaFeat.includes("advisor"))betaFeat.push("advisor");
+                        if(!betaFeat.includes("study"))betaFeat.push("study");
+                        await fbSet("users",u.id,{subscription:{...newSub,history},premiumFeatures:premFeat,betaFeatures:betaFeat});
+                        // Log revenue
+                        await fbAdd("revenue",{uid:u.id,userName:u.name||"",userEmail:u.email||"",plan:planId,cycle:cycleId,amount,startDate,endDate,grantedBy:au.email,createdAt:Date.now(),type:"subscription",status:"paid"});
+                        sh(`✅ ${plan.label} activated for ${u.name} (₹${amount})`);loadData();
+                      }} style={{...T.btn,flex:1,fontSize:".78rem",background:"linear-gradient(135deg,#c8a84e,#a88832)",border:"none"}}>💎 Activate</button>
+                      {isActive&&<button onClick={async()=>{
+                        if(!window.confirm("Cancel "+u.name+"'s subscription? They'll keep access until "+new Date(sub.endDate).toLocaleDateString("en-IN")))return;
+                        await fbSet("users",u.id,{subscription:{...sub,status:"cancelled"}});
+                        sh("Cancelled");loadData();
+                      }} style={{...T.btnDanger,...T.btnSm,fontSize:".72rem"}}>Cancel</button>}
+                      {isActive&&<button onClick={async()=>{
+                        const extDays=parseInt(prompt("Extend by how many days?")||"0");
+                        if(!extDays||extDays<=0)return;
+                        const newEnd=(sub.endDate||Date.now())+extDays*24*60*60*1000;
+                        await fbSet("users",u.id,{subscription:{...sub,endDate:newEnd}});
+                        sh(`Extended by ${extDays} days → ${new Date(newEnd).toLocaleDateString("en-IN")}`);loadData();
+                      }} style={{...T.btnO,...T.btnSm,fontSize:".72rem"}}>+Days</button>}
+                    </div>
+
+                    {/* Subscription history */}
+                    {(sub.history||[]).length>0&&<div style={{marginTop:10}}>
+                      <div style={{fontSize:".66rem",fontWeight:700,color:T.mute,textTransform:"uppercase",marginBottom:4}}>History</div>
+                      {(sub.history||[]).map((h,i)=><div key={i} style={{fontSize:".68rem",color:T.txt2,padding:"3px 0",borderBottom:"1px solid "+T.border}}>
+                        {SUB_PLANS.find(p=>p.id===h.plan)?.label||h.plan} · ₹{h.amount} · {new Date(h.start).toLocaleDateString("en-IN",{dateStyle:"short"})}→{new Date(h.end).toLocaleDateString("en-IN",{dateStyle:"short"})}
+                      </div>)}
+                    </div>}
+                  </div>);
+                })()}
+              </div>
+
+              {/* ═══ MANUAL PAYMENT / REVENUE ENTRY ═══ */}
+              <div style={{...T.card,borderLeft:"3px solid #1a7d42",marginBottom:14}}>
+                <div style={{fontSize:".88rem",fontWeight:700,marginBottom:8}}>💰 Record payment</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
+                  <input id={`pay-amt-${u.id}`} type="number" placeholder="Amount ₹" style={{...T.inp,width:100,fontSize:".78rem"}}/>
+                  <select id={`pay-type-${u.id}`} style={{...T.inp,fontSize:".78rem",flex:1}}>
+                    <option value="subscription">Subscription payment</option>
+                    <option value="premium_unlock">Premium insights unlock</option>
+                    <option value="competitor_scan">Competitor scan pack</option>
+                    <option value="consultation">Consultation fee</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  <input id={`pay-ref-${u.id}`} placeholder="Payment ref (UPI/Bank/Cash)" style={{...T.inp,flex:1,fontSize:".78rem"}}/>
+                  <button onClick={async()=>{
+                    const amt=parseInt(document.getElementById(`pay-amt-${u.id}`).value);
+                    const type=document.getElementById(`pay-type-${u.id}`).value;
+                    const ref=document.getElementById(`pay-ref-${u.id}`).value.trim();
+                    if(!amt||amt<=0){sh("Enter amount");return}
+                    if(!ref){sh("Enter payment reference");return}
+                    await fbAdd("revenue",{uid:u.id,userName:u.name||"",userEmail:u.email||"",amount:amt,type,paymentRef:ref,note:"Manual entry by admin",grantedBy:au.email,createdAt:Date.now(),status:"paid"});
+                    sh(`✅ ₹${amt} recorded for ${u.name}`);
+                    document.getElementById(`pay-amt-${u.id}`).value="";document.getElementById(`pay-ref-${u.id}`).value="";
+                    loadData();
+                  }} style={{...T.btn,...T.btnSm,fontSize:".78rem",background:"#1a7d42",border:"none"}}>💰 Record</button>
+                </div>
+              </div>
+
               {/* ═══ STUDY / TEST HISTORY (admin, collapsible) ═══ */}
               {(()=>{
                 const uAttempts=testAttempts.filter(a=>a.uid===u.id);
@@ -11469,7 +11609,7 @@ ${forDownload
         </h3>
         <div style={{position:"sticky",top:0,zIndex:30,background:T.bg,padding:"10px 0",marginBottom:16,marginInline:-12,paddingInline:12,borderBottom:"1px solid "+T.border}}>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-          {[["stats","📊 Overview"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["vendors","🏢 Vendors"],["flagged","🚩 Flagged"],["lowreviews","⭐ Low Reviews"],["placements","📢 Placements"],["messages","✉️ Messages"],["beta","🎯 Beta"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["consents","📋 Consents"],["referrals","🎁 Referrals"],["users","👥 Users"]].map(([id,l])=>{
+          {[["stats","📊 Overview"],["revenue","💰 Revenue"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["vendors","🏢 Vendors"],["flagged","🚩 Flagged"],["lowreviews","⭐ Low Reviews"],["placements","📢 Placements"],["messages","✉️ Messages"],["beta","🎯 Beta"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["consents","📋 Consents"],["referrals","🎁 Referrals"],["users","👥 Users"]].map(([id,l])=>{
             const flagCount=wallPosts.filter(w=>w.active!==false&&Array.isArray(w.flags)&&w.flags.length>0).length;
             const lowRev=reviews.filter(r=>r.active!==false&&r.rating<=2).length;
             const unreadMsg=adminMessages.filter(m=>m.status!=="replied").length;
@@ -11595,6 +11735,72 @@ ${forDownload
             */}
           </div>
         </>}
+        {aTab==="revenue"&&<div>
+          <div style={{...T.card,marginBottom:14}}>
+            <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6}}>💰 Revenue Dashboard</h4>
+            <p style={{fontSize:".82rem",color:T.txt2}}>Track all payments, subscriptions, and revenue from SKINARIO services.</p>
+          </div>
+
+          {/* Revenue summary */}
+          {(()=>{
+            const now=Date.now();
+            const thisMonth=new Date().toISOString().slice(0,7);
+            const allPaid=revenueEntries.filter(r=>r.status==="paid");
+            const totalRevenue=allPaid.reduce((s,r)=>s+(r.amount||0),0);
+            const monthRevenue=allPaid.filter(r=>{const d=r.createdAt?.seconds?new Date(r.createdAt.seconds*1000):new Date(r.createdAt);return d.toISOString().slice(0,7)===thisMonth;}).reduce((s,r)=>s+(r.amount||0),0);
+            const activeSubs=allUsers.filter(u=>u.subscription?.plan&&u.subscription.plan!=="free"&&(u.subscription.endDate||0)>now);
+            const mrr=activeSubs.reduce((s,u)=>{const p=SUB_PLANS.find(pl=>pl.id===u.subscription?.plan);return s+(p?.monthly||0);},0);
+            const byType={};allPaid.forEach(r=>{byType[r.type||"other"]=(byType[r.type||"other"]||0)+(r.amount||0);});
+
+            return(<>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:14}}>
+                {[["₹"+(totalRevenue/1000).toFixed(1)+"K","Total revenue","#1a7d42"],["₹"+(monthRevenue/1000).toFixed(1)+"K","This month","#0d6b6e"],["₹"+mrr,"Est. MRR","#c8a84e"],[activeSubs.length,"Active subs","#555"],[allPaid.length,"Transactions","#888"]].map(([v,l,c])=><div key={l} style={{...T.card,textAlign:"center",padding:14,marginBottom:0}}>
+                  <div style={{fontSize:"1.3rem",fontWeight:700,color:c}}>{v}</div>
+                  <div style={{fontSize:".62rem",color:T.mute,textTransform:"uppercase",letterSpacing:.5}}>{l}</div>
+                </div>)}
+              </div>
+
+              {/* Revenue by type */}
+              {Object.keys(byType).length>0&&<div style={{...T.card,marginBottom:14}}>
+                <div style={{fontSize:".82rem",fontWeight:700,marginBottom:8}}>Revenue by category</div>
+                {Object.entries(byType).sort((a,b)=>b[1]-a[1]).map(([type,amt])=><div key={type} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                  <span style={{fontSize:".74rem",flex:1,textTransform:"capitalize"}}>{type.replace(/_/g," ")}</span>
+                  <div style={{width:120,height:8,background:"#e8e8e8",borderRadius:4,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:Math.round(amt/totalRevenue*100)+"%",background:"#1a7d42",borderRadius:4}}/>
+                  </div>
+                  <span style={{fontSize:".74rem",fontWeight:700,minWidth:60,textAlign:"right"}}>₹{amt.toLocaleString("en-IN")}</span>
+                </div>)}
+              </div>}
+
+              {/* Active subscribers */}
+              {activeSubs.length>0&&<div style={{...T.card,marginBottom:14}}>
+                <div style={{fontSize:".82rem",fontWeight:700,marginBottom:8}}>Active subscribers ({activeSubs.length})</div>
+                {activeSubs.map(u=>{const sub=u.subscription;const plan=SUB_PLANS.find(p=>p.id===sub?.plan);const daysLeft=Math.ceil(((sub?.endDate||0)-now)/(86400000));
+                  return<div key={u.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:T.bg,borderRadius:8,marginBottom:4,borderLeft:"3px solid "+(daysLeft<=7?T.err:daysLeft<=30?T.goldD:"#1a7d42")}}>
+                    <div style={{flex:1}}><div style={{fontSize:".78rem",fontWeight:600}} onClick={()=>viewProfile(u.id)} style={{cursor:"pointer"}}>{u.name}</div><div style={{fontSize:".62rem",color:T.mute}}>{u.email}</div></div>
+                    <span style={{fontSize:".72rem",fontWeight:600,color:T.teal}}>{plan?.label}</span>
+                    <span style={{fontSize:".66rem",color:daysLeft<=7?T.err:daysLeft<=30?T.goldD:"#1a7d42",fontWeight:600}}>{daysLeft}d left</span>
+                  </div>;
+                })}
+              </div>}
+
+              {/* Transaction log */}
+              <div style={{...T.card}}>
+                <div style={{fontSize:".82rem",fontWeight:700,marginBottom:8}}>Transaction log ({allPaid.length})</div>
+                <div style={{maxHeight:400,overflowY:"auto"}}>
+                  {allPaid.sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt)).map(r=><div key={r.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderBottom:"1px solid "+T.border,fontSize:".76rem"}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:600}}>{r.userName||"—"}</div>
+                      <div style={{fontSize:".62rem",color:T.mute}}>{r.type?.replace(/_/g," ")} · {r.paymentRef||r.plan||"—"} · {fD(tsToDateStr(r.createdAt))}</div>
+                    </div>
+                    <span style={{fontWeight:700,color:"#1a7d42"}}>₹{(r.amount||0).toLocaleString("en-IN")}</span>
+                  </div>)}
+                </div>
+              </div>
+            </>);
+          })()}
+        </div>}
+
         {aTab==="quiz"&&<div style={T.card}>{edForm?.type==="quizzes"?<AdminForm type="Quiz sponsor" edForm={edForm} setEdForm={setEdForm} fields={[["sponsored","Mark as sponsored quiz","check"],["sponsor","Sponsor name (e.g. 'Sun Pharma')"],["sponsorLogo","Sponsor logo","image"],["sponsorUrl","Sponsor URL (optional — makes name clickable)"]]} onSave={()=>saveContent("quizzes")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{quizzes.length} questions</span><button onClick={genQuiz} style={T.btn}>🤖 Generate today</button></div>
           {quizzes.map(q=><div key={q.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border,gap:10}}><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,fontSize:".88rem"}}>{q.cat} — {q.diff} {q.sponsored&&<span style={{...T.tag(T.goldBg,T.goldD),marginLeft:6}}>📢 {q.sponsor||"Sponsored"}</span>}</div><div style={{fontSize:".72rem",color:T.mute}}>{fD(q.date)} · {Object.keys(q.answers||{}).length} answers · ❤️ {q.likes||0}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>{setSelD(q.date);go("quiz")}} style={{...T.btnO,...T.btnSm}}>View</button><button onClick={()=>setIgPost({item:q,type:"quiz"})} style={{...T.btnO,...T.btnSm}} title="Generate Instagram post">📸 IG</button><button onClick={()=>setEdForm({type:"quizzes",data:{...q},editing:true})} style={{...T.btnO,...T.btnSm}}>📢 Sponsor</button><button onClick={()=>deleteContent("quizzes",q.id,q.cat)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}

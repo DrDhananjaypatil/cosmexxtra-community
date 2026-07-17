@@ -150,6 +150,11 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    match /revenue/{entryId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
     // ── sponsorPlacements — vendor requests; admin approves/activates ──────
     match /sponsorPlacements/{placementId} {
       allow read: if isSignedIn();
