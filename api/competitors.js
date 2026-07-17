@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) return res.status(500).json({ ok: false, error: "GOOGLE_PLACES_API_KEY not configured in Vercel env" });
 
-    const { lat, lng, radius = 15000, city } = req.body || {};
+    const { lat, lng, radius = 15000, city, businessType } = req.body || {};
 
     // If no coordinates but city provided, geocode the city first
     let searchLat = lat;
@@ -25,7 +25,6 @@ export default async function handler(req, res) {
         searchLat = geoData.results[0].geometry.location.lat;
         searchLng = geoData.results[0].geometry.location.lng;
       } else {
-        // Return the actual Google error so we can debug
         return res.status(400).json({ 
           ok: false, 
           error: geoData.status === "REQUEST_DENIED" 
@@ -43,13 +42,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "Provide lat/lng or city name" });
     }
 
-    // Search for aesthetic/dermatology clinics nearby
-    const searchQueries = [
-      "aesthetic clinic",
-      "skin clinic dermatologist",
-      "cosmetology clinic",
-      "laser skin clinic",
-    ];
+    // Account-type-specific search queries
+    const searchQueriesMap = {
+      doctor: ["aesthetic clinic", "skin clinic dermatologist", "cosmetology clinic", "laser skin clinic"],
+      vendor: ["aesthetic medical equipment supplier", "dermatology product distributor", "cosmetic medicine supplies", "skincare brand distributor"],
+      institute: ["aesthetic medicine training institute", "cosmetology course academy", "dermatology training center", "beauty academy cosmetology"],
+    };
+    const searchQueries = searchQueriesMap[businessType] || searchQueriesMap.doctor;
 
     const allPlaces = [];
     const seenIds = new Set();

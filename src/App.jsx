@@ -6623,10 +6623,15 @@ ${forDownload
 
             {/* Local Competition Scanner */}
             <div style={{...T.card,padding:14,marginBottom:14}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+              {(()=>{
+                const acType=normalizeAccountType(prof?.accountType||"");
+                const isVendor=acType==="vendor"||acType==="brand";
+                const isInstitute=acType==="institute";
+                const scanLabel=isVendor?"competitor distributors/suppliers":isInstitute?"competing institutes/academies":"competitor clinics";
+                return(<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
                 <div style={{flex:1}}>
                   <div style={{fontSize:".88rem",fontWeight:700}}>📍 Local competition</div>
-                  <div style={{fontSize:".68rem",color:T.mute}}>{competitors?`${competitors.summary.totalFound} clinics found${prof?.competitorScanCity?" near "+prof.competitorScanCity:""}${prof?.competitorScanDate?" · scanned "+fD(new Date(prof.competitorScanDate).toISOString().slice(0,10)):""}`:"Scan to discover competitors within 15km"}</div>
+                  <div style={{fontSize:".68rem",color:T.mute}}>{competitors?`${competitors.summary.totalFound} ${scanLabel} found${prof?.competitorScanCity?" near "+prof.competitorScanCity:""}${prof?.competitorScanDate?" · scanned "+fD(new Date(prof.competitorScanDate).toISOString().slice(0,10)):""}`:`Scan to discover ${scanLabel} within 15km`}</div>
                 </div>
                 <input id="scan-city-input" defaultValue={prof?.clinicDetails?.city||prof?.city||""} placeholder="Your location (e.g. Pune)" style={{...T.inp,width:140,fontSize:".78rem",padding:"5px 8px"}}/>
                 <button disabled={competitorLoading} onClick={async()=>{
@@ -6634,7 +6639,9 @@ ${forDownload
                   const cityInput=document.getElementById("scan-city-input")?.value?.trim();
                   if(!cityInput){sh("Type your city name first");setCompetitorLoading(false);return;}
                   try{
-                    const r=await fetch("/api/competitors",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({city:cityInput,radius:15000})});
+                    const acType=normalizeAccountType(prof?.accountType||"");
+                    const bizType=acType==="vendor"||acType==="brand"?"vendor":acType==="institute"?"institute":"doctor";
+                    const r=await fetch("/api/competitors",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({city:cityInput,radius:15000,businessType:bizType})});
                     const data=await r.json();
                     if(data.ok){
                       setCompetitors(data);
@@ -6646,7 +6653,8 @@ ${forDownload
                   }catch(e){sh("Connection error")}
                   setCompetitorLoading(false);
                 }} style={{...T.btn,...T.btnSm,fontSize:".74rem",opacity:competitorLoading?0.5:1}}>{competitorLoading?"Scanning...":"🔍 Scan"}</button>
-              </div>
+              </div>);
+              })()}
               {competitors&&<div style={{marginTop:12}}>
                 {/* Summary stats */}
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(80px,1fr))",gap:6,marginBottom:10}}>
@@ -6701,15 +6709,33 @@ ${forDownload
                 {/* AI Deep Analysis buttons — uses existing Gemini API, no extra cost */}
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
                   <div style={{fontSize:".7rem",fontWeight:700,color:T.teal,marginBottom:2}}>🧠 AI ANALYSIS (no extra cost)</div>
-                  {[
-                    ["📊 Full competitive analysis","Analyze all "+competitors.competitors.length+" competitors near me in detail. Top 5 threats by rating and reviews. My positioning opportunities. Pricing strategy based on this competitive density. What gaps exist that I can fill?"],
-                    ["🎯 My top 5 threats","Who are my top 5 most dangerous competitors based on rating, reviews, and proximity? What makes them strong? How can I differentiate from each?"],
-                    ["💰 Pricing strategy","Based on "+competitors.summary.totalFound+" competitors with avg "+competitors.summary.avgRating+"★ rating in my area, what should my pricing strategy be? Should I go premium or competitive?"],
-                    ["📈 Growth opportunities","What untapped opportunities exist in my area given this competitive landscape? Are there service gaps? Underserved patient segments?"],
-                    ["⭐ Review strategy","I have "+competitors.summary.totalFound+" competitors. The top rated has "+competitors.competitors[0]?.rating+"★ with "+competitors.competitors[0]?.reviewCount+" reviews. How do I build reviews to beat them?"],
-                  ].map(([label,prompt])=><button key={label} onClick={()=>setAdvisorInput(prompt)} style={{textAlign:"left",padding:"7px 10px",background:T.bg,border:"1px solid "+T.border,borderRadius:6,cursor:"pointer",fontSize:".72rem",color:T.txt2,fontFamily:"inherit"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.background=T.tealBg}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background=T.bg}}>
-                    {label}
-                  </button>)}
+                  {(()=>{
+                    const acType=normalizeAccountType(prof?.accountType||"");
+                    const isV=acType==="vendor"||acType==="brand";
+                    const isI=acType==="institute";
+                    const prompts=isV?[
+                      ["📊 Market analysis","Analyze the "+competitors.summary.totalFound+" aesthetic businesses near me. Who are the top clinics I should target as customers? What products are they likely buying? How should I approach them?"],
+                      ["🎯 Sales targets","Based on "+competitors.summary.within5km+" clinics within 5km, estimate my addressable market. How many could be my customers? What's the potential monthly revenue?"],
+                      ["💰 Pricing strategy","With "+competitors.summary.totalFound+" clinics in my area, how should I price my products competitively? Should I go volume or premium?"],
+                      ["📈 Distribution plan","Create a distribution strategy for covering "+competitors.summary.totalFound+" clinics in my area. Prioritize by proximity and size."],
+                      ["🤝 Partnership opportunities","Which of these "+competitors.summary.totalFound+" clinics would be ideal exclusive partners or flagship accounts?"],
+                    ]:isI?[
+                      ["📊 Market analysis","Analyze "+competitors.summary.totalFound+" competing institutes/academies near me. What courses do they likely offer? How can I differentiate?"],
+                      ["🎯 Student acquisition","With "+competitors.summary.totalFound+" competing training centers, how do I attract more students? What marketing channels work best?"],
+                      ["💰 Course pricing","Based on this competitive landscape, how should I price my courses? Premium or accessible?"],
+                      ["📈 Curriculum gaps","What training gaps exist that competitors aren't addressing? What new courses should I launch?"],
+                      ["🤝 Clinic partnerships","How can I partner with the "+competitors.summary.within5km+" clinics within 5km for practical training placements?"],
+                    ]:[
+                      ["📊 Full competitive analysis","Analyze all "+competitors.competitors.length+" competitors in detail. Top 5 threats. Positioning opportunities. Pricing strategy. What gaps can I fill?"],
+                      ["🎯 My top 5 threats","Who are my 5 most dangerous competitors by rating, reviews, proximity? How to differentiate from each?"],
+                      ["💰 Pricing strategy","Based on "+competitors.summary.totalFound+" competitors with avg "+competitors.summary.avgRating+"★, what should my pricing be? Premium or competitive?"],
+                      ["📈 Growth opportunities","What untapped opportunities exist? Service gaps? Underserved patient segments?"],
+                      ["⭐ Review strategy","Top competitor has "+competitors.competitors[0]?.rating+"★ with "+competitors.competitors[0]?.reviewCount+" reviews. How do I beat them?"],
+                    ];
+                    return prompts.map(([label,prompt])=><button key={label} onClick={()=>setAdvisorInput(prompt)} style={{textAlign:"left",padding:"7px 10px",background:T.bg,border:"1px solid "+T.border,borderRadius:6,cursor:"pointer",fontSize:".72rem",color:T.txt2,fontFamily:"inherit"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.background=T.tealBg}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background=T.bg}}>
+                      {label}
+                    </button>);
+                  })()}
                 </div>
               </div>}
             </div>
