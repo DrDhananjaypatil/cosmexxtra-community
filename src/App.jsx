@@ -2566,6 +2566,8 @@ export default function App(){
   const[advisorViewChat,setAdvisorViewChat]=useState(null); // viewing a saved conversation
   const[advisorDailyCount,setAdvisorDailyCount]=useState(0);
   const[advisorDailyDate,setAdvisorDailyDate]=useState("");
+  // Helper: set prompt + scroll to chat + focus textarea
+  const setAdvisorPrompt=(text)=>{setAdvisorInput(text);setAdvisorViewChat(null);setTimeout(()=>{const ta=document.querySelector("[data-advisor-input]");if(ta){ta.scrollIntoView({behavior:"smooth",block:"center"});ta.focus();}},150);};
   const[competitors,setCompetitors]=useState(null); // {competitors:[], summary:{}}
   const[competitorLoading,setCompetitorLoading]=useState(false);
   // Load saved competitor scan from user profile when visiting advisor page
@@ -6892,10 +6894,14 @@ ${forDownload
                         }
                         return;
                       }
-                      setAdvisorInput(prompt);
-                      // Log premium usage for admin tracking
+                      setAdvisorPrompt(prompt);
+                      // Track usage in user's subscription doc (not in Messages)
                       if(hasPremium&&["💻","📝","🏆"].some(ic=>label.startsWith(ic))){
-                        try{await fbAdd("adminMessages",{uid:au?.uid,name:uName,email:au?.email||"",subject:"📊 Premium used: "+label.slice(2),message:uName+" used premium insight: "+label,type:"premium_usage_log",status:"replied",createdAt:Date.now()});}catch(e){}
+                        try{
+                          const usageLog=[...(prof?.subscription?.usageLog||[]),{insight:label.slice(2),at:Date.now()}];
+                          const usage={...(prof?.subscription?.usage||{}),premiumInsights:((prof?.subscription?.usage?.premiumInsights)||0)+1};
+                          await fbSet("users",prof.id,{subscription:{...(prof?.subscription||{}),usage,usageLog:usageLog.slice(-50)}});
+                        }catch(e){}
                       }
                     }} style={{textAlign:"left",padding:"7px 10px",background:locked?"#f9f9f9":"#fff",border:"1px solid "+(locked?"#ddd":T.gold+"44"),borderRadius:6,cursor:"pointer",fontSize:".7rem",color:locked?T.mute:T.txt2,fontFamily:"inherit",lineHeight:1.4,position:"relative",opacity:locked?0.85:1}} onMouseEnter={e=>{if(!locked){e.currentTarget.style.borderColor=T.goldD;e.currentTarget.style.background=T.goldBg}}} onMouseLeave={e=>{if(!locked){e.currentTarget.style.borderColor=T.gold+"44";e.currentTarget.style.background="#fff"}}}>
                       <span style={{display:"flex",alignItems:"center",gap:6}}>
@@ -6943,7 +6949,7 @@ ${forDownload
                       ["📈 Growth opportunities","What untapped opportunities exist? Service gaps? Underserved patient segments?"],
                       ["⭐ Review strategy","Top competitor has "+competitors.competitors[0]?.rating+"★ with "+competitors.competitors[0]?.reviewCount+" reviews. How do I beat them?"],
                     ];
-                    return prompts.map(([label,prompt])=><button key={label} onClick={()=>setAdvisorInput(prompt)} style={{textAlign:"left",padding:"7px 10px",background:T.bg,border:"1px solid "+T.border,borderRadius:6,cursor:"pointer",fontSize:".72rem",color:T.txt2,fontFamily:"inherit"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.background=T.tealBg}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background=T.bg}}>
+                    return prompts.map(([label,prompt])=><button key={label} onClick={()=>setAdvisorPrompt(prompt)} style={{textAlign:"left",padding:"7px 10px",background:T.bg,border:"1px solid "+T.border,borderRadius:6,cursor:"pointer",fontSize:".72rem",color:T.txt2,fontFamily:"inherit"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.background=T.tealBg}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background=T.bg}}>
                       {label}
                     </button>);
                   })()}
@@ -7007,7 +7013,7 @@ ${forDownload
 
               {/* Input area (hidden when at limits) */}
               {!atDailyLimit&&!atConvLimit&&<div style={{padding:"12px 16px",borderTop:"1px solid "+T.border,display:"flex",gap:8,alignItems:"flex-end"}}>
-                <textarea value={advisorInput} onChange={e=>setAdvisorInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();document.getElementById("advisor-send")?.click();}}} placeholder="Ask about pricing, marketing, growth strategy..." rows={2} style={{...T.txa,flex:1,resize:"none",fontSize:".88rem"}}/>
+                <textarea data-advisor-input value={advisorInput} onChange={e=>setAdvisorInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();document.getElementById("advisor-send")?.click();}}} placeholder="Ask about pricing, marketing, growth strategy..." rows={2} style={{...T.txa,flex:1,resize:"none",fontSize:".88rem"}}/>
                 <button id="advisor-send" disabled={!advisorInput.trim()||advisorLoading} onClick={async()=>{
                   const text=advisorInput.trim();if(!text)return;
                   const newMsgs=[...advisorMsgs,{role:"user",content:text}];
@@ -7104,7 +7110,7 @@ ${forDownload
             <div style={{...T.card}}>
               <h4 style={{fontSize:".88rem",fontWeight:700,margin:0,marginBottom:10}}>⚡ Quick prompts</h4>
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                {[["💰","How should I price Botox in a Tier 2 city?"],["📱","Create an Instagram content plan for my clinic"],["📈","I want to add laser services — what's the ROI?"],["🏥","How do I increase my consultation-to-treatment conversion?"],["🎯","Marketing strategy for a new aesthetic clinic"],["⭐","How to get more Google reviews for my clinic?"],["📊","Help me plan revenue targets for next quarter"],["🔍","How to differentiate from 5 competing clinics nearby?"]].map(([ic,prompt])=><button key={prompt} onClick={()=>{if(!atDailyLimit&&!atConvLimit)setAdvisorInput(prompt);}} style={{textAlign:"left",padding:"8px 12px",background:T.bg,border:"1px solid "+T.border,borderRadius:8,cursor:atDailyLimit?"not-allowed":"pointer",fontSize:".78rem",color:T.txt2,fontFamily:"inherit",display:"flex",gap:8,alignItems:"center",opacity:atDailyLimit?0.5:1}} onMouseEnter={e=>{if(!atDailyLimit){e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.background=T.tealBg;}}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background=T.bg;}}>
+                {[["💰","How should I price Botox in a Tier 2 city?"],["📱","Create an Instagram content plan for my clinic"],["📈","I want to add laser services — what's the ROI?"],["🏥","How do I increase my consultation-to-treatment conversion?"],["🎯","Marketing strategy for a new aesthetic clinic"],["⭐","How to get more Google reviews for my clinic?"],["📊","Help me plan revenue targets for next quarter"],["🔍","How to differentiate from 5 competing clinics nearby?"]].map(([ic,prompt])=><button key={prompt} onClick={()=>{if(!atDailyLimit&&!atConvLimit)setAdvisorPrompt(prompt);}} style={{textAlign:"left",padding:"8px 12px",background:T.bg,border:"1px solid "+T.border,borderRadius:8,cursor:atDailyLimit?"not-allowed":"pointer",fontSize:".78rem",color:T.txt2,fontFamily:"inherit",display:"flex",gap:8,alignItems:"center",opacity:atDailyLimit?0.5:1}} onMouseEnter={e=>{if(!atDailyLimit){e.currentTarget.style.borderColor=T.teal;e.currentTarget.style.background=T.tealBg;}}} onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background=T.bg;}}>
                   <span style={{fontSize:"1rem",flexShrink:0}}>{ic}</span>
                   <span style={{lineHeight:1.4}}>{prompt}</span>
                 </button>)}
@@ -11784,6 +11790,24 @@ ${forDownload
                 })}
               </div>}
 
+              {/* Premium usage log — grouped by user */}
+              {(()=>{
+                const usersWithUsage=allUsers.filter(u=>u.subscription?.usageLog?.length>0).sort((a,b)=>(b.subscription?.usage?.premiumInsights||0)-(a.subscription?.usage?.premiumInsights||0));
+                if(!usersWithUsage.length)return null;
+                return(<div style={{...T.card,marginBottom:14}}>
+                  <div style={{fontSize:".82rem",fontWeight:700,marginBottom:8}}>📊 Premium insight usage</div>
+                  {usersWithUsage.map(u=><div key={u.id} style={{marginBottom:8,padding:10,background:T.bg,borderRadius:8}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                      <span style={{fontSize:".78rem",fontWeight:600,cursor:"pointer"}} onClick={()=>viewProfile(u.id)}>{u.name||u.email}</span>
+                      <span style={{fontSize:".68rem",fontWeight:700,color:T.teal}}>{u.subscription.usage?.premiumInsights||0} uses</span>
+                    </div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                      {(u.subscription.usageLog||[]).slice(-10).map((log,i)=><span key={i} style={{fontSize:".6rem",padding:"2px 6px",background:"#fff",borderRadius:4,color:T.mute}}>{log.insight} · {new Date(log.at).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</span>)}
+                    </div>
+                  </div>)}
+                </div>);
+              })()}
+
               {/* Transaction log */}
               <div style={{...T.card}}>
                 <div style={{fontSize:".82rem",fontWeight:700,marginBottom:8}}>Transaction log ({allPaid.length})</div>
@@ -12862,14 +12886,14 @@ ${forDownload
           {(()=>{
             const premUsers=allUsers.filter(u=>Array.isArray(u.premiumFeatures)&&u.premiumFeatures.includes("advisor_marketing"));
             const pendingUnlocks=adminMessages.filter(m=>(m.type==="advisor_unlock"||m.type==="advisor_unlock_bundle")&&m.status!=="replied");
-            const usageLogs=adminMessages.filter(m=>m.type==="premium_usage_log");
+            const usageLogs=premUsers.reduce((s,u)=>s+((u.subscription?.usage?.premiumInsights)||0),0);
             if(premUsers.length===0&&pendingUnlocks.length===0)return null;
             return(<div style={{...T.card,marginBottom:14,borderLeft:"3px solid "+T.gold}}>
               <div style={{fontSize:".88rem",fontWeight:700,marginBottom:8}}>💎 Premium insights</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8,marginBottom:8}}>
                 <div style={{textAlign:"center",padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:"1.1rem",fontWeight:700,color:T.goldD}}>{premUsers.length}</div><div style={{fontSize:".56rem",color:T.mute}}>Active premium</div></div>
                 <div style={{textAlign:"center",padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:"1.1rem",fontWeight:700,color:T.err}}>{pendingUnlocks.length}</div><div style={{fontSize:".56rem",color:T.mute}}>Pending requests</div></div>
-                <div style={{textAlign:"center",padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:"1.1rem",fontWeight:700,color:T.teal}}>{usageLogs.length}</div><div style={{fontSize:".56rem",color:T.mute}}>Total uses</div></div>
+                <div style={{textAlign:"center",padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:"1.1rem",fontWeight:700,color:T.teal}}>{usageLogs}</div><div style={{fontSize:".56rem",color:T.mute}}>Total uses</div></div>
               </div>
               {premUsers.length>0&&<div style={{fontSize:".72rem",color:T.txt2}}>Active: {premUsers.map(u=>u.name||u.email).join(", ")}</div>}
             </div>);
