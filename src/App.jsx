@@ -6958,7 +6958,7 @@ ${forDownload
             </div>
 
             {/* Viewing a saved conversation */}
-            {advisorViewChat&&<div style={{...T.card,marginBottom:14}}>
+            {advisorViewChat&&<div data-advisor-view style={{...T.card,marginBottom:14}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                 <div><div style={{fontSize:".88rem",fontWeight:600}}>{advisorViewChat.title}</div><div style={{fontSize:".66rem",color:T.mute}}>{fD(tsToDateStr(advisorViewChat.createdAt))} · {advisorViewChat.messageCount} messages</div></div>
                 <button onClick={()=>setAdvisorViewChat(null)} style={{...T.btnO,...T.btnSm,fontSize:".68rem"}}>← Back to chat</button>
@@ -7044,7 +7044,7 @@ ${forDownload
               <h4 style={{fontSize:".88rem",fontWeight:700,margin:0,marginBottom:10}}>📂 Saved conversations</h4>
               {advisorHistory.length===0?<div style={{fontSize:".78rem",color:T.mute,fontStyle:"italic"}}>No saved conversations yet. Click "Save chat" to keep a conversation for later.</div>
               :<div style={{display:"flex",flexDirection:"column",gap:6}}>
-                {advisorHistory.slice(0,10).map(ch=><div key={ch.id} onClick={()=>setAdvisorViewChat(ch)} style={{padding:"8px 10px",background:T.bg,borderRadius:8,cursor:"pointer",transition:"all .1s",borderLeft:"3px solid "+T.teal}} onMouseEnter={e=>e.currentTarget.style.background=T.tealBg} onMouseLeave={e=>e.currentTarget.style.background=T.bg}>
+                {advisorHistory.slice(0,10).map(ch=><div key={ch.id} onClick={()=>{setAdvisorViewChat(ch);setTimeout(()=>{const el=document.querySelector("[data-advisor-view]");if(el)el.scrollIntoView({behavior:"smooth",block:"start"});},150);}} style={{padding:"8px 10px",background:T.bg,borderRadius:8,cursor:"pointer",transition:"all .1s",borderLeft:"3px solid "+T.teal}} onMouseEnter={e=>e.currentTarget.style.background=T.tealBg} onMouseLeave={e=>e.currentTarget.style.background=T.bg}>
                   <div style={{fontSize:".78rem",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ch.title}</div>
                   <div style={{fontSize:".64rem",color:T.mute}}>{fD(tsToDateStr(ch.createdAt))} · {ch.messageCount} msgs</div>
                 </div>)}
@@ -11808,6 +11808,58 @@ ${forDownload
                 </div>);
               })()}
 
+              {/* Quick add revenue entry */}
+              <div style={{...T.card,marginBottom:14,borderLeft:"3px solid #1a7d42"}}>
+                <div style={{fontSize:".88rem",fontWeight:700,marginBottom:8}}>➕ Record payment</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:6}} className="me-info-grid">
+                  <div>
+                    <label style={{fontSize:".62rem",color:T.mute,fontWeight:600}}>User</label>
+                    <select id="rev-user" style={{...T.inp,fontSize:".76rem"}}>
+                      <option value="">— Select user —</option>
+                      {allUsers.filter(u=>u.name).sort((a,b)=>(a.name||"").localeCompare(b.name||"")).map(u=><option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{fontSize:".62rem",color:T.mute,fontWeight:600}}>Amount (₹)</label>
+                    <input id="rev-amt" type="number" placeholder="₹" style={{...T.inp,fontSize:".76rem"}}/>
+                  </div>
+                  <div>
+                    <label style={{fontSize:".62rem",color:T.mute,fontWeight:600}}>Type</label>
+                    <select id="rev-type" style={{...T.inp,fontSize:".76rem"}}>
+                      <option value="subscription">Subscription</option>
+                      <option value="premium_unlock">Premium insights</option>
+                      <option value="premium_bundle">Premium bundle</option>
+                      <option value="competitor_scan">Competitor scan</option>
+                      <option value="consultation">Consultation</option>
+                      <option value="sponsorship">Sponsorship</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{fontSize:".62rem",color:T.mute,fontWeight:600}}>Payment ref</label>
+                    <input id="rev-ref" placeholder="UPI / Bank / Cash / Razorpay" style={{...T.inp,fontSize:".76rem"}}/>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  <input id="rev-note" placeholder="Note (optional)" style={{...T.inp,flex:1,fontSize:".76rem"}}/>
+                  <button onClick={async()=>{
+                    const uid=document.getElementById("rev-user").value;
+                    const amt=parseInt(document.getElementById("rev-amt").value);
+                    const type=document.getElementById("rev-type").value;
+                    const ref=document.getElementById("rev-ref").value.trim();
+                    const note=document.getElementById("rev-note").value.trim();
+                    if(!uid){sh("Select a user");return}
+                    if(!amt||amt<=0){sh("Enter amount");return}
+                    if(!ref){sh("Enter payment reference");return}
+                    const user=allUsers.find(u=>u.id===uid);
+                    await fbAdd("revenue",{uid,userName:user?.name||"",userEmail:user?.email||"",amount:amt,type,paymentRef:ref,note:note||"Manual entry",grantedBy:au.email,createdAt:Date.now(),status:"paid"});
+                    sh(`✅ ₹${amt} recorded for ${user?.name||"user"}`);
+                    document.getElementById("rev-amt").value="";document.getElementById("rev-ref").value="";document.getElementById("rev-note").value="";
+                    loadData();
+                  }} style={{...T.btn,fontSize:".78rem",background:"#1a7d42",border:"none",padding:"8px 16px"}}>💰 Record</button>
+                </div>
+              </div>
+
               {/* Transaction log */}
               <div style={{...T.card}}>
                 <div style={{fontSize:".82rem",fontWeight:700,marginBottom:8}}>Transaction log ({allPaid.length})</div>
@@ -12900,7 +12952,7 @@ ${forDownload
           })()}
           {adminMessages.length===0?<p style={{color:T.mute}}>No messages yet.</p>:
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {[...adminMessages].sort((a,b)=>(a.status==="replied"?1:0)-(b.status==="replied"?1:0)||tsToMillis(b.createdAt)-tsToMillis(a.createdAt)).map(m=>(
+            {[...adminMessages].filter(m=>m.type!=="premium_usage_log"&&m.type!=="premium_grant_log").sort((a,b)=>(a.status==="replied"?1:0)-(b.status==="replied"?1:0)||tsToMillis(b.createdAt)-tsToMillis(a.createdAt)).map(m=>(
               <div key={m.id} style={{...T.card,marginBottom:0,padding:16}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
                   <div>
