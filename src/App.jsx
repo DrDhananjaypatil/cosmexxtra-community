@@ -11617,7 +11617,7 @@ ${forDownload
         </h3>
         <div style={{position:"sticky",top:0,zIndex:30,background:T.bg,padding:"10px 0",marginBottom:16,marginInline:-12,paddingInline:12,borderBottom:"1px solid "+T.border}}>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-          {[["stats","📊 Overview"],["revenue","💰 Revenue"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["vendors","🏢 Vendors"],["flagged","🚩 Flagged"],["lowreviews","⭐ Low Reviews"],["placements","📢 Placements"],["messages","✉️ Messages"],["beta","🎯 Beta"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["consents","📋 Consents"],["referrals","🎁 Referrals"],["users","👥 Users"]].map(([id,l])=>{
+          {[["stats","📊 Overview"],["revenue","💰 Revenue"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["vendors","🏢 Vendors"],["flagged","🚩 Flagged"],["lowreviews","⭐ Low Reviews"],["placements","📢 Placements"],["messages","✉️ Messages"],["subs","💎 Subscriptions"],["beta","🎯 Beta"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["consents","📋 Consents"],["referrals","🎁 Referrals"],["users","👥 Users"]].map(([id,l])=>{
             const flagCount=wallPosts.filter(w=>w.active!==false&&Array.isArray(w.flags)&&w.flags.length>0).length;
             const lowRev=reviews.filter(r=>r.active!==false&&r.rating<=2).length;
             const unreadMsg=adminMessages.filter(m=>m.status!=="replied").length;
@@ -11626,7 +11626,7 @@ ${forDownload
             const tabDataMap={
               users:allUsers,articles,quiz:quizzes,resources,videos,events,forum:forumPosts,cases,
               ads,news:newsPosts,rewards,vendors:vendorApplications,messages:adminMessages,
-              submissions,roles:roleApplications,referrals:redemptions,flagged:wallPosts.filter(w=>Array.isArray(w.flags)&&w.flags.length>0),
+              submissions,roles:roleApplications,referrals:redemptions,subs:adminMessages.filter(m=>["advisor_unlock","advisor_unlock_bundle","advisor_upgrade"].includes(m.type)),flagged:wallPosts.filter(w=>Array.isArray(w.flags)&&w.flags.length>0),
               lowreviews:reviews.filter(r=>r.rating<=2),placements:sponsorPlacements,
             };
             const tabData=tabDataMap[id]||[];
@@ -12932,13 +12932,14 @@ ${forDownload
         </div>}
 
         {aTab==="messages"&&<div>
+          {/* Messages v2 — categorized + user-grouped */}
           <div style={{...T.card,marginBottom:14}}>
             <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6}}>✉️ Messages</h4>
             <p style={{fontSize:".82rem",color:T.txt2}}>All user messages grouped by category and person.</p>
           </div>
 
           {(()=>{
-            const filtered=adminMessages.filter(m=>m.type!=="premium_usage_log"&&m.type!=="premium_grant_log");
+            const filtered=adminMessages.filter(m=>m.type!=="premium_usage_log"&&m.type!=="premium_grant_log"&&m.type!=="advisor_unlock"&&m.type!=="advisor_unlock_bundle"&&m.type!=="advisor_upgrade");
             // Category definitions
             const categories=[
               {id:"all",label:"All",icon:"📋",filter:()=>true},
@@ -13056,6 +13057,129 @@ ${forDownload
           })()}
         </div>}
 
+        </div>}
+
+        {/* ═══ SUBSCRIPTIONS TAB ═══ */}
+        {aTab==="subs"&&<div>
+          <div style={{...T.card,marginBottom:14}}>
+            <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6}}>💎 Subscriptions & Premium</h4>
+            <p style={{fontSize:".82rem",color:T.txt2}}>Manage subscription requests, premium unlocks, and active subscribers.</p>
+          </div>
+
+          {(()=>{
+            const now=Date.now();
+            const subMsgs=adminMessages.filter(m=>["advisor_unlock","advisor_unlock_bundle","advisor_upgrade"].includes(m.type));
+            const activeSubs=allUsers.filter(u=>u.subscription?.plan&&u.subscription.plan!=="free"&&(u.subscription.endDate||0)>now);
+            const premUsers=allUsers.filter(u=>Array.isArray(u.premiumFeatures)&&u.premiumFeatures.includes("advisor_marketing"));
+            const pendingReqs=subMsgs.filter(m=>m.status!=="replied");
+            const totalUses=premUsers.reduce((s,u)=>s+((u.subscription?.usage?.premiumInsights)||0),0);
+
+            // Group messages by user
+            const grouped={};
+            subMsgs.forEach(m=>{
+              const key=m.uid||m.email||"unknown";
+              if(!grouped[key])grouped[key]={uid:key,name:m.name||"Unknown",email:m.email||"",messages:[],latestAt:0,unread:0};
+              grouped[key].messages.push(m);
+              const ts=m.createdAt?.seconds?m.createdAt.seconds*1000:typeof m.createdAt==="number"?m.createdAt:0;
+              if(ts>grouped[key].latestAt)grouped[key].latestAt=ts;
+              if(m.status!=="replied")grouped[key].unread++;
+            });
+            const threads=Object.values(grouped).sort((a,b)=>b.latestAt-a.latestAt);
+
+            return(<>
+              {/* Summary */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,marginBottom:14}}>
+                {[["Active subs",activeSubs.length,T.teal],["Premium users",premUsers.length,"#c8a84e"],["Pending",pendingReqs.length,T.err],["Total uses",totalUses,"#555"]].map(([l,v,c])=><div key={l} style={{...T.card,textAlign:"center",padding:12,marginBottom:0}}>
+                  <div style={{fontSize:"1.3rem",fontWeight:700,color:c}}>{v}</div>
+                  <div style={{fontSize:".6rem",color:T.mute,textTransform:"uppercase"}}>{l}</div>
+                </div>)}
+              </div>
+
+              {/* Active subscribers list */}
+              {activeSubs.length>0&&<div style={{...T.card,marginBottom:14}}>
+                <div style={{fontSize:".88rem",fontWeight:700,marginBottom:8}}>✅ Active subscribers</div>
+                {activeSubs.map(u=>{const sub=u.subscription;const plan=SUB_PLANS.find(p=>p.id===sub?.plan);const daysLeft=Math.ceil(((sub?.endDate||0)-now)/86400000);
+                  return<div key={u.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:T.bg,borderRadius:8,marginBottom:4,borderLeft:"3px solid "+(daysLeft<=7?T.err:daysLeft<=30?"#c8a84e":"#1a7d42")}}>
+                    {u.photo?<img src={u.photo} style={{width:32,height:32,borderRadius:"50%",objectFit:"cover"}}/>:<div style={{...T.av(32,T.tealBg,T.teal),fontSize:".65rem"}}>{(u.name||"?").slice(0,2).toUpperCase()}</div>}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:".82rem",fontWeight:600,cursor:"pointer"}} onClick={()=>viewProfile(u.id)}>{u.name}</div>
+                      <div style={{fontSize:".64rem",color:T.mute}}>{u.email}</div>
+                    </div>
+                    <span style={{fontSize:".74rem",fontWeight:700,color:T.teal,padding:"2px 8px",background:T.tealBg,borderRadius:6}}>{plan?.label}</span>
+                    <span style={{fontSize:".7rem",fontWeight:600,color:daysLeft<=7?T.err:daysLeft<=30?"#c8a84e":"#1a7d42"}}>{daysLeft}d left</span>
+                  </div>;
+                })}
+              </div>}
+
+              {/* Premium usage log */}
+              {premUsers.some(u=>u.subscription?.usageLog?.length>0)&&<div style={{...T.card,marginBottom:14}}>
+                <div style={{fontSize:".88rem",fontWeight:700,marginBottom:8}}>📊 Premium usage</div>
+                {premUsers.filter(u=>u.subscription?.usageLog?.length>0).map(u=><div key={u.id} style={{padding:8,background:T.bg,borderRadius:8,marginBottom:6}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                    <span style={{fontSize:".78rem",fontWeight:600,cursor:"pointer"}} onClick={()=>viewProfile(u.id)}>{u.name}</span>
+                    <span style={{fontSize:".68rem",fontWeight:700,color:T.teal}}>{u.subscription.usage?.premiumInsights||0} uses</span>
+                  </div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
+                    {(u.subscription.usageLog||[]).slice(-8).map((log,i)=><span key={i} style={{fontSize:".58rem",padding:"2px 6px",background:"#fff",borderRadius:4,color:T.mute,border:"1px solid "+T.border}}>{log.insight} · {new Date(log.at).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</span>)}
+                  </div>
+                </div>)}
+              </div>}
+
+              {/* Request threads — grouped by user */}
+              <div style={{...T.card}}>
+                <div style={{fontSize:".88rem",fontWeight:700,marginBottom:10}}>📨 Subscription requests ({subMsgs.length})</div>
+                {threads.length===0?<div style={{fontSize:".82rem",color:T.mute,fontStyle:"italic",padding:20,textAlign:"center"}}>No subscription requests yet</div>
+                :<div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {threads.map(thread=>{
+                    const isOpen=msgExpandedUser===("sub_"+thread.uid);
+                    const user=allUsers.find(u=>u.id===thread.uid);
+                    return(<div key={thread.uid} style={{background:T.bg,borderRadius:10,overflow:"hidden"}}>
+                      {/* User row */}
+                      <div onClick={()=>setMsgExpandedUser(isOpen?null:("sub_"+thread.uid))} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",cursor:"pointer",userSelect:"none"}} onMouseEnter={e=>e.currentTarget.style.background=T.tealBg} onMouseLeave={e=>e.currentTarget.style.background=T.bg}>
+                        {user?.photo?<img src={user.photo} style={{width:32,height:32,borderRadius:"50%",objectFit:"cover"}}/>:<div style={{...T.av(32,T.tealBg,T.teal),fontSize:".65rem"}}>{(thread.name||"?").slice(0,2).toUpperCase()}</div>}
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:".82rem",fontWeight:600,display:"flex",alignItems:"center",gap:6}}>
+                            {thread.name}
+                            {thread.unread>0&&<span style={{fontSize:".56rem",fontWeight:700,background:T.err,color:"#fff",padding:"1px 6px",borderRadius:8}}>{thread.unread} pending</span>}
+                          </div>
+                          <div style={{fontSize:".64rem",color:T.mute}}>{thread.email} · {thread.messages.length} request{thread.messages.length!==1?"s":""}</div>
+                        </div>
+                        <div style={{fontSize:".64rem",color:T.mute}}>{fD(new Date(thread.latestAt).toISOString().slice(0,10))}</div>
+                        <span style={{fontSize:".75rem",color:T.mute,transition:"transform .15s",transform:isOpen?"rotate(90deg)":"rotate(0)"}}>▶</span>
+                      </div>
+
+                      {/* Expanded: all requests from this user */}
+                      {isOpen&&<div style={{padding:"8px 14px 14px",borderTop:"1px solid "+T.border,background:"#fff"}}>
+                        {thread.messages.sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt)).map(m=>{
+                          const targetUser=allUsers.find(u2=>u2.id===m.uid);
+                          const alreadyGranted=targetUser&&Array.isArray(targetUser.premiumFeatures)&&targetUser.premiumFeatures.includes("advisor_marketing");
+                          return(<div key={m.id} style={{padding:"10px 12px",marginBottom:6,background:T.bg,borderRadius:8,borderLeft:"3px solid "+(m.status==="replied"?"#1a7d42":"#c8a84e")}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                              <span style={{fontSize:".78rem",fontWeight:700}}>{m.subject}</span>
+                              <span style={{fontSize:".6rem",fontWeight:600,color:m.status==="replied"?"#1a7d42":"#856404"}}>{m.status==="replied"?"✓ Done":"⏳ Pending"}</span>
+                            </div>
+                            <div style={{fontSize:".66rem",color:T.mute,marginBottom:4}}>{fD(tsToDateStr(m.createdAt))}</div>
+                            <div style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5,whiteSpace:"pre-line",marginBottom:6}}>{m.message}</div>
+                            {m.adminReply&&<div style={{padding:"4px 8px",background:"#e8f5e9",borderRadius:4,fontSize:".72rem",color:"#1a7d42",marginBottom:6}}>↩️ {m.adminReply}</div>}
+                            {alreadyGranted?<div style={{fontSize:".7rem",color:"#1a7d42",fontWeight:600}}>✅ Premium active</div>
+                            :m.status!=="replied"&&<div style={{display:"flex",gap:6}}>
+                              <button onClick={async()=>{
+                                if(!window.confirm("Grant premium to "+(targetUser?.name||"user")+"?"))return;
+                                await fbSet("users",m.uid,{premiumFeatures:[...(targetUser?.premiumFeatures||[]),"advisor_marketing"],premiumGrantedAt:Date.now(),premiumGrantedBy:au.email});
+                                await fbSet("adminMessages",m.id,{status:"replied",adminReply:"✅ Premium activated!",repliedAt:Date.now()});
+                                sh("✅ Granted");loadData();
+                              }} style={{...T.btn,...T.btnSm,fontSize:".68rem",background:"linear-gradient(135deg,#c8a84e,#a88832)",border:"none"}}>✓ Grant</button>
+                              <button onClick={async()=>{await fbSet("adminMessages",m.id,{status:"replied",adminReply:"Payment pending",repliedAt:Date.now()});sh("Marked");loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".68rem",color:T.mute}}>Pending</button>
+                            </div>}
+                          </div>);
+                        })}
+                      </div>}
+                    </div>);
+                  })}
+                </div>}
+              </div>
+            </>);
+          })()}
         </div>}
 
         {aTab==="roles"&&<div>
