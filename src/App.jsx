@@ -2387,6 +2387,8 @@ export default function App(){
   const[welcomeSeen,setWelcomeSeen]=useState(()=>localStorage.getItem("sk_welcome")==="1");
   const[quizzes,setQuizzes]=useState([]);const[articles,setArticles]=useState([]);const[resources,setResources]=useState([]);const[videos,setVideos]=useState([]);const[forumPosts,setForumPosts]=useState([]);const[cases,setCases]=useState([]);const[allUsers,setAllUsers]=useState([]);
   const[selD,setSelD]=useState(ds(getIST()));const[selA,setSelA]=useState(null);const[selV,setSelV]=useState(null);const[selU,setSelU]=useState(null);const[toast,setToast]=useState(null);const[cmt,setCmt]=useState("");const[ld,setLd]=useState(false);const[aTab,setATab]=useState("stats");
+  const[msgFilter,setMsgFilter]=useState("all"); // message category filter
+  const[msgExpandedUser,setMsgExpandedUser]=useState(null); // expanded user thread
   // Vendor directory page states (must be top-level — hooks can't be inside IIFE)
   const[vendorFilter,setVendorFilter]=useState("all");
   const[vendorSearch,setVendorSearch]=useState("");
@@ -12931,82 +12933,127 @@ ${forDownload
 
         {aTab==="messages"&&<div>
           <div style={{...T.card,marginBottom:14}}>
-            <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>✉️ Messages to Admin</h4>
-            <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.55}}>Every "Contact Admin" message, who sent it, and our reply trail.</p>
+            <h4 style={{fontSize:"1rem",fontWeight:700,marginBottom:6}}>✉️ Messages</h4>
+            <p style={{fontSize:".82rem",color:T.txt2}}>All user messages grouped by category and person.</p>
           </div>
-          {/* Premium users summary */}
+
           {(()=>{
-            const premUsers=allUsers.filter(u=>Array.isArray(u.premiumFeatures)&&u.premiumFeatures.includes("advisor_marketing"));
-            const pendingUnlocks=adminMessages.filter(m=>(m.type==="advisor_unlock"||m.type==="advisor_unlock_bundle")&&m.status!=="replied");
-            const usageLogs=premUsers.reduce((s,u)=>s+((u.subscription?.usage?.premiumInsights)||0),0);
-            if(premUsers.length===0&&pendingUnlocks.length===0)return null;
-            return(<div style={{...T.card,marginBottom:14,borderLeft:"3px solid "+T.gold}}>
-              <div style={{fontSize:".88rem",fontWeight:700,marginBottom:8}}>💎 Premium insights</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8,marginBottom:8}}>
-                <div style={{textAlign:"center",padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:"1.1rem",fontWeight:700,color:T.goldD}}>{premUsers.length}</div><div style={{fontSize:".56rem",color:T.mute}}>Active premium</div></div>
-                <div style={{textAlign:"center",padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:"1.1rem",fontWeight:700,color:T.err}}>{pendingUnlocks.length}</div><div style={{fontSize:".56rem",color:T.mute}}>Pending requests</div></div>
-                <div style={{textAlign:"center",padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:"1.1rem",fontWeight:700,color:T.teal}}>{usageLogs}</div><div style={{fontSize:".56rem",color:T.mute}}>Total uses</div></div>
+            const filtered=adminMessages.filter(m=>m.type!=="premium_usage_log"&&m.type!=="premium_grant_log");
+            // Category definitions
+            const categories=[
+              {id:"all",label:"All",icon:"📋",filter:()=>true},
+              {id:"purchase",label:"Purchases",icon:"💎",filter:m=>["advisor_unlock","advisor_unlock_bundle","advisor_upgrade"].includes(m.type)},
+              {id:"general",label:"General",icon:"✉️",filter:m=>!m.type||m.type==="general"||m.type==="contact"},
+              {id:"forum",label:"Forum",icon:"💬",filter:m=>m.type==="forum"||m.type==="report"},
+              {id:"vendor",label:"Vendor",icon:"🏢",filter:m=>m.type==="vendor"||m.type==="vendor_inquiry"},
+              {id:"premium",label:"Premium",icon:"💰",filter:m=>m.type?.startsWith("premium_")||m.type?.startsWith("advisor_")},
+              {id:"other",label:"Other",icon:"📌",filter:m=>!["advisor_unlock","advisor_unlock_bundle","advisor_upgrade","general","contact","forum","report","vendor","vendor_inquiry"].includes(m.type||"general")&&!m.type?.startsWith("premium_")},
+            ];
+            const activeCat=categories.find(c=>c.id===msgFilter)||categories[0];
+            const catFiltered=msgFilter==="all"?filtered:filtered.filter(activeCat.filter);
+
+            // Group by user
+            const grouped={};
+            catFiltered.forEach(m=>{
+              const key=m.uid||m.senderEmail||m.email||"unknown";
+              if(!grouped[key])grouped[key]={uid:key,name:m.name||m.senderName||"Unknown",email:m.email||m.senderEmail||"",messages:[],latestAt:0,unread:0};
+              grouped[key].messages.push(m);
+              const ts=m.createdAt?.seconds?m.createdAt.seconds*1000:typeof m.createdAt==="number"?m.createdAt:0;
+              if(ts>grouped[key].latestAt)grouped[key].latestAt=ts;
+              if(m.status!=="replied")grouped[key].unread++;
+            });
+            const threads=Object.values(grouped).sort((a,b)=>b.latestAt-a.latestAt);
+
+            return(<>
+              {/* Category filter chips */}
+              <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
+                {categories.map(c=>{
+                  const count=c.id==="all"?filtered.length:filtered.filter(c.filter).length;
+                  if(count===0&&c.id!=="all")return null;
+                  return<button key={c.id} onClick={()=>{setMsgFilter(c.id);setMsgExpandedUser(null);}} style={{padding:"5px 12px",borderRadius:16,border:"1.5px solid "+(msgFilter===c.id?T.teal:T.border),background:msgFilter===c.id?T.tealBg:"#fff",color:msgFilter===c.id?T.teal:T.mute,cursor:"pointer",fontSize:".74rem",fontWeight:msgFilter===c.id?600:400,fontFamily:"inherit"}}>{c.icon} {c.label} ({count})</button>;
+                })}
               </div>
-              {premUsers.length>0&&<div style={{fontSize:".72rem",color:T.txt2}}>Active: {premUsers.map(u=>u.name||u.email).join(", ")}</div>}
-            </div>);
-          })()}
-          {adminMessages.length===0?<p style={{color:T.mute}}>No messages yet.</p>:
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {[...adminMessages].filter(m=>m.type!=="premium_usage_log"&&m.type!=="premium_grant_log").sort((a,b)=>(a.status==="replied"?1:0)-(b.status==="replied"?1:0)||tsToMillis(b.createdAt)-tsToMillis(a.createdAt)).map(m=>(
-              <div key={m.id} style={{...T.card,marginBottom:0,padding:16}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
-                  <div>
-                    <div style={{fontSize:".92rem",fontWeight:700}}>{m.subject}</div>
-                    <div style={{fontSize:".76rem",color:T.mute,marginTop:2}}>{m.name||m.senderName||"Unknown"} · {m.email||m.senderEmail||""} · {fD(tsToDateStr(m.createdAt))}</div>
-                  </div>
-                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                    {(m.type==="advisor_unlock"||m.type==="advisor_unlock_bundle"||m.type==="advisor_upgrade")&&<span style={{fontSize:".62rem",fontWeight:700,padding:"2px 8px",borderRadius:5,background:"linear-gradient(135deg,#c8a84e,#a88832)",color:"#fff"}}>💎 Premium</span>}
-                    <span style={{fontSize:".68rem",fontWeight:700,padding:"3px 10px",borderRadius:8,background:m.status==="replied"?"#e8f5e9":"#fff3cd",color:m.status==="replied"?"#1a7d42":"#856404"}}>{m.status==="replied"?"✓ Replied":"⏳ Open"}</span>
-                  </div>
-                </div>
-                <div style={{fontSize:".84rem",color:T.txt2,marginTop:8,lineHeight:1.55,whiteSpace:"pre-line"}}>{m.message}</div>
-                {/* Grant Premium Access button for unlock requests */}
-                {(m.type==="advisor_unlock"||m.type==="advisor_unlock_bundle"||m.type==="advisor_upgrade")&&m.uid&&(()=>{
-                  const targetUser=allUsers.find(u=>u.id===m.uid);
-                  const alreadyGranted=targetUser&&Array.isArray(targetUser.premiumFeatures)&&targetUser.premiumFeatures.includes("advisor_marketing");
-                  return(<div style={{marginTop:8,padding:"8px 12px",background:alreadyGranted?"#e8f5e9":"#fff8e1",borderRadius:8,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                    {alreadyGranted?<span style={{fontSize:".78rem",color:"#1a7d42",fontWeight:600}}>✅ Premium already granted to {targetUser?.name}</span>
-                    :<>
-                      <span style={{fontSize:".78rem",color:T.goldD,fontWeight:600}}>💎 Grant premium marketing insights to {targetUser?.name||"user"}?</span>
-                      <button onClick={async()=>{
-                        if(!window.confirm("Grant premium AI marketing insights to "+(targetUser?.name||"this user")+"?\n\nThis unlocks: Digital strategy, Content calendar, #1 plan"))return;
-                        const nextFeatures=[...(targetUser?.premiumFeatures||[]),"advisor_marketing"];
-                        await fbSet("users",m.uid,{premiumFeatures:nextFeatures,premiumGrantedAt:Date.now(),premiumGrantedBy:au.email});
-                        await fbSet("adminMessages",m.id,{status:"replied",adminReply:"✅ Premium marketing insights activated!",repliedAt:Date.now(),repliedBy:au.email});
-                        // Log the grant for audit
-                        await fbAdd("adminMessages",{uid:m.uid,name:"SYSTEM",email:"system",subject:"💎 Premium granted: "+m.type,message:"Admin ("+au.email+") granted advisor_marketing premium to "+(targetUser?.name||m.uid)+" at "+new Date().toLocaleString("en-IN"),type:"premium_grant_log",status:"replied",createdAt:Date.now()});
-                        sh("✅ Premium granted to "+(targetUser?.name||"user"));loadData();
-                      }} style={{...T.btn,...T.btnSm,fontSize:".72rem",background:"linear-gradient(135deg,#c8a84e,#a88832)",border:"none"}}>✓ Grant access</button>
-                      <button onClick={async()=>{
-                        await fbSet("adminMessages",m.id,{status:"replied",adminReply:"Payment pending — will activate after confirmation.",repliedAt:Date.now(),repliedBy:au.email});
-                        sh("Marked as pending");loadData();
-                      }} style={{...T.btnO,...T.btnSm,fontSize:".72rem",color:T.mute}}>Mark pending</button>
-                    </>}
+
+              {/* Summary stats */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8,marginBottom:14}}>
+                <div style={{textAlign:"center",padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:"1.1rem",fontWeight:700,color:T.teal}}>{threads.length}</div><div style={{fontSize:".56rem",color:T.mute}}>People</div></div>
+                <div style={{textAlign:"center",padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:"1.1rem",fontWeight:700,color:T.txt}}>{catFiltered.length}</div><div style={{fontSize:".56rem",color:T.mute}}>Messages</div></div>
+                <div style={{textAlign:"center",padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:"1.1rem",fontWeight:700,color:T.err}}>{catFiltered.filter(m=>m.status!=="replied").length}</div><div style={{fontSize:".56rem",color:T.mute}}>Unreplied</div></div>
+              </div>
+
+              {/* User threads */}
+              {threads.length===0?<div style={{...T.card,textAlign:"center",padding:30,color:T.mute}}>No messages in this category</div>
+              :<div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {threads.map(thread=>{
+                  const isOpen=msgExpandedUser===thread.uid;
+                  const user=allUsers.find(u=>u.id===thread.uid);
+                  return(<div key={thread.uid} style={{...T.card,marginBottom:0,padding:0,overflow:"hidden"}}>
+                    {/* Thread header — clickable row */}
+                    <div onClick={()=>setMsgExpandedUser(isOpen?null:thread.uid)} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 16px",cursor:"pointer",background:isOpen?T.tealBg:"#fff",transition:"background .15s"}} onMouseEnter={e=>{if(!isOpen)e.currentTarget.style.background=T.bg}} onMouseLeave={e=>{if(!isOpen)e.currentTarget.style.background="#fff"}}>
+                      {user?.photo?<img src={user.photo} style={{width:36,height:36,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(36,T.tealBg,T.teal),flexShrink:0,fontSize:".7rem"}}>{(thread.name||"?").slice(0,2).toUpperCase()}</div>}
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:".84rem",fontWeight:600,display:"flex",alignItems:"center",gap:6}}>
+                          {thread.name}
+                          {thread.unread>0&&<span style={{fontSize:".58rem",fontWeight:700,background:T.err,color:"#fff",padding:"1px 6px",borderRadius:8}}>{thread.unread} new</span>}
+                        </div>
+                        <div style={{fontSize:".66rem",color:T.mute,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{thread.email} · {thread.messages.length} message{thread.messages.length!==1?"s":""}</div>
+                      </div>
+                      <div style={{textAlign:"right",flexShrink:0}}>
+                        <div style={{fontSize:".66rem",color:T.mute}}>{fD(new Date(thread.latestAt).toISOString().slice(0,10))}</div>
+                        <div style={{fontSize:".62rem",color:T.mute}}>{thread.messages[0]?.subject?.slice(0,30)||""}</div>
+                      </div>
+                      <span style={{fontSize:".8rem",color:T.mute,transition:"transform .15s",transform:isOpen?"rotate(90deg)":"rotate(0)",flexShrink:0}}>▶</span>
+                    </div>
+
+                    {/* Expanded thread — all messages from this person */}
+                    {isOpen&&<div style={{borderTop:"1px solid "+T.border,padding:"12px 16px",background:"#fafafa"}}>
+                      {thread.messages.sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt)).map(m=><div key={m.id} style={{padding:"10px 12px",marginBottom:8,background:"#fff",borderRadius:8,borderLeft:"3px solid "+(m.status==="replied"?"#1a7d42":T.goldD)}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                          <div style={{fontSize:".78rem",fontWeight:700}}>{m.subject}</div>
+                          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                            {(m.type==="advisor_unlock"||m.type==="advisor_unlock_bundle")&&<span style={{fontSize:".58rem",fontWeight:700,padding:"2px 6px",borderRadius:4,background:"linear-gradient(135deg,#c8a84e,#a88832)",color:"#fff"}}>💎</span>}
+                            <span style={{fontSize:".6rem",fontWeight:600,color:m.status==="replied"?"#1a7d42":"#856404"}}>{m.status==="replied"?"✓ Replied":"⏳ Open"}</span>
+                          </div>
+                        </div>
+                        <div style={{fontSize:".66rem",color:T.mute,marginBottom:6}}>{fD(tsToDateStr(m.createdAt))} · {m.type||"general"}</div>
+                        <div style={{fontSize:".8rem",color:T.txt2,lineHeight:1.5,whiteSpace:"pre-line",marginBottom:6}}>{m.message}</div>
+                        {m.adminReply&&<div style={{padding:"6px 10px",background:"#e8f5e9",borderRadius:6,fontSize:".76rem",color:"#1a7d42",marginBottom:6}}>↩️ {m.adminReply}</div>}
+
+                        {/* Grant premium button for unlock requests */}
+                        {(m.type==="advisor_unlock"||m.type==="advisor_unlock_bundle"||m.type==="advisor_upgrade")&&m.uid&&(()=>{
+                          const targetUser=allUsers.find(u2=>u2.id===m.uid);
+                          const alreadyGranted=targetUser&&Array.isArray(targetUser.premiumFeatures)&&targetUser.premiumFeatures.includes("advisor_marketing");
+                          return alreadyGranted?<div style={{fontSize:".72rem",color:"#1a7d42",fontWeight:600}}>✅ Premium granted</div>
+                          :<div style={{display:"flex",gap:6,marginTop:4}}>
+                            <button onClick={async()=>{
+                              if(!window.confirm("Grant premium to "+(targetUser?.name||"user")+"?"))return;
+                              await fbSet("users",m.uid,{premiumFeatures:[...(targetUser?.premiumFeatures||[]),"advisor_marketing"],premiumGrantedAt:Date.now(),premiumGrantedBy:au.email});
+                              await fbSet("adminMessages",m.id,{status:"replied",adminReply:"✅ Premium activated!",repliedAt:Date.now()});
+                              sh("✅ Granted");loadData();
+                            }} style={{...T.btn,...T.btnSm,fontSize:".68rem",background:"linear-gradient(135deg,#c8a84e,#a88832)",border:"none"}}>✓ Grant</button>
+                            <button onClick={async()=>{await fbSet("adminMessages",m.id,{status:"replied",adminReply:"Payment pending",repliedAt:Date.now()});sh("Marked pending");loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".68rem",color:T.mute}}>Pending</button>
+                          </div>;
+                        })()}
+
+                        {/* Reply input */}
+                        {m.status!=="replied"&&<div style={{display:"flex",gap:6,marginTop:6}}>
+                          <input id={`reply-${m.id}`} placeholder="Type a reply..." style={{...T.inp,flex:1,fontSize:".76rem"}}/>
+                          <button onClick={async()=>{
+                            const reply=document.getElementById(`reply-${m.id}`).value.trim();
+                            if(!reply){sh("Type a reply");return}
+                            await fbSet("adminMessages",m.id,{status:"replied",adminReply:reply,repliedAt:Date.now(),repliedBy:au.email});
+                            sh("✓ Replied");loadData();
+                          }} style={{...T.btn,...T.btnSm,fontSize:".72rem"}}>Send</button>
+                        </div>}
+                      </div>)}
+                    </div>}
                   </div>);
-                })()}
-                {m.adminReply&&<div style={{marginTop:10,padding:"8px 12px",background:T.tealBg,borderRadius:8,borderLeft:"2px solid "+T.teal}}>
-                  <div style={{fontSize:".68rem",fontWeight:700,color:T.teal,marginBottom:2}}>Our reply</div>
-                  <div style={{fontSize:".82rem",color:T.txt2,lineHeight:1.5}}>{m.adminReply}</div>
-                </div>}
-                <div style={{marginTop:10,display:"flex",gap:8}}>
-                  <input value={adminReplyDraft[m.id]??m.adminReply??""} onChange={e=>setAdminReplyDraft(p=>({...p,[m.id]:e.target.value}))} placeholder="Type a reply..." style={{...T.inp,flex:1}}/>
-                  <button onClick={async()=>{
-                    const reply=(adminReplyDraft[m.id]??"").trim();
-                    if(!reply){sh("Type a reply first");return}
-                    await fbSet("adminMessages",m.id,{adminReply:reply,status:"replied",repliedAt:Date.now(),repliedBy:au.email});
-                    await createNotif({toUid:m.uid,fromUid:au.uid,fromName:"SKINARIO Admin",fromIni:"A",fromPhoto:"",type:"admin_reply",text:`replied to your message "${m.subject}"`,linkType:"",linkId:"",linkLabel:""});
-                    sh("✓ Reply sent");
-                    loadData();
-                  }} style={{...T.btn,...T.btnSm}}>Send</button>
-                </div>
-              </div>
-            ))}
-          </div>}
+                })}
+              </div>}
+            </>);
+          })()}
+        </div>}
+
         </div>}
 
         {aTab==="roles"&&<div>
