@@ -13057,8 +13057,6 @@ ${forDownload
           })()}
         </div>}
 
-        </div>}
-
         {/* ═══ SUBSCRIPTIONS TAB ═══ */}
         {aTab==="subs"&&<div>
           <div style={{...T.card,marginBottom:14}}>
