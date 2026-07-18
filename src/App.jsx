@@ -12965,13 +12965,15 @@ ${forDownload
             const threads=Object.values(grouped).sort((a,b)=>b.latestAt-a.latestAt);
 
             return(<>
-              {/* Category filter chips */}
-              <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
+              {/* Category filter chips — sticky */}
+              <div style={{position:"sticky",top:100,zIndex:20,background:"#ffffffee",backdropFilter:"blur(8px)",padding:"8px 0",marginBottom:10}}>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 {categories.map(c=>{
                   const count=c.id==="all"?filtered.length:filtered.filter(c.filter).length;
                   if(count===0&&c.id!=="all")return null;
                   return<button key={c.id} onClick={()=>{setMsgFilter(c.id);setMsgExpandedUser(null);}} style={{padding:"5px 12px",borderRadius:16,border:"1.5px solid "+(msgFilter===c.id?T.teal:T.border),background:msgFilter===c.id?T.tealBg:"#fff",color:msgFilter===c.id?T.teal:T.mute,cursor:"pointer",fontSize:".74rem",fontWeight:msgFilter===c.id?600:400,fontFamily:"inherit"}}>{c.icon} {c.label} ({count})</button>;
                 })}
+                </div>
               </div>
 
               {/* Summary stats */}
