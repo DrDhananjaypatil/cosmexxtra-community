@@ -5461,6 +5461,7 @@ ${forDownload
     {id:"rank",ic:"🏆",l:"Rank"},
     {id:"consent",ic:"📋",l:"Consent"},
     ...(isAdm?[{id:"admin",ic:"⚙️",l:"Admin"}]:[]),
+    {id:"_logout",ic:"🚪",l:"Sign out"},
   ];
   // Check if current page is in overflow (so More button highlights)
   const overflowActive=overflowNavs.some(n=>n.id===pg);
@@ -5521,7 +5522,7 @@ ${forDownload
                   </div>
                 </div>
                 {/* Overflow nav items */}
-                {overflowNavs.map(n=><button key={n.id} onClick={()=>{go(n.id);setMoreOpen(false)}} style={{width:"100%",background:pg===n.id?T.tealBg:"none",border:"none",borderLeft:pg===n.id?"3px solid "+T.teal:"3px solid transparent",color:pg===n.id?T.teal:T.txt,padding:"9px 16px",cursor:"pointer",fontSize:".84rem",fontFamily:"inherit",fontWeight:pg===n.id?600:400,display:"flex",alignItems:"center",gap:10,textAlign:"left"}}>
+                {overflowNavs.map(n=><button key={n.id} onClick={()=>{if(n.id==="_logout"){if(window.confirm("Sign out of SKINARIO?")){import("firebase/auth").then(m=>m.getAuth().signOut()).catch(()=>{});setScr("login");setProf(null);}return;}go(n.id);setMoreOpen(false)}} style={{width:"100%",background:n.id==="_logout"?"#fdecea":pg===n.id?T.tealBg:"none",border:"none",borderLeft:pg===n.id?"3px solid "+T.teal:"3px solid transparent",color:n.id==="_logout"?T.err:pg===n.id?T.teal:T.txt,padding:"9px 16px",cursor:"pointer",fontSize:".84rem",fontFamily:"inherit",fontWeight:n.id==="_logout"||pg===n.id?600:400,display:"flex",alignItems:"center",gap:10,textAlign:"left",marginTop:n.id==="_logout"?8:0,borderTop:n.id==="_logout"?"1px solid "+T.border:"none"}}>
                   <span style={{fontSize:"1rem",width:20,textAlign:"center"}}>{n.ic}</span>{n.l}
                   {n.beta&&<span style={{fontSize:".54rem",fontWeight:700,color:"#fff",background:T.goldD,padding:"1px 5px",borderRadius:4,letterSpacing:.5,marginLeft:"auto"}}>BETA</span>}
                 </button>)}
