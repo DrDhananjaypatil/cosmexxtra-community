@@ -13675,6 +13675,7 @@ ${forDownload
               <option value="verified">✓ Verified</option>
               <option value="beta-study">🎯 Study Beta users</option>
               <option value="waitlist-study">⏳ Study Waitlist</option>
+              <option value="deleted">🗑️ Deleted</option>
             </select>
             {(adminUserSearch||adminUserFilter!=="all")&&<button onClick={()=>{setAdminUserSearch("");setAdminUserFilter("all")}} style={{...T.btnO,...T.btnSm,whiteSpace:"nowrap"}}>✕ Clear</button>}
           </div>
@@ -13683,8 +13684,10 @@ ${forDownload
           {(()=>{
             const q=adminUserSearch.toLowerCase();
             const filtered=allUsers.filter(u=>{
+              if(u.deleted&&adminUserFilter!=="deleted")return false; // hide deleted unless filtering for them
               const matchSearch=!q||(u.name||"").toLowerCase().includes(q)||(u.email||"").toLowerCase().includes(q)||(u.clinic||"").toLowerCase().includes(q)||(u.city||"").toLowerCase().includes(q)||(u.companyName||"").toLowerCase().includes(q)||(u.regNumber||"").toLowerCase().includes(q);
               const matchFilter=adminUserFilter==="all"?true
+                :adminUserFilter==="deleted"?u.deleted
                 :adminUserFilter==="flagged"?u.regFlagged
                 :adminUserFilter==="premium"?u.paid
                 :adminUserFilter==="verified"?u.verified
@@ -13744,6 +13747,17 @@ ${forDownload
                   }} title={inStudyBeta?"Revoke Study beta access":"Grant Study beta access"} style={{...(inStudyBeta?T.btnDanger:T.btnO),...T.btnSm,fontSize:".68rem",flexShrink:0,whiteSpace:"nowrap"}}>
                     {inStudyBeta?"✕ Revoke Study":"🎯 Grant Study"}
                   </button>
+                  {isAdm&&u.id!==au?.uid&&<button onClick={async()=>{
+                    if(!window.confirm(`⚠️ DELETE account "${u.name}" (${u.email})?\n\nThis will permanently remove this user's profile data. This action cannot be undone.`))return;
+                    if(!window.confirm(`FINAL CONFIRMATION: Type YES to delete ${u.name}'s account permanently.`))return;
+                    try{
+                      await fbSet("users",u.id,{deleted:true,deletedAt:Date.now(),deletedBy:au.email,active:false});
+                      sh(`🗑️ ${u.name}'s account marked as deleted`);
+                      setSelU(null);loadData();
+                    }catch(err){sh("Failed to delete")}
+                  }} title="Delete this account" style={{...T.btnDanger,...T.btnSm,fontSize:".68rem",flexShrink:0,whiteSpace:"nowrap"}}>
+                    🗑️ Delete account
+                  </button>}
                 </div>;
               })}
             </>);
