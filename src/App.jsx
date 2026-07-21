@@ -3045,7 +3045,7 @@ export default function App(){
     setSetupErr("");
     // Validate by account type
     if(!pf.accountType){setSetupErr("Pick your account type to continue");return}
-    if(!pf.naprof?.trim()){setSetupErr("Name is required");return}
+    if(!pf.name?.trim()){setSetupErr("Name is required");return}
     if(!pf.mobile?.trim()){setSetupErr("Mobile number is required");return}
     if(!pf.country){setSetupErr("Country is required");return}
     if(pf.accountType==="doctor"){
@@ -3061,19 +3061,19 @@ export default function App(){
       if(!pf.clinic?.trim()){setSetupErr("Clinic name is required");return}
     }
     if(pf.accountType==="pharma"||pf.accountType==="brand"){
-      if(!pf.companyNaprof?.trim()){setSetupErr("Company name is required");return}
+      if(!pf.companyName?.trim()){setSetupErr("Company name is required");return}
       if(!pf.brandCategories?.length){setSetupErr("Pick at least one brand category");return}
       if(!pf.contactPerson?.trim()){setSetupErr("Contact person is required");return}
     }
     if(pf.accountType==="vendor"){
-      if(!pf.companyNaprof?.trim()){setSetupErr("Company name is required");return}
+      if(!pf.companyName?.trim()){setSetupErr("Company name is required");return}
       if(!pf.vendorCategories?.length){setSetupErr("Pick at least one vendor category");return}
       if(!pf.contactPerson?.trim()){setSetupErr("Contact person is required");return}
     }
     if(pf.accountType==="institute"){
-      if(!pf.instituteNaprof?.trim()){setSetupErr("Institute name is required");return}
+      if(!pf.instituteName?.trim()){setSetupErr("Institute name is required");return}
       if(!pf.instituteType){setSetupErr("Pick an institute type");return}
-      if(!pf.directorNaprof?.trim()){setSetupErr("Director / principal name is required");return}
+      if(!pf.directorName?.trim()){setSetupErr("Director / principal name is required");return}
     }
 
     // ═══ MCI / international DUPLICATE CHECK (for doctors) ═══
@@ -9291,7 +9291,7 @@ ${forDownload
           {!canSee&&<div style={{...T.card,textAlign:"center",padding:36}}>
             <div style={{fontSize:"2.4rem",marginBottom:8}}>🔒</div>
             <h3 style={{fontSize:"1rem",fontWeight:600,marginBottom:6}}>This profile is private</h3>
-            <p style={{color:T.txt2,fontSize:".88rem",lineHeight:1.55,maxWidth:380,margin:"0 auto"}}>{u.naprof?.split(" ")[0]||"This user"} has chosen to keep their profile private. Only basic info is visible.</p>
+            <p style={{color:T.txt2,fontSize:".88rem",lineHeight:1.55,maxWidth:380,margin:"0 auto"}}>{u.name?.split(" ")[0]||"This user"} has chosen to keep their profile private. Only basic info is visible.</p>
           </div>}
 
           {/* PUBLIC PROFILE CONTENT */}
@@ -9301,7 +9301,7 @@ ${forDownload
               <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
                 {u.photo?<img src={u.photo} style={{width:40,height:40,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(40,T.tealBg,T.teal),flexShrink:0}}>{u.initials||"?"}</div>}
                 <div style={{flex:1}}>
-                  <textarea value={profileWallText} onChange={e=>setProfileWallText(e.target.value)} placeholder={`What's on your mind, ${u.naprof?.split(" ")[0]||""}?`} rows={2} style={{...T.txa,marginBottom:8}}/>
+                  <textarea value={profileWallText} onChange={e=>setProfileWallText(e.target.value)} placeholder={`What's on your mind, ${u.name?.split(" ")[0]||""}?`} rows={2} style={{...T.txa,marginBottom:8}}/>
                   {profileWallImage&&<div style={{position:"relative",width:100,marginBottom:8}}>
                     <img src={profileWallImage} alt="" style={{width:100,height:100,objectFit:"cover",borderRadius:8,border:"1px solid "+T.border}}/>
                     <button type="button" onClick={()=>setProfileWallImage("")} style={{position:"absolute",top:-6,right:-6,width:18,height:18,borderRadius:"50%",border:"none",background:T.err,color:"#fff",cursor:"pointer",fontSize:".6rem"}}>✕</button>
@@ -10639,7 +10639,7 @@ ${forDownload
           {editErr&&<div style={{color:T.err,fontSize:".82rem",marginBottom:10}}>{editErr}</div>}
           <div style={{display:"flex",gap:10}}>
             <button onClick={async()=>{
-              if(!editPf.companyNaprof?.trim()){setEditErr("Company name required");return}
+              if(!editPf.companyName?.trim()){setEditErr("Company name required");return}
               if(!editPf.contactPerson?.trim()){setEditErr("Contact person required");return}
               const updated={
                 name:editPf.companyName.trim(),companyName:editPf.companyName.trim(),
@@ -10932,7 +10932,7 @@ ${forDownload
               setEditErr("");
               const e=editPf;
               if(!e.accountType){setEditErr("Account type required");return}
-              if(!e.naprof?.trim()){setEditErr("Name required");return}
+              if(!e.name?.trim()){setEditErr("Name required");return}
               if(!e.mobile?.trim()){setEditErr("Mobile required");return}
               if(e.accountType==="doctor"){
                 if(!e.degree){setEditErr("Degree required");return}
@@ -10943,19 +10943,19 @@ ${forDownload
                 if(!e.clinic?.trim()){setEditErr("Clinic required");return}
               }
               if(e.accountType==="pharma"||e.accountType==="brand"){
-                if(!e.companyNaprof?.trim()){setEditErr("Company name required");return}
+                if(!e.companyName?.trim()){setEditErr("Company name required");return}
                 if(!e.brandCategory){setEditErr("Brand category required");return}
                 if(!e.contactPerson?.trim()){setEditErr("Contact person required");return}
               }
               if(e.accountType==="vendor"){
-                if(!e.companyNaprof?.trim()){setEditErr("Company name required");return}
+                if(!e.companyName?.trim()){setEditErr("Company name required");return}
                 if(!e.vendorCategory){setEditErr("Vendor category required");return}
                 if(!e.contactPerson?.trim()){setEditErr("Contact person required");return}
               }
               if(e.accountType==="institute"){
-                if(!e.instituteNaprof?.trim()){setEditErr("Institute name required");return}
+                if(!e.instituteName?.trim()){setEditErr("Institute name required");return}
                 if(!e.instituteType){setEditErr("Institute type required");return}
-                if(!e.directorNaprof?.trim()){setEditErr("Director name required");return}
+                if(!e.directorName?.trim()){setEditErr("Director name required");return}
               }
               const initials=(e.name||"D").replace(/^Dr\.?\s*/i,"").split(" ").map(w=>w[0]||"").join("").toUpperCase().slice(0,2)||"D";
               const updated={
@@ -12680,10 +12680,10 @@ ${forDownload
                         <button onClick={async()=>{
                           if(atCap&&!window.confirm(`Cap is ${capNow} and full. Approve anyway?`))return;
                           await fbSet("users",u.id,{betaFeatures:[...(u.betaFeatures||[]),"study"],betaWaitlist:(u.betaWaitlist||[]).filter(f=>f!=="study")});
-                          sh(`✓ Approved ${u.naprof?.split(" ")[0]||"user"}`);loadData();
+                          sh(`✓ Approved ${u.name?.split(" ")[0]||"user"}`);loadData();
                         }} style={{...T.btn,...T.btnSm,fontSize:".68rem",padding:"4px 10px"}}>✓ Approve</button>
                         <button onClick={async()=>{
-                          if(!window.confirm(`Remove ${u.naprof?.split(" ")[0]||"user"} from waitlist?`))return;
+                          if(!window.confirm(`Remove ${u.name?.split(" ")[0]||"user"} from waitlist?`))return;
                           await fbSet("users",u.id,{betaWaitlist:(u.betaWaitlist||[]).filter(f=>f!=="study")});
                           sh("Removed");loadData();
                         }} style={{...T.btnO,...T.btnSm,fontSize:".68rem",padding:"4px 10px",color:T.mute}}>Reject</button>
@@ -12720,7 +12720,7 @@ ${forDownload
                         <div style={{fontSize:".66rem",color:T.mute}}>{u.email}{uAttempts.length>0?` · ${uAttempts.length} test${uAttempts.length!==1?"s":""} · avg ${Math.round(uAttempts.reduce((s,a)=>s+(a.accuracy||0),0)/uAttempts.length)}%`:""}</div>
                       </div>
                       <button onClick={async()=>{
-                        if(!window.confirm(`Revoke Study beta for ${u.naprof?.split(" ")[0]||"user"}?`))return;
+                        if(!window.confirm(`Revoke Study beta for ${u.name?.split(" ")[0]||"user"}?`))return;
                         await fbSet("users",u.id,{betaFeatures:(u.betaFeatures||[]).filter(f=>f!=="study")});
                         sh(`Revoked`);loadData();
                       }} style={{...T.btnDanger,...T.btnSm,fontSize:".64rem",padding:"3px 8px",flexShrink:0}}>✕</button>
@@ -13738,7 +13738,7 @@ ${forDownload
                     const wlNext=inStudyBeta?wlCurrent:wlCurrent.filter(f=>f!=="study");
                     try{
                       await fbSet("users",u.id,{betaFeatures:next,betaWaitlist:wlNext});
-                      sh(inStudyBeta?`Revoked Study beta for ${u.naprof?.split(" ")[0]||"user"}`:`Granted Study beta to ${u.naprof?.split(" ")[0]||"user"}`);
+                      sh(inStudyBeta?`Revoked Study beta for ${u.name?.split(" ")[0]||"user"}`:`Granted Study beta to ${u.name?.split(" ")[0]||"user"}`);
                       loadData();
                     }catch(err){sh("Failed to update beta access")}
                   }} title={inStudyBeta?"Revoke Study beta access":"Grant Study beta access"} style={{...(inStudyBeta?T.btnDanger:T.btnO),...T.btnSm,fontSize:".68rem",flexShrink:0,whiteSpace:"nowrap"}}>
