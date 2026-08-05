@@ -727,37 +727,27 @@ const normalizeAccountType=(t)=>t==="pharma"?"brand":t;
 // ═══ MEDICAL DEGREES (alphabetized) ═══
 const DEGREES=["MBBS","BAMS","BHMS","BDS","BUMS","MD - Dermatology","MD - General Medicine","MS - Surgery","DDV (Diploma in Dermatology)","DNB - Dermatology","Diploma in Aesthetic Medicine","Diploma in Cosmetology","Fellowship in Aesthetic Medicine","Fellowship in Cosmetology","Other"];
 
-// ═══ COUNTRIES — India default + top markets for aesthetic medicine ═══
+// ═══ COUNTRIES — comprehensive list for aesthetic medicine professionals ═══
 const COUNTRIES=[
   "India",
-  "United Arab Emirates",
-  "Saudi Arabia",
-  "Qatar",
-  "Kuwait",
-  "Oman",
-  "Bahrain",
-  "Singapore",
-  "Malaysia",
-  "Thailand",
-  "Indonesia",
-  "Philippines",
-  "Vietnam",
-  "Sri Lanka",
-  "Bangladesh",
-  "Nepal",
-  "Pakistan",
-  "United Kingdom",
-  "United States",
-  "Canada",
-  "Australia",
-  "New Zealand",
-  "South Africa",
-  "Nigeria",
-  "Kenya",
-  "Egypt",
-  "Turkey",
-  "Brazil",
-  "Mexico",
+  // Middle East
+  "United Arab Emirates","Saudi Arabia","Qatar","Kuwait","Oman","Bahrain","Iraq","Jordan","Lebanon","Iran",
+  // East Asia
+  "South Korea","Japan","China","Taiwan","Hong Kong",
+  // Southeast Asia
+  "Singapore","Malaysia","Thailand","Indonesia","Philippines","Vietnam","Myanmar","Cambodia",
+  // South Asia
+  "Sri Lanka","Bangladesh","Nepal","Pakistan","Maldives","Bhutan",
+  // Europe
+  "United Kingdom","Germany","France","Italy","Spain","Netherlands","Belgium","Switzerland","Austria","Sweden","Norway","Denmark","Finland","Poland","Czech Republic","Portugal","Greece","Ireland","Russia","Ukraine",
+  // Americas
+  "United States","Canada","Brazil","Mexico","Colombia","Argentina","Chile","Peru",
+  // Oceania
+  "Australia","New Zealand",
+  // Africa
+  "South Africa","Nigeria","Kenya","Egypt","Morocco","Ghana","Ethiopia","Tanzania",
+  // Central Asia & Others
+  "Turkey","Israel","Kazakhstan","Uzbekistan",
   "Other"
 ];
 
@@ -4340,6 +4330,18 @@ ${forDownload
   };
   const addComment=async(qid,qObj)=>{if(!cmt.trim())return;const c={n:uName,ini:uIni,txt:cmt,tm:getIST().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",hour12:true}),uid:au.uid,likedBy:[],likes:0};const comments=[...(qObj.comments||[]),c];await fbSet("quizzes",qid,{comments});setQuizzes(p=>p.map(q=>q.id===qid?{...q,comments}:q));setCmt("")};
   const genQuiz=async()=>{if(quizzes.find(q=>q.date===today)){sh("Already exists!");return}setLd(true);const q=await genQuizAI(today);if(q){const id=await fbAdd("quizzes",q);if(id){setQuizzes(p=>[{id,...q},...p]);sh("Question live!")}}else sh("Failed");setLd(false)};
+  // Auto-generate today's quiz if missing (runs once on admin load)
+  const autoGenRef=useRef(false);
+  useEffect(()=>{
+    if(!isAdm||!today||autoGenRef.current)return;
+    if(quizzes.length>0&&!quizzes.find(q=>q.date===today)){
+      autoGenRef.current=true;
+      console.log("[SKINARIO] Auto-generating today's quiz...");
+      (async()=>{
+        try{const q=await genQuizAI(today);if(q){const id=await fbAdd("quizzes",q);if(id){setQuizzes(p=>[{id,...q},...p]);sh("🤖 Today's quiz auto-generated!")}}}catch(e){console.error("Auto-gen failed:",e)}
+      })();
+    }
+  },[isAdm,quizzes,today]);
 
   // ═══ CONTENT ═══
   const saveContent=async(type)=>{
