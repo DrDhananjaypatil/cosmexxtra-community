@@ -4373,7 +4373,7 @@ ${forDownload
   // shuffle the question order (per confirmed plan), then transition to intro screen.
   const startTest=(topic,difficulty)=>{
     const monthKey=new Date().toISOString().slice(0,7); // YYYY-MM
-    const variants=testSeries.filter(t=>t.topicId===topic.id&&t.difficulty===difficulty&&t.monthKey===monthKey);
+    const variants=testSeries.filter(t=>t.topicId===topic.id&&t.difficulty===difficulty);
     if(variants.length===0){sh("No test available for this topic/difficulty yet. Check back soon!");return;}
     const pick=variants[Math.floor(Math.random()*variants.length)];
     // Fisher-Yates shuffle a copy of the questions
@@ -4444,7 +4444,7 @@ ${forDownload
       if(!data.ok||!data.test){sh("Generation failed: "+(data.error||"unknown"));setTestGenerating(false);return;}
       const monthKey=new Date().toISOString().slice(0,7);
       // Determine variant number for this topic/difficulty/month (1, 2, or 3 — we cap at 3)
-      const existing=testSeries.filter(t=>t.topicId===topic.id&&t.difficulty===difficulty&&t.monthKey===monthKey);
+      const existing=testSeries.filter(t=>t.topicId===topic.id&&t.difficulty===difficulty);
       const variantNum=existing.length+1;
       if(variantNum>3){sh("Already 3 variants exist for this topic/difficulty this month");setTestGenerating(false);return;}
       await fbAdd("testSeries",{
@@ -8440,7 +8440,7 @@ ${forDownload
                   <h4 style={{fontSize:".92rem",fontWeight:700,marginBottom:12}}>Pick a topic to test yourself</h4>
                   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:10,marginBottom:16}}>
                     {TEST_TOPICS.map(t=>{
-                      const availCount=testSeries.filter(x=>x.topicId===t.id&&x.monthKey===monthKey).length;
+                      const availCount=testSeries.filter(x=>x.topicId===t.id).length;
                       const myTopicAttempts=myAttempts.filter(a=>a.topicId===t.id);
                       const myBest=myTopicAttempts.length?Math.max(...myTopicAttempts.map(a=>a.accuracy||0)):null;
                       return(<div key={t.id} onClick={()=>{if(availCount>0){setSelTestTopic(t);setStudyView("picker");}}} style={{...T.card,cursor:availCount>0?"pointer":"default",marginBottom:0,padding:14,opacity:availCount>0?1:0.55,transition:"all .15s"}} onMouseEnter={e=>{if(availCount>0){e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 18px rgba(0,0,0,0.08)";}}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
@@ -8524,7 +8524,7 @@ ${forDownload
                           <div style={{fontSize:".82rem",fontWeight:600,marginBottom:6}}>{t.icon} {t.label}</div>
                           <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                             {TEST_DIFFICULTIES.map(d=>{
-                              const count=testSeries.filter(x=>x.topicId===t.id&&x.difficulty===d&&x.monthKey===monthKey).length;
+                              const count=testSeries.filter(x=>x.topicId===t.id&&x.difficulty===d).length;
                               return(<button key={d} disabled={testGenerating||count>=3} onClick={()=>adminGenerateTest(t,d)} style={{...T.btnO,padding:"4px 8px",fontSize:".68rem",opacity:count>=3?0.5:1}}>{d} ({count}/3)</button>);
                             })}
                           </div>
@@ -8617,7 +8617,7 @@ ${forDownload
           if(studyView==="picker"&&selTestTopic){
             const monthKey=new Date().toISOString().slice(0,7);
             // Find which difficulties user has already attempted this month
-            const myTopicAttempts=myAttempts.filter(a=>a.topicId===selTestTopic.id&&a.monthKey===monthKey);
+            const myTopicAttempts=myAttempts.filter(a=>a.topicId===selTestTopic.id);
             const attemptedDiffs=new Set(myTopicAttempts.map(a=>a.difficulty));
             // Find a suggested "next" difficulty
             const suggestedNext=!attemptedDiffs.has("Easy")?"Easy":!attemptedDiffs.has("Moderate")?"Moderate":!attemptedDiffs.has("Hard")?"Hard":null;
@@ -8631,7 +8631,7 @@ ${forDownload
               </div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}>
                 {TEST_DIFFICULTIES.map(d=>{
-                  const avail=testSeries.filter(x=>x.topicId===selTestTopic.id&&x.difficulty===d&&x.monthKey===monthKey).length;
+                  const avail=testSeries.filter(x=>x.topicId===selTestTopic.id&&x.difficulty===d).length;
                   const prevAttempts=myTopicAttempts.filter(a=>a.difficulty===d);
                   const hasTaken=prevAttempts.length>0;
                   const best=hasTaken?Math.max(...prevAttempts.map(a=>a.accuracy||0)):null;
