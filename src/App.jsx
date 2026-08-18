@@ -5535,6 +5535,11 @@ ${forDownload
               </div>}
             </div>
 
+            {/* 🏥 SKINARIO-OS link */}
+            <a href="https://skinario-os.vercel.app" target="_blank" rel="noopener noreferrer" title="Open Clinic Admin (SKINARIO-OS)" style={{background:"none",border:"1px solid "+T.border,padding:"4px 10px",borderRadius:8,cursor:"pointer",fontSize:".6rem",fontFamily:"inherit",color:T.teal,fontWeight:500,display:"flex",alignItems:"center",gap:4,textDecoration:"none",marginLeft:4,whiteSpace:"nowrap"}} onMouseEnter={e=>{e.currentTarget.style.background=T.tealBg;e.currentTarget.style.borderColor=T.teal}} onMouseLeave={e=>{e.currentTarget.style.background="none";e.currentTarget.style.borderColor=T.border}}>
+              <span style={{fontSize:".8rem"}}>🏥</span>Clinic OS
+            </a>
+
             {/* 🔔 Notifications bell */}
             {(()=>{const unread=notifs.filter(n=>!n.read).length;return(<div style={{position:"relative",marginLeft:4}}>
               <button onClick={()=>{setNotifsOpen(o=>!o);setMoreOpen(false)}} style={{background:notifsOpen?T.tealBg:"none",border:"none",padding:"5px 9px",borderRadius:9,cursor:"pointer",fontSize:".85rem",position:"relative"}} title="Notifications">
