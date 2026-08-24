@@ -9,6 +9,68 @@ const fbApp=initializeApp(firebaseConfig);const auth=getAuth(fbApp);const db=get
 const storage=getStorage(fbApp);
 const ADMINS=["drjpatil@gmail.com","absoluteinstituteedu@gmail.com"];
 
+// ── Sync a sponsor placement into skinario-os's ad system ──────────────
+// SKINARIO.app and skinario-os run on the SAME Firebase project
+// (skinario-369, confirmed via firebaseConfig above) — so this is a
+// plain same-project Firestore write, not a cross-project sync. It
+// writes into the top-level `advertisements` collection that
+// skinario-os's Developer console and clinic-facing ad banners already
+// read from. Only an authenticated admin (one of the two ADMINS emails,
+// same as this whole panel is gated behind) can write there per
+// skinario-os's own Firestore rules, which this write already satisfies
+// since only an admin can click these buttons in the first place.
+async function syncPlacementToSkinarioOS(sp, status) {
+  try {
+    const adRef = doc(db, "advertisements", `skinario-app-${sp.id}`);
+
+    if (status === "rejected" || status === "expired") {
+      // Pull down rather than delete, so any click history skinario-os
+      // records against this ad later isn't destroyed by a re-sync.
+      await setDoc(adRef, { active: false, updatedAt: serverTimestamp() }, { merge: true });
+      return;
+    }
+    if (status !== "active") {
+      // "pending" / "approved but not yet live" — stays dark on
+      // skinario-os too.
+      await setDoc(adRef, { active: false, updatedAt: serverTimestamp() }, { merge: true });
+      return;
+    }
+
+    await setDoc(adRef, {
+      title: sp.title || "",
+      advertiserName: sp.vendorName || "",
+      category: "Other",
+      imageUrl: sp.logo || null,
+      // linkUrl gets normalized (https:// added if missing) at RENDER
+      // time already, by skinario-os's AdDisplay.jsx — no cleanup needed here.
+      linkUrl: sp.website || null,
+      // skinario-os only has two placement styles (flash / dedicated).
+      // Every SKINARIO.app placementType maps to 'dedicated' — there's no
+      // one-time-login-popup equivalent on this side, and the study_*
+      // types are SKINARIO.app-specific pages skinario-os has no
+      // matching context for, so they fall back here rather than being
+      // silently dropped.
+      placement: "dedicated",
+      targetRoles: null,
+      startDate: null,
+      endDate: null,
+      priority: 0,
+      active: true,
+      source: "skinario-app",
+      sourcePlacementId: sp.id,
+      sourcePlacementType: sp.placementType || null,
+      updatedAt: serverTimestamp(),
+      createdAt: serverTimestamp()
+    }, { merge: true });
+  } catch (e) {
+    console.error("Sync to skinario-os ads failed:", e);
+    // Deliberately not surfaced to the admin — the placement's own
+    // status update already succeeded via fbSet; this is a secondary
+    // mirror, not what the button's own success message is about.
+  }
+}
+
+
 // ═══ ROLE-BASED ACCESS CONTROL ═══
 // Roles are stored on the user document under `role` field.
 // Default if missing: regular user (no elevated permissions).
@@ -12454,11 +12516,11 @@ ${forDownload
                     </div>
                     <div style={{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap"}}>
                       {sp.status==="pending"&&<>
-                        <button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"approved",approvedAt:Date.now(),approvedBy:au.email});loadData();sh("Approved — not live yet");}} style={{...T.btnO,...T.btnSm}}>Approve</button>
-                        <button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"rejected"});loadData();sh("Rejected")}} style={{...T.btnDanger,...T.btnSm}}>Reject</button>
+                        <button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"approved",approvedAt:Date.now(),approvedBy:au.email});syncPlacementToSkinarioOS(sp,"approved");loadData();sh("Approved — not live yet");}} style={{...T.btnO,...T.btnSm}}>Approve</button>
+                        <button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"rejected"});syncPlacementToSkinarioOS(sp,"rejected");loadData();sh("Rejected")}} style={{...T.btnDanger,...T.btnSm}}>Reject</button>
                       </>}
-                      {sp.status==="approved"&&<button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"active",activatedAt:Date.now()});loadData();sh("🟢 Now live!");}} style={{...T.btn,...T.btnSm}}>▶ Make Live</button>}
-                      {sp.status==="active"&&<button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"expired",expiredAt:Date.now()});loadData();sh("Deactivated")}} style={{...T.btnO,...T.btnSm}}>⏹ Deactivate</button>}
+                      {sp.status==="approved"&&<button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"active",activatedAt:Date.now()});syncPlacementToSkinarioOS(sp,"active");loadData();sh("🟢 Now live!");}} style={{...T.btn,...T.btnSm}}>▶ Make Live</button>}
+                      {sp.status==="active"&&<button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"expired",expiredAt:Date.now()});syncPlacementToSkinarioOS(sp,"expired");loadData();sh("Deactivated")}} style={{...T.btnO,...T.btnSm}}>⏹ Deactivate</button>}
                     </div>
                   </div>
                 </div>
@@ -12928,11 +12990,11 @@ ${forDownload
                 </div>
                 <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
                   {(!sp.status||sp.status==="pending")&&<>
-                    <button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"approved",approvedAt:Date.now(),approvedBy:au.email});loadData();sh("✓ Approved")}} style={{...T.btn,...T.btnSm}}>✓ Approve</button>
-                    <button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"rejected",rejectedAt:Date.now()});loadData();sh("Rejected")}} style={{...T.btnO,...T.btnSm,color:T.err,borderColor:T.err}}>✕ Reject</button>
+                    <button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"approved",approvedAt:Date.now(),approvedBy:au.email});syncPlacementToSkinarioOS(sp,"approved");loadData();sh("✓ Approved")}} style={{...T.btn,...T.btnSm}}>✓ Approve</button>
+                    <button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"rejected",rejectedAt:Date.now()});syncPlacementToSkinarioOS(sp,"rejected");loadData();sh("Rejected")}} style={{...T.btnO,...T.btnSm,color:T.err,borderColor:T.err}}>✕ Reject</button>
                   </>}
-                  {sp.status==="approved"&&<button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"active",activatedAt:Date.now()});loadData();sh("🟢 Now live!")}} style={{...T.btn,...T.btnSm}}>▶ Make Live</button>}
-                  {sp.status==="active"&&<button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"expired",expiredAt:Date.now()});loadData();sh("Deactivated")}} style={{...T.btnO,...T.btnSm}}>⏹ Deactivate</button>}
+                  {sp.status==="approved"&&<button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"active",activatedAt:Date.now()});syncPlacementToSkinarioOS(sp,"active");loadData();sh("🟢 Now live!")}} style={{...T.btn,...T.btnSm}}>▶ Make Live</button>}
+                  {sp.status==="active"&&<button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"expired",expiredAt:Date.now()});syncPlacementToSkinarioOS(sp,"expired");loadData();sh("Deactivated")}} style={{...T.btnO,...T.btnSm}}>⏹ Deactivate</button>}
                 </div>
               </div>
             ))}
