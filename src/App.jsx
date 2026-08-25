@@ -10557,7 +10557,7 @@ ${forDownload
         {/* Vendor reward partner + placement sections */}
         {(()=>{
           const aType=normalizeAccountType(prof?.accountType||"");
-          if(aType!=="vendor"&&aType!=="brand")return null;
+          if(aType!=="vendor"&&aType!=="brand"&&aType!=="institute")return null;
           const myPlacements=sponsorPlacements.filter(p=>p.vendorId===au?.uid);
           const myRewards=rewards.filter(r=>r.vendorId===au?.uid);
           return(<div style={{display:"flex",flexDirection:"column",gap:14}}>
@@ -10587,7 +10587,7 @@ ${forDownload
                 </div>)}
               </div>}
               <p style={{fontSize:".82rem",color:T.txt2,lineHeight:1.6,marginBottom:10}}>Get featured on SKINARIO's home page, articles, or quiz. Manually invoiced — no payment integration needed.</p>
-              <button onClick={()=>{const el=document.getElementById("vendor-placement-form");if(el)el.style.display=el.style.display==="none"?"block":"none";}} style={{...T.btnO,padding:"7px 16px",fontSize:".82rem"}}>+ Request placement</button>
+              <button onClick={()=>{const el=document.getElementById("vendor-placement-form");if(el)el.style.display=el.style.display==="none"?"flex":"none";}} style={{...T.btnO,padding:"7px 16px",fontSize:".82rem"}}>+ Request placement</button>
               <div id="vendor-placement-form" style={{display:"none",marginTop:12,padding:14,background:T.bg,borderRadius:8,flexDirection:"column",gap:10}}>
                 <select value={spForm.placementType} onChange={e=>setSpForm(p=>({...p,placementType:e.target.value}))} style={T.inp}>
                   <option value="home_banner">🏠 Home spotlight banner</option>
@@ -11521,7 +11521,7 @@ ${forDownload
         })()}
 
         {/* ═══ PHASE 4: SPONSORED PLACEMENT REQUEST (vendor/brand Me page) ═══ */}
-        {(prof?.accountType==="vendor"||prof?.accountType==="brand"||prof?.accountType==="pharma")&&!editingProfile&&(()=>{
+        {(prof?.accountType==="vendor"||prof?.accountType==="brand"||prof?.accountType==="pharma"||prof?.accountType==="institute")&&!editingProfile&&(()=>{
           const myPlacements=sponsorPlacements.filter(p=>p.vendorId===au?.uid);
           return(<div id="vendor-section-placement" style={{...T.card,marginBottom:14}}>
             <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:8}}>📢 Sponsored Placements</h4>
