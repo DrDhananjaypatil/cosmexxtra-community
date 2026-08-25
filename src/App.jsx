@@ -12522,6 +12522,7 @@ ${forDownload
                       </>}
                       {sp.status==="approved"&&<button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"active",activatedAt:Date.now()});syncPlacementToSkinarioOS(sp,"active");loadData();sh("🟢 Now live!");}} style={{...T.btn,...T.btnSm}}>▶ Make Live</button>}
                       {sp.status==="active"&&<button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"expired",expiredAt:Date.now()});syncPlacementToSkinarioOS(sp,"expired");loadData();sh("Deactivated")}} style={{...T.btnO,...T.btnSm}}>⏹ Deactivate</button>}
+                      {sp.status==="expired"&&<button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"active",activatedAt:Date.now()});syncPlacementToSkinarioOS(sp,"active");loadData();sh("🟢 Reactivated!")}} style={{...T.btn,...T.btnSm}}>↻ Reactivate</button>}
                     </div>
                   </div>
                 </div>
@@ -12996,6 +12997,7 @@ ${forDownload
                   </>}
                   {sp.status==="approved"&&<button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"active",activatedAt:Date.now()});syncPlacementToSkinarioOS(sp,"active");loadData();sh("🟢 Now live!")}} style={{...T.btn,...T.btnSm}}>▶ Make Live</button>}
                   {sp.status==="active"&&<button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"expired",expiredAt:Date.now()});syncPlacementToSkinarioOS(sp,"expired");loadData();sh("Deactivated")}} style={{...T.btnO,...T.btnSm}}>⏹ Deactivate</button>}
+                  {sp.status==="expired"&&<button onClick={async()=>{await fbSet("sponsorPlacements",sp.id,{status:"active",activatedAt:Date.now()});syncPlacementToSkinarioOS(sp,"active");loadData();sh("🟢 Reactivated!")}} style={{...T.btn,...T.btnSm}}>↻ Reactivate</button>}
                 </div>
               </div>
             ))}
