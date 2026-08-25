@@ -8172,16 +8172,17 @@ ${forDownload
                 {/* Full attendee list for event owner or admin */}
                 {(isAdm||selE.publisherUid===au?.uid)&&selE.attendees.length>0?<div style={{border:"1px solid "+T.border,borderRadius:8,overflow:"hidden"}}>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 80px",gap:0,fontSize:".68rem",fontWeight:700,color:T.mute,textTransform:"uppercase",padding:"6px 12px",background:T.bg}}>
-                    <span>Name</span><span>Email</span><span>Joined</span>
+                    <span>Name</span><span>Email / Contact</span><span>Joined</span>
                   </div>
-                  {selE.attendees.map((a,i)=><div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 80px",gap:0,padding:"6px 12px",fontSize:".78rem",borderTop:"1px solid "+T.border,alignItems:"center"}} onClick={()=>{const u=allUsers.find(x=>x.id===a.uid);if(u)viewProfile(u.id)}} onMouseEnter={e=>e.currentTarget.style.background=T.bg} onMouseLeave={e=>e.currentTarget.style.background="#fff"} style={{cursor:"pointer"}}>
+                  {selE.attendees.map((a,i)=>{const userInfo=allUsers.find(x=>x.id===a.uid);const email=a.email||userInfo?.email||"—";const city=userInfo?.city||a.city||"";
+                    return<div key={i} onClick={()=>{if(userInfo)viewProfile(userInfo.id)}} style={{display:"grid",gridTemplateColumns:"1fr 1fr 80px",gap:0,padding:"8px 12px",fontSize:".78rem",borderTop:"1px solid "+T.border,alignItems:"center",cursor:"pointer"}} onMouseEnter={e=>e.currentTarget.style.background=T.bg} onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
                     <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      {a.photo?<img src={a.photo} style={{width:24,height:24,borderRadius:"50%"}}/>:<div style={T.av(24,T.tealBg,T.teal)}>{a.ini||"?"}</div>}
-                      <span style={{fontWeight:600}}>{a.name}</span>
+                      {a.photo?<img src={a.photo} style={{width:26,height:26,borderRadius:"50%"}}/>:<div style={T.av(26,T.tealBg,T.teal)}>{a.ini||"?"}</div>}
+                      <div><div style={{fontWeight:600}}>{a.name}</div>{city&&<div style={{fontSize:".64rem",color:T.mute}}>{city}</div>}</div>
                     </div>
-                    <span style={{fontSize:".72rem",color:T.mute}}>{a.email||"—"}</span>
+                    <div><div style={{fontSize:".74rem",color:T.txt2}}>{email}</div>{userInfo?.phone&&<div style={{fontSize:".66rem",color:T.mute}}>📞 {userInfo.phone}</div>}</div>
                     <span style={{fontSize:".68rem",color:T.mute}}>{a.joined||"—"}</span>
-                  </div>)}
+                  </div>})}
                 </div>
                 :<div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                   {selE.attendees.slice(0,12).map((a,i)=>a.photo?<img key={i} src={a.photo} title={a.name} style={{width:32,height:32,borderRadius:"50%",border:"2px solid "+T.tealBg}}/>:<div key={i} title={a.name} style={T.av(32,T.tealBg,T.teal)}>{a.ini}</div>)}
