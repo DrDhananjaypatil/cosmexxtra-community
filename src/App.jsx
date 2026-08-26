@@ -10915,28 +10915,47 @@ ${forDownload
         {/* ══ PENDING TEAM INVITES for doctors ══ */}
         {(()=>{
           const myInvites=adminMessages.filter(m=>m.type==="company_invite"&&m.uid===au?.uid&&m.status==="pending");
-          if(!myInvites.length)return null;
-          return myInvites.map(inv=><div key={inv.id} style={{padding:14,marginBottom:12,background:"linear-gradient(135deg,#e8f5e9,#f0faf3)",borderRadius:12,border:"2px solid #1a7d42"}}>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-              <div style={{fontSize:"1.5rem"}}>📨</div>
-              <div>
-                <div style={{fontSize:".92rem",fontWeight:700,color:"#1a7d42"}}>Team invitation</div>
-                <div style={{fontSize:".78rem",color:T.txt2}}><b>{inv.companyName}</b> invited you as <b>{COMPANY_ROLES.find(r=>r.id===inv.invitedRole)?.label||inv.invitedRole}</b></div>
+          const hasTeam=prof?.companyId&&prof.companyId!==au?.uid;
+          const teamOwner=hasTeam?allUsers.find(u=>u.id===prof.companyId):null;
+          const teamName=teamOwner?.companyName||teamOwner?.instituteName||teamOwner?.name||"Organization";
+          return(<>
+            {/* Pending invites */}
+            {myInvites.map(inv=><div key={inv.id} style={{padding:14,marginBottom:12,background:"linear-gradient(135deg,#e8f5e9,#f0faf3)",borderRadius:12,border:"2px solid #1a7d42"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                <div style={{fontSize:"1.5rem"}}>📨</div>
+                <div>
+                  <div style={{fontSize:".92rem",fontWeight:700,color:"#1a7d42"}}>Team invitation</div>
+                  <div style={{fontSize:".78rem",color:T.txt2}}><b>{inv.companyName}</b> invited you as <b>{COMPANY_ROLES.find(r=>r.id===inv.invitedRole)?.label||inv.invitedRole}</b></div>
+                </div>
               </div>
-            </div>
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={async()=>{
-                await fbSet("users",au.uid,{companyId:inv.companyOwnerId,companyRole:inv.invitedRole});
-                await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"✅ Accepted"});
-                try{await fbAdd("notifications",{toUid:inv.invitedBy,fromUid:au.uid,type:"team_accepted",message:`${uName} accepted your invite to join ${inv.companyName}`,read:false,createdAt:Date.now()});}catch(e){}
-                sh("✅ Joined "+inv.companyName+"!");loadData();
-              }} style={{...T.btn,...T.btnSm,fontSize:".78rem",background:"#1a7d42",border:"none"}}>✓ Accept</button>
-              <button onClick={async()=>{
-                await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"Declined"});
-                sh("Declined");loadData();
-              }} style={{...T.btnO,...T.btnSm,fontSize:".78rem",color:T.mute}}>✕ Decline</button>
-            </div>
-          </div>);
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={async()=>{
+                  await fbSet("users",au.uid,{companyId:inv.companyOwnerId,companyRole:inv.invitedRole});
+                  await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"✅ Accepted"});
+                  try{await fbAdd("notifications",{toUid:inv.invitedBy,fromUid:au.uid,type:"team_accepted",message:`${uName} accepted your invite to join ${inv.companyName}`,read:false,createdAt:Date.now()});}catch(e){}
+                  sh("✅ Joined "+inv.companyName+"!");loadData();
+                }} style={{...T.btn,...T.btnSm,fontSize:".78rem",background:"#1a7d42",border:"none"}}>✓ Accept</button>
+                <button onClick={async()=>{
+                  await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"Declined"});
+                  sh("Declined");loadData();
+                }} style={{...T.btnO,...T.btnSm,fontSize:".78rem",color:T.mute}}>✕ Decline</button>
+              </div>
+            </div>)}
+            {/* Already on a team — always visible */}
+            {hasTeam&&<div style={{padding:"10px 14px",marginBottom:12,background:T.tealBg,borderRadius:10,border:"1px solid "+T.teal+"33",display:"flex",alignItems:"center",gap:10,justifyContent:"space-between"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                {teamOwner?.logo?<img src={teamOwner.logo} style={{width:28,height:28,borderRadius:6,objectFit:"cover"}}/>:<div style={{fontSize:"1.2rem"}}>🏢</div>}
+                <div>
+                  <div style={{fontSize:".82rem",fontWeight:600,color:T.teal}}>{teamName}</div>
+                  <div style={{fontSize:".66rem",color:T.mute}}>Your role: {COMPANY_ROLES.find(r=>r.id===prof.companyRole)?.label||"Staff"}</div>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:6}}>
+                <button onClick={()=>{const u=allUsers.find(x=>x.id===prof.companyId);if(u)viewProfile(u.id);}} style={{...T.btnO,...T.btnSm,fontSize:".68rem"}}>View page</button>
+                <button onClick={async()=>{if(!window.confirm("Leave "+teamName+"?"))return;await fbSet("users",au.uid,{companyId:null,companyRole:null});sh("Left "+teamName);loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".68rem",color:T.err}}>Leave</button>
+              </div>
+            </div>}
+          </>);
         })()}
 
         {/* ═══ POINTS + REDEEM PILL — only for doctor accounts (other types don't earn quiz points) ═══ */}
