@@ -10041,6 +10041,38 @@ ${forDownload
       {pg==="me"&&(normalizeAccountType(prof?.accountType||"")==="vendor"||normalizeAccountType(prof?.accountType||"")==="brand"||normalizeAccountType(prof?.accountType||"")==="institute")&&!editingProfile&&<div style={{maxWidth:900,margin:"0 auto"}}>
 
         {/* ══ VENDOR / BRAND / INSTITUTE ME PAGE ══ */}
+
+        {/* ══ PENDING TEAM INVITES — show at very top so user can't miss ══ */}
+        {(()=>{
+          const myInvites=adminMessages.filter(m=>m.type==="company_invite"&&m.uid===au?.uid&&m.status==="pending");
+          if(!myInvites.length)return null;
+          return myInvites.map(inv=>{
+            const inviter=allUsers.find(u=>u.id===inv.invitedBy);
+            return(<div key={inv.id} style={{padding:16,marginBottom:14,background:"linear-gradient(135deg,#e8f5e9,#f0faf3)",borderRadius:12,border:"2px solid #1a7d42"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                <div style={{fontSize:"1.8rem"}}>📨</div>
+                <div>
+                  <div style={{fontSize:"1rem",fontWeight:700,color:"#1a7d42"}}>Team invitation</div>
+                  <div style={{fontSize:".82rem",color:T.txt2}}><b>{inv.companyName}</b> invited you to join as <b>{COMPANY_ROLES.find(r=>r.id===inv.invitedRole)?.label||inv.invitedRole}</b></div>
+                  {inviter&&<div style={{fontSize:".72rem",color:T.mute,marginTop:2}}>Invited by {inviter.name} ({inviter.email})</div>}
+                </div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={async()=>{
+                  await fbSet("users",au.uid,{companyId:inv.companyOwnerId,companyRole:inv.invitedRole});
+                  await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"✅ Accepted"});
+                  try{await fbAdd("notifications",{toUid:inv.invitedBy,fromUid:au.uid,type:"team_accepted",message:`${uName} accepted your invite to join ${inv.companyName}`,read:false,createdAt:Date.now()});}catch(e){}
+                  sh("✅ You've joined "+inv.companyName+"!");loadData();
+                }} style={{...T.btn,padding:"8px 20px",fontSize:".84rem",background:"#1a7d42",border:"none"}}>✓ Accept & join</button>
+                <button onClick={async()=>{
+                  await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"Declined by user"});
+                  sh("Declined");loadData();
+                }} style={{...T.btnO,padding:"8px 20px",fontSize:".84rem",color:T.mute}}>✕ Decline</button>
+              </div>
+            </div>);
+          });
+        })()}
+
         {/* Company profile card — Facebook Page style: cover photo + overlapping logo */}
         {(()=>{
           const bizLogo=prof?.logo||uPhoto;
@@ -10647,18 +10679,27 @@ ${forDownload
                   const email=document.getElementById("team-invite-email")?.value?.trim();
                   const role=document.getElementById("team-invite-role")?.value||"editor";
                   if(!email){sh("Enter an email");return}
-                  // Check if user exists
                   const target=allUsers.find(u=>u.email?.toLowerCase()===email.toLowerCase());
                   if(!target){sh("No user found with that email. They need to register on SKINARIO first.");return}
-                  if(target.companyId){sh(target.name+" is already on another team");return}
+                  if(target.companyId&&target.companyId!==companyOwnerId){sh(target.name+" is already on another team");return}
                   if(target.id===au.uid){sh("That's you!");return}
-                  await fbSet("users",target.id,{companyId:companyOwnerId,companyRole:role});
-                  try{await fbAdd("notifications",{toUid:target.id,fromUid:au.uid,type:"team_invite",message:`You've been added to ${companyName} as ${COMPANY_ROLES.find(r=>r.id===role)?.label||role}`,read:false,createdAt:Date.now()});}catch(e){}
-                  sh("✅ "+target.name+" added as "+role);
+                  // Send invite as pending — user must accept
+                  await fbAdd("adminMessages",{uid:target.id,name:target.name,email:target.email,companyOwnerId:companyOwnerId,companyName:companyName,invitedRole:role,subject:"📨 Team invite: "+companyName,message:companyName+" has invited you to join as "+COMPANY_ROLES.find(r=>r.id===role)?.label,type:"company_invite",status:"pending",createdAt:Date.now(),invitedBy:au.uid,invitedByName:uName});
+                  try{await fbAdd("notifications",{toUid:target.id,fromUid:au.uid,type:"team_invite",message:`${companyName} invited you to join as ${COMPANY_ROLES.find(r=>r.id===role)?.label||role}. Go to Me page to accept.`,read:false,createdAt:Date.now()});}catch(e){}
+                  sh("✅ Invite sent to "+target.name+"! They'll see it on their Me page.");
                   document.getElementById("team-invite-email").value="";
                   loadData();
                 }} style={{...T.btn,...T.btnSm,fontSize:".72rem"}}>Invite</button>
               </div>
+              {/* Sent invites */}
+              {(()=>{
+                const sentInvites=adminMessages.filter(m=>m.type==="company_invite"&&m.companyOwnerId===companyOwnerId&&m.status==="pending");
+                if(!sentInvites.length)return null;
+                return<div style={{marginTop:8}}><div style={{fontSize:".66rem",color:T.mute,marginBottom:4}}>Pending invites:</div>{sentInvites.map(inv=><div key={inv.id} style={{display:"flex",alignItems:"center",gap:6,fontSize:".72rem",padding:"3px 0"}}>
+                  <span>{inv.name} ({inv.email})</span><span style={{color:T.mute}}>· {inv.invitedRole}</span>
+                  <button onClick={async()=>{await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"Cancelled"});sh("Cancelled");loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".58rem",padding:"1px 6px",color:T.mute}}>Cancel</button>
+                </div>)}</div>;
+              })()}
             </div>}
 
             {/* Join a company — shown to users who aren't on any team */}
@@ -10870,6 +10911,33 @@ ${forDownload
 
         {/* ═══ MAIN COLUMN: Profile + Saved Items ═══ */}
         <div style={{minWidth:0}}>
+
+        {/* ══ PENDING TEAM INVITES for doctors ══ */}
+        {(()=>{
+          const myInvites=adminMessages.filter(m=>m.type==="company_invite"&&m.uid===au?.uid&&m.status==="pending");
+          if(!myInvites.length)return null;
+          return myInvites.map(inv=><div key={inv.id} style={{padding:14,marginBottom:12,background:"linear-gradient(135deg,#e8f5e9,#f0faf3)",borderRadius:12,border:"2px solid #1a7d42"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+              <div style={{fontSize:"1.5rem"}}>📨</div>
+              <div>
+                <div style={{fontSize:".92rem",fontWeight:700,color:"#1a7d42"}}>Team invitation</div>
+                <div style={{fontSize:".78rem",color:T.txt2}}><b>{inv.companyName}</b> invited you as <b>{COMPANY_ROLES.find(r=>r.id===inv.invitedRole)?.label||inv.invitedRole}</b></div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={async()=>{
+                await fbSet("users",au.uid,{companyId:inv.companyOwnerId,companyRole:inv.invitedRole});
+                await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"✅ Accepted"});
+                try{await fbAdd("notifications",{toUid:inv.invitedBy,fromUid:au.uid,type:"team_accepted",message:`${uName} accepted your invite to join ${inv.companyName}`,read:false,createdAt:Date.now()});}catch(e){}
+                sh("✅ Joined "+inv.companyName+"!");loadData();
+              }} style={{...T.btn,...T.btnSm,fontSize:".78rem",background:"#1a7d42",border:"none"}}>✓ Accept</button>
+              <button onClick={async()=>{
+                await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"Declined"});
+                sh("Declined");loadData();
+              }} style={{...T.btnO,...T.btnSm,fontSize:".78rem",color:T.mute}}>✕ Decline</button>
+            </div>
+          </div>);
+        })()}
 
         {/* ═══ POINTS + REDEEM PILL — only for doctor accounts (other types don't earn quiz points) ═══ */}
         {!editingProfile&&prof?.accountType==="doctor"&&<div onClick={()=>go("rewards")} style={{...T.card,padding:"12px 16px",marginBottom:12,borderLeft:"3px solid "+T.gold,background:"linear-gradient(135deg,"+T.goldBg+"55,#fff)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 4px 14px rgba(0,0,0,0.07)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
