@@ -348,7 +348,9 @@ const CLINIC_SERVICES=["Botox","Dermal Fillers","Chemical Peels","PRP Therapy","
 const CLINIC_EQUIPMENT=["Q-Switch Laser","Diode Laser","Pico Laser","CO2 Fractional Laser","RF Machine","HIFU","Hydrafacial Machine","Microneedling Pen","Cryolipolysis Machine","IPL Machine","LED Therapy Panel","OxyGeneo","Dermapen","PRP Centrifuge","Electrocautery","Autoclave","Dermatoscope"];
 const INSTITUTE_COURSES=["Fellowship in Aesthetic Medicine","Botox & Fillers Certification","Laser Training","Chemical Peel Workshop","PRP Therapy Course","Thread Lift Training","Advanced Dermatology","Trichology Course","Cosmetology Diploma","Skin Care Formulation","Practice Management","Medical Aesthetics MBA","Hands-on Cadaver Workshop","Online CME Credits"];
 const VENDOR_PRODUCTS=["Botulinum Toxin","Dermal Fillers (HA)","Dermal Fillers (CaHA)","Chemical Peel Solutions","PRP Kits","Mesotherapy Cocktails","Skin Boosters","Thread Lift PDO","Laser Machines","RF Devices","HIFU Machines","Microneedling Devices","Skincare Range","Topical Anesthetics","Surgical Instruments","Consumables & Disposables"];
-const VENDOR_MACHINES=["Q-Switch Nd:YAG","Diode 810nm","Alexandrite Laser","Pico Laser","CO2 Fractional","Er:YAG Laser","IPL Platform","RF Monopolar","RF Bipolar","HIFU","Cryolipolysis","Body Sculpting","LED Panel","Hydrafacial Platform","Microneedling RF","Plasma Pen"]; // Default cap on first-ever load; admin can change from Beta Settings tab.
+const VENDOR_MACHINES=["Q-Switch Nd:YAG","Diode 810nm","Alexandrite Laser","Pico Laser","CO2 Fractional","Er:YAG Laser","IPL Platform","RF Monopolar","RF Bipolar","HIFU","Cryolipolysis","Body Sculpting","LED Panel","Hydrafacial Platform","Microneedling RF","Plasma Pen"];
+// Company team roles
+const COMPANY_ROLES=[{id:"owner",label:"👑 Owner",desc:"Full control"},{id:"admin",label:"⚙️ Admin",desc:"Manage products, wall, team"},{id:"editor",label:"✏️ Editor",desc:"Add/edit products & posts"},{id:"viewer",label:"👁️ Viewer",desc:"View only"}]; // Default cap on first-ever load; admin can change from Beta Settings tab.
 // Difficulty-specific theming — used across intro, taking, and result views
 const DIFF_THEME={
   Easy:{color:"#1a7d42",bg:"#e8f5e9",bgLight:"linear-gradient(135deg,#e8f5e9,#f0faf3)",border:"#4caf50",label:"🟢"},
@@ -3185,9 +3187,9 @@ export default function App(){
         // India-specific OR international-specific council
         ...(pf.country==="India"?{council:pf.council}:{internationalCouncil:pf.internationalCouncil.trim(),city:pf.city.trim(),region:pf.region?.trim()||""})
       }:{}),
-      ...(pf.accountType==="pharma"||pf.accountType==="brand"?{companyName:pf.companyName.trim(),brandCategories:pf.brandCategories,brandCategory:pf.brandCategories.join(", "),contactPerson:pf.contactPerson.trim(),website:pf.website?.trim()||"",address:pf.address?.trim()||""}:{}),
-      ...(pf.accountType==="vendor"?{companyName:pf.companyName.trim(),vendorCategories:pf.vendorCategories,vendorCategory:pf.vendorCategories.join(", "),contactPerson:pf.contactPerson.trim(),gstNumber:pf.gstNumber?.trim()||"",website:pf.website?.trim()||"",address:pf.address?.trim()||""}:{}),
-      ...(pf.accountType==="institute"?{instituteName:pf.instituteName.trim(),instituteType:pf.instituteType,directorName:pf.directorName.trim(),address:pf.address?.trim()||"",website:pf.website?.trim()||""}:{})
+      ...(pf.accountType==="pharma"||pf.accountType==="brand"?{companyName:pf.companyName.trim(),brandCategories:pf.brandCategories,brandCategory:pf.brandCategories.join(", "),contactPerson:pf.contactPerson.trim(),website:pf.website?.trim()||"",address:pf.address?.trim()||"",companyRole:"owner"}:{}),
+      ...(pf.accountType==="vendor"?{companyName:pf.companyName.trim(),vendorCategories:pf.vendorCategories,vendorCategory:pf.vendorCategories.join(", "),contactPerson:pf.contactPerson.trim(),gstNumber:pf.gstNumber?.trim()||"",website:pf.website?.trim()||"",address:pf.address?.trim()||"",companyRole:"owner"}:{}),
+      ...(pf.accountType==="institute"?{instituteName:pf.instituteName.trim(),instituteType:pf.instituteType,directorName:pf.directorName.trim(),address:pf.address?.trim()||"",website:pf.website?.trim()||"",companyRole:"owner"}:{})
     };
     await fbSet("users",au.uid,p);
     localStorage.setItem("sk_p_"+au.uid,JSON.stringify(p));
@@ -5741,8 +5743,9 @@ ${forDownload
           if(isBiz){
             const isInst=aType==="institute";
             // ─── VENDOR / BRAND / INSTITUTE DASHBOARD ───
-            const myProducts=products.filter(p=>p.vendorId===au?.uid&&p.active!==false);
-            const myEnquiries=productEnquiries.filter(e=>e.vendorId===au?.uid);
+            const companyUid=prof?.companyId||au?.uid;
+            const myProducts=products.filter(p=>p.vendorId===companyUid&&p.active!==false);
+            const myEnquiries=productEnquiries.filter(e=>e.vendorId===companyUid);
             const openEnquiries=myEnquiries.filter(e=>e.status!=="fulfilled");
             const recentEnquiries=[...myEnquiries].sort((a,b)=>(b.createdAt?.seconds||b.createdAt||0)-(a.createdAt?.seconds||a.createdAt||0)).slice(0,5);
             const myRedemptions=redemptions.filter(rd=>{const r=rewards.find(x=>x.id===rd.rewardId);return r?.vendorId===au?.uid});
@@ -10560,6 +10563,130 @@ ${forDownload
                 </div>}
               </div>)}
             </div>
+          </div>);
+        })()}
+
+        {/* ═══ TEAM MANAGEMENT — Invite & manage company staff ═══ */}
+        {(()=>{
+          const acType=normalizeAccountType(prof?.accountType||"");
+          if(acType!=="vendor"&&acType!=="brand"&&acType!=="institute")return null;
+          const isOwner=!prof.companyId||prof.companyRole==="owner";
+          const companyOwnerId=prof.companyId||au?.uid;
+          const companyOwner=prof.companyId?allUsers.find(u=>u.id===prof.companyId):prof;
+          const companyName=companyOwner?.companyName||companyOwner?.instituteName||"My Company";
+          // Find all staff linked to this company
+          const staffMembers=allUsers.filter(u=>u.companyId===companyOwnerId&&u.id!==companyOwnerId);
+          // Find pending join requests
+          const pendingRequests=adminMessages.filter(m=>m.type==="company_join_request"&&m.companyOwnerId===companyOwnerId&&m.status!=="replied");
+
+          return(<div style={{...T.card,marginBottom:14,borderLeft:"3px solid "+T.teal}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,flexWrap:"wrap",gap:8}}>
+              <div>
+                <div style={{fontSize:".92rem",fontWeight:700}}>👥 Team — {companyName}</div>
+                <div style={{fontSize:".68rem",color:T.mute}}>Your role: {COMPANY_ROLES.find(r=>r.id===(prof.companyRole||"owner"))?.label||"Owner"}</div>
+              </div>
+              {isOwner&&<span style={{fontSize:".62rem",fontWeight:600,color:T.teal,background:T.tealBg,padding:"3px 8px",borderRadius:6}}>👑 Owner</span>}
+            </div>
+
+            {/* Current team */}
+            <div style={{marginBottom:12}}>
+              <div style={{fontSize:".76rem",fontWeight:600,color:T.mute,marginBottom:6}}>Team members ({staffMembers.length+1})</div>
+              {/* Owner */}
+              <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:T.tealBg,borderRadius:8,marginBottom:4}}>
+                {companyOwner?.photo?<img src={companyOwner.photo} style={{width:32,height:32,borderRadius:"50%"}}/>:<div style={T.av(32,T.tealBg,T.teal)}>{(companyOwner?.name||"?").slice(0,2).toUpperCase()}</div>}
+                <div style={{flex:1}}><div style={{fontSize:".82rem",fontWeight:600}}>{companyOwner?.name||"Owner"}</div><div style={{fontSize:".64rem",color:T.mute}}>{companyOwner?.email}</div></div>
+                <span style={{fontSize:".62rem",fontWeight:700,color:T.teal}}>👑 Owner</span>
+              </div>
+              {/* Staff */}
+              {staffMembers.map(s=><div key={s.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:T.bg,borderRadius:8,marginBottom:4}}>
+                {s.photo?<img src={s.photo} style={{width:32,height:32,borderRadius:"50%"}}/>:<div style={T.av(32,T.bg,T.mute)}>{(s.name||"?").slice(0,2).toUpperCase()}</div>}
+                <div style={{flex:1,cursor:"pointer"}} onClick={()=>viewProfile(s.id)}><div style={{fontSize:".82rem",fontWeight:600}}>{s.name}</div><div style={{fontSize:".64rem",color:T.mute}}>{s.email} · {s.city||""}</div></div>
+                <span style={{fontSize:".62rem",fontWeight:600,color:T.mute}}>{COMPANY_ROLES.find(r=>r.id===(s.companyRole||"viewer"))?.label||"Staff"}</span>
+                {isOwner&&<button onClick={async()=>{
+                  if(!window.confirm("Remove "+s.name+" from your team?"))return;
+                  await fbSet("users",s.id,{companyId:null,companyRole:null});
+                  sh("Removed "+s.name);loadData();
+                }} style={{...T.btnDanger,...T.btnSm,fontSize:".6rem",padding:"2px 6px"}}>✕</button>}
+              </div>)}
+            </div>
+
+            {/* Pending join requests */}
+            {isOwner&&pendingRequests.length>0&&<div style={{marginBottom:12,padding:10,background:"#fff8e1",borderRadius:8}}>
+              <div style={{fontSize:".76rem",fontWeight:600,color:T.goldD,marginBottom:6}}>📨 Join requests ({pendingRequests.length})</div>
+              {pendingRequests.map(req=>{
+                const reqUser=allUsers.find(u=>u.id===req.uid);
+                return<div key={req.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:"#fff",borderRadius:6,marginBottom:4}}>
+                  <div style={{flex:1}}><div style={{fontSize:".78rem",fontWeight:600}}>{req.name}</div><div style={{fontSize:".64rem",color:T.mute}}>{req.email} · {req.message}</div></div>
+                  <select id={`role-${req.id}`} defaultValue="editor" style={{...T.inp,width:90,fontSize:".68rem",padding:"3px 6px"}}>
+                    {COMPANY_ROLES.filter(r=>r.id!=="owner").map(r=><option key={r.id} value={r.id}>{r.label}</option>)}
+                  </select>
+                  <button onClick={async()=>{
+                    const role=document.getElementById(`role-${req.id}`)?.value||"viewer";
+                    await fbSet("users",req.uid,{companyId:companyOwnerId,companyRole:role});
+                    await fbSet("adminMessages",req.id,{status:"replied",adminReply:"✅ Approved as "+role});
+                    try{await fbAdd("notifications",{toUid:req.uid,fromUid:au.uid,type:"team_approved",message:`You've been added to ${companyName} as ${role}`,read:false,createdAt:Date.now()});}catch(e){}
+                    sh("✅ "+req.name+" added as "+role);loadData();
+                  }} style={{...T.btn,...T.btnSm,fontSize:".64rem"}}>✓</button>
+                  <button onClick={async()=>{
+                    await fbSet("adminMessages",req.id,{status:"replied",adminReply:"Declined"});
+                    sh("Declined");loadData();
+                  }} style={{...T.btnO,...T.btnSm,fontSize:".64rem",color:T.mute}}>✕</button>
+                </div>;
+              })}
+            </div>}
+
+            {/* Invite by email */}
+            {isOwner&&<div style={{padding:10,background:T.bg,borderRadius:8}}>
+              <div style={{fontSize:".76rem",fontWeight:600,marginBottom:6}}>✉️ Invite team member</div>
+              <div style={{display:"flex",gap:6}}>
+                <input id="team-invite-email" placeholder="Email of person to invite" style={{...T.inp,flex:1,fontSize:".78rem"}}/>
+                <select id="team-invite-role" style={{...T.inp,width:100,fontSize:".72rem"}}>
+                  {COMPANY_ROLES.filter(r=>r.id!=="owner").map(r=><option key={r.id} value={r.id}>{r.label}</option>)}
+                </select>
+                <button onClick={async()=>{
+                  const email=document.getElementById("team-invite-email")?.value?.trim();
+                  const role=document.getElementById("team-invite-role")?.value||"editor";
+                  if(!email){sh("Enter an email");return}
+                  // Check if user exists
+                  const target=allUsers.find(u=>u.email?.toLowerCase()===email.toLowerCase());
+                  if(!target){sh("No user found with that email. They need to register on SKINARIO first.");return}
+                  if(target.companyId){sh(target.name+" is already on another team");return}
+                  if(target.id===au.uid){sh("That's you!");return}
+                  await fbSet("users",target.id,{companyId:companyOwnerId,companyRole:role});
+                  try{await fbAdd("notifications",{toUid:target.id,fromUid:au.uid,type:"team_invite",message:`You've been added to ${companyName} as ${COMPANY_ROLES.find(r=>r.id===role)?.label||role}`,read:false,createdAt:Date.now()});}catch(e){}
+                  sh("✅ "+target.name+" added as "+role);
+                  document.getElementById("team-invite-email").value="";
+                  loadData();
+                }} style={{...T.btn,...T.btnSm,fontSize:".72rem"}}>Invite</button>
+              </div>
+            </div>}
+
+            {/* Join a company — shown to users who aren't on any team */}
+            {!prof.companyId&&!isOwner&&<div style={{padding:10,background:T.bg,borderRadius:8,marginTop:8}}>
+              <div style={{fontSize:".76rem",fontWeight:600,marginBottom:6}}>🔍 Join an existing company</div>
+              <div style={{display:"flex",gap:6}}>
+                <select id="join-company-select" style={{...T.inp,flex:1,fontSize:".78rem"}}>
+                  <option value="">— Select company —</option>
+                  {allUsers.filter(u=>{const at=normalizeAccountType(u.accountType||"");return (at==="vendor"||at==="brand"||at==="institute")&&(!u.companyId||u.companyRole==="owner")&&u.id!==au?.uid;}).map(u=><option key={u.id} value={u.id}>{u.companyName||u.instituteName||u.name} ({u.email})</option>)}
+                </select>
+                <button onClick={async()=>{
+                  const ownerId=document.getElementById("join-company-select")?.value;
+                  if(!ownerId){sh("Select a company");return}
+                  const owner=allUsers.find(u=>u.id===ownerId);
+                  await fbAdd("adminMessages",{uid:au.uid,name:uName,email:au.email,companyOwnerId:ownerId,companyName:owner?.companyName||owner?.instituteName||"",subject:"📨 Team join request: "+(owner?.companyName||owner?.instituteName||""),message:uName+" wants to join your team.",type:"company_join_request",status:"pending",createdAt:Date.now()});
+                  // Notify the owner
+                  try{await fbAdd("notifications",{toUid:ownerId,fromUid:au.uid,type:"team_request",message:`${uName} wants to join your company`,read:false,createdAt:Date.now()});}catch(e){}
+                  sh("✅ Request sent to "+(owner?.companyName||owner?.name)+"!");
+                }} style={{...T.btn,...T.btnSm,fontSize:".72rem"}}>Request to join</button>
+              </div>
+            </div>}
+
+            {/* Staff member view — you belong to someone else's company */}
+            {prof.companyId&&prof.companyId!==au?.uid&&<div style={{padding:10,background:"#e8f5e9",borderRadius:8,marginTop:8}}>
+              <div style={{fontSize:".78rem",color:"#1a7d42",fontWeight:600}}>✅ You're part of {companyName}</div>
+              <div style={{fontSize:".68rem",color:T.mute,marginTop:2}}>You can see the shared business page, products, and wall posts.</div>
+              <button onClick={async()=>{if(!window.confirm("Leave "+companyName+"?"))return;await fbSet("users",au.uid,{companyId:null,companyRole:null});sh("Left "+companyName);loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".68rem",marginTop:6,color:T.err}}>Leave team</button>
+            </div>}
           </div>);
         })()}
 
