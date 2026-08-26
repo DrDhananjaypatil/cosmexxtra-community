@@ -5486,8 +5486,7 @@ ${forDownload
     {id:"quiz",ic:"🧠",l:"Quiz"},
     {id:"forum",ic:"💬",l:"Forum"},
     {id:"cases",ic:"🔬",l:"Cases"},
-    {id:"me",ic:"👤",l:"Me"},
-    ...(isBizAccount?[{id:"team",ic:"👥",l:"My Team"}]:[]),
+    ...(isBizAccount?[{id:"me",ic:"🏢",l:"My Page"},{id:"team",ic:"👥",l:"My Team"}]:[{id:"me",ic:"👤",l:"Me"}]),
   ];
   // ── Beta access gates. Feature is visible in nav ONLY to admins and users
   //    whose profile has the feature key in prof.betaFeatures. Admins can grant
@@ -5675,7 +5674,7 @@ ${forDownload
                         {n.linkLabel&&<div style={{fontSize:".74rem",color:T.mute,marginTop:2,fontStyle:"italic",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>"{n.linkLabel}"</div>}
                       </>}
                       <div style={{fontSize:".68rem",color:T.mute,marginTop:3,display:"flex",gap:6,alignItems:"center"}}>
-                        <span style={{fontSize:".7rem"}}>{n.type==="like"?"❤️":n.type==="comment"?"💬":n.type==="mention"?"@":n.type==="reply"?"↩️":n.type==="announcement"?"📣":"🔔"}</span>
+                        <span style={{fontSize:".7rem"}}>{n.type==="like"?"❤️":n.type==="comment"?"💬":n.type==="mention"?"@":n.type==="reply"?"↩️":n.type==="announcement"?"📣":n.type==="team_invite"?"📨":n.type==="team_accepted"?"✅":n.type==="team_approved"?"👥":n.type==="team_request"?"📨":n.type==="rsvp"?"📌":"🔔"}</span>
                         <span>{relTime(n.createdAt)}</span>
                         {!n.read&&<span style={{width:6,height:6,borderRadius:"50%",background:n.type==="announcement"?T.gold:T.teal,marginLeft:"auto"}}/>}
                       </div>
@@ -6682,7 +6681,7 @@ ${forDownload
               </div>
             </div>
             <div style={{display:"flex",gap:8}}>
-              <button onClick={async()=>{await fbSet("users",au.uid,{companyId:inv.companyOwnerId,companyRole:inv.invitedRole});await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"✅ Accepted"});try{await fbAdd("notifications",{toUid:inv.invitedBy,fromUid:au.uid,type:"team_accepted",message:`${uName} accepted your invite`,read:false,createdAt:Date.now()});}catch(e){}sh("✅ Joined "+inv.companyName+"!");loadData();}} style={{...T.btn,padding:"10px 24px",fontSize:".88rem",background:"#1a7d42",border:"none"}}>✓ Accept & join</button>
+              <button onClick={async()=>{await fbSet("users",au.uid,{companyId:inv.companyOwnerId,companyRole:inv.invitedRole});await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"✅ Accepted"});try{await fbAdd("notifications",{toUid:inv.invitedBy,fromUid:au.uid,type:"team_accepted",text:`${uName} accepted your invite`,read:false,createdAt:Date.now()});}catch(e){}sh("✅ Joined "+inv.companyName+"!");loadData();}} style={{...T.btn,padding:"10px 24px",fontSize:".88rem",background:"#1a7d42",border:"none"}}>✓ Accept & join</button>
               <button onClick={async()=>{await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"Declined"});sh("Declined");loadData();}} style={{...T.btnO,padding:"10px 24px",fontSize:".88rem",color:T.mute}}>✕ Decline</button>
             </div>
           </div>)}
@@ -6750,7 +6749,7 @@ ${forDownload
                   const existing=adminMessages.find(m=>m.type==="company_invite"&&m.uid===target.id&&m.companyOwnerId===companyOwnerId&&m.status==="pending");
                   if(existing){sh("Already invited — waiting for their response");return}
                   await fbAdd("adminMessages",{uid:target.id,name:target.name,email:target.email,companyOwnerId,companyName,invitedRole:role,subject:"📨 Team invite: "+companyName,message:companyName+" invited you to join as "+COMPANY_ROLES.find(r=>r.id===role)?.label,type:"company_invite",status:"pending",createdAt:Date.now(),invitedBy:au?.uid,invitedByName:uName});
-                  try{await fbAdd("notifications",{toUid:target.id,fromUid:au?.uid,type:"team_invite",message:`${companyName} invited you to join as ${COMPANY_ROLES.find(r=>r.id===role)?.label}. Go to My Team to accept.`,read:false,createdAt:Date.now()});}catch(e){}
+                  try{await fbAdd("notifications",{toUid:target.id,fromUid:au?.uid,type:"team_invite",text:`${companyName} invited you to join as ${COMPANY_ROLES.find(r=>r.id===role)?.label}. Go to My Team to accept.`,read:false,createdAt:Date.now()});}catch(e){}
                   sh("✅ Invite sent to "+target.name+"!");
                   document.getElementById("team-invite-email2").value="";loadData();
                 }} style={{...T.btn,width:"100%",fontSize:".84rem"}}>📨 Send invitation</button>
@@ -6775,7 +6774,7 @@ ${forDownload
                   <select id={`jr-${req.id}`} defaultValue="editor" style={{...T.inp,fontSize:".64rem",width:80,padding:"2px 4px"}}>
                     {COMPANY_ROLES.filter(r=>r.id!=="owner").map(r=><option key={r.id} value={r.id}>{r.label}</option>)}
                   </select>
-                  <button onClick={async()=>{const role=document.getElementById(`jr-${req.id}`)?.value||"viewer";await fbSet("users",req.uid,{companyId:companyOwnerId,companyRole:role});await fbSet("adminMessages",req.id,{status:"replied",adminReply:"✅ Approved as "+role});try{await fbAdd("notifications",{toUid:req.uid,fromUid:au?.uid,type:"team_approved",message:`You've been added to ${companyName}`,read:false,createdAt:Date.now()});}catch(e){}sh("✅ Approved");loadData();}} style={{...T.btn,...T.btnSm,fontSize:".62rem"}}>✓</button>
+                  <button onClick={async()=>{const role=document.getElementById(`jr-${req.id}`)?.value||"viewer";await fbSet("users",req.uid,{companyId:companyOwnerId,companyRole:role});await fbSet("adminMessages",req.id,{status:"replied",adminReply:"✅ Approved as "+role});try{await fbAdd("notifications",{toUid:req.uid,fromUid:au?.uid,type:"team_approved",text:`You've been added to ${companyName}`,read:false,createdAt:Date.now()});}catch(e){}sh("✅ Approved");loadData();}} style={{...T.btn,...T.btnSm,fontSize:".62rem"}}>✓</button>
                   <button onClick={async()=>{await fbSet("adminMessages",req.id,{status:"replied",adminReply:"Declined"});sh("Declined");loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".62rem",color:T.mute}}>✕</button>
                 </div>;})}
               </div>}
@@ -6793,7 +6792,7 @@ ${forDownload
                   if(!ownerId){sh("Select an organization");return}
                   const owner=allUsers.find(u=>u.id===ownerId);
                   await fbAdd("adminMessages",{uid:au?.uid,name:uName,email:au?.email,companyOwnerId:ownerId,companyName:owner?.companyName||owner?.instituteName||"",subject:"📨 Join request: "+(owner?.companyName||owner?.instituteName||""),message:uName+" wants to join your team.",type:"company_join_request",status:"pending",createdAt:Date.now()});
-                  try{await fbAdd("notifications",{toUid:ownerId,fromUid:au?.uid,type:"team_request",message:`${uName} wants to join your team`,read:false,createdAt:Date.now()});}catch(e){}
+                  try{await fbAdd("notifications",{toUid:ownerId,fromUid:au?.uid,type:"team_request",text:`${uName} wants to join your team`,read:false,createdAt:Date.now()});}catch(e){}
                   sh("✅ Request sent!");loadData();
                 }} style={{...T.btn,width:"100%",fontSize:".84rem"}}>📨 Request to join</button>
               </div>}
@@ -10219,7 +10218,7 @@ ${forDownload
                 <button onClick={async()=>{
                   await fbSet("users",au.uid,{companyId:inv.companyOwnerId,companyRole:inv.invitedRole});
                   await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"✅ Accepted"});
-                  try{await fbAdd("notifications",{toUid:inv.invitedBy,fromUid:au.uid,type:"team_accepted",message:`${uName} accepted your invite to join ${inv.companyName}`,read:false,createdAt:Date.now()});}catch(e){}
+                  try{await fbAdd("notifications",{toUid:inv.invitedBy,fromUid:au.uid,type:"team_accepted",text:`${uName} accepted your invite to join ${inv.companyName}`,read:false,createdAt:Date.now()});}catch(e){}
                   sh("✅ You've joined "+inv.companyName+"!");loadData();
                 }} style={{...T.btn,padding:"8px 20px",fontSize:".84rem",background:"#1a7d42",border:"none"}}>✓ Accept & join</button>
                 <button onClick={async()=>{
@@ -10814,7 +10813,7 @@ ${forDownload
                     const role=document.getElementById(`role-${req.id}`)?.value||"viewer";
                     await fbSet("users",req.uid,{companyId:companyOwnerId,companyRole:role});
                     await fbSet("adminMessages",req.id,{status:"replied",adminReply:"✅ Approved as "+role});
-                    try{await fbAdd("notifications",{toUid:req.uid,fromUid:au.uid,type:"team_approved",message:`You've been added to ${companyName} as ${role}`,read:false,createdAt:Date.now()});}catch(e){}
+                    try{await fbAdd("notifications",{toUid:req.uid,fromUid:au.uid,type:"team_approved",text:`You've been added to ${companyName} as ${role}`,read:false,createdAt:Date.now()});}catch(e){}
                     sh("✅ "+req.name+" added as "+role);loadData();
                   }} style={{...T.btn,...T.btnSm,fontSize:".64rem"}}>✓</button>
                   <button onClick={async()=>{
@@ -10843,7 +10842,7 @@ ${forDownload
                   if(target.id===au.uid){sh("That's you!");return}
                   // Send invite as pending — user must accept
                   await fbAdd("adminMessages",{uid:target.id,name:target.name,email:target.email,companyOwnerId:companyOwnerId,companyName:companyName,invitedRole:role,subject:"📨 Team invite: "+companyName,message:companyName+" has invited you to join as "+COMPANY_ROLES.find(r=>r.id===role)?.label,type:"company_invite",status:"pending",createdAt:Date.now(),invitedBy:au.uid,invitedByName:uName});
-                  try{await fbAdd("notifications",{toUid:target.id,fromUid:au.uid,type:"team_invite",message:`${companyName} invited you to join as ${COMPANY_ROLES.find(r=>r.id===role)?.label||role}. Go to Me page to accept.`,read:false,createdAt:Date.now()});}catch(e){}
+                  try{await fbAdd("notifications",{toUid:target.id,fromUid:au.uid,type:"team_invite",text:`${companyName} invited you to join as ${COMPANY_ROLES.find(r=>r.id===role)?.label||role}. Go to Me page to accept.`,read:false,createdAt:Date.now()});}catch(e){}
                   sh("✅ Invite sent to "+target.name+"! They'll see it on their Me page.");
                   document.getElementById("team-invite-email").value="";
                   loadData();
@@ -10874,7 +10873,7 @@ ${forDownload
                   const owner=allUsers.find(u=>u.id===ownerId);
                   await fbAdd("adminMessages",{uid:au.uid,name:uName,email:au.email,companyOwnerId:ownerId,companyName:owner?.companyName||owner?.instituteName||"",subject:"📨 Team join request: "+(owner?.companyName||owner?.instituteName||""),message:uName+" wants to join your team.",type:"company_join_request",status:"pending",createdAt:Date.now()});
                   // Notify the owner
-                  try{await fbAdd("notifications",{toUid:ownerId,fromUid:au.uid,type:"team_request",message:`${uName} wants to join your company`,read:false,createdAt:Date.now()});}catch(e){}
+                  try{await fbAdd("notifications",{toUid:ownerId,fromUid:au.uid,type:"team_request",text:`${uName} wants to join your company`,read:false,createdAt:Date.now()});}catch(e){}
                   sh("✅ Request sent to "+(owner?.companyName||owner?.name)+"!");
                 }} style={{...T.btn,...T.btnSm,fontSize:".72rem"}}>Request to join</button>
               </div>
@@ -11090,7 +11089,7 @@ ${forDownload
                 <button onClick={async()=>{
                   await fbSet("users",au.uid,{companyId:inv.companyOwnerId,companyRole:inv.invitedRole});
                   await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"✅ Accepted"});
-                  try{await fbAdd("notifications",{toUid:inv.invitedBy,fromUid:au.uid,type:"team_accepted",message:`${uName} accepted your invite to join ${inv.companyName}`,read:false,createdAt:Date.now()});}catch(e){}
+                  try{await fbAdd("notifications",{toUid:inv.invitedBy,fromUid:au.uid,type:"team_accepted",text:`${uName} accepted your invite to join ${inv.companyName}`,read:false,createdAt:Date.now()});}catch(e){}
                   sh("✅ Joined "+inv.companyName+"!");loadData();
                 }} style={{...T.btn,...T.btnSm,fontSize:".78rem",background:"#1a7d42",border:"none"}}>✓ Accept</button>
                 <button onClick={async()=>{
