@@ -22,6 +22,19 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
     }
 
+    // ── SKINARIO-OS (clinic module) helpers ─────────────────────────────
+    function isClinicStaff(clinicId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/clinics/$(clinicId)/staff/$(request.auth.uid));
+    }
+    function clinicStaffDoc(clinicId) {
+      return get(/databases/$(database)/documents/clinics/$(clinicId)/staff/$(request.auth.uid)).data;
+    }
+    function hasClinicPermission(clinicId, module, action) {
+      return isClinicStaff(clinicId) &&
+        clinicStaffDoc(clinicId).permissions[module][action] == true;
+    }
+
     // ── users/{uid} — doc id IS the uid, so ownership = doc id match ──────
     match /users/{uid} {
       allow read: if isSignedIn();
@@ -296,6 +309,80 @@ service cloud.firestore {
       allow update: if isAdmin()
                     || (isSignedIn() && onlyChangedTo(['clicks','updatedAt']))
                     || (isSignedIn() && onlyChangedTo(['visits','updatedAt']));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ── SKINARIO-OS — Clinic Administration module ─────────────────────
+    //    New block. Everything below is scoped under /clinics/{clinicId}
+    //    and does not touch any SKINARIO collection above. ─────────────────
+    // ══════════════════════════════════════════════════════════════════════
+    match /clinics/{clinicId} {
+      allow read: if isClinicStaff(clinicId);
+      allow create: if isSignedIn(); // clinic creation happens client-side in ClinicSetup.jsx
+      allow update: if isClinicStaff(clinicId) && clinicStaffDoc(clinicId).role == 'owner';
+
+      match /staff/{staffUid} {
+        allow read: if isClinicStaff(clinicId);
+        allow create: if isSignedIn() && request.auth.uid == staffUid;
+        allow update: if hasClinicPermission(clinicId, 'staffMgmt', 'edit') || request.auth.uid == staffUid;
+        allow delete: if hasClinicPermission(clinicId, 'staffMgmt', 'remove');
+      }
+
+      match /invites/{inviteId} {
+        allow read: if isSignedIn();
+        allow create, update: if hasClinicPermission(clinicId, 'staffMgmt', 'add');
+        allow delete: if isSignedIn();
+      }
+
+      match /patients/{patientId} {
+        allow read: if isClinicStaff(clinicId);
+        allow create: if hasClinicPermission(clinicId, 'patients', 'add');
+        allow update: if hasClinicPermission(clinicId, 'patients', 'edit');
+        allow delete: if hasClinicPermission(clinicId, 'patients', 'delete');
+      }
+
+      match /appointments/{appointmentId} {
+        allow read: if isClinicStaff(clinicId);
+        allow create: if hasClinicPermission(clinicId, 'appointments', 'add');
+        allow update: if hasClinicPermission(clinicId, 'appointments', 'edit');
+        allow delete: if hasClinicPermission(clinicId, 'appointments', 'cancel');
+      }
+
+      match /services/{serviceId} {
+        allow read: if isClinicStaff(clinicId);
+        allow write: if hasClinicPermission(clinicId, 'services', 'edit');
+      }
+
+      match /inventory/{itemId} {
+        allow read: if isClinicStaff(clinicId);
+        allow create: if hasClinicPermission(clinicId, 'inventory', 'add');
+        allow update: if hasClinicPermission(clinicId, 'inventory', 'edit');
+      }
+
+      match /inventoryLedger/{entryId} {
+        allow read: if isClinicStaff(clinicId);
+        allow create: if hasClinicPermission(clinicId, 'inventory', 'recordOutward')
+                      || hasClinicPermission(clinicId, 'inventory', 'add');
+      }
+
+      match /invoices/{invoiceId} {
+        allow read: if isClinicStaff(clinicId);
+        allow create, update: if hasClinicPermission(clinicId, 'billing', 'createInvoice');
+      }
+
+      match /discountApprovals/{approvalId} {
+        allow read: if isClinicStaff(clinicId);
+        allow create: if isClinicStaff(clinicId);
+        allow update: if isClinicStaff(clinicId); // refine later: only approvers with sufficient maxDiscountPct
+      }
+
+      // Catch-all for remaining clinic collections not yet built as their own
+      // rule (rooms, vendors, consultations, treatmentPlans, accounts, expenses,
+      // commissionProfiles, etc.) — any clinic staff can read/write for now;
+      // tighten with specific per-module permissions as each is built.
+      match /{document=**} {
+        allow read, write: if isClinicStaff(clinicId);
+      }
     }
 
     // Default deny for anything not explicitly listed above

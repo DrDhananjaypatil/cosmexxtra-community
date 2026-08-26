@@ -5661,6 +5661,8 @@ ${forDownload
                     else if(n.linkType==="quiz"){go("quiz")}
                     else if(n.linkType==="enquiry"){go("home")}
                     else if(n.linkType==="follow"){if(n.linkId)viewProfile(n.linkId)}
+                    else if(n.type==="team_invite"||n.type==="team_approved"||n.type==="team_request"||n.type==="team_accepted"){go("team")}
+                    else if(n.type==="rsvp"&&n.eventId){const e=events.find(x=>x.id===n.eventId);if(e){setSelE(e);go("events")}}
                     setNotifsOpen(false);
                   }} style={{padding:"12px 14px",borderBottom:"1px solid "+T.border,cursor:"pointer",background:n.read?"#fff":(n.type==="announcement"?"#fdf6e3":"#fef9ef"),borderLeft:n.type==="announcement"?"3px solid "+T.gold:"none",display:"flex",gap:10,alignItems:"flex-start"}}>
                     {n.type==="announcement"?<div style={{...T.av(36,T.goldBg,T.goldD),flexShrink:0,fontSize:"1.1rem"}}>📣</div>:n.fromPhoto?<img src={n.fromPhoto} style={{width:36,height:36,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(36,T.tealBg,T.teal),flexShrink:0}}>{n.fromIni}</div>}
