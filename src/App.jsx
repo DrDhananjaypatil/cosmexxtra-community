@@ -350,7 +350,8 @@ const INSTITUTE_COURSES=["Fellowship in Aesthetic Medicine","Botox & Fillers Cer
 const VENDOR_PRODUCTS=["Botulinum Toxin","Dermal Fillers (HA)","Dermal Fillers (CaHA)","Chemical Peel Solutions","PRP Kits","Mesotherapy Cocktails","Skin Boosters","Thread Lift PDO","Laser Machines","RF Devices","HIFU Machines","Microneedling Devices","Skincare Range","Topical Anesthetics","Surgical Instruments","Consumables & Disposables"];
 const VENDOR_MACHINES=["Q-Switch Nd:YAG","Diode 810nm","Alexandrite Laser","Pico Laser","CO2 Fractional","Er:YAG Laser","IPL Platform","RF Monopolar","RF Bipolar","HIFU","Cryolipolysis","Body Sculpting","LED Panel","Hydrafacial Platform","Microneedling RF","Plasma Pen"];
 // Company team roles
-const COMPANY_ROLES=[{id:"owner",label:"👑 Owner",desc:"Full control"},{id:"admin",label:"⚙️ Admin",desc:"Manage products, wall, team"},{id:"editor",label:"✏️ Editor",desc:"Add/edit products & posts"},{id:"viewer",label:"👁️ Viewer",desc:"View only"}]; // Default cap on first-ever load; admin can change from Beta Settings tab.
+const COMPANY_ROLES=[{id:"owner",label:"👑 Owner",desc:"Full control"},{id:"director",label:"🎯 Director",desc:"Strategic decisions"},{id:"admin",label:"⚙️ Admin",desc:"Manage products, wall, team"},{id:"manager",label:"📋 Manager",desc:"Day-to-day operations"},{id:"editor",label:"✏️ Editor",desc:"Add/edit products & posts"},{id:"consultant",label:"🧠 Consultant",desc:"Advisory role"},{id:"representative",label:"🤝 Representative",desc:"Sales & outreach"},{id:"viewer",label:"👁️ Viewer",desc:"View only"}];
+const EDIT_ROLES=["owner","director","admin","manager","editor"]; // roles that can edit company page // Default cap on first-ever load; admin can change from Beta Settings tab.
 // Difficulty-specific theming — used across intro, taking, and result views
 const DIFF_THEME={
   Easy:{color:"#1a7d42",bg:"#e8f5e9",bgLight:"linear-gradient(135deg,#e8f5e9,#f0faf3)",border:"#4caf50",label:"🟢"},
@@ -5481,12 +5482,28 @@ ${forDownload
   // Primary (always visible): Home, Quiz, Forum, Cases, Me
   // Overflow ("⋯ More" dropdown): Library, Videos, Events, Rank, Consent, Admin
   const isBizAccount=(()=>{const at=normalizeAccountType(prof?.accountType||"");return at==="vendor"||at==="brand"||at==="institute";})();
+  // Multi-company helpers
+  const myCompanies=Array.isArray(prof?.companies)?prof.companies:(prof?.companyId?[{id:prof.companyId,role:prof.companyRole||"viewer",name:"",type:""}]:[]);
+  const hasAnyTeam=isBizAccount||myCompanies.length>0;
+  const getCompanyRole=(companyOwnerId)=>{const c=myCompanies.find(x=>x.id===companyOwnerId);return c?.role||null;};
+  const canEditCompany=(companyOwnerId)=>{if(au?.uid===companyOwnerId)return true;const role=getCompanyRole(companyOwnerId);return role&&EDIT_ROLES.includes(role);};
+  const addToMyCompanies=async(companyOwnerId,role,companyName,companyType)=>{
+    const existing=myCompanies.filter(c=>c.id!==companyOwnerId);
+    const updated=[...existing,{id:companyOwnerId,role,name:companyName,type:companyType,joinedAt:Date.now()}];
+    await fbSet("users",au.uid,{companies:updated,companyId:companyOwnerId,companyRole:role});
+  };
+  const removeFromMyCompanies=async(companyOwnerId)=>{
+    const updated=myCompanies.filter(c=>c.id!==companyOwnerId);
+    const newPrimary=updated.length>0?updated[0]:null;
+    await fbSet("users",au.uid,{companies:updated,companyId:newPrimary?.id||null,companyRole:newPrimary?.role||null});
+  };
   const primaryNavs=[
     {id:"home",ic:"🏠",l:"Home"},
     {id:"quiz",ic:"🧠",l:"Quiz"},
     {id:"forum",ic:"💬",l:"Forum"},
     {id:"cases",ic:"🔬",l:"Cases"},
-    ...(isBizAccount?[{id:"me",ic:"🏢",l:"My Page"},{id:"team",ic:"👥",l:"My Team"}]:[{id:"me",ic:"👤",l:"Me"}]),
+    ...(isBizAccount?[{id:"me",ic:"🏢",l:"My Page"}]:[{id:"me",ic:"👤",l:"Me"}]),
+    ...(hasAnyTeam?[{id:"team",ic:"👥",l:"My Team"}]:[]),
   ];
   // ── Beta access gates. Feature is visible in nav ONLY to admins and users
   //    whose profile has the feature key in prof.betaFeatures. Admins can grant
@@ -6649,157 +6666,198 @@ ${forDownload
       </div>}
       {/* ═══ MY TEAM PAGE ═══ */}
       {pg==="team"&&(()=>{
-        const acType=normalizeAccountType(prof?.accountType||"");
-        const isOwnerAccount=!prof?.companyId||prof?.companyRole==="owner";
-        const companyOwnerId=prof?.companyId||au?.uid;
-        const companyOwner=prof?.companyId?allUsers.find(u=>u.id===prof.companyId):prof;
-        const companyName=companyOwner?.companyName||companyOwner?.instituteName||companyOwner?.name||"My Organization";
-        const companyLogo=companyOwner?.logo||companyOwner?.photo||"";
-        const staffMembers=allUsers.filter(u=>u.companyId===companyOwnerId&&u.id!==companyOwnerId);
-        const pendingJoinReqs=adminMessages.filter(m=>m.type==="company_join_request"&&m.companyOwnerId===companyOwnerId&&m.status!=="replied");
-        const pendingInvites=adminMessages.filter(m=>m.type==="company_invite"&&m.companyOwnerId===companyOwnerId&&m.status==="pending");
         const myPendingInvites=adminMessages.filter(m=>m.type==="company_invite"&&m.uid===au?.uid&&m.status==="pending");
 
-        return(<div style={{maxWidth:800,margin:"0 auto"}}>
-          {/* Header */}
-          <div style={{...T.card,padding:"22px 24px",marginBottom:14,background:"linear-gradient(135deg,#0d6b6e,#0a5c5f)",color:"#fff",borderRadius:14}}>
-            <div style={{display:"flex",alignItems:"center",gap:14}}>
-              {companyLogo?<img src={companyLogo} style={{width:52,height:52,borderRadius:12,objectFit:"cover",border:"2px solid rgba(255,255,255,0.3)"}}/>:<div style={{width:52,height:52,borderRadius:12,background:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.6rem"}}>👥</div>}
-              <div>
-                <h2 style={{fontSize:"1.3rem",fontWeight:700,margin:0}}>{companyName}</h2>
-                <div style={{fontSize:".78rem",opacity:0.8}}>Your role: {COMPANY_ROLES.find(r=>r.id===(prof?.companyRole||"owner"))?.label||"Owner"} · {staffMembers.length+1} team member{staffMembers.length!==0?"s":""}</div>
-              </div>
-            </div>
+        return(<div style={{maxWidth:900,margin:"0 auto"}}>
+          <div style={{...T.card,padding:"20px 24px",marginBottom:14,background:"linear-gradient(135deg,#0d6b6e,#0a5c5f)",color:"#fff",borderRadius:14}}>
+            <h2 style={{fontSize:"1.3rem",fontWeight:700,margin:0}}>👥 My Team & Associations</h2>
+            <div style={{fontSize:".82rem",opacity:0.8,marginTop:4}}>All your company, institute, and pharma associations in one place.</div>
           </div>
 
-          {/* Pending invites FOR ME */}
-          {myPendingInvites.map(inv=><div key={inv.id} style={{...T.card,marginBottom:14,padding:16,background:"linear-gradient(135deg,#e8f5e9,#f0faf3)",border:"2px solid #1a7d42"}}>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-              <span style={{fontSize:"1.5rem"}}>📨</span>
+          {/* Pending invites */}
+          {myPendingInvites.map(inv=><div key={inv.id} style={{...T.card,marginBottom:14,padding:18,background:"linear-gradient(135deg,#e8f5e9,#f0faf3)",border:"2px solid #1a7d42"}}>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
+              <span style={{fontSize:"2rem"}}>📨</span>
               <div>
-                <div style={{fontSize:"1rem",fontWeight:700,color:"#1a7d42"}}>Team invitation</div>
-                <div style={{fontSize:".84rem",color:T.txt2}}><b>{inv.companyName}</b> invited you as <b>{COMPANY_ROLES.find(r=>r.id===inv.invitedRole)?.label||inv.invitedRole}</b></div>
-                <div style={{fontSize:".72rem",color:T.mute}}>Invited by {inv.invitedByName||"Admin"}</div>
+                <div style={{fontSize:"1.05rem",fontWeight:700,color:"#1a7d42"}}>Team invitation</div>
+                <div style={{fontSize:".86rem",color:T.txt2}}><b>{inv.companyName}</b> invited you as <b>{COMPANY_ROLES.find(r=>r.id===inv.invitedRole)?.label||inv.invitedRole}</b></div>
+                {inv.invitedByName&&<div style={{fontSize:".72rem",color:T.mute,marginTop:2}}>From {inv.invitedByName}</div>}
               </div>
             </div>
             <div style={{display:"flex",gap:8}}>
-              <button onClick={async()=>{await fbSet("users",au.uid,{companyId:inv.companyOwnerId,companyRole:inv.invitedRole});await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"✅ Accepted"});try{await fbAdd("notifications",{toUid:inv.invitedBy,fromUid:au.uid,type:"team_accepted",text:`${uName} accepted your invite`,read:false,createdAt:Date.now()});}catch(e){}sh("✅ Joined "+inv.companyName+"!");loadData();}} style={{...T.btn,padding:"10px 24px",fontSize:".88rem",background:"#1a7d42",border:"none"}}>✓ Accept & join</button>
-              <button onClick={async()=>{await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"Declined"});sh("Declined");loadData();}} style={{...T.btnO,padding:"10px 24px",fontSize:".88rem",color:T.mute}}>✕ Decline</button>
+              <button onClick={async()=>{
+                const owner=allUsers.find(u=>u.id===inv.companyOwnerId);
+                const cType=normalizeAccountType(owner?.accountType||"");
+                await addToMyCompanies(inv.companyOwnerId,inv.invitedRole,inv.companyName,cType);
+                await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"✅ Accepted"});
+                try{await fbAdd("notifications",{toUid:inv.invitedBy,fromUid:au.uid,type:"team_accepted",text:uName+" accepted your invite to "+inv.companyName,read:false,createdAt:Date.now()});}catch(e){}
+                sh("✅ Joined "+inv.companyName+"!");loadData();
+              }} style={{...T.btn,padding:"10px 28px",fontSize:".88rem",background:"#1a7d42",border:"none"}}>✓ Accept & join</button>
+              <button onClick={async()=>{await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"Declined"});sh("Declined");loadData();}} style={{...T.btnO,padding:"10px 28px",fontSize:".88rem",color:T.mute}}>✕ Decline</button>
             </div>
           </div>)}
 
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}} className="me-grid">
-            {/* LEFT — Team members */}
-            <div>
-              <div style={{...T.card,marginBottom:14}}>
-                <h4 style={{fontSize:".92rem",fontWeight:700,margin:0,marginBottom:12}}>👥 Team members ({staffMembers.length+1})</h4>
-                {/* Owner */}
-                <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:T.tealBg,borderRadius:10,marginBottom:6}}>
-                  {companyOwner?.photo?<img src={companyOwner.photo} style={{width:38,height:38,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(38,T.tealBg,T.teal)}>{(companyOwner?.name||"?").slice(0,2).toUpperCase()}</div>}
-                  <div style={{flex:1,cursor:"pointer"}} onClick={()=>viewProfile(companyOwnerId)}>
-                    <div style={{fontSize:".86rem",fontWeight:700}}>{companyOwner?.name||"Owner"}</div>
-                    <div style={{fontSize:".68rem",color:T.mute}}>{companyOwner?.email}</div>
+          {/* My associations */}
+          {myCompanies.length>0&&<div style={{...T.card,marginBottom:14}}>
+            <h4 style={{fontSize:".92rem",fontWeight:700,margin:0,marginBottom:12}}>🏢 My associations ({myCompanies.length})</h4>
+            {myCompanies.map(co=>{
+              const owner=allUsers.find(u=>u.id===co.id);
+              const coName=co.name||owner?.companyName||owner?.instituteName||owner?.name||"Company";
+              const coType=co.type||normalizeAccountType(owner?.accountType||"");
+              const roleInfo=COMPANY_ROLES.find(r=>r.id===co.role);
+              const canEdit=EDIT_ROLES.includes(co.role);
+              const staffCount=allUsers.filter(u=>(Array.isArray(u.companies)?u.companies:[]).some(c=>c.id===co.id)).length;
+              return(<div key={co.id} style={{padding:14,background:T.bg,borderRadius:10,marginBottom:8,borderLeft:"3px solid "+(co.role==="owner"||co.role==="director"?T.teal:co.role==="admin"?"#c8a84e":T.border)}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                  {owner?.logo||owner?.photo?<img src={owner.logo||owner.photo} style={{width:40,height:40,borderRadius:10,objectFit:"cover"}}/>:<div style={{width:40,height:40,borderRadius:10,background:T.tealBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.2rem"}}>{coType==="institute"?"🎓":coType==="brand"||coType==="vendor"?"🏭":"🏢"}</div>}
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:".92rem",fontWeight:700}}>{coName}</div>
+                    <div style={{fontSize:".68rem",color:T.mute}}>{coType==="institute"?"Institute":coType==="brand"?"Pharma/Brand":coType==="vendor"?"Vendor":"Organization"} · {staffCount+1} members</div>
                   </div>
-                  <span style={{fontSize:".72rem",fontWeight:700,color:T.teal,background:"#fff",padding:"3px 10px",borderRadius:6}}>👑 Owner</span>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:".74rem",fontWeight:600,color:co.role==="owner"?T.teal:co.role==="director"?"#c8a84e":T.txt2}}>{roleInfo?.label||co.role}</div>
+                    {canEdit&&<div style={{fontSize:".58rem",color:"#1a7d42"}}>✏️ Can edit</div>}
+                  </div>
                 </div>
-                {/* Staff */}
-                {staffMembers.map(s=><div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:T.bg,borderRadius:10,marginBottom:4}}>
-                  {s.photo?<img src={s.photo} style={{width:36,height:36,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(36,T.bg,T.mute)}>{(s.name||"?").slice(0,2).toUpperCase()}</div>}
-                  <div style={{flex:1,cursor:"pointer"}} onClick={()=>viewProfile(s.id)}>
-                    <div style={{fontSize:".84rem",fontWeight:600}}>{s.name}</div>
-                    <div style={{fontSize:".66rem",color:T.mute}}>{s.email}{s.city?" · "+s.city:""}</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <button onClick={()=>{const u=allUsers.find(x=>x.id===co.id);if(u){setSelU(u);go("profile")}}} style={{...T.btnO,...T.btnSm,fontSize:".72rem"}}>👁️ View page</button>
+                  {canEdit&&<button onClick={()=>{go("me");}} style={{...T.btnO,...T.btnSm,fontSize:".72rem",color:T.teal,borderColor:T.teal}}>✏️ Edit page</button>}
+                  {co.role!=="owner"&&<button onClick={async()=>{if(!window.confirm("Leave "+coName+"?"))return;await removeFromMyCompanies(co.id);sh("Left "+coName);loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".72rem",color:T.err}}>Leave</button>}
+                </div>
+              </div>);
+            })}
+          </div>}
+
+          {/* Own company team management (if user is a business account owner) */}
+          {isBizAccount&&(()=>{
+            const companyOwnerId=au?.uid;
+            const companyName=prof?.companyName||prof?.instituteName||prof?.name||"My Organization";
+            const staffMembers=allUsers.filter(u=>(Array.isArray(u.companies)?u.companies:[u.companyId?{id:u.companyId,role:u.companyRole}:null].filter(Boolean)).some(c=>c?.id===companyOwnerId));
+            const pendingJoinReqs=adminMessages.filter(m=>m.type==="company_join_request"&&m.companyOwnerId===companyOwnerId&&m.status!=="replied");
+            const pendingInvitesSent=adminMessages.filter(m=>m.type==="company_invite"&&m.companyOwnerId===companyOwnerId&&m.status==="pending");
+
+            return(<>
+              <div style={{...T.card,marginBottom:14,borderLeft:"3px solid "+T.teal}}>
+                <h4 style={{fontSize:".92rem",fontWeight:700,margin:0,marginBottom:12}}>👑 My company: {companyName}</h4>
+
+                {/* Team list */}
+                <div style={{marginBottom:12}}>
+                  <div style={{fontSize:".76rem",fontWeight:600,color:T.mute,marginBottom:6}}>Team ({staffMembers.length+1})</div>
+                  {/* Owner row */}
+                  <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:T.tealBg,borderRadius:8,marginBottom:4}}>
+                    {prof?.photo?<img src={prof.photo} style={{width:36,height:36,borderRadius:"50%"}}/>:<div style={T.av(36,T.tealBg,T.teal)}>{uIni}</div>}
+                    <div style={{flex:1}}><div style={{fontSize:".84rem",fontWeight:700}}>{uName} (You)</div><div style={{fontSize:".66rem",color:T.mute}}>{au?.email}</div></div>
+                    <span style={{fontSize:".72rem",fontWeight:700,color:T.teal}}>👑 Owner</span>
                   </div>
-                  <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    {isOwnerAccount&&<select value={s.companyRole||"viewer"} onChange={async(e)=>{await fbSet("users",s.id,{companyRole:e.target.value});sh("Updated");loadData();}} style={{...T.inp,fontSize:".64rem",padding:"2px 4px",width:85}}>
+                  {staffMembers.map(s=>{
+                    const sCo=(Array.isArray(s.companies)?s.companies:[s.companyId?{id:s.companyId,role:s.companyRole}:null].filter(Boolean)).find(c=>c?.id===companyOwnerId);
+                    return<div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:T.bg,borderRadius:8,marginBottom:4}}>
+                      {s.photo?<img src={s.photo} style={{width:34,height:34,borderRadius:"50%"}}/>:<div style={T.av(34,T.bg,T.mute)}>{(s.name||"?").slice(0,2).toUpperCase()}</div>}
+                      <div style={{flex:1,cursor:"pointer"}} onClick={()=>viewProfile(s.id)}><div style={{fontSize:".84rem",fontWeight:600}}>{s.name}</div><div style={{fontSize:".66rem",color:T.mute}}>{s.email}{s.city?" · "+s.city:""}</div></div>
+                      <select value={sCo?.role||"viewer"} onChange={async(e)=>{
+                        const uComps=Array.isArray(s.companies)?s.companies:s.companyId?[{id:s.companyId,role:s.companyRole}]:[];
+                        const updated=uComps.map(c=>c.id===companyOwnerId?{...c,role:e.target.value}:c);
+                        await fbSet("users",s.id,{companies:updated,companyRole:e.target.value});sh("Updated");loadData();
+                      }} style={{...T.inp,fontSize:".66rem",padding:"2px 4px",width:100}}>
+                        {COMPANY_ROLES.filter(r=>r.id!=="owner").map(r=><option key={r.id} value={r.id}>{r.label}</option>)}
+                      </select>
+                      <button onClick={async()=>{if(!window.confirm("Remove "+s.name+"?"))return;
+                        const uComps=Array.isArray(s.companies)?s.companies:s.companyId?[{id:s.companyId,role:s.companyRole}]:[];
+                        const updated=uComps.filter(c=>c.id!==companyOwnerId);
+                        await fbSet("users",s.id,{companies:updated,companyId:updated[0]?.id||null,companyRole:updated[0]?.role||null});
+                        sh("Removed");loadData();
+                      }} style={{...T.btnDanger,...T.btnSm,fontSize:".58rem",padding:"2px 6px"}}>✕</button>
+                    </div>;
+                  })}
+                </div>
+
+                {/* Invite form */}
+                <div style={{padding:12,background:T.bg,borderRadius:8,marginBottom:10}}>
+                  <div style={{fontSize:".78rem",fontWeight:700,marginBottom:8}}>✉️ Invite someone</div>
+                  <div style={{display:"flex",gap:6,marginBottom:6}}>
+                    <input id="team-inv-email" placeholder="Email address" style={{...T.inp,flex:1,fontSize:".82rem"}}/>
+                    <select id="team-inv-role" style={{...T.inp,width:120,fontSize:".72rem"}}>
+                      {COMPANY_ROLES.filter(r=>r.id!=="owner").map(r=><option key={r.id} value={r.id}>{r.label} — {r.desc}</option>)}
+                    </select>
+                  </div>
+                  <button onClick={async()=>{
+                    const email=document.getElementById("team-inv-email")?.value?.trim();
+                    const role=document.getElementById("team-inv-role")?.value||"editor";
+                    if(!email){sh("Enter email");return}
+                    const target=allUsers.find(u=>u.email?.toLowerCase()===email.toLowerCase());
+                    if(!target){sh("❌ No SKINARIO user with "+email);return}
+                    if(target.id===au?.uid){sh("That's you!");return}
+                    const already=adminMessages.find(m=>m.type==="company_invite"&&m.uid===target.id&&m.companyOwnerId===companyOwnerId&&m.status==="pending");
+                    if(already){sh("Already invited — waiting for response");return}
+                    const acType=normalizeAccountType(prof?.accountType||"");
+                    await fbAdd("adminMessages",{uid:target.id,name:target.name,email:target.email,companyOwnerId,companyName,invitedRole:role,subject:"📨 Team invite: "+companyName,message:companyName+" invited you as "+COMPANY_ROLES.find(r=>r.id===role)?.label,type:"company_invite",status:"pending",createdAt:Date.now(),invitedBy:au?.uid,invitedByName:uName});
+                    try{await fbAdd("notifications",{toUid:target.id,fromUid:au?.uid,type:"team_invite",text:companyName+" invited you to join as "+COMPANY_ROLES.find(r=>r.id===role)?.label+". Go to My Team to accept.",read:false,createdAt:Date.now()});}catch(e){}
+                    sh("✅ Invite sent to "+target.name);document.getElementById("team-inv-email").value="";loadData();
+                  }} style={{...T.btn,width:"100%",fontSize:".82rem"}}>📨 Send invite</button>
+                  {pendingInvitesSent.length>0&&<div style={{marginTop:8}}><div style={{fontSize:".68rem",color:T.mute,marginBottom:4}}>⏳ Pending ({pendingInvitesSent.length}):</div>{pendingInvitesSent.map(inv=><div key={inv.id} style={{fontSize:".72rem",display:"flex",gap:6,alignItems:"center",padding:"3px 0"}}><span>{inv.name}</span><span style={{color:T.mute}}>· {inv.invitedRole}</span><button onClick={async()=>{await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"Cancelled"});loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".56rem",padding:"1px 5px"}}>Cancel</button></div>)}</div>}
+                </div>
+
+                {/* Join requests */}
+                {pendingJoinReqs.length>0&&<div style={{padding:12,background:"#fff8e1",borderRadius:8}}>
+                  <div style={{fontSize:".78rem",fontWeight:700,color:T.goldD,marginBottom:6}}>📨 Join requests ({pendingJoinReqs.length})</div>
+                  {pendingJoinReqs.map(req=><div key={req.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:"#fff",borderRadius:6,marginBottom:4}}>
+                    <div style={{flex:1}}><div style={{fontSize:".78rem",fontWeight:600}}>{req.name}</div><div style={{fontSize:".64rem",color:T.mute}}>{req.email}</div></div>
+                    <select id={`jr2-${req.id}`} defaultValue="editor" style={{...T.inp,fontSize:".64rem",width:90}}>
                       {COMPANY_ROLES.filter(r=>r.id!=="owner").map(r=><option key={r.id} value={r.id}>{r.label}</option>)}
-                    </select>}
-                    {isOwnerAccount&&<button onClick={async()=>{if(!window.confirm("Remove "+s.name+"?"))return;await fbSet("users",s.id,{companyId:null,companyRole:null});sh("Removed");loadData();}} style={{...T.btnDanger,...T.btnSm,fontSize:".58rem",padding:"2px 6px"}}>✕</button>}
-                  </div>
-                </div>)}
-                {staffMembers.length===0&&<div style={{fontSize:".78rem",color:T.mute,fontStyle:"italic",padding:10}}>No team members yet. Invite people using the form on the right →</div>}
-              </div>
-            </div>
-
-            {/* RIGHT — Invite + Join requests */}
-            <div>
-              {/* Invite form (owner only) */}
-              {isOwnerAccount&&<div style={{...T.card,marginBottom:14,borderLeft:"3px solid "+T.teal}}>
-                <h4 style={{fontSize:".92rem",fontWeight:700,margin:0,marginBottom:10}}>✉️ Invite people</h4>
-                <p style={{fontSize:".72rem",color:T.mute,margin:"0 0 10px"}}>Enter the email of a SKINARIO member to invite them to your team.</p>
-                <div style={{marginBottom:8}}>
-                  <label style={{fontSize:".68rem",color:T.mute,fontWeight:600}}>Email</label>
-                  <input id="team-invite-email2" placeholder="colleague@email.com" style={{...T.inp,fontSize:".82rem"}}/>
-                </div>
-                <div style={{marginBottom:10}}>
-                  <label style={{fontSize:".68rem",color:T.mute,fontWeight:600}}>Role</label>
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                    {COMPANY_ROLES.filter(r=>r.id!=="owner").map(r=><label key={r.id} style={{display:"flex",alignItems:"center",gap:4,padding:"6px 10px",background:T.bg,borderRadius:8,cursor:"pointer",fontSize:".74rem",border:"1px solid "+T.border}}>
-                      <input type="radio" name="invite-role2" value={r.id} defaultChecked={r.id==="editor"}/>{r.label} <span style={{fontSize:".6rem",color:T.mute}}>— {r.desc}</span>
-                    </label>)}
-                  </div>
-                </div>
-                <button onClick={async()=>{
-                  const email=document.getElementById("team-invite-email2")?.value?.trim();
-                  const roleEl=document.querySelector('input[name="invite-role2"]:checked');
-                  const role=roleEl?.value||"editor";
-                  if(!email){sh("Enter an email");return}
-                  const target=allUsers.find(u=>u.email?.toLowerCase()===email.toLowerCase());
-                  if(!target){sh("❌ No SKINARIO user found with "+email+". They need to register first.");return}
-                  if(target.companyId&&target.companyId!==companyOwnerId){sh("⚠ "+target.name+" is already on another team");return}
-                  if(target.id===au?.uid){sh("That's you!");return}
-                  // Check if already invited
-                  const existing=adminMessages.find(m=>m.type==="company_invite"&&m.uid===target.id&&m.companyOwnerId===companyOwnerId&&m.status==="pending");
-                  if(existing){sh("Already invited — waiting for their response");return}
-                  await fbAdd("adminMessages",{uid:target.id,name:target.name,email:target.email,companyOwnerId,companyName,invitedRole:role,subject:"📨 Team invite: "+companyName,message:companyName+" invited you to join as "+COMPANY_ROLES.find(r=>r.id===role)?.label,type:"company_invite",status:"pending",createdAt:Date.now(),invitedBy:au?.uid,invitedByName:uName});
-                  try{await fbAdd("notifications",{toUid:target.id,fromUid:au?.uid,type:"team_invite",text:`${companyName} invited you to join as ${COMPANY_ROLES.find(r=>r.id===role)?.label}. Go to My Team to accept.`,read:false,createdAt:Date.now()});}catch(e){}
-                  sh("✅ Invite sent to "+target.name+"!");
-                  document.getElementById("team-invite-email2").value="";loadData();
-                }} style={{...T.btn,width:"100%",fontSize:".84rem"}}>📨 Send invitation</button>
-
-                {/* Pending invites sent */}
-                {pendingInvites.length>0&&<div style={{marginTop:12}}>
-                  <div style={{fontSize:".72rem",fontWeight:700,color:T.mute,marginBottom:6}}>⏳ Pending invites ({pendingInvites.length})</div>
-                  {pendingInvites.map(inv=><div key={inv.id} style={{display:"flex",alignItems:"center",gap:6,padding:"6px 8px",background:T.bg,borderRadius:6,marginBottom:4,fontSize:".76rem"}}>
-                    <span style={{flex:1}}>{inv.name} ({inv.email})</span>
-                    <span style={{fontSize:".64rem",color:T.mute}}>{inv.invitedRole}</span>
-                    <button onClick={async()=>{await fbSet("adminMessages",inv.id,{status:"replied",adminReply:"Cancelled"});sh("Cancelled");loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".56rem",padding:"1px 6px",color:T.mute}}>Cancel</button>
+                    </select>
+                    <button onClick={async()=>{const role=document.getElementById(`jr2-${req.id}`)?.value||"viewer";const acType=normalizeAccountType(prof?.accountType||"");
+                      const tgt=allUsers.find(u=>u.id===req.uid);const tgtComps=Array.isArray(tgt?.companies)?tgt.companies:tgt?.companyId?[{id:tgt.companyId,role:tgt.companyRole}]:[];
+                      const updated=[...tgtComps.filter(c=>c.id!==companyOwnerId),{id:companyOwnerId,role,name:companyName,type:acType,joinedAt:Date.now()}];
+                      await fbSet("users",req.uid,{companies:updated,companyId:companyOwnerId,companyRole:role});
+                      await fbSet("adminMessages",req.id,{status:"replied",adminReply:"✅ Approved as "+role});
+                      try{await fbAdd("notifications",{toUid:req.uid,fromUid:au?.uid,type:"team_approved",text:"You've been added to "+companyName+" as "+COMPANY_ROLES.find(r=>r.id===role)?.label,read:false,createdAt:Date.now()});}catch(e){}
+                      sh("✅ Approved");loadData();
+                    }} style={{...T.btn,...T.btnSm,fontSize:".62rem"}}>✓</button>
+                    <button onClick={async()=>{await fbSet("adminMessages",req.id,{status:"replied",adminReply:"Declined"});loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".62rem",color:T.mute}}>✕</button>
                   </div>)}
                 </div>}
-              </div>}
+              </div>
 
-              {/* Join requests (owner only) */}
-              {isOwnerAccount&&pendingJoinReqs.length>0&&<div style={{...T.card,marginBottom:14,borderLeft:"3px solid "+T.gold}}>
-                <h4 style={{fontSize:".92rem",fontWeight:700,margin:0,marginBottom:10}}>📨 Join requests ({pendingJoinReqs.length})</h4>
-                {pendingJoinReqs.map(req=>{const reqUser=allUsers.find(u=>u.id===req.uid);return<div key={req.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:T.bg,borderRadius:8,marginBottom:4}}>
-                  {reqUser?.photo?<img src={reqUser.photo} style={{width:32,height:32,borderRadius:"50%"}}/>:<div style={T.av(32,T.bg,T.mute)}>{(req.name||"?").slice(0,2)}</div>}
-                  <div style={{flex:1}}><div style={{fontSize:".78rem",fontWeight:600}}>{req.name}</div><div style={{fontSize:".64rem",color:T.mute}}>{req.email}</div></div>
-                  <select id={`jr-${req.id}`} defaultValue="editor" style={{...T.inp,fontSize:".64rem",width:80,padding:"2px 4px"}}>
-                    {COMPANY_ROLES.filter(r=>r.id!=="owner").map(r=><option key={r.id} value={r.id}>{r.label}</option>)}
-                  </select>
-                  <button onClick={async()=>{const role=document.getElementById(`jr-${req.id}`)?.value||"viewer";await fbSet("users",req.uid,{companyId:companyOwnerId,companyRole:role});await fbSet("adminMessages",req.id,{status:"replied",adminReply:"✅ Approved as "+role});try{await fbAdd("notifications",{toUid:req.uid,fromUid:au?.uid,type:"team_approved",text:`You've been added to ${companyName}`,read:false,createdAt:Date.now()});}catch(e){}sh("✅ Approved");loadData();}} style={{...T.btn,...T.btnSm,fontSize:".62rem"}}>✓</button>
-                  <button onClick={async()=>{await fbSet("adminMessages",req.id,{status:"replied",adminReply:"Declined"});sh("Declined");loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".62rem",color:T.mute}}>✕</button>
-                </div>;})}
-              </div>}
-
-              {/* Join a company (non-owner, not on a team) */}
-              {!prof?.companyId&&!isOwnerAccount&&<div style={{...T.card,borderLeft:"3px solid "+T.gold}}>
-                <h4 style={{fontSize:".92rem",fontWeight:700,margin:0,marginBottom:8}}>🔍 Join an organization</h4>
-                <p style={{fontSize:".72rem",color:T.mute,margin:"0 0 10px"}}>Search for an existing vendor, institute, or pharma company to join their team.</p>
-                <select id="join-co-select" style={{...T.inp,fontSize:".82rem",marginBottom:8}}>
-                  <option value="">— Select organization —</option>
+              {/* Join another company */}
+              <div style={{...T.card,borderLeft:"3px solid "+T.gold}}>
+                <h4 style={{fontSize:".88rem",fontWeight:700,margin:0,marginBottom:8}}>🔍 Join another organization</h4>
+                <select id="join-co2" style={{...T.inp,fontSize:".82rem",marginBottom:8}}>
+                  <option value="">— Select —</option>
                   {allUsers.filter(u=>{const at=normalizeAccountType(u.accountType||"");return(at==="vendor"||at==="brand"||at==="institute")&&(!u.companyId||u.companyRole==="owner")&&u.id!==au?.uid;}).map(u=><option key={u.id} value={u.id}>{u.companyName||u.instituteName||u.name} ({normalizeAccountType(u.accountType||"")})</option>)}
                 </select>
                 <button onClick={async()=>{
-                  const ownerId=document.getElementById("join-co-select")?.value;
-                  if(!ownerId){sh("Select an organization");return}
-                  const owner=allUsers.find(u=>u.id===ownerId);
-                  await fbAdd("adminMessages",{uid:au?.uid,name:uName,email:au?.email,companyOwnerId:ownerId,companyName:owner?.companyName||owner?.instituteName||"",subject:"📨 Join request: "+(owner?.companyName||owner?.instituteName||""),message:uName+" wants to join your team.",type:"company_join_request",status:"pending",createdAt:Date.now()});
-                  try{await fbAdd("notifications",{toUid:ownerId,fromUid:au?.uid,type:"team_request",text:`${uName} wants to join your team`,read:false,createdAt:Date.now()});}catch(e){}
+                  const oid=document.getElementById("join-co2")?.value;if(!oid){sh("Select one");return}
+                  const o=allUsers.find(u=>u.id===oid);
+                  await fbAdd("adminMessages",{uid:au?.uid,name:uName,email:au?.email,companyOwnerId:oid,companyName:o?.companyName||o?.instituteName||"",subject:"📨 Join: "+(o?.companyName||o?.instituteName||""),message:uName+" wants to join.",type:"company_join_request",status:"pending",createdAt:Date.now()});
+                  try{await fbAdd("notifications",{toUid:oid,fromUid:au?.uid,type:"team_request",text:uName+" wants to join your team",read:false,createdAt:Date.now()});}catch(e){}
                   sh("✅ Request sent!");loadData();
-                }} style={{...T.btn,width:"100%",fontSize:".84rem"}}>📨 Request to join</button>
-              </div>}
-            </div>
-          </div>
+                }} style={{...T.btn,width:"100%",fontSize:".82rem"}}>Request to join</button>
+              </div>
+            </>);
+          })()}
+
+          {/* For doctors — join a company */}
+          {!isBizAccount&&myCompanies.length===0&&<div style={{...T.card,borderLeft:"3px solid "+T.gold}}>
+            <h4 style={{fontSize:".88rem",fontWeight:700,margin:0,marginBottom:8}}>🔍 Join an organization</h4>
+            <p style={{fontSize:".76rem",color:T.mute,margin:"0 0 10px"}}>Join a vendor, institute, or pharma company as a team member.</p>
+            <select id="join-co3" style={{...T.inp,fontSize:".82rem",marginBottom:8}}>
+              <option value="">— Select —</option>
+              {allUsers.filter(u=>{const at=normalizeAccountType(u.accountType||"");return(at==="vendor"||at==="brand"||at==="institute")&&u.id!==au?.uid;}).map(u=><option key={u.id} value={u.id}>{u.companyName||u.instituteName||u.name} ({normalizeAccountType(u.accountType||"")})</option>)}
+            </select>
+            <button onClick={async()=>{
+              const oid=document.getElementById("join-co3")?.value;if(!oid){sh("Select one");return}
+              const o=allUsers.find(u=>u.id===oid);
+              await fbAdd("adminMessages",{uid:au?.uid,name:uName,email:au?.email,companyOwnerId:oid,companyName:o?.companyName||o?.instituteName||"",subject:"📨 Join: "+(o?.companyName||o?.instituteName||""),message:uName+" wants to join.",type:"company_join_request",status:"pending",createdAt:Date.now()});
+              try{await fbAdd("notifications",{toUid:oid,fromUid:au?.uid,type:"team_request",text:uName+" wants to join your team",read:false,createdAt:Date.now()});}catch(e){}
+              sh("✅ Request sent!");loadData();
+            }} style={{...T.btn,width:"100%",fontSize:".82rem"}}>Request to join</button>
+          </div>}
+
+          {!isBizAccount&&myCompanies.length===0&&myPendingInvites.length===0&&<div style={{...T.card,textAlign:"center",padding:30,color:T.mute}}>
+            <div style={{fontSize:"2rem",marginBottom:8}}>👥</div>
+            <div style={{fontSize:".88rem",fontWeight:600,color:T.txt}}>No team associations yet</div>
+            <div style={{fontSize:".78rem",marginTop:4}}>Join a vendor, institute, or pharma company above, or wait for an invite.</div>
+          </div>}
         </div>);
       })()}
 
