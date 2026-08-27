@@ -9661,40 +9661,72 @@ ${forDownload
             })()}
 
             {/* Doctor-specific details */}
-            {/* Products / Courses — visible on company profiles for team members */}
-            {(isMe||canEditThisProfile)&&(u.accountType==="vendor"||u.accountType==="brand"||u.accountType==="pharma"||u.accountType==="institute")&&(()=>{
+            {/* Products / Courses — visible to everyone on company profiles */}
+            {(u.accountType==="vendor"||u.accountType==="brand"||u.accountType==="pharma"||u.accountType==="institute")&&(()=>{
               const uProducts=products.filter(p=>p.vendorId===u.id&&p.active!==false);
               const uEnquiries=productEnquiries.filter(e=>e.vendorId===u.id);
+              const uWallAll=wallPosts.filter(w=>w.vendorId===u.id&&w.active!==false).sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt));
               return(<>
+                {/* Business snapshot */}
+                <div style={{...T.card,marginBottom:14}}>
+                  <h4 style={{fontSize:".95rem",fontWeight:700,margin:0,marginBottom:10}}>{u.accountType==="institute"?"🎓 Institute Details":"🏢 Business Details"}</h4>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:10}}>
+                    {u.companyName&&<div style={{padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:".66rem",color:T.mute}}>Company</div><div style={{fontSize:".84rem",fontWeight:600}}>{u.companyName}</div></div>}
+                    {u.instituteName&&<div style={{padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:".66rem",color:T.mute}}>Institute</div><div style={{fontSize:".84rem",fontWeight:600}}>{u.instituteName}</div></div>}
+                    {u.city&&<div style={{padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:".66rem",color:T.mute}}>Location</div><div style={{fontSize:".84rem",fontWeight:600}}>{u.city}{u.state?", "+u.state:""}</div></div>}
+                    {u.website&&<div style={{padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:".66rem",color:T.mute}}>Website</div><a href={u.website.startsWith("http")?u.website:"https://"+u.website} target="_blank" rel="noopener noreferrer" style={{fontSize:".84rem",fontWeight:600,color:T.teal}}>{u.website}</a></div>}
+                    {u.contactPerson&&<div style={{padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:".66rem",color:T.mute}}>Contact</div><div style={{fontSize:".84rem",fontWeight:600}}>{u.contactPerson}</div></div>}
+                    {u.directorName&&<div style={{padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:".66rem",color:T.mute}}>Director</div><div style={{fontSize:".84rem",fontWeight:600}}>{u.directorName}</div></div>}
+                    {(u.vendorCategories||u.brandCategories)&&<div style={{padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:".66rem",color:T.mute}}>Categories</div><div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>{(u.vendorCategories||u.brandCategories||[]).map(c=><span key={c} style={{fontSize:".68rem",padding:"2px 8px",background:T.tealBg,color:T.teal,borderRadius:10}}>{c}</span>)}</div></div>}
+                  </div>
+                </div>
+
+                {/* Products grid */}
                 <div style={{...T.card,marginBottom:14}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                    <h4 style={{fontSize:".92rem",fontWeight:700,margin:0}}>📦 Products / Services ({uProducts.length})</h4>
-                    {canEditThisProfile&&<button onClick={()=>{go("me");setShowProdForm&&setShowProdForm(true)}} style={{...T.btn,...T.btnSm,fontSize:".72rem"}}>+ Add</button>}
+                    <h4 style={{fontSize:".92rem",fontWeight:700,margin:0}}>📦 {u.accountType==="institute"?"Courses":"Products"} ({uProducts.length})</h4>
+                    {canEditThisProfile&&<button onClick={()=>{go("me")}} style={{...T.btn,...T.btnSm,fontSize:".72rem"}}>+ Add</button>}
                   </div>
-                  {uProducts.length===0?<div style={{fontSize:".78rem",color:T.mute,fontStyle:"italic"}}>No products yet</div>
-                  :<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
-                    {uProducts.slice(0,8).map(p=><div key={p.id} style={{padding:10,background:T.bg,borderRadius:8,fontSize:".78rem"}}>
-                      {p.images?.[0]&&<img src={p.images[0]} style={{width:"100%",height:80,objectFit:"cover",borderRadius:6,marginBottom:6}}/>}
-                      <div style={{fontWeight:600}}>{p.name}</div>
-                      {p.price&&<div style={{color:T.teal,fontWeight:700}}>₹{p.price}</div>}
-                      <div style={{fontSize:".66rem",color:T.mute}}>{p.enquiries||0} enquiries</div>
+                  {uProducts.length===0?<div style={{fontSize:".78rem",color:T.mute,fontStyle:"italic",padding:20,textAlign:"center"}}>No {u.accountType==="institute"?"courses":"products"} listed yet</div>
+                  :<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:10}}>
+                    {uProducts.map(p=><div key={p.id} style={{padding:10,background:T.bg,borderRadius:8}}>
+                      {p.images?.[0]&&<img src={p.images[0]} style={{width:"100%",height:100,objectFit:"cover",borderRadius:6,marginBottom:6}}/>}
+                      <div style={{fontSize:".82rem",fontWeight:600}}>{p.name}</div>
+                      {p.category&&<div style={{fontSize:".66rem",color:T.mute}}>{p.category}</div>}
+                      {p.price&&<div style={{fontSize:".88rem",fontWeight:700,color:T.teal,marginTop:4}}>₹{p.price}</div>}
+                      <div style={{fontSize:".64rem",color:T.mute,marginTop:2}}>{p.enquiries||0} enquiries</div>
                     </div>)}
                   </div>}
                 </div>
-                {/* Enquiries — team members can see and reply */}
+
+                {/* Wall posts */}
+                {uWallAll.length>0&&<div style={{...T.card,marginBottom:14}}>
+                  <h4 style={{fontSize:".92rem",fontWeight:700,margin:0,marginBottom:10}}>📝 Wall ({uWallAll.length})</h4>
+                  {uWallAll.slice(0,5).map(w=><div key={w.id} style={{padding:10,borderBottom:"1px solid "+T.border,marginBottom:6}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                      <div style={{fontSize:".78rem",fontWeight:600}}>{w.vendorName||u.name}</div>
+                      <div style={{fontSize:".66rem",color:T.mute}}>{fD(tsToDateStr(w.createdAt))}</div>
+                      {(isMe||canEditThisProfile)&&<button onClick={async()=>{if(!window.confirm("Remove?"))return;await fbSet("wallPosts",w.id,{active:false});sh("Removed");loadData()}} style={{marginLeft:"auto",background:"none",border:"none",color:T.mute,cursor:"pointer",fontSize:".7rem"}}>✕</button>}
+                    </div>
+                    {w.caption&&<div style={{fontSize:".84rem",color:T.txt2,lineHeight:1.6,whiteSpace:"pre-wrap",marginBottom:w.imageUrl?8:0}}>{w.caption}</div>}
+                    {w.imageUrl&&<img src={w.imageUrl} style={{width:"100%",maxHeight:300,objectFit:"cover",borderRadius:8}}/>}
+                  </div>)}
+                </div>}
+
+                {/* Enquiries — team members only */}
                 {canEditThisProfile&&uEnquiries.length>0&&<div style={{...T.card,marginBottom:14}}>
                   <h4 style={{fontSize:".92rem",fontWeight:700,margin:0,marginBottom:10}}>📨 Enquiries ({uEnquiries.length})</h4>
                   <div style={{maxHeight:300,overflowY:"auto"}}>
                     {uEnquiries.sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt)).slice(0,10).map(e=><div key={e.id} style={{padding:10,background:T.bg,borderRadius:8,marginBottom:6,borderLeft:"3px solid "+(e.status==="replied"?"#1a7d42":T.goldD)}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                         <div style={{fontSize:".78rem",fontWeight:600}}>{e.doctorName||"Doctor"} — {e.productName}</div>
-                        <span style={{fontSize:".62rem",fontWeight:600,color:e.status==="replied"?"#1a7d42":"#856404"}}>{e.status==="replied"?"✓ Replied":"⏳ Pending"}</span>
+                        <span style={{fontSize:".62rem",fontWeight:600,color:e.status==="replied"?"#1a7d42":"#856404"}}>{e.status==="replied"?"✓":"⏳"}</span>
                       </div>
                       <div style={{fontSize:".74rem",color:T.txt2,marginBottom:4}}>{e.message}</div>
                       {e.vendorReply&&<div style={{fontSize:".72rem",color:"#1a7d42",background:"#e8f5e9",padding:"4px 8px",borderRadius:4}}>↩️ {e.vendorReply}</div>}
-                      {e.status!=="replied"&&<div style={{display:"flex",gap:6,marginTop:6}}>
-                        <input id={`enq-r-${e.id}`} placeholder="Type reply..." style={{...T.inp,flex:1,fontSize:".74rem"}}/>
-                        <button onClick={async()=>{const reply=document.getElementById(`enq-r-${e.id}`)?.value?.trim();if(!reply){sh("Type a reply");return}await fbSet("productEnquiries",e.id,{status:"replied",vendorReply:reply,vendorRepliedAt:Date.now()});sh("✓ Replied");loadData();}} style={{...T.btn,...T.btnSm,fontSize:".68rem"}}>Reply</button>
+                      {e.status!=="replied"&&canEditThisProfile&&<div style={{display:"flex",gap:6,marginTop:6}}>
+                        <input id={`enq-r-${e.id}`} placeholder="Reply..." style={{...T.inp,flex:1,fontSize:".74rem"}}/>
+                        <button onClick={async()=>{const reply=document.getElementById(`enq-r-${e.id}`)?.value?.trim();if(!reply)return;await fbSet("productEnquiries",e.id,{status:"replied",vendorReply:reply,vendorRepliedAt:Date.now()});sh("✓ Replied");loadData();}} style={{...T.btn,...T.btnSm,fontSize:".68rem"}}>Reply</button>
                       </div>}
                     </div>)}
                   </div>
