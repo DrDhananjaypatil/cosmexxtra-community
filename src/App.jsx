@@ -9670,6 +9670,43 @@ ${forDownload
                 {/* Business snapshot */}
                 <div style={{...T.card,marginBottom:14}}>
                   <h4 style={{fontSize:".95rem",fontWeight:700,margin:0,marginBottom:10}}>{u.accountType==="institute"?"🎓 Institute Details":"🏢 Business Details"}</h4>
+                  {/* Dashboard stats — visible to team members */}
+                  {(isMe||canEditThisProfile)&&(()=>{
+                    const uProducts=products.filter(p=>p.vendorId===u.id&&p.active!==false);
+                    const uEnquiries=productEnquiries.filter(e=>e.vendorId===u.id);
+                    const openEnq=uEnquiries.filter(e=>e.status!=="replied"&&e.status!=="fulfilled");
+                    const fulfilledEnq=uEnquiries.filter(e=>e.status==="fulfilled");
+                    const bizGenerated=fulfilledEnq.reduce((s,e)=>s+(e.price||e.amount||0),0);
+                    const uWallCount=wallPosts.filter(w=>w.vendorId===u.id&&w.active!==false).length;
+                    const uFollowers=follows.filter(f=>f.followingId===u.id).length;
+                    const uRewards=rewards.filter(r=>r.vendorId===u.id&&r.active!==false).length;
+                    const uPlacements=sponsorPlacements.filter(p=>p.vendorId===u.id);
+                    const topProduct=uProducts.sort((a,b)=>(b.enquiries||0)-(a.enquiries||0))[0];
+                    return(<>
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:8,marginBottom:12}}>
+                        {[[uProducts.length,u.accountType==="institute"?"Courses":"Products","#0d6b6e"],[openEnq.length,"Open enquiries",T.err],[uEnquiries.length,"Total enquiries","#555"],[uFollowers,"Followers","#c8a84e"],[uWallCount,"Wall posts","#888"],[uRewards,"Active rewards","#1a7d42"]].map(([v,l,c])=><div key={l} style={{textAlign:"center",padding:10,background:T.bg,borderRadius:8}}>
+                          <div style={{fontSize:"1.15rem",fontWeight:700,color:c}}>{v}</div>
+                          <div style={{fontSize:".58rem",color:T.mute,textTransform:"uppercase"}}>{l}</div>
+                        </div>)}
+                      </div>
+                      {bizGenerated>0&&<div style={{padding:14,background:"linear-gradient(135deg,#fff8e1,#fffdf5)",borderRadius:10,border:"1px solid #f0e6c8",marginBottom:12}}>
+                        <div style={{fontSize:".7rem",fontWeight:700,color:T.goldD,textTransform:"uppercase",letterSpacing:1}}>💰 Business generated</div>
+                        <div style={{fontSize:"1.4rem",fontWeight:700,color:T.txt}}>₹{bizGenerated.toLocaleString("en-IN")}</div>
+                        <div style={{fontSize:".68rem",color:T.mute}}>from {fulfilledEnq.length} fulfilled enquiries</div>
+                      </div>}
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}} className="me-info-grid">
+                        {topProduct&&<div style={{padding:10,background:T.bg,borderRadius:8}}>
+                          <div style={{fontSize:".62rem",color:T.mute,textTransform:"uppercase"}}>🏆 Top {u.accountType==="institute"?"course":"product"}</div>
+                          <div style={{fontSize:".88rem",fontWeight:700}}>{topProduct.name}</div>
+                          <div style={{fontSize:".68rem",color:T.teal}}>{topProduct.enquiries||0} enquiries</div>
+                        </div>}
+                        {uPlacements.length>0&&<div style={{padding:10,background:T.bg,borderRadius:8}}>
+                          <div style={{fontSize:".62rem",color:T.mute,textTransform:"uppercase"}}>📢 Placements</div>
+                          <div style={{fontSize:".88rem",fontWeight:700}}>{uPlacements.filter(p=>p.status==="active").length} live · {uPlacements.filter(p=>p.status==="pending").length} pending</div>
+                        </div>}
+                      </div>
+                    </>);
+                  })()}
                   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:10}}>
                     {u.companyName&&<div style={{padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:".66rem",color:T.mute}}>Company</div><div style={{fontSize:".84rem",fontWeight:600}}>{u.companyName}</div></div>}
                     {u.instituteName&&<div style={{padding:8,background:T.bg,borderRadius:6}}><div style={{fontSize:".66rem",color:T.mute}}>Institute</div><div style={{fontSize:".84rem",fontWeight:600}}>{u.instituteName}</div></div>}
