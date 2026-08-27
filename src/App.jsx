@@ -6707,7 +6707,7 @@ ${forDownload
               const roleInfo=COMPANY_ROLES.find(r=>r.id===co.role);
               const canEdit=EDIT_ROLES.includes(co.role);
               const staffCount=allUsers.filter(u=>(Array.isArray(u.companies)?u.companies:[]).some(c=>c.id===co.id)).length;
-              return(<div key={co.id} style={{padding:14,background:T.bg,borderRadius:10,marginBottom:8,borderLeft:"3px solid "+(co.role==="owner"||co.role==="director"?T.teal:co.role==="admin"?"#c8a84e":T.border)}}>
+              return(<div key={co.id} onClick={()=>{const u=allUsers.find(x=>x.id===co.id);if(u){setSelU(u);go("profile")}}} style={{padding:14,background:T.bg,borderRadius:10,marginBottom:8,borderLeft:"3px solid "+(co.role==="owner"||co.role==="director"?T.teal:co.role==="admin"?"#c8a84e":T.border),cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 4px 12px rgba(0,0,0,0.08)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
                 <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
                   {owner?.logo||owner?.photo?<img src={owner.logo||owner.photo} style={{width:40,height:40,borderRadius:10,objectFit:"cover"}}/>:<div style={{width:40,height:40,borderRadius:10,background:T.tealBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.2rem"}}>{coType==="institute"?"🎓":coType==="brand"||coType==="vendor"?"🏭":"🏢"}</div>}
                   <div style={{flex:1}}>
@@ -6719,9 +6719,8 @@ ${forDownload
                     {canEdit&&<div style={{fontSize:".58rem",color:"#1a7d42"}}>✏️ Can edit</div>}
                   </div>
                 </div>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  <button onClick={()=>{const u=allUsers.find(x=>x.id===co.id);if(u){setSelU(u);go("profile")}}} style={{...T.btnO,...T.btnSm,fontSize:".72rem"}}>👁️ View page</button>
-                  {canEdit&&<button onClick={()=>{go("me");}} style={{...T.btnO,...T.btnSm,fontSize:".72rem",color:T.teal,borderColor:T.teal}}>✏️ Edit page</button>}
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}} onClick={e=>e.stopPropagation()}>
+                  <button onClick={()=>{const u=allUsers.find(x=>x.id===co.id);if(u){setSelU(u);go("profile")}}} style={{...T.btn,...T.btnSm,fontSize:".72rem"}}>Open page →</button>
                   {co.role!=="owner"&&<button onClick={async()=>{if(!window.confirm("Leave "+coName+"?"))return;await removeFromMyCompanies(co.id);sh("Left "+coName);loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".72rem",color:T.err}}>Leave</button>}
                 </div>
               </div>);
@@ -9514,6 +9513,10 @@ ${forDownload
         const u=selU;
         const isMe=u.id===au?.uid;
         const isAdmin=ADMINS.includes(au?.email);
+        // Check if viewer is a team member with edit access to this profile
+        const viewerCompanies=Array.isArray(prof?.companies)?prof.companies:(prof?.companyId?[{id:prof.companyId,role:prof.companyRole}]:[]);
+        const viewerRole=viewerCompanies.find(c=>c.id===u.id)?.role;
+        const canEditThisProfile=isMe||isAdmin||(viewerRole&&EDIT_ROLES.includes(viewerRole));
         const acc=ACCOUNT_TYPES.find(t=>t.id===u.accountType);
         const isPrivate=u.visibility==="private";
         // If profile is private and viewer isn't owner or admin, show locked state
@@ -9595,12 +9598,13 @@ ${forDownload
 
           {/* PUBLIC PROFILE CONTENT */}
           {canSee&&<>
-            {/* Wall — quick status-style posts, visible to anyone who can see this profile */}
-            {isMe&&<div style={{...T.card,marginBottom:14}}>
+            {/* Wall — quick status-style posts */}
+            {(isMe||canEditThisProfile)&&<div style={{...T.card,marginBottom:14}}>
+              {canEditThisProfile&&!isMe&&<div style={{fontSize:".7rem",color:T.teal,fontWeight:600,marginBottom:8,padding:"4px 8px",background:T.tealBg,borderRadius:6,display:"inline-block"}}>✏️ Posting as team member ({viewerRole})</div>}
               <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
                 {u.photo?<img src={u.photo} style={{width:40,height:40,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>:<div style={{...T.av(40,T.tealBg,T.teal),flexShrink:0}}>{u.initials||"?"}</div>}
                 <div style={{flex:1}}>
-                  <textarea value={profileWallText} onChange={e=>setProfileWallText(e.target.value)} placeholder={`What's on your mind, ${u.name?.split(" ")[0]||""}?`} rows={2} style={{...T.txa,marginBottom:8}}/>
+                  <textarea value={profileWallText} onChange={e=>setProfileWallText(e.target.value)} placeholder={`Post on ${isMe?"your":u.name?.split(" ")[0]+"'s"} wall...`} rows={2} style={{...T.txa,marginBottom:8}}/>
                   {profileWallImage&&<div style={{position:"relative",width:100,marginBottom:8}}>
                     <img src={profileWallImage} alt="" style={{width:100,height:100,objectFit:"cover",borderRadius:8,border:"1px solid "+T.border}}/>
                     <button type="button" onClick={()=>setProfileWallImage("")} style={{position:"absolute",top:-6,right:-6,width:18,height:18,borderRadius:"50%",border:"none",background:T.err,color:"#fff",cursor:"pointer",fontSize:".6rem"}}>✕</button>
@@ -9623,7 +9627,8 @@ ${forDownload
                     <button onClick={async()=>{
                       if(!profileWallText.trim()&&!profileWallImage){sh("Write something or add a photo first");return}
                       try{
-                        await fbAdd("wallPosts",{vendorId:au.uid,vendorName:uName,vendorPhoto:u.photo||"",imageUrl:profileWallImage,caption:profileWallText.trim(),active:true});
+                        const postAsId=isMe?au.uid:u.id; // post under the company's profile
+                        await fbAdd("wallPosts",{vendorId:postAsId,vendorName:u.companyName||u.instituteName||u.name||"",vendorPhoto:u.photo||u.logo||"",imageUrl:profileWallImage,caption:profileWallText.trim(),active:true,postedBy:au.uid,postedByName:uName});
                         setProfileWallText("");setProfileWallImage("");
                         sh("✅ Posted!");
                         loadData();
@@ -9646,7 +9651,8 @@ ${forDownload
                       <div style={{fontSize:".85rem",fontWeight:700}}>{u.name}</div>
                       <div style={{fontSize:".68rem",color:T.mute}}>{fD(tsToDateStr(w.createdAt))}</div>
                     </div>
-                    {isMe&&<button onClick={async()=>{if(!window.confirm("Remove this post?"))return;await fbSet("wallPosts",w.id,{active:false});sh("Removed");loadData()}} style={{marginLeft:"auto",background:"none",border:"none",color:T.mute,cursor:"pointer",fontSize:".8rem"}}>✕</button>}
+              {/* Wall post delete — also for team editors */}
+                  {(isMe||canEditThisProfile)&&<button onClick={async()=>{if(!window.confirm("Remove this post?"))return;await fbSet("wallPosts",w.id,{active:false});sh("Removed");loadData()}} style={{marginLeft:"auto",background:"none",border:"none",color:T.mute,cursor:"pointer",fontSize:".8rem"}}>✕</button>}
                   </div>
                   {w.caption&&<div style={{fontSize:".88rem",color:T.txt2,lineHeight:1.6,whiteSpace:"pre-wrap",marginBottom:w.imageUrl?10:0}}>{w.caption}</div>}
                   {w.imageUrl&&<img src={w.imageUrl} alt="" style={{width:"100%",maxHeight:360,objectFit:"cover",borderRadius:8}}/>}
@@ -9655,6 +9661,47 @@ ${forDownload
             })()}
 
             {/* Doctor-specific details */}
+            {/* Products / Courses — visible on company profiles for team members */}
+            {(isMe||canEditThisProfile)&&(u.accountType==="vendor"||u.accountType==="brand"||u.accountType==="pharma"||u.accountType==="institute")&&(()=>{
+              const uProducts=products.filter(p=>p.vendorId===u.id&&p.active!==false);
+              const uEnquiries=productEnquiries.filter(e=>e.vendorId===u.id);
+              return(<>
+                <div style={{...T.card,marginBottom:14}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                    <h4 style={{fontSize:".92rem",fontWeight:700,margin:0}}>📦 Products / Services ({uProducts.length})</h4>
+                    {canEditThisProfile&&<button onClick={()=>{go("me");setShowProdForm&&setShowProdForm(true)}} style={{...T.btn,...T.btnSm,fontSize:".72rem"}}>+ Add</button>}
+                  </div>
+                  {uProducts.length===0?<div style={{fontSize:".78rem",color:T.mute,fontStyle:"italic"}}>No products yet</div>
+                  :<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
+                    {uProducts.slice(0,8).map(p=><div key={p.id} style={{padding:10,background:T.bg,borderRadius:8,fontSize:".78rem"}}>
+                      {p.images?.[0]&&<img src={p.images[0]} style={{width:"100%",height:80,objectFit:"cover",borderRadius:6,marginBottom:6}}/>}
+                      <div style={{fontWeight:600}}>{p.name}</div>
+                      {p.price&&<div style={{color:T.teal,fontWeight:700}}>₹{p.price}</div>}
+                      <div style={{fontSize:".66rem",color:T.mute}}>{p.enquiries||0} enquiries</div>
+                    </div>)}
+                  </div>}
+                </div>
+                {/* Enquiries — team members can see and reply */}
+                {canEditThisProfile&&uEnquiries.length>0&&<div style={{...T.card,marginBottom:14}}>
+                  <h4 style={{fontSize:".92rem",fontWeight:700,margin:0,marginBottom:10}}>📨 Enquiries ({uEnquiries.length})</h4>
+                  <div style={{maxHeight:300,overflowY:"auto"}}>
+                    {uEnquiries.sort((a,b)=>tsToMillis(b.createdAt)-tsToMillis(a.createdAt)).slice(0,10).map(e=><div key={e.id} style={{padding:10,background:T.bg,borderRadius:8,marginBottom:6,borderLeft:"3px solid "+(e.status==="replied"?"#1a7d42":T.goldD)}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                        <div style={{fontSize:".78rem",fontWeight:600}}>{e.doctorName||"Doctor"} — {e.productName}</div>
+                        <span style={{fontSize:".62rem",fontWeight:600,color:e.status==="replied"?"#1a7d42":"#856404"}}>{e.status==="replied"?"✓ Replied":"⏳ Pending"}</span>
+                      </div>
+                      <div style={{fontSize:".74rem",color:T.txt2,marginBottom:4}}>{e.message}</div>
+                      {e.vendorReply&&<div style={{fontSize:".72rem",color:"#1a7d42",background:"#e8f5e9",padding:"4px 8px",borderRadius:4}}>↩️ {e.vendorReply}</div>}
+                      {e.status!=="replied"&&<div style={{display:"flex",gap:6,marginTop:6}}>
+                        <input id={`enq-r-${e.id}`} placeholder="Type reply..." style={{...T.inp,flex:1,fontSize:".74rem"}}/>
+                        <button onClick={async()=>{const reply=document.getElementById(`enq-r-${e.id}`)?.value?.trim();if(!reply){sh("Type a reply");return}await fbSet("productEnquiries",e.id,{status:"replied",vendorReply:reply,vendorRepliedAt:Date.now()});sh("✓ Replied");loadData();}} style={{...T.btn,...T.btnSm,fontSize:".68rem"}}>Reply</button>
+                      </div>}
+                    </div>)}
+                  </div>
+                </div>}
+              </>);
+            })()}
+
             {u.accountType==="doctor"&&<div style={{...T.card,marginBottom:14}}>
               <h4 style={{fontSize:".95rem",fontWeight:700,marginBottom:14}}>🩺 Practice Details</h4>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:14}}>
