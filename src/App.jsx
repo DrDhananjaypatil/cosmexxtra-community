@@ -2476,7 +2476,7 @@ export default function App(){
   // KNOWN_PAGES must match every page condition the app actually renders.
   // If you add a new page (`pg==="xyz"&&...` block), add "xyz" here too.
   const KNOWN_PAGES=["home","me","quiz","library","forum","cases","rewards","submit","rank","events","videos","admin","profile","ad","consent","vendors","study","articles","advisor","team"];
-  const sh=m=>setToast(m);const go=p=>{const safe=KNOWN_PAGES.includes(p)?p:"home";setPg(safe);setSelA(null);setSelV(null);setSelAd(null);setSelE(null);setSelU(null);setSelFP(null);setSelCs(null);setEdForm(null)};
+  const sh=m=>setToast(m);const go=(p,keepUser)=>{const safe=KNOWN_PAGES.includes(p)?p:"home";setPg(safe);setSelA(null);setSelV(null);setSelAd(null);setSelE(null);if(!keepUser)setSelU(null);setSelFP(null);setSelCs(null);setEdForm(null)};
 
   // ─── FOLLOW SYSTEM ────────────────────────────────────────────────────────
   const[follows,setFollows]=useState([]); // all follows where follower=au.uid or followed=au.uid // enquiry ledger for Phase 3
@@ -6707,7 +6707,7 @@ ${forDownload
               const roleInfo=COMPANY_ROLES.find(r=>r.id===co.role);
               const canEdit=EDIT_ROLES.includes(co.role);
               const staffCount=allUsers.filter(u=>(Array.isArray(u.companies)?u.companies:[]).some(c=>c.id===co.id)).length;
-              return(<div key={co.id} onClick={()=>{const u=allUsers.find(x=>x.id===co.id);if(u){setSelU(u);go("profile")}}} style={{padding:14,background:T.bg,borderRadius:10,marginBottom:8,borderLeft:"3px solid "+(co.role==="owner"||co.role==="director"?T.teal:co.role==="admin"?"#c8a84e":T.border),cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 4px 12px rgba(0,0,0,0.08)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
+              return(<div key={co.id} onClick={()=>{const u=allUsers.find(x=>x.id===co.id);if(u){setSelU(u);go("profile",true)}}} style={{padding:14,background:T.bg,borderRadius:10,marginBottom:8,borderLeft:"3px solid "+(co.role==="owner"||co.role==="director"?T.teal:co.role==="admin"?"#c8a84e":T.border),cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 4px 12px rgba(0,0,0,0.08)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
                 <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
                   {owner?.logo||owner?.photo?<img src={owner.logo||owner.photo} style={{width:40,height:40,borderRadius:10,objectFit:"cover"}}/>:<div style={{width:40,height:40,borderRadius:10,background:T.tealBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.2rem"}}>{coType==="institute"?"🎓":coType==="brand"||coType==="vendor"?"🏭":"🏢"}</div>}
                   <div style={{flex:1}}>
@@ -6720,7 +6720,7 @@ ${forDownload
                   </div>
                 </div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}} onClick={e=>e.stopPropagation()}>
-                  <button onClick={()=>{const u=allUsers.find(x=>x.id===co.id);if(u){setSelU(u);go("profile")}}} style={{...T.btn,...T.btnSm,fontSize:".72rem"}}>Open page →</button>
+                  <button onClick={()=>{const u=allUsers.find(x=>x.id===co.id);if(u){setSelU(u);go("profile",true)}}} style={{...T.btn,...T.btnSm,fontSize:".72rem"}}>Open page →</button>
                   {co.role!=="owner"&&<button onClick={async()=>{if(!window.confirm("Leave "+coName+"?"))return;await removeFromMyCompanies(co.id);sh("Left "+coName);loadData();}} style={{...T.btnO,...T.btnSm,fontSize:".72rem",color:T.err}}>Leave</button>}
                 </div>
               </div>);
