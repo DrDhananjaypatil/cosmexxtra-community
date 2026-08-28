@@ -3253,10 +3253,13 @@ export default function App(){
     if(!au)return;
     const attendees=ev.attendees||[];
     const has=attendees.find(a=>a.uid===au.uid);
-    const newAttendees=has?attendees.filter(a=>a.uid!==au.uid):[...attendees,{uid:au.uid,name:uName,ini:uIni,photo:uPhoto||"",joined:ds(getIST())}];
+    const newAttendees=has?attendees.filter(a=>a.uid!==au.uid):[...attendees,{uid:au.uid,name:uName,ini:uIni,photo:uPhoto||"",email:au.email||"",city:prof?.city||"",joined:ds(getIST())}];
     await fbSet("events",ev.id,{attendees:newAttendees});
     setEvents(p=>p.map(x=>x.id===ev.id?{...x,attendees:newAttendees}:x));
     if(selE?.id===ev.id)setSelE(p=>({...p,attendees:newAttendees}));
+    if(!has&&ev.publisherUid&&ev.publisherUid!==au.uid){
+      try{await fbAdd("notifications",{toUid:ev.publisherUid,fromUid:au.uid,type:"rsvp",text:`${uName} will attend "${ev.title}"`,eventId:ev.id,read:false,createdAt:Date.now()});}catch(e){}
+    }
     sh(has?"RSVP cancelled":"✓ You're going!");
   };
 
@@ -8314,6 +8317,10 @@ ${forDownload
                     {e.time&&<div>🕐 {e.time}</div>}
                     {e.location&&<div>📍 {e.location}</div>}
                     {e.attendees?.length>0&&<div style={{marginTop:6,color:T.teal,fontWeight:500}}>👥 {e.attendees.length} attending{attending?" · You're going":""}</div>}
+                    {e.pricingType==="paid"&&e.price?<div style={{marginTop:6,display:"flex",alignItems:"center",gap:6}}>
+                      {e.memberDiscount?<><span style={{fontSize:".78rem",color:T.mute,textDecoration:"line-through"}}>₹{e.price}</span><span style={{fontSize:".88rem",fontWeight:700,color:"#1a7d42"}}>₹{Math.round(e.price*(1-e.memberDiscount/100))}</span><span style={{fontSize:".62rem",fontWeight:600,background:"#e8f5e9",color:"#1a7d42",padding:"1px 6px",borderRadius:4}}>{e.memberDiscount}% off</span></>
+                      :<span style={{fontSize:".88rem",fontWeight:700,color:T.teal}}>₹{e.price}</span>}
+                    </div>:<div style={{marginTop:4,fontSize:".76rem",fontWeight:600,color:"#1a7d42"}}>🎟️ Free</div>}
                     {(e.views||0)>0&&<div style={{marginTop:4,color:T.mute,fontSize:".7rem"}}>👁️ {e.views} views</div>}
                   </div>
                   {e.sponsor&&<div style={{display:"flex",alignItems:"center",gap:8,marginTop:10,paddingTop:10,borderTop:"1px dashed "+T.border}}>
@@ -8355,6 +8362,24 @@ ${forDownload
                 <div><div style={{fontSize:".7rem",color:T.goldD,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>Sponsored by</div><div style={{fontSize:"1rem",fontWeight:600,color:T.txt}}>{selE.sponsor}</div></div>
               </div>}
 
+              {/* Pricing */}
+              <div style={{padding:14,background:selE.pricingType==="paid"?"#fff8e1":T.tealBg,borderRadius:10,marginBottom:14,border:"1px solid "+(selE.pricingType==="paid"?"#f0e6c8":T.teal+"22")}}>
+                {selE.pricingType==="paid"&&selE.price?<div>
+                  <div style={{fontSize:".72rem",color:T.goldD,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>💰 Event pricing</div>
+                  <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap"}}>
+                    {selE.memberDiscount?<>
+                      <span style={{fontSize:"1.3rem",fontWeight:700,color:"#1a7d42"}}>₹{Math.round(selE.price*(1-selE.memberDiscount/100))}</span>
+                      <span style={{fontSize:".92rem",color:T.mute,textDecoration:"line-through"}}>₹{selE.price}</span>
+                      <span style={{fontSize:".72rem",fontWeight:700,background:"#e8f5e9",color:"#1a7d42",padding:"3px 10px",borderRadius:6}}>SKINARIO Member {selE.memberDiscount}% off</span>
+                    </>:<span style={{fontSize:"1.3rem",fontWeight:700,color:T.goldD}}>₹{selE.price}</span>}
+                  </div>
+                  {selE.earlyBirdPrice&&<div style={{fontSize:".78rem",color:T.teal,fontWeight:600,marginTop:4}}>🐦 Early bird: ₹{selE.earlyBirdPrice}</div>}
+                </div>:<div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:"1.1rem"}}>🎟️</span>
+                  <span style={{fontSize:"1rem",fontWeight:700,color:"#1a7d42"}}>Free event</span>
+                </div>}
+              </div>
+
               {/* Registration */}
               {!isPast&&<div style={{padding:16,background:T.tealBg,borderRadius:12,marginBottom:14}}>
                 {selE.regType==="external"&&selE.regUrl?<>
@@ -8369,10 +8394,24 @@ ${forDownload
               {/* Attendees */}
               {selE.attendees?.length>0&&<div style={{marginBottom:14}}>
                 <div style={{fontSize:".82rem",color:T.teal,fontWeight:600,marginBottom:8}}>👥 {selE.attendees.length} attending</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {(isAdm||selE.publisherUid===au?.uid)?<div style={{border:"1px solid "+T.border,borderRadius:8,overflow:"hidden"}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 80px",fontSize:".68rem",fontWeight:700,color:T.mute,textTransform:"uppercase",padding:"6px 12px",background:T.bg}}>
+                    <span>Name</span><span>Email / Contact</span><span>Joined</span>
+                  </div>
+                  {selE.attendees.map((a,i)=>{const userInfo=allUsers.find(x=>x.id===a.uid);const email=a.email||userInfo?.email||"—";const city=userInfo?.city||a.city||"";
+                    return<div key={i} onClick={()=>{if(userInfo)viewProfile(userInfo.id)}} style={{display:"grid",gridTemplateColumns:"1fr 1fr 80px",padding:"8px 12px",fontSize:".78rem",borderTop:"1px solid "+T.border,alignItems:"center",cursor:"pointer"}} onMouseEnter={e=>e.currentTarget.style.background=T.bg} onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        {a.photo?<img src={a.photo} style={{width:26,height:26,borderRadius:"50%"}}/>:<div style={T.av(26,T.tealBg,T.teal)}>{a.ini||"?"}</div>}
+                        <div><div style={{fontWeight:600}}>{a.name}</div>{city&&<div style={{fontSize:".64rem",color:T.mute}}>{city}</div>}</div>
+                      </div>
+                      <div><div style={{fontSize:".74rem",color:T.txt2}}>{email}</div>{userInfo?.phone&&<div style={{fontSize:".66rem",color:T.mute}}>📞 {userInfo.phone}</div>}</div>
+                      <span style={{fontSize:".68rem",color:T.mute}}>{a.joined||"—"}</span>
+                    </div>})}
+                </div>
+                :<div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                   {selE.attendees.slice(0,12).map((a,i)=>a.photo?<img key={i} src={a.photo} title={a.name} style={{width:32,height:32,borderRadius:"50%",border:"2px solid "+T.tealBg}}/>:<div key={i} title={a.name} style={T.av(32,T.tealBg,T.teal)}>{a.ini}</div>)}
                   {selE.attendees.length>12&&<div style={{...T.av(32,T.bg,T.mute),fontSize:".7rem"}}>+{selE.attendees.length-12}</div>}
-                </div>
+                </div>}
               </div>}
 
               {/* Like + share */}
@@ -12540,7 +12579,7 @@ ${forDownload
         {aTab==="videos"&&<div style={T.card}>{edForm?.type==="videos"?<AdminForm type="Video" edForm={edForm} setEdForm={setEdForm} fields={[["title","Title"],["cat","Category","select"],["dur","Duration (e.g. '12:34')"],["desc","Description","textarea"],["embedUrl","YouTube/Vimeo URL (paste any format — share link, watch URL, or embed URL)"],["icon","Emoji thumbnail"],["free","Free","check"]]} onSave={()=>saveContent("videos")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{videos.length}</span><button onClick={()=>setEdForm({type:"videos",data:{icon:"🎥",free:true,cat:TOPICS[0]},editing:false})} style={T.btn}>+ New</button></div>
           {videos.map(v=><div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border}}><div><div style={{fontWeight:500,fontSize:".88rem"}}>{v.title||v.t}</div><div style={{fontSize:".72rem",color:T.mute}}>{v.cat} · {v.free?"Free":"Premium"}</div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setIgPost({item:v,type:"video"})} style={{...T.btnO,...T.btnSm}} title="Generate Instagram post">📸 IG</button><button onClick={()=>setEdForm({type:"videos",data:{...v},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("videos",v.id,v.title||v.t)} style={T.btnDanger}>Del</button></div></div>)}</>}</div>}
-        {aTab==="events"&&<div style={T.card}>{edForm?.type==="events"?<AdminForm type="Event" edForm={edForm} setEdForm={setEdForm} fields={[["title","Event title"],["cat","Category","select",["Conference","Workshop","Masterclass","Webinar","Product Launch","Course Deadline","Other"]],["date","Start date","date"],["endDate","End date (leave blank for single-day event)","date"],["time","Time (e.g. '10:00 AM - 4:00 PM IST')"],["location","Location (or 'Online')"],["organizer","Organizer / Host"],["banner","Banner image","image"],["body","Description","textarea"],["speakers","Speakers (comma-separated)","textarea"],["sponsor","Sponsored by (e.g. 'Sun Pharma') — leave blank if not sponsored"],["sponsorLogo","Sponsor logo image","image"],["regType","Registration type","select",["internal","external"]],["regUrl","External registration URL (if regType is external)"],["regCta","CTA button text (e.g. 'Buy ticket', 'Register on Eventbrite')"]]} onSave={()=>saveContent("events")}/>
+        {aTab==="events"&&<div style={T.card}>{edForm?.type==="events"?<AdminForm type="Event" edForm={edForm} setEdForm={setEdForm} fields={[["title","Event title"],["cat","Category","select",["Conference","Workshop","Masterclass","Webinar","Product Launch","Course Deadline","Other"]],["date","Start date","date"],["endDate","End date (leave blank for single-day event)","date"],["time","Time (e.g. '10:00 AM - 4:00 PM IST')"],["location","Location (or 'Online')"],["organizer","Organizer / Host"],["banner","Banner image","image"],["body","Description","textarea"],["speakers","Speakers (comma-separated)","textarea"],["sponsor","Sponsored by (e.g. 'Sun Pharma') — leave blank if not sponsored"],["sponsorLogo","Sponsor logo image","image"],["regType","Registration type","select",["internal","external"]],["regUrl","External registration URL (if regType is external)"],["regCta","CTA button text (e.g. 'Buy ticket', 'Register on Eventbrite')"],["publisherUid","Post on behalf of (event owner)","userSelect"],["pricingType","Pricing","select",["free","paid"]],["price","Price (₹) — only if paid"],["memberDiscount","Member discount % (e.g. 20)"],["earlyBirdPrice","Early bird price (₹) — optional"]]} onSave={()=>saveContent("events")}/>
           :<><div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><span style={{color:T.mute}}>{events.length} events</span><button onClick={()=>setEdForm({type:"events",data:{cat:"Conference",regType:"internal"},editing:false})} style={T.btn}>+ New event</button></div>
           {events.length===0&&<p style={{color:T.mute,fontSize:".85rem",padding:"12px 0"}}>No events yet. Click "+ New event" to add your first event.</p>}
           {events.map(e=>{const isPast=e.date<ds(getIST());return<div key={e.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+T.border,gap:10}}><div style={{display:"flex",gap:10,alignItems:"center",flex:1,minWidth:0}}>{e.banner?<img src={e.banner} style={{width:60,height:42,objectFit:"cover",borderRadius:6}}/>:<div style={{width:60,height:42,background:T.bg,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center"}}>📅</div>}<div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,fontSize:".88rem"}}>{e.title}</div><div style={{fontSize:".7rem",color:T.mute,display:"flex",gap:8,flexWrap:"wrap"}}><span style={T.tag(isPast?T.errBg:T.okBg,isPast?T.err:T.ok)}>{isPast?"Past":"Upcoming"}</span><span>{e.cat}</span><span>{e.date}</span><span>👥 {e.attendees?.length||0}</span></div></div></div><div style={{display:"flex",gap:4}}><button onClick={()=>setEdForm({type:"events",data:{...e},editing:true})} style={{...T.btnO,...T.btnSm}}>Edit</button><button onClick={()=>deleteContent("events",e.id,e.title)} style={T.btnDanger}>Del</button></div></div>})}</>}</div>}
