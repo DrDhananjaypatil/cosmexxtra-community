@@ -999,7 +999,7 @@ const ShareBar=({title,url,description,itemId,itemType,currentUser,prof,onSaveTo
 const renderTextWithMentions=(text)=>{
   if(!text)return text;
   const parts=text.split(/(@[a-zA-Z][a-zA-Z0-9._]{1,30})/g);
-  return parts.map((p,i)=>p.startsWith("@")?<span key={i} style={{color:T.teal,fontWeight:600,background:T.tealBg,padding:"1px 5px",borderRadius:4}}>{p}</span>:p);
+  return parts.map((p,i)=>p==="@everyone"?<span key={i} style={{color:"#fff",fontWeight:700,background:"linear-gradient(135deg,#0d6b6e,#c8a84e)",padding:"2px 8px",borderRadius:6,fontSize:".82rem"}}>@everyone</span>:p.startsWith("@")?<span key={i} style={{color:T.teal,fontWeight:600,background:T.tealBg,padding:"1px 5px",borderRadius:4}}>{p}</span>:p);
 };
 
 // ═══ MENTION INPUT — input with @ autocomplete dropdown ═══
@@ -1016,17 +1016,22 @@ const MentionInput=({value,onChange,onSubmit,placeholder,allUsers,style})=>{
     const m=before.match(/@([a-zA-Z][a-zA-Z0-9._]{0,30})$/);
     if(m&&allUsers){
       const search=m[1].toLowerCase();
-      const filtered=allUsers.filter(u=>{
+      let filtered=[];
+      // Show @everyone option for admin users
+      if("everyone".startsWith(search)&&window.__skinarioIsAdmin){
+        filtered.push({id:"__everyone__",name:"@everyone",email:"Notify all members",initials:"👥",isEveryone:true});
+      }
+      filtered=[...filtered,...allUsers.filter(u=>{
         const n=(u.name||"").replace(/^Dr\.?\s*/i,"").toLowerCase();
         return n.includes(search)||n.split(" ").some(w=>w.startsWith(search));
-      }).slice(0,5);
+      }).slice(0,5)];
       setMatches(filtered);setSelIdx(0);
     }else{
       setMatches([]);
     }
   };
   const insertMention=(user)=>{
-    const handle=(user.name||"").replace(/^Dr\.?\s*/i,"").split(" ")[0];
+    const handle=user.isEveryone?"everyone":(user.name||"").replace(/^Dr\.?\s*/i,"").split(" ")[0];
     const v=value;
     const cur=inputRef.current?.selectionStart||v.length;
     const before=v.slice(0,cur);
@@ -1048,11 +1053,11 @@ const MentionInput=({value,onChange,onSubmit,placeholder,allUsers,style})=>{
     <input ref={inputRef} value={value} onChange={handleChange} onKeyDown={handleKey} placeholder={placeholder} style={style}/>
     {matches.length>0&&<div style={{position:"absolute",bottom:"calc(100% + 4px)",left:0,right:0,background:"#fff",border:"1px solid "+T.border,borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,0.12)",zIndex:200,maxHeight:240,overflowY:"auto"}}>
       <div style={{padding:"5px 10px",fontSize:".66rem",color:T.mute,letterSpacing:1,textTransform:"uppercase",fontWeight:600,borderBottom:"1px solid "+T.border}}>Mention</div>
-      {matches.map((u,i)=><div key={u.id} onMouseDown={(e)=>{e.preventDefault();insertMention(u)}} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",cursor:"pointer",background:i===selIdx?T.tealBg:"#fff",fontSize:".82rem"}}>
-        {u.photo?<img src={u.photo} style={{width:26,height:26,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(26,T.tealBg,T.teal)}>{u.initials||"?"}</div>}
+      {matches.map((u,i)=><div key={u.id} onMouseDown={(e)=>{e.preventDefault();insertMention(u)}} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",cursor:"pointer",background:i===selIdx?T.tealBg:"#fff",fontSize:".82rem",borderBottom:u.isEveryone?"1px solid "+T.border:"none"}}>
+        {u.isEveryone?<div style={{width:26,height:26,borderRadius:"50%",background:"linear-gradient(135deg,#0d6b6e,#c8a84e)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:".8rem",color:"#fff"}}>👥</div>:u.photo?<img src={u.photo} style={{width:26,height:26,borderRadius:"50%",objectFit:"cover"}}/>:<div style={T.av(26,T.tealBg,T.teal)}>{u.initials||"?"}</div>}
         <div style={{flex:1,minWidth:0}}>
-          <div style={{fontWeight:500,color:T.txt,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{u.name}</div>
-          {u.degree&&<div style={{fontSize:".7rem",color:T.mute,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{u.degree}</div>}
+          <div style={{fontWeight:u.isEveryone?700:500,color:u.isEveryone?T.teal:T.txt,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{u.name}</div>
+          {u.isEveryone?<div style={{fontSize:".68rem",color:T.mute}}>Notify all members (admin only)</div>:u.degree&&<div style={{fontSize:".7rem",color:T.mute,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{u.degree}</div>}
         </div>
       </div>)}
     </div>}
@@ -1683,6 +1688,10 @@ async function createNotif({toUid,fromUid,fromName,fromIni,fromPhoto,type,text,l
 // ═══ PARSE @MENTIONS from text — returns array of matched users ═══
 function parseMentions(text,allUsers){
   if(!text||!allUsers)return[];
+  // @everyone — admin-only, returns all users
+  if(text.includes("@everyone")&&window.__skinarioIsAdmin){
+    return allUsers.filter(u=>u.name);
+  }
   // Match @firstname or @first.last patterns
   const matches=[...text.matchAll(/@([a-zA-Z][a-zA-Z0-9._]{1,30})/g)];
   if(!matches.length)return[];
@@ -3096,7 +3105,7 @@ export default function App(){
     }
   },[scr,articles,videos,forumPosts,events,ads,quizzes,cases,products,allUsers]);
 
-  const isAdm=prof&&ADMINS.includes(au?.email);const isPd=prof?.paid;const today=ds(getIST());const hr=getIST().getHours();
+  const isAdm=prof&&ADMINS.includes(au?.email);window.__skinarioIsAdmin=!!isAdm;const isPd=prof?.paid;const today=ds(getIST());const hr=getIST().getHours();
   const uName=prof?.name||au?.displayName||"Doctor";const uIni=(uName.replace(/^Dr\.?\s*/i,"").split(" ").map(w=>w[0]).join("").toUpperCase()||"D").slice(0,2);const uPhoto=au?.photoURL;
   // ═══ PHARMA = sponsor only, can't post clinical content ═══
   const isPharma=prof?.accountType==="pharma"||prof?.accountType==="brand";
