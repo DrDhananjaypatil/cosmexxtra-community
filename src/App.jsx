@@ -54,7 +54,7 @@ async function syncPlacementToSkinarioOS(sp, status) {
       // linkUrl gets normalized (https:// added if missing) at RENDER
       // time already, by skinario-os's AdDisplay.jsx — no cleanup needed here.
       linkUrl: sp.website || null,
-      // Now that "SKINARIO-OS" is its own explicit placement type
+      // Now that "SKINARIO.CLINIC" is its own explicit placement type
       // (rather than every type falling back here), this only ever
       // fires for placements the vendor specifically chose for this
       // slot — always 'dedicated', skinario-os's persistent dashboard
@@ -5644,9 +5644,9 @@ ${forDownload
               </div>}
             </div>
 
-            {/* 🏥 SKINARIO-OS link */}
-            <a href="https://skinario-os.vercel.app" target="_blank" rel="noopener noreferrer" title="Open Clinic Admin (SKINARIO-OS)" style={{background:"none",border:"1px solid "+T.border,padding:"4px 10px",borderRadius:8,cursor:"pointer",fontSize:".6rem",fontFamily:"inherit",color:T.teal,fontWeight:500,display:"flex",alignItems:"center",gap:4,textDecoration:"none",marginLeft:4,whiteSpace:"nowrap"}} onMouseEnter={e=>{e.currentTarget.style.background=T.tealBg;e.currentTarget.style.borderColor=T.teal}} onMouseLeave={e=>{e.currentTarget.style.background="none";e.currentTarget.style.borderColor=T.border}}>
-              <span style={{fontSize:".8rem"}}>🏥</span>Clinic OS
+            {/* 🏥 SKINARIO.CLINIC link */}
+            <a href="https://www.skinario.clinic" target="_blank" rel="noopener noreferrer" title="Open SKINARIO.CLINIC" style={{background:"none",border:"1px solid "+T.border,padding:"4px 10px",borderRadius:8,cursor:"pointer",fontSize:".6rem",fontFamily:"inherit",color:T.teal,fontWeight:500,display:"flex",alignItems:"center",gap:4,textDecoration:"none",marginLeft:4,whiteSpace:"nowrap"}} onMouseEnter={e=>{e.currentTarget.style.background=T.tealBg;e.currentTarget.style.borderColor=T.teal}} onMouseLeave={e=>{e.currentTarget.style.background="none";e.currentTarget.style.borderColor=T.border}}>
+              <span style={{fontSize:".8rem"}}>🏥</span>SKINARIO.CLINIC
             </a>
 
             {/* 🔔 Notifications bell */}
@@ -11160,7 +11160,7 @@ ${forDownload
                   <option value="article_sidebar">📰 Article sidebar</option>
                   <option value="quiz_sponsor">🧠 Quiz sponsor label</option>
                   <option value="vendor_featured">🏭 Featured in vendor directory</option>
-                  <option value="skinario_os">💻 SKINARIO-OS (clinic dashboard ad)</option>
+                  <option value="skinario_os">💻 SKINARIO.CLINIC (clinic dashboard ad)</option>
                 </select>
                 <input value={spForm.title} onChange={e=>setSpForm(p=>({...p,title:e.target.value}))} placeholder="Ad headline *" style={T.inp}/>
                 <input value={spForm.tagline} onChange={e=>setSpForm(p=>({...p,tagline:e.target.value}))} placeholder="Short tagline" style={T.inp}/>
@@ -12151,7 +12151,7 @@ ${forDownload
                   <option value="article_sidebar">📰 Article sidebar / in-article</option>
                   <option value="quiz_sponsor">🧠 Quiz sponsor label</option>
                   <option value="vendor_featured">🏭 Featured vendor (top of directory)</option>
-                  <option value="skinario_os">💻 SKINARIO-OS (clinic dashboard ad)</option>
+                  <option value="skinario_os">💻 SKINARIO.CLINIC (clinic dashboard ad)</option>
                 </select>
                 <input value={spForm.title} onChange={e=>setSpForm(p=>({...p,title:e.target.value}))} placeholder="Ad title / headline *" style={T.inp}/>
                 <input value={spForm.tagline} onChange={e=>setSpForm(p=>({...p,tagline:e.target.value}))} placeholder="Tagline / short description" style={T.inp}/>
