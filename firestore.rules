@@ -31,8 +31,55 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/clinics/$(clinicId)/staff/$(request.auth.uid)).data;
     }
     function hasClinicPermission(clinicId, module, action) {
-      return isClinicStaff(clinicId) &&
-        clinicStaffDoc(clinicId).permissions[module][action] == true;
+      // isAdmin() first so it short-circuits before touching
+      // clinicStaffDoc() — the Developer team usually isn't a staff
+      // member of every clinic, and evaluating clinicStaffDoc() for a
+      // uid with no staff doc there would error out the whole rule.
+      return isAdmin() || (isClinicStaff(clinicId) &&
+        clinicStaffDoc(clinicId).permissions[module][action] == true);
+    }
+
+    // ── BETA PROGRAM gate — server-side mirror of ClinicSetup.jsx's client
+    //    check (createIsOpen = status=='open' && spotsLeft>0). The client check
+    //    only hides the button - without this rule any signed-in user could
+    //    call setDoc() on /clinics/ directly and bypass the beta cap entirely.
+    //    Admin always bypasses (internal testing). ───────────────────
+    function betaSlotAvailable() {
+      return !exists(/databases/$(database)/documents/platformConfig/betaProgram)
+        || (
+          get(/databases/$(database)/documents/platformConfig/betaProgram).data.status == 'open'
+          && (
+            get(/databases/$(database)/documents/platformConfig/betaProgram).data.activeTesterCount == null
+            || get(/databases/$(database)/documents/platformConfig/betaProgram).data.activeTesterCount <
+               (get(/databases/$(database)/documents/platformConfig/betaProgram).data.betaCap == null
+                 ? 10
+                 : get(/databases/$(database)/documents/platformConfig/betaProgram).data.betaCap)
+          )
+        );
+    }
+
+    // ── FEATURE FLAG gate — mirrors App.jsx's canSeeTab() semantics exactly:
+    //    a clinic with NO featureFlags map at all (legacy/never-restricted) or
+    //    with this specific key not explicitly set to false is ALLOWED — only an
+    //    explicit `false` blocks access. Without this, toggling a module off in
+    //    Developer mode only hid the UI tab - staff could still read/write that
+    //    module's data directly via the Firestore SDK. ──────────────────────
+    function featureAllowed(clinicId, key) {
+      return !exists(/databases/$(database)/documents/clinics/$(clinicId))
+        || get(/databases/$(database)/documents/clinics/$(clinicId)).data.featureFlags == null
+        || get(/databases/$(database)/documents/clinics/$(clinicId)).data.featureFlags[key] != false;
+    }
+
+    // ── collectionGroup rule for subscriptionHistory — needed for
+    //    CEOPanel.jsx's cross-clinic revenue read (`collectionGroup(db,
+    //    'subscriptionHistory')`). The nested rule under
+    //    /clinics/{clinicId}/subscriptionHistory only governs reads
+    //    scoped to ONE clinic's own subcollection — a collectionGroup
+    //    query spanning every clinic's subscriptionHistory at once needs
+    //    its own top-level wildcard rule, admin-only since this is
+    //    platform-wide revenue data.
+    match /{path=**}/subscriptionHistory/{entryId} {
+      allow read: if isAdmin();
     }
 
     // ── users/{uid} — doc id IS the uid, so ownership = doc id match ──────
@@ -43,7 +90,7 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // ── follows — create/delete only by the follower themself ─────────────
+    // ── follows — create/delete only by the follower themself ────────────
     match /follows/{followId} {
       allow read: if isSignedIn();
       allow create: if isOwner('followerId');
@@ -56,7 +103,7 @@ service cloud.firestore {
     //    for every logged-in user to build their notification bell client-side,
     //    so read access must be isSignedIn() — a per-doc ownership read rule
     //    here would reject the entire unfiltered query for non-admins. Writes
-    //    remain properly restricted below. ─────────────────────────────────
+    //    remain properly restricted below. ───────────────────────────────
     match /notifications/{notifId} {
       allow read: if isSignedIn();
       allow create: if isOwner('fromUid');
@@ -68,7 +115,7 @@ service cloud.firestore {
     //    note above — this is bulk-fetched unfiltered too, by both the doctor
     //    ledger and the vendor's own dashboard); vendor updates status;
     //    product's own enquiry counter can be bumped by the enquiring doctor
-    //    (see products rule below) ───────────────────────────────────────
+    //    (see products rule below) ──────────────────────────────────────────
     match /productEnquiries/{enqId} {
       allow read: if isSignedIn();
       allow create: if isOwner('doctorUid');
@@ -99,7 +146,7 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // ── wallPosts — institute's marketing/celebration photo wall ──────────
+    // ── wallPosts — institute's marketing/celebration photo wall ───────────
     match /wallPosts/{postId} {
       allow read: if isSignedIn();
       allow create: if isOwner('vendorId');
@@ -123,17 +170,21 @@ service cloud.firestore {
 
     // ── adminMessages — any signed-in user can message admin; only admin
     //    can reply/close. Read is open (bulk-fetched by every user so they
-    //    can see their own message trail client-side). ─────────────────────
+    //    can see their own message trail client-side). ────────────────────
+    // ── adminMessages — any signed-in user can create (includes team
+    //    invites where uid is the TARGET user, not the sender). Target user
+    //    can update their own invite (accept/decline). Admin can update all.
+    //    Read is open (bulk-fetched). ─────────────────────────────────────
     match /adminMessages/{msgId} {
       allow read: if isSignedIn();
-      allow create: if isOwner('uid');
-      allow update: if isAdmin();
+      allow create: if isSignedIn();
+      allow update: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
       allow delete: if isAdmin();
     }
 
     // ── platformSettings — global config docs (e.g. betaConfig).
     //    Signed-in read (users need to see beta cap/enabled state on the
-    //    gated landing page). Admin-only write. ─────────────────────────
+    //    gated landing page). Admin-only write. ───────────────────────
     match /platformSettings/{settingId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
@@ -156,7 +207,7 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // ── advisorChats — saved AI Advisor conversations per user ──────
+    // ── advisorChats — saved AI Advisor conversations per user ───────
     match /advisorChats/{chatId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
@@ -184,7 +235,7 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // ── pointsActivity — append-only ledger, self-pay pattern ─────────────
+    // ── pointsActivity — append-only ledger, self-pay pattern ────────────
     match /pointsActivity/{entryId} {
       allow read: if wasOwner('uid') || isAdmin();
       allow create, update: if isOwner('uid') || isAdmin();
@@ -208,7 +259,7 @@ service cloud.firestore {
     //    any signed-in user can bump views or append a comment ────────────
     match /forum/{postId} {
       allow read: if isSignedIn();
-      allow create: if isOwner('uid');
+      allow create: if isOwner('uid') || isAdmin();
       allow update: if wasOwner('uid') || isAdmin()
                     || (isSignedIn() && onlyChangedTo(['views','updatedAt']))
                     || (isSignedIn() && onlyChangedTo(['comments','updatedAt']));
@@ -216,7 +267,7 @@ service cloud.firestore {
     }
     match /cases/{caseId} {
       allow read: if isSignedIn();
-      allow create: if isOwner('uid');
+      allow create: if isOwner('uid') || isAdmin();
       allow update: if wasOwner('uid') || isAdmin()
                     || (isSignedIn() && onlyChangedTo(['views','updatedAt']))
                     || (isSignedIn() && onlyChangedTo(['comments','updatedAt']));
@@ -234,7 +285,7 @@ service cloud.firestore {
     }
 
     // ── roleApplications — user applies, admin reviews (read open — see
-    //    submissions note above) ──────────────────────────────────────────
+    //    submissions note above) ────────────────────────────────────────
     match /roleApplications/{appId} {
       allow read: if isSignedIn();
       allow create: if isOwner('uid');
@@ -242,7 +293,7 @@ service cloud.firestore {
     }
 
     // ── vendorApplications — vendor applies, admin reviews (read open —
-    //    see submissions note above) ─────────────────────────────────────
+    //    see submissions note above) ────────────────────────────────────
     match /vendorApplications/{appId} {
       allow read: if isSignedIn();
       allow create: if isOwner('uid');
@@ -311,77 +362,453 @@ service cloud.firestore {
                     || (isSignedIn() && onlyChangedTo(['visits','updatedAt']));
     }
 
-    // ══════════════════════════════════════════════════════════════════════
+    // ── advertisements — SKINARIO-OS's own ad system (Developer panel →
+    //    Advertisements). Deliberately separate from /ads/ above — that
+    //    collection belongs to SKINARIO's community-content admin workflow;
+    //    this one is skinario-os's Flash/Dedicated clinic-facing ad system,
+    //    managed from DeveloperPage.jsx → AdvertisementManager.jsx. Read is
+    //    open to any signed-in user since it's only ever queried from
+    //    within skinario-os's authenticated UI (FlashAdModal /
+    //    DedicatedAdBanner); only the Developer team creates/edits/deletes. ─
+    match /advertisements/{adId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ── SKINARIO-OS — top-level index collections (avoid collection-group
+    //    query limitations encountered in testing — see App.jsx comments) ──
+    match /clinicStaffIndex/{uid} {
+      allow read, write: if (isSignedIn() && request.auth.uid == uid) || isAdmin();
+    }
+
+    // ── Pricing Tiers — Developer-editable standard plan pricing, shown on
+    //    ClinicSetup.jsx's Choose Your Plan screen. Read needs to be
+    //    signed-in (not public) since it's only ever shown to an
+    //    already-authenticated user right after creating their clinic.
+    match /pricingTiers/{tierId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ── Coupons — marketing codes. Deliberately signed-in-only for read
+    //    (never public) since this holds whitelist emails and redemption
+    //    counts. Validated client-side in ClinicSetup.jsx AFTER Google
+    //    sign-in, not before.
+    match /coupons/{couponId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+      // redemptionCount needs to be incremented by the signed-in user
+      // completing signup (ClinicSetup.jsx's CouponAppliedCard) — but ONLY
+      // that field, so a compromised client can't rewrite the code, the
+      // whitelist, expiry, or anything else about the coupon itself.
+      allow update: if isSignedIn() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['redemptionCount', 'updatedAt']);
+    }
+
+    // ── Coupon redemptions — the analytics log (email, clinic, coupon,
+    //    timestamp). The signed-in user creates their own redemption record
+    //    at signup; only admin can read the list back (this is your
+    //    marketing data, not something every clinic should see).
+    match /couponRedemptions/{redemptionId} {
+      allow create: if isSignedIn();
+      allow read: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    match /pendingInvites/{inviteId} {
+      allow read: if isSignedIn();
+      allow create: if isClinicStaff(request.resource.data.clinicId)
+                    && hasClinicPermission(request.resource.data.clinicId, 'staffMgmt', 'add');
+      allow delete: if isSignedIn();
+    }
+
+    // ── helpDesk — clinic staff submit support tickets (read is open since
+    //    HelpDeskButton bulk-fetches unfiltered and filters client-side by
+    //    clinicId+userId, and HelpDeskManager/DeveloperPage need to read
+    //    across all clinics — same bulk-fetch pattern as notifications
+    //    above). Only the ticket's own author can create it; only the
+    //    Developer team can reply/update status.
+    match /helpDesk/{ticketId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner('userId');
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── centerRequests — a clinic owner requests an additional center;
+    //    only the Developer team (isAdmin) reviews/approves/rejects. Written
+    //    by DeveloperPage.jsx (approve/reject) and read there too. Create is
+    //    scoped to the clinic's own owner requesting on their own behalf.
+    match /centerRequests/{requestId} {
+      allow read: if isAdmin();
+      allow create: if isClinicStaff(request.resource.data.existingClinicId)
+                    && clinicStaffDoc(request.resource.data.existingClinicId).role == 'owner';
+      allow update, delete: if isAdmin();
+    }
+
+    // ── platformGrants/{uid} — admin-granted flags for a specific user
+    //    (e.g. additionalCenterUnlocked). The user reads their own grant to
+    //    show/hide unlocked features; only the Developer team can write it.
+    match /platformGrants/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow write: if isAdmin();
+    }
+
+    // ── platformConfig — SEPARATE from platformSettings above. That
+    //    collection requires isSignedIn() to read, which doesn't work here:
+    //    the Beta Launch signup page (BetaLaunchGate.jsx) needs to show the
+    //    slot counter to anonymous visitors who haven't created an account
+    //    yet. This collection exists specifically to expose one small,
+    //    non-sensitive doc (betaProgram: cap/status/activeTesterCount)
+    //    publicly, without loosening platformSettings' auth requirement for
+    //    everything else stored there. Written by DeveloperPage.jsx's
+    //    BetaProgramPanel; changeHistory is its append-only audit log. ─────
+    match /platformConfig/{configId} {
+      allow read: if true;
+      allow write: if isAdmin();
+
+      match /changeHistory/{entryId} {
+        allow read: if isAdmin();
+        allow create: if isAdmin();
+      }
+    }
+
+    // ── betaWaitlist — anyone, including anonymous pre-signup visitors on
+    //    the Beta Launch page, can join the waitlist. Only the Developer
+    //    team can view/manage the list (reviewed from the Beta Program
+    //    panel). ────────────────────────────────────────────────────────────────
+    match /betaWaitlist/{entryId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ── featureUsage — analytics tracking (any user writes, admin reads) ──
+    match /featureUsage/{docId} {
+      allow read: if isAdmin();
+      allow create, update: if isSignedIn();
+    }
+
+    // ── aiUsageLog — token usage per AI Cloud Function call, written
+    //    only by the Admin SDK (Cloud Functions bypass these rules
+    //    entirely), so client writes are denied outright. Read is
+    //    admin-only, for Developer Analytics to show usage per clinic
+    //    and platform-wide.
+    match /aiUsageLog/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ── instagramAccountIndex — maps an Instagram account ID to the
+    //    clinic that connected it, used only by instagramWebhook to
+    //    route incoming comment/DM events to the right clinic. Purely
+    //    internal; no client ever needs to read or write this.
+    match /instagramAccountIndex/{igUserId} {
+      allow read, write: if false;
+    }
+
+    // ── platformInvoices / platformPayments / platformLeads — internal
+    //    Developer-team billing & lead tracking, admin-only end to end. ───
+    match /platformInvoices/{invoiceId} {
+      allow read, write: if isAdmin();
+    }
+    match /platformPayments/{paymentId} {
+      allow read, write: if isAdmin();
+    }
+    match /platformLeads/{leadId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════════════
     // ── SKINARIO-OS — Clinic Administration module ─────────────────────
     //    New block. Everything below is scoped under /clinics/{clinicId}
     //    and does not touch any SKINARIO collection above. ─────────────────
-    // ══════════════════════════════════════════════════════════════════════
     match /clinics/{clinicId} {
-      allow read: if isClinicStaff(clinicId);
-      allow create: if isSignedIn(); // clinic creation happens client-side in ClinicSetup.jsx
-      allow update: if isClinicStaff(clinicId) && clinicStaffDoc(clinicId).role == 'owner';
+      allow read: if isClinicStaff(clinicId) || isAdmin();
+      allow create: if isSignedIn() && (betaSlotAvailable() || isAdmin()); // clinic creation happens client-side in ClinicSetup.jsx, now server-enforced behind the beta cap
+      allow update: if (isClinicStaff(clinicId) && clinicStaffDoc(clinicId).role == 'owner') || isAdmin();
+      // Delete Clinic (Developer console) — admin-only, never a regular
+      // clinic staff action.
+      allow delete: if isAdmin();
 
       match /staff/{staffUid} {
-        allow read: if isClinicStaff(clinicId);
+        allow read: if isClinicStaff(clinicId) || isAdmin();
         allow create: if isSignedIn() && request.auth.uid == staffUid;
         allow update: if hasClinicPermission(clinicId, 'staffMgmt', 'edit') || request.auth.uid == staffUid;
         allow delete: if hasClinicPermission(clinicId, 'staffMgmt', 'remove');
       }
 
-      match /invites/{inviteId} {
-        allow read: if isSignedIn();
-        allow create, update: if hasClinicPermission(clinicId, 'staffMgmt', 'add');
-        allow delete: if isSignedIn();
-      }
-
       match /patients/{patientId} {
-        allow read: if isClinicStaff(clinicId);
+        allow read: if isClinicStaff(clinicId) || isAdmin();
         allow create: if hasClinicPermission(clinicId, 'patients', 'add');
         allow update: if hasClinicPermission(clinicId, 'patients', 'edit');
         allow delete: if hasClinicPermission(clinicId, 'patients', 'delete');
       }
 
       match /appointments/{appointmentId} {
-        allow read: if isClinicStaff(clinicId);
+        allow read: if isClinicStaff(clinicId) || isAdmin();
         allow create: if hasClinicPermission(clinicId, 'appointments', 'add');
         allow update: if hasClinicPermission(clinicId, 'appointments', 'edit');
         allow delete: if hasClinicPermission(clinicId, 'appointments', 'cancel');
       }
 
       match /services/{serviceId} {
-        allow read: if isClinicStaff(clinicId);
+        allow read: if isClinicStaff(clinicId) || isAdmin();
         allow write: if hasClinicPermission(clinicId, 'services', 'edit');
       }
 
+      // Pharmacy module — gated by featureAllowed(..., 'pharmacy') in addition
+      // to the existing permission checks. No delete rule existed before —
+      // added admin-only so Delete Clinic can clear inventory items.
       match /inventory/{itemId} {
-        allow read: if isClinicStaff(clinicId);
-        allow create: if hasClinicPermission(clinicId, 'inventory', 'add');
-        allow update: if hasClinicPermission(clinicId, 'inventory', 'edit');
+        allow read: if (isClinicStaff(clinicId) && featureAllowed(clinicId, 'pharmacy')) || isAdmin();
+        allow create: if hasClinicPermission(clinicId, 'inventory', 'add') && featureAllowed(clinicId, 'pharmacy');
+        allow update: if hasClinicPermission(clinicId, 'inventory', 'edit') && featureAllowed(clinicId, 'pharmacy');
+        allow delete: if isAdmin();
       }
 
       match /inventoryLedger/{entryId} {
-        allow read: if isClinicStaff(clinicId);
-        allow create: if hasClinicPermission(clinicId, 'inventory', 'recordOutward')
-                      || hasClinicPermission(clinicId, 'inventory', 'add');
+        allow read: if (isClinicStaff(clinicId) && featureAllowed(clinicId, 'pharmacy')) || isAdmin();
+        allow create: if (hasClinicPermission(clinicId, 'inventory', 'recordOutward')
+                      || hasClinicPermission(clinicId, 'inventory', 'add'))
+                      && featureAllowed(clinicId, 'pharmacy');
+        allow delete: if isAdmin();
       }
 
       match /invoices/{invoiceId} {
-        allow read: if isClinicStaff(clinicId);
+        allow read: if isClinicStaff(clinicId) || isAdmin();
         allow create, update: if hasClinicPermission(clinicId, 'billing', 'createInvoice');
+        allow delete: if isAdmin();
       }
 
       match /discountApprovals/{approvalId} {
-        allow read: if isClinicStaff(clinicId);
+        // Read restricted to actual approval authority (Admin, Director,
+        // Center Head, Owner) — the requester finds out what happened
+        // through the INVOICE's own status field instead (pending-
+        // discount-approval / cancelled with a discount-rejected
+        // reason), governed by the separate invoices rule above, not
+        // this one.
+        allow read: if isAdmin()
+          || (isClinicStaff(clinicId) && clinicStaffDoc(clinicId).role in ['owner', 'admin', 'director', 'center-head']);
         allow create: if isClinicStaff(clinicId);
-        allow update: if isClinicStaff(clinicId); // refine later: only approvers with sufficient maxDiscountPct
+        // Tiered approval authority, enforced here rather than only in
+        // the UI — Admin/Director up to 25%, Center Head up to 50%,
+        // Owner unlimited. Without this, any clinic staff member could
+        // call updateDoc() directly and approve/reject ANY request via
+        // the Firestore SDK, completely bypassing DiscountApprovals.jsx's
+        // client-side button-hiding, which is a convenience, not a
+        // security boundary on its own.
+        allow update: if isAdmin()
+          || (isClinicStaff(clinicId) && clinicStaffDoc(clinicId).role == 'owner')
+          || (isClinicStaff(clinicId) && clinicStaffDoc(clinicId).role == 'center-head'
+              && resource.data.requestedPct <= 50)
+          || (isClinicStaff(clinicId) && clinicStaffDoc(clinicId).role in ['admin', 'director']
+              && resource.data.requestedPct <= 25);
+        allow delete: if isAdmin();
+      }
+
+      // ── purchaseOrders — pre-purchase approval workflow, distinct
+      //    from vendorInvoices (which records stock already received).
+      //    Any clinic staff can request; only Owner/Director/Admin/
+      //    Center Head can approve or reject — no tiered ceiling by
+      //    amount here, unlike discountApprovals, since that wasn't
+      //    asked for. emailSentAt/lastEmailedTo are written by the
+      //    sendPurchaseOrderEmail Cloud Function via the Admin SDK
+      //    (bypasses rules entirely), not by client writes.
+      match /purchaseOrders/{poId} {
+        allow read: if isClinicStaff(clinicId) || isAdmin();
+        allow create: if isClinicStaff(clinicId);
+        allow update: if isAdmin()
+          || (isClinicStaff(clinicId) && clinicStaffDoc(clinicId).role in ['owner', 'admin', 'director', 'center-head']);
+        allow delete: if isAdmin();
+      }
+
+      // ── vendorInvoices — records stock already received. Server-side
+      //    mirror of RecordPurchaseInvoice.jsx's lockdown: a non-owner
+      //    can only create one if it references a currently-approved
+      //    PO; Owner can create freely (their own bypass path, tracked
+      //    via noPOEscalations below). Without this, the UI-level block
+      //    would be the only thing stopping a non-owner from writing
+      //    directly via the Firestore SDK — same class of gap already
+      //    fixed for discountApprovals.
+      match /vendorInvoices/{invoiceId} {
+        allow read: if isClinicStaff(clinicId) || isAdmin();
+        allow create: if isAdmin()
+          || (isClinicStaff(clinicId) && clinicStaffDoc(clinicId).role == 'owner')
+          || (isClinicStaff(clinicId) && request.resource.data.purchaseOrderId != null
+              && get(/databases/$(database)/documents/clinics/$(clinicId)/purchaseOrders/$(request.resource.data.purchaseOrderId)).data.status == 'approved');
+        // Broader corrections (items, invoiceAmount, batch/MRP fixes) are
+        // Owner-only, matching VendorProfile.jsx's edit UI. Any clinic
+        // staff can still record a payment against an invoice — that
+        // only ever touches amountPaid/status, never the line items
+        // themselves, so it's carved out separately rather than locking
+        // the whole document to Owner and breaking payment recording.
+        allow update: if isAdmin()
+          || (isClinicStaff(clinicId) && clinicStaffDoc(clinicId).role == 'owner')
+          || (isClinicStaff(clinicId) && onlyChangedTo(['amountPaid', 'status']));
+        allow delete: if isAdmin();
+      }
+
+      // ── purchaseEditLog — audit trail for Owner's corrections to an
+      //    already-recorded purchase invoice (VendorProfile.jsx). Only
+      //    Owner ever writes these (matches the update rule above);
+      //    any clinic staff can read the history for transparency.
+      match /purchaseEditLog/{logId} {
+        allow read: if isClinicStaff(clinicId) || isAdmin();
+        allow create: if isAdmin() || (isClinicStaff(clinicId) && clinicStaffDoc(clinicId).role == 'owner');
+        allow update, delete: if isAdmin();
+      }
+
+      // ── aiInsights — the cached AI Today briefs (generateAiBrief Cloud
+      //    Function), one per domain: pharmacyBrief, financeBrief,
+      //    crmBrief. Read-only from the client on purpose: the function
+      //    writes via the Admin SDK, which bypasses these rules entirely,
+      //    so denying client writes here closes off the only other path
+      //    this document could be written through. Read is restricted to
+      //    Owner + Director — generation is Owner-only (enforced in the
+      //    Cloud Function itself), but a Director should still be able
+      //    to read whatever's already been generated for the day.
+      match /aiInsights/{docId} {
+        allow read: if (isClinicStaff(clinicId) && (clinicStaffDoc(clinicId).role == 'owner' || clinicStaffDoc(clinicId).role == 'director')) || isAdmin();
+        allow write: if false;
+      }
+
+      // ── noPOEscalations — oversight trail for Owner's no-PO purchase
+      //    bypass. Only Owner ever creates these (RecordPurchaseInvoice.jsx
+      //    only takes this path when the current user IS owner); visible
+      //    to Director and Center Head, not Owner — notifying Owner about
+      //    their own action would be circular.
+      match /noPOEscalations/{escId} {
+        allow read: if isAdmin()
+          || (isClinicStaff(clinicId) && clinicStaffDoc(clinicId).role in ['director', 'center-head']);
+        allow create: if isClinicStaff(clinicId) && clinicStaffDoc(clinicId).role == 'owner';
+        allow update, delete: if isAdmin();
+      }
+
+      // ── subscriptionHistory — append-only log of every subscription set
+      //    by the Developer team (see DeveloperPage.jsx's SubscriptionModal).
+      //    Only admin writes it; clinic staff can read their own center's
+      //    history. Needs its own rule since the catch-all below only
+      //    checks isClinicStaff, which an admin working on someone else's
+      //    clinic wouldn't satisfy.
+      match /subscriptionHistory/{entryId} {
+        allow read: if isClinicStaff(clinicId) || isAdmin();
+        allow create: if isAdmin()
+          // Self-serve carve-out: the owner may log their OWN free
+          // (₹0) beta-plan activation from ChoosePlanCard — paid
+          // entries still require the Developer team.
+          || (isClinicStaff(clinicId) && clinicStaffDoc(clinicId).role == 'owner'
+              && request.resource.data.amountPaid == 0);
+        allow delete: if isAdmin();
+      }
+
+      // ── settings/messaging — holds raw WhatsApp/SMS provider API keys
+      //    (MessagingSettings.jsx). Needs its own rule since the catch-all
+      //    below would otherwise let ANY clinic staff member read these
+      //    credentials straight out of Firestore — restrict to owner/admin,
+      //    same roles allowed to view/edit the connection in the UI, AND now
+      //    also gated by the 'messaging' feature flag. isAdmin() is its own
+      //    top-level clause so it short-circuits before clinicStaffDoc().
+      match /settings/messaging {
+        allow read, write: if isAdmin() || (isClinicStaff(clinicId) &&
+          clinicStaffDoc(clinicId).role in ['owner', 'admin'] &&
+          featureAllowed(clinicId, 'messaging'));
+      }
+
+      // CRM module — gated by featureAllowed(..., 'crm'). Leads had no explicit
+      // rule before and fell through to the catch-all (any staff, no feature gate).
+      match /leads/{leadId} {
+        allow read, write: if (isClinicStaff(clinicId) && featureAllowed(clinicId, 'crm')) || isAdmin();
+      }
+
+      // Drip/journey automation definitions — same gate as leads, since
+      // this is a CRM sub-feature (see JourneyManager.jsx).
+      match /marketingJourneys/{journeyId} {
+        allow read, write: if (isClinicStaff(clinicId) && featureAllowed(clinicId, 'crm')) || isAdmin();
+      }
+
+      // ── Instagram content automation (CRM sub-feature) — connection
+      //    status is owner/admin readable so the UI can show "Connected
+      //    as @username", but never client-writable: only the OAuth
+      //    callback Cloud Function sets this, after actually exchanging
+      //    a code for a token. The real access token never lives here —
+      //    see instagramAuth/credentials below, which is never
+      //    client-readable at all.
+      match /settings/instagramContent {
+        allow read: if isAdmin() || (isClinicStaff(clinicId) &&
+          clinicStaffDoc(clinicId).role in ['owner', 'admin'] &&
+          featureAllowed(clinicId, 'crm'));
+        allow write: if false;
+      }
+      match /instagramAuth/credentials {
+        allow read, write: if false;
+      }
+      match /instagramDrafts/{draftId} {
+        allow read: if (isClinicStaff(clinicId) && featureAllowed(clinicId, 'crm')) || isAdmin();
+        allow write: if false;
+      }
+
+      // Email campaign send history — logged by EmailCampaign.jsx after
+      // each send. Same gate as leads/journeys, since this is a CRM
+      // sub-feature too.
+      match /emailCampaigns/{campaignId} {
+        allow read, write: if (isClinicStaff(clinicId) && featureAllowed(clinicId, 'crm')) || isAdmin();
+      }
+
+      // Live Meta ads_read insights — schema ready, ingestion not built yet
+      // (see MarketingROI in CRM.jsx). Read-only for clinic staff once
+      // populated; write is admin-only since this will eventually be
+      // written by a scheduled Cloud Function via the Admin SDK (which
+      // bypasses rules entirely) — staff should never be able to type in
+      // fake automated ad numbers themselves.
+      match /metaAdInsights/{monthId} {
+        allow read: if (isClinicStaff(clinicId) && featureAllowed(clinicId, 'crm')) || isAdmin();
+        allow write: if isAdmin();
+      }
+
+      // Promotions module — gated by featureAllowed(..., 'promotions'). Same situation
+      // as leads — offers had no explicit rule before.
+      match /offers/{offerId} {
+        allow read, write: if (isClinicStaff(clinicId) && featureAllowed(clinicId, 'promotions')) || isAdmin();
+      }
+      match /offerRedemptions/{redemptionId} {
+        allow read, write: if (isClinicStaff(clinicId) && featureAllowed(clinicId, 'promotions')) || isAdmin();
+      }
+
+      // Finance module — gated by featureAllowed(..., 'finance'). These collection
+      // names follow the same camelCase pattern as every other clinic subcollection
+      // in this file (matching Finance.jsx's sub-tabs) — if any actual component
+      // uses a different collection name, that one still falls through to the
+      // catch-all below until confirmed and added here explicitly.
+      match /expenses/{entryId} {
+        allow read, write: if (isClinicStaff(clinicId) && featureAllowed(clinicId, 'finance')) || isAdmin();
+      }
+      match /financeLedger/{entryId} {
+        allow read, write: if (isClinicStaff(clinicId) && featureAllowed(clinicId, 'finance')) || isAdmin();
+      }
+      match /accounts/{accountId} {
+        allow read, write: if (isClinicStaff(clinicId) && featureAllowed(clinicId, 'finance')) || isAdmin();
+      }
+      match /commissionProfiles/{profileId} {
+        allow read, write: if (isClinicStaff(clinicId) && featureAllowed(clinicId, 'finance')) || isAdmin();
+      }
+      match /salesTargets/{targetId} {
+        allow read, write: if (isClinicStaff(clinicId) && featureAllowed(clinicId, 'finance')) || isAdmin();
+      }
+      match /customIncentives/{incentiveId} {
+        allow read, write: if (isClinicStaff(clinicId) && featureAllowed(clinicId, 'finance')) || isAdmin();
+      }
+      match /payrollAttendance/{entryId} {
+        allow read, write: if (isClinicStaff(clinicId) && featureAllowed(clinicId, 'finance')) || isAdmin();
       }
 
       // Catch-all for remaining clinic collections not yet built as their own
-      // rule (rooms, vendors, consultations, treatmentPlans, accounts, expenses,
-      // commissionProfiles, etc.) — any clinic staff can read/write for now;
-      // tighten with specific per-module permissions as each is built.
+      // rule (rooms, vendors, consultations, treatmentPlans, packages,
+      // procedureExecutions, etc.) — any clinic staff can read/write for now,
+      // and admin can too (needed so Delete Clinic can clear these); tighten
+      // with specific per-module permissions/feature gates as each is built
+      // and confirmed.
       match /{document=**} {
-        allow read, write: if isClinicStaff(clinicId);
+        allow read, write: if isClinicStaff(clinicId) || isAdmin();
       }
     }
 
