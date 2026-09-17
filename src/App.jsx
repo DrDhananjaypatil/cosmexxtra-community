@@ -311,7 +311,7 @@ function genReferralCode(name,uid){
 const TOPICS=["Botox & Neurotoxins","Dermal Fillers","Threads","PDRN & Polynucleotides","Peptides & Skin Boosters","Chemical Peels","Laser & Energy Devices","Hair Restoration","Body Contouring","Anti-Aging & Regenerative","Skincare Science","Pigmentation & Melasma","Acne & Scars","Practice Management"];
 // Presets for the new Case Blog builder. Each section has one of these labels + free-text content
 // (or a before/after image pair). Users can also enter a Custom label.
-const CASE_BLOCK_TEXT_PRESETS=["Patient Profile","Case History","Chief Complaint","Examination Findings","Previous Rx / Prior Treatments","Diagnosis","Treatment Given","Products Used","Outcome / Follow-up","Discussion Question for Community","Learning Point","Additional Notes","Custom…"];
+const CASE_BLOCK_TEXT_PRESETS=["Patient Profile","Case History","Chief Complaint","Examination Findings","Previous Rx / Prior Treatments","Diagnosis","Treatment Given","Products Used","Outcome / Follow-up","My Insight / Takeaway","Tips for Practitioners","Discussion Question","Learning Point","Additional Notes","Custom…"];
 const CASE_BLOCK_IMAGE_PRESETS=["Before & After","Baseline vs Result","Session 1 vs Final","Custom…"];
 // ── Test Series topics (10 topics, per plan). Each will get 3 variants × 3 difficulties per month.
 const TEST_TOPICS=[
@@ -4777,18 +4777,26 @@ ${forDownload
 
   const postCase=async()=>{
     if(!ccT.trim()){sh("Title required");return}
-    if(caseBlocks.length===0){sh("Add at least one section (History, Before/After, etc.)");return}
-    // Validate each block has some content
+    if(caseBlocks.length===0){sh("Add at least one section");return}
     for(const b of caseBlocks){
       if(b.type==="text"&&!b.value?.trim()){sh(`"${b.label}" section is empty`);return}
-      if(b.type==="beforeAfter"&&(!b.beforeUrl||!b.afterUrl)){sh(`"${b.label}" section needs both a Before and After image`);return}
+      if(b.type==="beforeAfter"&&(!b.beforeUrl||!b.afterUrl)){sh(`"${b.label}" needs both Before and After images`);return}
+      if(b.type==="gallery"&&(!b.images||b.images.length===0)){sh(`"${b.label}" needs at least one photo`);return}
     }
-    // Populate legacy top-level image field from the first beforeAfter block so existing feed thumbnails still work
+    // Publisher — admin can post on behalf of someone
+    const pubId=isAdm?document.getElementById("diary-publisher")?.value:"";
+    const publisher=pubId?allUsers.find(u=>u.id===pubId):null;
+    const authorName=publisher?.name||uName;
+    const authorUid=publisher?.id||au.uid;
+    const authorPhoto=publisher?.photo||uPhoto||"";
+    const authorIni=publisher?(publisher.name||"?").split(" ").map(w=>w[0]).join("").toUpperCase().slice(0,2):uIni;
+    // Legacy thumbnail from first image block
     const firstImgBlock=caseBlocks.find(b=>b.type==="beforeAfter");
-    const legacyImages=firstImgBlock?[firstImgBlock.beforeUrl,firstImgBlock.afterUrl]:[];
-    await fbAdd("cases",{author:uName,ini:uIni,uid:au.uid,photo:uPhoto||"",title:ccT,cat:ccC,blocks:caseBlocks,images:legacyImages,likedBy:[],likes:0,comments:[],date:ds(getIST())});
+    const firstGallery=caseBlocks.find(b=>b.type==="gallery"&&b.images?.length>0);
+    const legacyImages=firstImgBlock?[firstImgBlock.beforeUrl,firstImgBlock.afterUrl]:firstGallery?firstGallery.images.slice(0,2):[];
+    await fbAdd("cases",{author:authorName,ini:authorIni,uid:authorUid,publisherUid:authorUid,photo:authorPhoto,title:ccT,cat:ccC,blocks:caseBlocks,images:legacyImages,likedBy:[],likes:0,comments:[],date:ds(getIST())});
     setCcT("");setCcC(TOPICS[0]);setCaseBlocks([]);setShowAddBlockPicker(false);
-    setNewCase(false);sh("Case posted!");loadData();await awardPoints("case_post");
+    setNewCase(false);sh("📖 Diary post published!");loadData();await awardPoints("case_post");
   };
 
   // ═══ CASE COMMENT ═══
@@ -5521,7 +5529,7 @@ ${forDownload
     {id:"home",ic:"🏠",l:"Home"},
     {id:"quiz",ic:"🧠",l:"Quiz"},
     {id:"forum",ic:"💬",l:"Forum"},
-    {id:"cases",ic:"🔬",l:"Cases"},
+    {id:"cases",ic:"📖",l:"Diaries"},
     ...(isBizAccount?[{id:"me",ic:"🏢",l:"My Page"}]:[{id:"me",ic:"👤",l:"Me"}]),
     ...(hasAnyTeam?[{id:"team",ic:"👥",l:"My Team"}]:[]),
   ];
@@ -5944,7 +5952,7 @@ ${forDownload
           <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
             <button onClick={()=>go("quiz")} style={T.btn}>🧠 Today's quiz</button>
             <button onClick={()=>go("events")} style={T.btnO}>📅 Events</button>
-            <button onClick={()=>go("cases")} style={T.btnO}>🔬 Clinical cases</button>
+            <button onClick={()=>go("cases")} style={T.btnO}>📖 Aesthetic Diaries</button>
             <button onClick={()=>go("forum")} style={T.btnO}>💬 Forum</button>
             <button onClick={()=>go("vendors")} style={T.btnO}>🏢 Vendors</button>
             <button onClick={()=>{setDirTab("institutes");go("vendors");}} style={T.btnO}>🎓 Institutes</button>
@@ -6324,7 +6332,7 @@ ${forDownload
           if(eligible.length<2)return null;
           return(<div style={{...T.card,padding:18,marginBottom:14}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
-              <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>🔬 Real Cases from the Community</h3>
+              <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>📖 Aesthetic Diaries</h3>
               <span onClick={()=>go("cases")} style={{fontSize:".78rem",color:T.teal,fontWeight:600,cursor:"pointer"}}>View all cases →</span>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
@@ -8448,15 +8456,15 @@ ${forDownload
         <div style={{...T.card,padding:24,background:"linear-gradient(135deg,#fff,"+T.goldBg+"77)",borderLeft:"3px solid "+T.gold,marginBottom:14}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:14}}>
             <div>
-              <h3 style={{fontSize:"1.4rem",fontWeight:700,margin:0}}>🔬 Clinical Cases</h3>
-              <p style={{color:T.txt2,fontSize:".88rem",marginTop:6,maxWidth:560}}>Share interesting cases with images for peer discussion. Get insights from colleagues across India.</p>
+              <h3 style={{fontSize:"1.4rem",fontWeight:700,margin:0}}>📖 Aesthetic Diaries</h3>
+              <p style={{color:T.txt2,fontSize:".88rem",marginTop:6,maxWidth:560}}>Share clinical cases, before-after transformations, treatment insights, and peer discussions. Build your professional portfolio.</p>
               <div style={{display:"flex",gap:14,marginTop:10,fontSize:".75rem",color:T.mute}}>
-                <span><b style={{color:T.teal,fontSize:".9rem"}}>{cases.length}</b> cases shared</span>
+                <span><b style={{color:T.teal,fontSize:".9rem"}}>{cases.length}</b> posts</span>
                 <span><b style={{color:T.teal,fontSize:".9rem"}}>{cases.reduce((s,c)=>s+(c.comments?.length||0),0)}</b> discussions</span>
               </div>
             </div>
-            {isPharma?<div style={{padding:"10px 14px",background:T.goldBg,border:"1px solid "+T.gold+"55",borderRadius:8,fontSize:".82rem",color:T.goldD,maxWidth:280}}>📢 Pharma accounts can sponsor cases & content. <button onClick={()=>setShowContactAdmin(true)} style={{background:"none",border:"none",color:T.goldD,fontWeight:700,textDecoration:"underline",cursor:"pointer",padding:0,fontSize:"inherit",fontFamily:"inherit"}}>Contact admin →</button></div>
-            :<button onClick={()=>setNewCase(true)} style={{...T.btn,padding:"13px 26px",fontSize:".95rem",background:"linear-gradient(135deg,"+T.gold+","+T.goldD+")"}}>📋 Post a new case</button>}
+            {isPharma?<div style={{padding:"10px 14px",background:T.goldBg,border:"1px solid "+T.gold+"55",borderRadius:8,fontSize:".82rem",color:T.goldD,maxWidth:280}}>📢 Pharma accounts can sponsor content. <button onClick={()=>setShowContactAdmin(true)} style={{background:"none",border:"none",color:T.goldD,fontWeight:700,textDecoration:"underline",cursor:"pointer",padding:0,fontSize:"inherit",fontFamily:"inherit"}}>Contact admin →</button></div>
+            :<button onClick={()=>setNewCase(true)} style={{...T.btn,padding:"13px 26px",fontSize:".95rem",background:"linear-gradient(135deg,"+T.gold+","+T.goldD+")"}}>📖 New diary post</button>}
           </div>
         </div>
 
@@ -8466,14 +8474,22 @@ ${forDownload
             {/* Modal header */}
             <div style={{padding:"18px 24px",background:"linear-gradient(135deg,"+T.goldBg+","+T.tealBg+")",borderBottom:"1px solid "+T.border,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div>
-                <h3 style={{fontSize:"1.1rem",fontWeight:700,margin:0,color:T.txt}}>📋 New Clinical Case</h3>
-                <p style={{fontSize:".78rem",color:T.txt2,margin:"3px 0 0"}}>Fill in what's relevant — only title and image are required</p>
+                <h3 style={{fontSize:"1.1rem",fontWeight:700,margin:0,color:T.txt}}>📖 New Aesthetic Diary Post</h3>
+                <p style={{fontSize:".78rem",color:T.txt2,margin:"3px 0 0"}}>Share a clinical case, transformation, or treatment insight</p>
               </div>
               <button onClick={()=>setNewCase(false)} style={{background:"rgba(255,255,255,0.6)",border:"none",width:32,height:32,borderRadius:"50%",cursor:"pointer",fontSize:"1rem",color:T.txt2,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
             </div>
 
             {/* Modal body */}
             <div style={{padding:24,maxHeight:"65vh",overflowY:"auto"}}>
+              {/* Publisher — admin can post on behalf of someone */}
+              {isAdm&&<div style={{marginBottom:14}}>
+                <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Published by</label>
+                <select id="diary-publisher" style={T.inp}>
+                  <option value="">— You ({uName}) —</option>
+                  {allUsers.filter(u=>u.name).sort((a,b)=>(a.name||"").localeCompare(b.name||"")).map(u=><option key={u.id} value={u.id}>{u.name} ({u.accountType||"doctor"}) — {u.email}</option>)}
+                </select>
+              </div>}
               <label style={{display:"block",fontSize:".7rem",color:T.teal,marginBottom:4,fontWeight:600,textTransform:"uppercase",letterSpacing:1}}>Title <span style={{color:T.err}}>*</span></label>
               <input value={ccT} onChange={e=>setCcT(e.target.value)} placeholder="e.g. 'Unusual pigmentation pattern on forearm'" style={{...T.inp,marginBottom:14,fontSize:".95rem"}}/>
 
@@ -8495,6 +8511,28 @@ ${forDownload
                   </div>
                   {b.type==="text"?
                     <MarkdownEditor value={b.value||""} onChange={v=>{const next=[...caseBlocks];next[idx]={...b,value:v};setCaseBlocks(next);}} placeholder={`Write ${b.label.toLowerCase()}...`} rows={3}/>
+                    :b.type==="gallery"?
+                    <div>
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))",gap:8,marginBottom:8}}>
+                        {(b.images||[]).map((img,gi)=><div key={gi} style={{position:"relative"}}>
+                          <img src={img} style={{width:"100%",height:100,objectFit:"cover",borderRadius:8}}/>
+                          <button onClick={()=>{const next=[...caseBlocks];next[idx]={...b,images:(b.images||[]).filter((_,j)=>j!==gi)};setCaseBlocks(next);}} style={{position:"absolute",top:2,right:2,width:20,height:20,borderRadius:"50%",border:"none",background:"rgba(0,0,0,0.6)",color:"#fff",cursor:"pointer",fontSize:".6rem"}}>✕</button>
+                        </div>)}
+                        <label style={{display:"flex",alignItems:"center",justifyContent:"center",height:100,border:"2px dashed "+T.border,borderRadius:8,cursor:"pointer",fontSize:".72rem",color:T.mute,background:"#fff"}}>
+                          + Add photo
+                          <input type="file" accept="image/*" multiple onChange={async e=>{
+                            const files=Array.from(e.target.files||[]);if(!files.length)return;
+                            const newImgs=[...(b.images||[])];
+                            for(const f of files.slice(0,10)){
+                              if(f.size>5*1024*1024){sh(f.name+" too large (5MB max)");continue;}
+                              try{const path=`images/diary_${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`;const sRef=ref(storage,path);await uploadBytes(sRef,f);const dlUrl=await getDownloadURL(sRef);newImgs.push(dlUrl);}catch(err){sh("Upload failed for "+f.name);}
+                            }
+                            const next=[...caseBlocks];next[idx]={...b,images:newImgs};setCaseBlocks(next);e.target.value="";
+                          }} style={{display:"none"}}/>
+                        </label>
+                      </div>
+                      <div style={{fontSize:".66rem",color:T.mute}}>{(b.images||[]).length}/10 photos · Select multiple at once</div>
+                    </div>
                     :
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                       {["beforeUrl","afterUrl"].map((key,ki)=>{
@@ -8547,6 +8585,15 @@ ${forDownload
                       setShowAddBlockPicker(false);
                     }} style={{...T.btnO,padding:"6px 12px",fontSize:".76rem",background:"#fff"}}>{p}</button>)}
                   </div>
+                  <div style={{fontSize:".7rem",color:T.txt2,marginBottom:6,fontWeight:600}}>📸 Photo gallery (multiple photos)</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+                    {["Treatment Photos","Results Gallery","Progress Timeline","Procedure Steps","Custom…"].map(p=><button key={p} onClick={()=>{
+                      let label=p;
+                      if(p==="Custom…"){const custom=window.prompt("Gallery heading:");if(!custom?.trim())return;label=custom.trim();}
+                      setCaseBlocks([...caseBlocks,{id:"b"+Date.now()+Math.random().toString(36).slice(2,7),type:"gallery",label,images:[]}]);
+                      setShowAddBlockPicker(false);
+                    }} style={{...T.btnO,padding:"6px 12px",fontSize:".76rem",background:"#fff"}}>{p}</button>)}
+                  </div>
                   <button onClick={()=>setShowAddBlockPicker(false)} style={{...T.btnO,padding:"4px 10px",fontSize:".72rem"}}>Cancel</button>
                 </div>
               }
@@ -8555,7 +8602,7 @@ ${forDownload
             {/* Modal footer */}
             <div style={{padding:"14px 24px",borderTop:"1px solid "+T.border,background:T.bg,display:"flex",justifyContent:"flex-end",gap:10}}>
               <button onClick={()=>setNewCase(false)} style={T.btnO}>Cancel</button>
-              <button onClick={postCase} style={T.btn}>📋 Publish case</button>
+              <button onClick={postCase} style={T.btn}>📖 Publish diary post</button>
             </div>
           </div>
           <style>{`
@@ -8607,6 +8654,14 @@ ${forDownload
                             <img src={url} alt="" onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=url;im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v);}} style={{width:"100%",height:220,objectFit:"cover",borderRadius:8,cursor:"zoom-in",border:"1px solid "+T.border}}/>
                           </div>:null)}
                         </div>
+                      </div>
+                      :b.type==="gallery"?
+                      <div key={b.id||i} style={{marginBottom:16}}>
+                        <div style={{fontSize:".68rem",color:T.teal,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>📸 {b.label}</div>
+                        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:8}}>
+                          {(b.images||[]).map((url,gi)=><img key={gi} src={url} alt="" onClick={()=>{const v=document.createElement("div");v.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px";const im=document.createElement("img");im.src=url;im.style.cssText="max-width:95%;max-height:95%;border-radius:8px";v.appendChild(im);v.onclick=()=>v.remove();document.body.appendChild(v);}} style={{width:"100%",height:150,objectFit:"cover",borderRadius:8,cursor:"zoom-in",border:"1px solid "+T.border}}/>)}
+                        </div>
+                        <div style={{fontSize:".66rem",color:T.mute,marginTop:4}}>{(b.images||[]).length} photos</div>
                       </div>
                       :
                       <div key={b.id||i} style={{marginBottom:14}}>
@@ -12313,7 +12368,7 @@ ${forDownload
         </h3>
         <div style={{position:"sticky",top:0,zIndex:30,background:T.bg,padding:"10px 0",marginBottom:16,marginInline:-12,paddingInline:12,borderBottom:"1px solid "+T.border}}>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-          {[["stats","📊 Overview"],["revenue","💰 Revenue"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","🔬 Cases"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["vendors","🏢 Vendors"],["flagged","🚩 Flagged"],["lowreviews","⭐ Low Reviews"],["placements","📢 Placements"],["messages","✉️ Messages"],["subs","💎 Subscriptions"],["beta","🎯 Beta"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["consents","📋 Consents"],["referrals","🎁 Referrals"],["users","👥 Users"]].map(([id,l])=>{
+          {[["stats","📊 Overview"],["revenue","💰 Revenue"],["quiz","🧠 Quiz"],["articles","📰 Articles"],["resources","📚 Resources"],["videos","🎥 Videos"],["events","📅 Events"],["forum","💬 Forum"],["cases","📖 Diaries"],["ads","📢 Ads"],["news","📰 News"],["rewards","🎁 Rewards"],["vendors","🏢 Vendors"],["flagged","🚩 Flagged"],["lowreviews","⭐ Low Reviews"],["placements","📢 Placements"],["messages","✉️ Messages"],["subs","💎 Subscriptions"],["beta","🎯 Beta"],["roles","🛡️ Roles"],["submissions","📥 Submissions"],["announce","📣 Announce"],["consents","📋 Consents"],["referrals","🎁 Referrals"],["users","👥 Users"]].map(([id,l])=>{
             const flagCount=wallPosts.filter(w=>w.active!==false&&Array.isArray(w.flags)&&w.flags.length>0).length;
             const lowRev=reviews.filter(r=>r.active!==false&&r.rating<=2).length;
             const unreadMsg=adminMessages.filter(m=>m.status!=="replied").length;
@@ -12375,7 +12430,7 @@ ${forDownload
               {[
                 ["📰 Articles",articles,"title"],
                 ["🎥 Videos",videos,"title"],
-                ["🔬 Cases",cases,"title"],
+                ["📖 Diaries",cases,"title"],
                 ["💬 Forum",forumPosts,"title"],
                 ["📰 News",newsPosts,"title"],
                 ["🧠 Quizzes",quizzes,"cat"]
