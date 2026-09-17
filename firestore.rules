@@ -21,6 +21,18 @@ service cloud.firestore {
     function onlyChangedTo(fields) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
     }
+    // ── Team members — allows a vendor/institute team member to post to
+    //    or manage the shared company profile (vendorId == company owner's
+    //    uid, not the poster's own uid). Mirrors the user's own companyId
+    //    field, which the app always keeps in sync with their companies[]
+    //    array on invite/accept/approve. ─────────────────────────────────
+    function isCompanyMember(companyId) {
+      return isSignedIn() && (
+        request.auth.uid == companyId ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == companyId)
+      );
+    }
 
     // ── SKINARIO-OS (clinic module) helpers ─────────────────────────────
     function isClinicStaff(clinicId) {
@@ -119,7 +131,7 @@ service cloud.firestore {
     match /productEnquiries/{enqId} {
       allow read: if isSignedIn();
       allow create: if isOwner('doctorUid');
-      allow update: if wasOwner('vendorId') && onlyChangedTo(['status','updatedAt','vendorReply','vendorRepliedAt']) || isAdmin();
+      allow update: if (wasOwner('vendorId') || isCompanyMember(resource.data.vendorId)) && onlyChangedTo(['status','updatedAt','vendorReply','vendorRepliedAt']) || isAdmin();
       allow delete: if isAdmin();
     }
 
@@ -127,11 +139,12 @@ service cloud.firestore {
     //    may bump the enquiries counter when they submit an enquiry ───────
     match /products/{productId} {
       allow read: if isSignedIn();
-      allow create: if isOwner('vendorId');
+      allow create: if isOwner('vendorId') || isCompanyMember(request.resource.data.vendorId) || isAdmin();
       allow update: if wasOwner('vendorId')
+                    || isCompanyMember(resource.data.vendorId)
                     || isAdmin()
                     || (isSignedIn() && onlyChangedTo(['enquiries','updatedAt']));
-      allow delete: if wasOwner('vendorId') || isAdmin();
+      allow delete: if wasOwner('vendorId') || isCompanyMember(resource.data.vendorId) || isAdmin();
     }
 
     // ── teamMembers — vendor's own local sales/service contacts. Read is
@@ -149,13 +162,14 @@ service cloud.firestore {
     // ── wallPosts — institute's marketing/celebration photo wall ───────────
     match /wallPosts/{postId} {
       allow read: if isSignedIn();
-      allow create: if isOwner('vendorId');
+      allow create: if isOwner('vendorId') || isCompanyMember(request.resource.data.vendorId) || isAdmin();
       allow update: if wasOwner('vendorId')
+                    || isCompanyMember(resource.data.vendorId)
                     || isAdmin()
                     || (isSignedIn() && onlyChangedTo(['likes','updatedAt']))
                     || (isSignedIn() && onlyChangedTo(['flags','updatedAt']))
                     || (isSignedIn() && onlyChangedTo(['comments','updatedAt']));
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isCompanyMember(resource.data.vendorId);
     }
 
     // ── reviews — star ratings & reviews for vendors/institutes. Any
