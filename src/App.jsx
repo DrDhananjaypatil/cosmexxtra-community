@@ -4788,7 +4788,7 @@ ${forDownload
     const publisher=pubId?allUsers.find(u=>u.id===pubId):null;
     const authorName=publisher?.name||uName;
     const authorUid=publisher?.id||au.uid;
-    const authorPhoto=publisher?.photo||uPhoto||"";
+    const authorPhoto=publisher?publisher.photo||"":uPhoto||""; // never fall back to admin's own photo when posting on behalf of someone
     const authorIni=publisher?(publisher.name||"?").split(" ").map(w=>w[0]).join("").toUpperCase().slice(0,2):uIni;
     // Legacy thumbnail from first image block
     const firstImgBlock=caseBlocks.find(b=>b.type==="beforeAfter");
