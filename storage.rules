@@ -1,31 +1,21 @@
 rules_version = '2';
 
-// SKINARIO Firebase Storage rules
+// ══════════════════════════════════════════════════════════════════
+// FIREBASE STORAGE RULES — MERGED for both:
+//   1. SKINARIO Community App (skinario.app)
+//   2. SKINARIO-OS Clinic Admin (skinario-os.vercel.app)
 //
-// PASTE THIS INTO: Firebase Console → Storage → Rules tab → click Publish
-// NOT into Firestore rules — those are a separate file/screen.
-//
-// Storage paths used by the app:
-//   /images/...           — forum & case post images
-//   /covers/...           — admin cover images for articles, resources, events
-//   /videos/...           — video thumbnails
-//   /news/...             — news image uploads
-//   /submissions/...      — user content submissions (nested by typeKey)
-//   /rewards/...          — reward catalog images
-//   /avatars/{uid}        — user profile photos
-//   /quiz-ig-images/...   — AI-generated Instagram post images for quizzes
-//   /article-blocks/...   — article inline block images
-//   /forum-blocks/...     — forum post inline block images
-//   /products/...         — product/course listing images (vendor + institute)
-//   /sponsor-placements/... — sponsor placement logos/banners
-//   /wallPosts/...        — institute & personal profile wall posts
-//
-// All paths use {path=**} to allow nested folders. 5MB size limit. Image MIME types only.
+// Both apps share the same Firebase project (skinario-369).
+// ══════════════════════════════════════════════════════════════════
 
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // ═══ Forum & Case post images ═══
+    // ═══════════════════════════════════════════════════════════════
+    // SKINARIO COMMUNITY APP PATHS
+    // ═══════════════════════════════════════════════════════════════
+
+    // ── Forum & Case post images ──
     match /images/{path=**} {
       allow read: if true;
       allow write: if request.auth != null
@@ -34,7 +24,7 @@ service firebase.storage {
       allow delete: if request.auth != null;
     }
 
-    // ═══ Cover images for articles, resources, events, ads ═══
+    // ── Cover images for articles, resources, events, ads ──
     match /covers/{path=**} {
       allow read: if true;
       allow write: if request.auth != null
@@ -43,7 +33,7 @@ service firebase.storage {
       allow delete: if request.auth != null;
     }
 
-    // ═══ Video thumbnails ═══
+    // ── Video thumbnails ──
     match /videos/{path=**} {
       allow read: if true;
       allow write: if request.auth != null
@@ -52,7 +42,7 @@ service firebase.storage {
       allow delete: if request.auth != null;
     }
 
-    // ═══ News images ═══
+    // ── News images ──
     match /news/{path=**} {
       allow read: if true;
       allow write: if request.auth != null
@@ -61,7 +51,7 @@ service firebase.storage {
       allow delete: if request.auth != null;
     }
 
-    // ═══ User content submissions ═══
+    // ── User content submissions ──
     match /submissions/{path=**} {
       allow read: if true;
       allow write: if request.auth != null
@@ -70,7 +60,7 @@ service firebase.storage {
       allow delete: if request.auth != null;
     }
 
-    // ═══ Reward catalog images ═══
+    // ── Reward catalog images ──
     match /rewards/{path=**} {
       allow read: if true;
       allow write: if request.auth != null
@@ -79,8 +69,7 @@ service firebase.storage {
       allow delete: if request.auth != null;
     }
 
-    // ═══ AI-generated Instagram post images for quizzes ═══
-    // Cached after first generation so $0.04 isn't re-spent per modal open.
+    // ── AI-generated Instagram post images for quizzes ──
     match /quiz-ig-images/{path=**} {
       allow read: if true;
       allow write: if request.auth != null
@@ -89,8 +78,7 @@ service firebase.storage {
       allow delete: if request.auth != null;
     }
 
-    // ═══ User profile avatars ═══
-    // Only the owner can write their own avatar.
+    // ── User profile avatars (owner only) ──
     match /avatars/{uid} {
       allow read: if true;
       allow write: if request.auth != null
@@ -100,7 +88,7 @@ service firebase.storage {
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
-    // ═══ Article inline block images ═══
+    // ── Article inline block images ──
     match /article-blocks/{path=**} {
       allow read: if true;
       allow write: if request.auth != null
@@ -109,7 +97,7 @@ service firebase.storage {
       allow delete: if request.auth != null;
     }
 
-    // ═══ Forum post inline block images ═══
+    // ── Forum post inline block images ──
     match /forum-blocks/{path=**} {
       allow read: if true;
       allow write: if request.auth != null
@@ -118,7 +106,7 @@ service firebase.storage {
       allow delete: if request.auth != null;
     }
 
-    // ═══ Phase 3: Product listing images ═══
+    // ── Product listing images ──
     match /products/{path=**} {
       allow read: if true;
       allow write: if request.auth != null
@@ -127,7 +115,7 @@ service firebase.storage {
       allow delete: if request.auth != null;
     }
 
-    // ═══ Phase 4: Sponsor placement logos/banners ═══
+    // ── Sponsor placement logos/banners ──
     match /sponsor-placements/{path=**} {
       allow read: if true;
       allow write: if request.auth != null
@@ -136,7 +124,7 @@ service firebase.storage {
       allow delete: if request.auth != null;
     }
 
-    // ═══ Institute & profile wall posts ═══
+    // ── Wall posts (institute & personal profile) ──
     match /wallPosts/{path=**} {
       allow read: if true;
       allow write: if request.auth != null
@@ -145,17 +133,35 @@ service firebase.storage {
       allow delete: if request.auth != null;
     }
 
-    // Certificate logos — admin uploads SKINARIO logo + accreditation logos
+    // ── Certificate logos (admin uploads) ──
     match /certLogos/{path=**} {
-      allow read: if true;  // public read so certificate canvas can load them
+      allow read: if true;
       allow write: if request.auth != null
                    && request.resource.size < 2 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
       allow delete: if request.auth != null;
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // SKINARIO-OS CLINIC ADMIN PATHS
+    // ═══════════════════════════════════════════════════════════════
+
+    // ── Clinic receipts/bills (Finance module) ──
+    match /clinics/{clinicId}/receipts/{fileName} {
+      allow read, write: if request.auth != null &&
+        firestore.exists(/databases/(default)/documents/clinics/$(clinicId)/staff/$(request.auth.uid));
+      allow write: if request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // ── SKINARIO-OS ad images (Developer panel) ──
+    match /ads/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        request.auth.token.email in ['drjpatil@gmail.com', 'absoluteinstituteedu@gmail.com'] &&
+        request.resource.size < 5 * 1024 * 1024;
+    }
+
     // ═══ DEFAULT DENY ═══
-    // Anything not matched above is blocked.
     match /{allPaths=**} {
       allow read, write: if false;
     }
