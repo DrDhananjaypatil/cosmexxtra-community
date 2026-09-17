@@ -6328,25 +6328,33 @@ ${forDownload
 
         {/* ═══ FEATURED CASES ═══ */}
         {(()=>{
-          const eligible=cases.filter(c=>c&&c.images&&c.images.length>0&&c.title).slice(0,3);
+          const eligible=cases.filter(c=>c&&c.title).slice(0,4);
           if(eligible.length<2)return null;
           return(<div style={{...T.card,padding:18,marginBottom:14}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
               <h3 style={{fontSize:"1.05rem",fontWeight:700,margin:0}}>📖 Aesthetic Diaries</h3>
-              <span onClick={()=>go("cases")} style={{fontSize:".78rem",color:T.teal,fontWeight:600,cursor:"pointer"}}>View all cases →</span>
+              <span onClick={()=>go("cases")} style={{fontSize:".78rem",color:T.teal,fontWeight:600,cursor:"pointer"}}>View all →</span>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
-              {eligible.map(c=><div key={c.id} onClick={()=>go("cases")} style={{background:"#fff",borderRadius:10,overflow:"hidden",border:"1px solid "+T.border,cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 20px rgba(0,0,0,0.07)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
-                <div style={{aspectRatio:"4/3",overflow:"hidden",background:T.bg,position:"relative"}}>
-                  <img src={c.images[0]} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
-                  {c.images.length>1&&<div style={{position:"absolute",bottom:6,right:6,background:"rgba(0,0,0,0.65)",color:"#fff",fontSize:".62rem",padding:"2px 7px",borderRadius:10,fontWeight:600}}>+{c.images.length-1}</div>}
-                </div>
+              {eligible.map(c=>{
+                const galleryImgs=(c.blocks||[]).filter(b=>b.type==="gallery").flatMap(b=>b.images||[]);
+                const baImgs=(c.blocks||[]).filter(b=>b.type==="beforeAfter").flatMap(b=>[b.beforeUrl,b.afterUrl].filter(Boolean));
+                const allImgs=[...(c.images||[]),...galleryImgs,...baImgs].filter(Boolean);
+                const firstText=(c.blocks||[]).find(b=>b.type==="text"&&b.value?.trim());
+                return(<div key={c.id} onClick={()=>{setSelCs(c);setPg("cases")}} style={{background:"#fff",borderRadius:10,overflow:"hidden",border:"1px solid "+T.border,cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 20px rgba(0,0,0,0.07)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=""}}>
+                {allImgs.length>0?<div style={{aspectRatio:"4/3",overflow:"hidden",background:T.bg,position:"relative"}}>
+                  <img src={allImgs[0]} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+                  {allImgs.length>1&&<div style={{position:"absolute",bottom:6,right:6,background:"rgba(0,0,0,0.65)",color:"#fff",fontSize:".62rem",padding:"2px 7px",borderRadius:10,fontWeight:600}}>+{allImgs.length-1}</div>}
+                </div>:<div style={{aspectRatio:"4/3",background:"linear-gradient(135deg,"+T.tealBg+",#fff)",display:"flex",alignItems:"center",justifyContent:"center",padding:12}}>
+                  {firstText?<p style={{fontSize:".74rem",color:T.txt2,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:4,WebkitBoxOrient:"vertical",overflow:"hidden",margin:0,textAlign:"center"}}>{firstText.value.replace(/[*#-]/g,"").slice(0,120)}</p>
+                  :<div style={{fontSize:"2rem",color:T.mute}}>📖</div>}
+                </div>}
                 <div style={{padding:12}}>
                   {c.cat&&<div style={{fontSize:".64rem",color:T.teal,fontWeight:700,letterSpacing:1.2,textTransform:"uppercase",marginBottom:5}}>{c.cat}</div>}
                   <div style={{fontSize:".88rem",fontWeight:600,color:T.txt,lineHeight:1.35,marginBottom:6,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{c.title}</div>
                   <div style={{fontSize:".68rem",color:T.mute}}>by {c.author||"Anonymous"} · 💬 {(c.comments||[]).length}</div>
                 </div>
-              </div>)}
+              </div>);})}
             </div>
           </div>);
         })()}
@@ -8714,16 +8722,25 @@ ${forDownload
           {cases.map(cs=>{
             const replyCount=cs.comments?.length||0;
             return(<div key={cs.id} onClick={()=>{setSelCs(cs);window.scrollTo(0,0)}} style={{...T.card,padding:0,overflow:"hidden",cursor:"pointer",transition:"all .15s",boxShadow:"0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 22px rgba(0,0,0,0.07)"}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)"}}>
-              {cs.images?.length>0?<div style={{width:"100%",aspectRatio:"4/3",overflow:"hidden",background:"#f4f1ea",position:"relative"}}>
-                <img src={cs.images[0]} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
-                {cs.images.length>1&&<div style={{position:"absolute",bottom:6,right:6,background:"rgba(0,0,0,0.65)",color:"#fff",fontSize:".62rem",padding:"2px 7px",borderRadius:10,fontWeight:600}}>+{cs.images.length-1}</div>}
-              </div>:<div style={{width:"100%",aspectRatio:"4/3",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2rem",color:T.mute}}>🔬</div>}
+              {(()=>{
+                const galleryImgs=(cs.blocks||[]).filter(b=>b.type==="gallery").flatMap(b=>b.images||[]);
+                const baImgs=(cs.blocks||[]).filter(b=>b.type==="beforeAfter").flatMap(b=>[b.beforeUrl,b.afterUrl].filter(Boolean));
+                const allImgs=[...(cs.images||[]),...galleryImgs,...baImgs].filter(Boolean);
+                const firstText=(cs.blocks||[]).find(b=>b.type==="text"&&b.value?.trim());
+                return allImgs.length>0?<div style={{width:"100%",aspectRatio:"4/3",overflow:"hidden",background:"#f4f1ea",position:"relative"}}>
+                  <img src={allImgs[0]} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+                  {allImgs.length>1&&<div style={{position:"absolute",bottom:6,right:6,background:"rgba(0,0,0,0.65)",color:"#fff",fontSize:".62rem",padding:"2px 7px",borderRadius:10,fontWeight:600}}>+{allImgs.length-1} photos</div>}
+                </div>:<div style={{width:"100%",padding:"20px 16px",background:"linear-gradient(135deg,"+T.tealBg+",#fff)",minHeight:120,display:"flex",alignItems:"center"}}>
+                  {firstText?<p style={{fontSize:".84rem",color:T.txt2,lineHeight:1.6,display:"-webkit-box",WebkitLineClamp:4,WebkitBoxOrient:"vertical",overflow:"hidden",margin:0}}>{firstText.value.replace(/[*#-]/g,"").slice(0,200)}</p>
+                  :<div style={{fontSize:"2.5rem",color:T.mute,margin:"0 auto"}}>📖</div>}
+                </div>;
+              })()}
               <div style={{padding:14}}>
                 <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,flexWrap:"wrap"}}>
                   <span style={T.tag(T.tealBg,T.teal)}>{cs.cat}</span>
                 </div>
                 <h4 style={{fontSize:".98rem",fontWeight:700,lineHeight:1.35,marginBottom:8,color:T.txt,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{cs.title}</h4>
-                {cs.history&&<p style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5,marginBottom:10,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{cs.history.replace(/[*#-]/g,"").slice(0,120)}</p>}
+                {(()=>{const preview=cs.history||(cs.blocks||[]).find(b=>b.type==="text"&&b.value?.trim())?.value||"";return preview?<p style={{fontSize:".78rem",color:T.txt2,lineHeight:1.5,marginBottom:10,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{preview.replace(/[*#-]/g,"").slice(0,120)}</p>:null;})()}
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:10,borderTop:"1px solid "+T.border,gap:8,flexWrap:"wrap"}}>
                   <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0,flex:1}}>
                     {cs.photo?<img src={cs.photo} style={{width:22,height:22,borderRadius:"50%",flexShrink:0}}/>:<div style={{...T.av(22,T.tealBg,T.teal),fontSize:".6rem",flexShrink:0}}>{cs.ini||"?"}</div>}
