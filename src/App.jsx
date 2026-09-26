@@ -7716,9 +7716,18 @@ ${forDownload
 
       {/* QUIZ */}
       {pg==="quiz"&&<div>
+        {/* Prominent archive callout — old questions available for study/practice */}
+        <div onClick={()=>{setShowQuizArchive(true);setArchiveMonth(ds(getIST()).slice(0,7));}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",marginBottom:14,borderRadius:12,background:"linear-gradient(135deg,"+T.gold+","+T.goldD+")",cursor:"pointer",boxShadow:"0 2px 8px rgba(200,168,78,0.35)",transition:"transform .15s"}} onMouseEnter={e=>e.currentTarget.style.transform="translateY(-1px)"} onMouseLeave={e=>e.currentTarget.style.transform=""}>
+          <div style={{fontSize:"1.5rem"}}>📚</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:".92rem",fontWeight:700,color:"#fff"}}>Looking for more questions to study or practice?</div>
+            <div style={{fontSize:".76rem",color:"rgba(255,255,255,0.9)"}}>Browse {quizzes.length}+ old quiz questions with answers &amp; explanations — free practice, any time</div>
+          </div>
+          <div style={{background:"rgba(255,255,255,0.25)",color:"#fff",padding:"8px 16px",borderRadius:8,fontSize:".82rem",fontWeight:700,whiteSpace:"nowrap",flexShrink:0}}>🗓️ Open Archive →</div>
+        </div>
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
+          <div style={{fontSize:".72rem",color:T.mute,fontWeight:600,whiteSpace:"nowrap"}}>Last 14 days:</div>
           <div style={{display:"flex",gap:6,overflowX:"auto",padding:"4px 0 14px",flex:1}}>{dates.map(d=>{const dt=new Date(d+"T12:00:00");const on=d===selD;const hasQuiz=quizzes.some(q=>q.date===d);return<div key={d} onClick={()=>setSelD(d)} style={{minWidth:52,padding:"8px 4px",textAlign:"center",borderRadius:10,border:`1.5px solid ${on?T.teal:T.border}`,cursor:"pointer",background:on?T.tealBg:"#fff",opacity:hasQuiz?1:.45}}><div style={{fontSize:".58rem",color:on?T.teal:T.mute,textTransform:"uppercase",fontWeight:on?600:400}}>{dN(d)}</div><div style={{fontSize:"1rem",fontWeight:700,color:on?T.teal:T.txt}}>{dt.getDate()}</div></div>})}</div>
-          <button onClick={()=>{setShowQuizArchive(true);setArchiveMonth(ds(getIST()).slice(0,7));}} style={{...T.btnO,padding:"8px 14px",fontSize:".78rem",whiteSpace:"nowrap",flexShrink:0,marginBottom:14}}>🗓️ Full archive</button>
         </div>
         {ld&&<div style={{...T.card,textAlign:"center",padding:50}}><p style={{color:T.mute}}>⏳ Generating...</p></div>}
         {!ld&&!qObj&&<div style={{...T.card,textAlign:"center",padding:40}}>{selD===today?<><div style={{fontSize:"2rem",marginBottom:10}}>🔬</div><p style={{color:T.teal,fontWeight:600}}>Today's question</p><p style={{color:T.mute,fontSize:".88rem",margin:"8px 0 16px"}}>10 AM IST daily</p>{isAdm&&<button onClick={genQuiz} style={T.btn}>🤖 Generate now</button>}</>:<p style={{color:T.mute}}>No question for this date</p>}</div>}
@@ -7781,8 +7790,8 @@ ${forDownload
           <div style={{background:"#fff",borderRadius:16,maxWidth:640,width:"100%",maxHeight:"88vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
             <div style={{padding:"18px 22px",borderBottom:"1px solid "+T.border,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div>
-                <h3 style={{fontSize:"1.1rem",fontWeight:700,margin:0}}>🗓️ Quiz Archive</h3>
-                <p style={{fontSize:".76rem",color:T.mute,margin:"3px 0 0"}}>Browse or search every question ever published — for practice, no points awarded</p>
+                <h3 style={{fontSize:"1.1rem",fontWeight:700,margin:0}}>📚 Study Archive — Old Quiz Questions</h3>
+                <p style={{fontSize:".76rem",color:T.mute,margin:"3px 0 0"}}>{quizzes.length}+ previously published questions with full answers & explanations. For self-study only — <b>no points awarded</b>.</p>
               </div>
               <button onClick={()=>{setShowQuizArchive(false);setArchiveSearch("")}} style={{background:T.bg,border:"none",width:32,height:32,borderRadius:"50%",cursor:"pointer",fontSize:"1rem",color:T.txt2}}>✕</button>
             </div>
