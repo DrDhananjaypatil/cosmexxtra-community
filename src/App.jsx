@@ -2465,6 +2465,7 @@ export default function App(){
   const[welcomeSeen,setWelcomeSeen]=useState(()=>localStorage.getItem("sk_welcome")==="1");
   const[quizzes,setQuizzes]=useState([]);const[articles,setArticles]=useState([]);const[resources,setResources]=useState([]);const[videos,setVideos]=useState([]);const[forumPosts,setForumPosts]=useState([]);const[cases,setCases]=useState([]);const[allUsers,setAllUsers]=useState([]);
   const[selD,setSelD]=useState(ds(getIST()));const[selA,setSelA]=useState(null);const[selV,setSelV]=useState(null);const[selU,setSelU]=useState(null);const[toast,setToast]=useState(null);const[cmt,setCmt]=useState("");const[ld,setLd]=useState(false);const[aTab,setATab]=useState("stats");
+  const[showQuizArchive,setShowQuizArchive]=useState(false);const[archiveMonth,setArchiveMonth]=useState(()=>ds(getIST()).slice(0,7));const[archiveSearch,setArchiveSearch]=useState("");
   const[msgFilter,setMsgFilter]=useState("all"); // message category filter
   const[msgExpandedUser,setMsgExpandedUser]=useState(null); // expanded user thread
   // Vendor directory page states (must be top-level — hooks can't be inside IIFE)
@@ -7715,7 +7716,10 @@ ${forDownload
 
       {/* QUIZ */}
       {pg==="quiz"&&<div>
-        <div style={{display:"flex",gap:6,overflowX:"auto",padding:"4px 0 14px"}}>{dates.map(d=>{const dt=new Date(d+"T12:00:00");const on=d===selD;const hasQuiz=quizzes.some(q=>q.date===d);return<div key={d} onClick={()=>setSelD(d)} style={{minWidth:52,padding:"8px 4px",textAlign:"center",borderRadius:10,border:`1.5px solid ${on?T.teal:T.border}`,cursor:"pointer",background:on?T.tealBg:"#fff",opacity:hasQuiz?1:.45}}><div style={{fontSize:".58rem",color:on?T.teal:T.mute,textTransform:"uppercase",fontWeight:on?600:400}}>{dN(d)}</div><div style={{fontSize:"1rem",fontWeight:700,color:on?T.teal:T.txt}}>{dt.getDate()}</div></div>})}</div>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
+          <div style={{display:"flex",gap:6,overflowX:"auto",padding:"4px 0 14px",flex:1}}>{dates.map(d=>{const dt=new Date(d+"T12:00:00");const on=d===selD;const hasQuiz=quizzes.some(q=>q.date===d);return<div key={d} onClick={()=>setSelD(d)} style={{minWidth:52,padding:"8px 4px",textAlign:"center",borderRadius:10,border:`1.5px solid ${on?T.teal:T.border}`,cursor:"pointer",background:on?T.tealBg:"#fff",opacity:hasQuiz?1:.45}}><div style={{fontSize:".58rem",color:on?T.teal:T.mute,textTransform:"uppercase",fontWeight:on?600:400}}>{dN(d)}</div><div style={{fontSize:"1rem",fontWeight:700,color:on?T.teal:T.txt}}>{dt.getDate()}</div></div>})}</div>
+          <button onClick={()=>{setShowQuizArchive(true);setArchiveMonth(ds(getIST()).slice(0,7));}} style={{...T.btnO,padding:"8px 14px",fontSize:".78rem",whiteSpace:"nowrap",flexShrink:0,marginBottom:14}}>🗓️ Full archive</button>
+        </div>
         {ld&&<div style={{...T.card,textAlign:"center",padding:50}}><p style={{color:T.mute}}>⏳ Generating...</p></div>}
         {!ld&&!qObj&&<div style={{...T.card,textAlign:"center",padding:40}}>{selD===today?<><div style={{fontSize:"2rem",marginBottom:10}}>🔬</div><p style={{color:T.teal,fontWeight:600}}>Today's question</p><p style={{color:T.mute,fontSize:".88rem",margin:"8px 0 16px"}}>10 AM IST daily</p>{isAdm&&<button onClick={genQuiz} style={T.btn}>🤖 Generate now</button>}</>:<p style={{color:T.mute}}>No question for this date</p>}</div>}
         {!ld&&qObj&&<div className="quiz-grid" style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 340px",gap:16,alignItems:"start"}}>
@@ -7762,6 +7766,73 @@ ${forDownload
           `}</style>
         </div>}
       </div>}
+
+      {/* ═══ QUIZ ARCHIVE — full calendar + search of all past questions ═══ */}
+      {showQuizArchive&&(()=>{
+        const[y,m]=archiveMonth.split("-").map(Number);
+        const firstDay=new Date(y,m-1,1);
+        const daysInMonth=new Date(y,m,0).getDate();
+        const startWeekday=firstDay.getDay();
+        const monthLabel=firstDay.toLocaleDateString("en-US",{month:"long",year:"numeric"});
+        const quizByDate={};quizzes.forEach(q=>{if(q.date)quizByDate[q.date]=q;});
+        const searchResults=archiveSearch.trim()?quizzes.filter(q=>(q.question||"").toLowerCase().includes(archiveSearch.toLowerCase())||(q.cat||"").toLowerCase().includes(archiveSearch.toLowerCase())).sort((a,b)=>(b.date||"").localeCompare(a.date||"")):null;
+        const canGoNext=archiveMonth<ds(getIST()).slice(0,7);
+        return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={e=>{if(e.target===e.currentTarget)setShowQuizArchive(false)}}>
+          <div style={{background:"#fff",borderRadius:16,maxWidth:640,width:"100%",maxHeight:"88vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+            <div style={{padding:"18px 22px",borderBottom:"1px solid "+T.border,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <h3 style={{fontSize:"1.1rem",fontWeight:700,margin:0}}>🗓️ Quiz Archive</h3>
+                <p style={{fontSize:".76rem",color:T.mute,margin:"3px 0 0"}}>Browse or search every question ever published — for practice, no points awarded</p>
+              </div>
+              <button onClick={()=>{setShowQuizArchive(false);setArchiveSearch("")}} style={{background:T.bg,border:"none",width:32,height:32,borderRadius:"50%",cursor:"pointer",fontSize:"1rem",color:T.txt2}}>✕</button>
+            </div>
+            <div style={{padding:"14px 22px 0"}}>
+              <input value={archiveSearch} onChange={e=>setArchiveSearch(e.target.value)} placeholder="🔍 Search questions by keyword or category..." style={{...T.inp,width:"100%"}}/>
+            </div>
+            <div style={{padding:"14px 22px 22px",overflowY:"auto",flex:1}}>
+              {searchResults?
+                <div>
+                  <div style={{fontSize:".76rem",color:T.mute,marginBottom:10}}>{searchResults.length} result{searchResults.length!==1?"s":""}</div>
+                  {searchResults.length===0?<div style={{textAlign:"center",padding:30,color:T.mute,fontSize:".84rem"}}>No questions match "{archiveSearch}"</div>
+                  :searchResults.map(q=><div key={q.id} onClick={()=>{setSelD(q.date);setShowQuizArchive(false);setArchiveSearch("")}} style={{padding:"10px 12px",borderRadius:8,border:"1px solid "+T.border,marginBottom:8,cursor:"pointer"}} onMouseEnter={e=>e.currentTarget.style.background=T.bg} onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
+                    <div style={{display:"flex",gap:6,marginBottom:4,flexWrap:"wrap"}}><span style={T.tag(T.tealBg,T.teal)}>{q.cat}</span><span style={{fontSize:".7rem",color:T.mute}}>{fD(q.date)}</span></div>
+                    <div style={{fontSize:".84rem",color:T.txt,lineHeight:1.4}}>{q.question}</div>
+                  </div>)}
+                </div>
+              :
+                <div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+                    <button onClick={()=>{const[yy,mm]=archiveMonth.split("-").map(Number);const d=new Date(yy,mm-2,1);setArchiveMonth(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"));}} style={{...T.btnO,...T.btnSm,padding:"4px 10px"}}>← Prev</button>
+                    <div style={{fontSize:".95rem",fontWeight:700}}>{monthLabel}</div>
+                    <button disabled={!canGoNext} onClick={()=>{const[yy,mm]=archiveMonth.split("-").map(Number);const d=new Date(yy,mm,1);setArchiveMonth(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"));}} style={{...T.btnO,...T.btnSm,padding:"4px 10px",opacity:canGoNext?1:.3,cursor:canGoNext?"pointer":"default"}}>Next →</button>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,marginBottom:6}}>
+                    {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=><div key={d} style={{textAlign:"center",fontSize:".64rem",fontWeight:700,color:T.mute,padding:"4px 0"}}>{d}</div>)}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>
+                    {Array.from({length:startWeekday}).map((_,i)=><div key={"empty"+i}/>)}
+                    {Array.from({length:daysInMonth}).map((_,i)=>{
+                      const day=i+1;
+                      const dateStr=archiveMonth+"-"+String(day).padStart(2,"0");
+                      const q=quizByDate[dateStr];
+                      const isFuture=dateStr>ds(getIST());
+                      const isToday=dateStr===ds(getIST());
+                      return(<div key={day} onClick={()=>{if(q){setSelD(dateStr);setShowQuizArchive(false)}}} style={{aspectRatio:"1",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",borderRadius:8,cursor:q?"pointer":"default",background:q?T.tealBg:isToday?T.goldBg:"#fff",border:isToday?"1.5px solid "+T.gold:"1px solid "+T.border,opacity:isFuture?.3:1,position:"relative"}} onMouseEnter={e=>{if(q)e.currentTarget.style.background=T.teal;}} onMouseLeave={e=>{if(q)e.currentTarget.style.background=T.tealBg;}}>
+                        <div style={{fontSize:".78rem",fontWeight:q?700:400,color:q?T.teal:T.txt2}}>{day}</div>
+                        {q&&<div style={{fontSize:".5rem",color:T.teal}}>●</div>}
+                      </div>);
+                    })}
+                  </div>
+                  <div style={{display:"flex",gap:14,marginTop:14,fontSize:".68rem",color:T.mute}}>
+                    <span><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:T.tealBg,border:"1px solid "+T.teal,marginRight:4}}/>Has question</span>
+                    <span><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:T.goldBg,border:"1px solid "+T.gold,marginRight:4}}/>Today</span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        </div>);
+      })()}
 
       {/* LIBRARY */}
       {pg==="library"&&<div><h3 style={{fontSize:"1.15rem",fontWeight:700,marginBottom:14}}>📚 Resource library</h3>
