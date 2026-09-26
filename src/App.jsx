@@ -2465,7 +2465,7 @@ export default function App(){
   const[welcomeSeen,setWelcomeSeen]=useState(()=>localStorage.getItem("sk_welcome")==="1");
   const[quizzes,setQuizzes]=useState([]);const[articles,setArticles]=useState([]);const[resources,setResources]=useState([]);const[videos,setVideos]=useState([]);const[forumPosts,setForumPosts]=useState([]);const[cases,setCases]=useState([]);const[allUsers,setAllUsers]=useState([]);
   const[selD,setSelD]=useState(ds(getIST()));const[selA,setSelA]=useState(null);const[selV,setSelV]=useState(null);const[selU,setSelU]=useState(null);const[toast,setToast]=useState(null);const[cmt,setCmt]=useState("");const[ld,setLd]=useState(false);const[aTab,setATab]=useState("stats");
-  const[showQuizArchive,setShowQuizArchive]=useState(false);const[archiveMonth,setArchiveMonth]=useState(()=>ds(getIST()).slice(0,7));const[archiveSearch,setArchiveSearch]=useState("");
+  const[showQuizArchive,setShowQuizArchive]=useState(false);const[archiveMonth,setArchiveMonth]=useState(()=>ds(getIST()).slice(0,7));const[archiveCat,setArchiveCat]=useState("");
   const[msgFilter,setMsgFilter]=useState("all"); // message category filter
   const[msgExpandedUser,setMsgExpandedUser]=useState(null); // expanded user thread
   // Vendor directory page states (must be top-level — hooks can't be inside IIFE)
@@ -7784,7 +7784,9 @@ ${forDownload
         const startWeekday=firstDay.getDay();
         const monthLabel=firstDay.toLocaleDateString("en-US",{month:"long",year:"numeric"});
         const quizByDate={};quizzes.forEach(q=>{if(q.date)quizByDate[q.date]=q;});
-        const searchResults=archiveSearch.trim()?quizzes.filter(q=>(q.question||"").toLowerCase().includes(archiveSearch.toLowerCase())||(q.cat||"").toLowerCase().includes(archiveSearch.toLowerCase())).sort((a,b)=>(b.date||"").localeCompare(a.date||"")):null;
+        const allCats=[...new Set(quizzes.map(q=>q.cat).filter(Boolean))].sort();
+        // Full results — from the topic dropdown selection
+        const searchResults=archiveCat?quizzes.filter(q=>q.cat===archiveCat).sort((a,b)=>(b.date||"").localeCompare(a.date||"")):null;
         const canGoNext=archiveMonth<ds(getIST()).slice(0,7);
         return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={e=>{if(e.target===e.currentTarget)setShowQuizArchive(false)}}>
           <div style={{background:"#fff",borderRadius:16,maxWidth:640,width:"100%",maxHeight:"88vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
@@ -7793,17 +7795,21 @@ ${forDownload
                 <h3 style={{fontSize:"1.1rem",fontWeight:700,margin:0}}>📚 Study Archive — Old Quiz Questions</h3>
                 <p style={{fontSize:".76rem",color:T.mute,margin:"3px 0 0"}}>{quizzes.length}+ previously published questions with full answers & explanations. For self-study only — <b>no points awarded</b>.</p>
               </div>
-              <button onClick={()=>{setShowQuizArchive(false);setArchiveSearch("")}} style={{background:T.bg,border:"none",width:32,height:32,borderRadius:"50%",cursor:"pointer",fontSize:"1rem",color:T.txt2}}>✕</button>
+              <button onClick={()=>{setShowQuizArchive(false);setArchiveCat("")}} style={{background:T.bg,border:"none",width:32,height:32,borderRadius:"50%",cursor:"pointer",fontSize:"1rem",color:T.txt2}}>✕</button>
             </div>
-            <div style={{padding:"14px 22px 0"}}>
-              <input value={archiveSearch} onChange={e=>setArchiveSearch(e.target.value)} placeholder="🔍 Search questions by keyword or category..." style={{...T.inp,width:"100%"}}/>
+            <div style={{padding:"16px 22px 0"}}>
+              <label style={{display:"block",fontSize:".72rem",fontWeight:700,color:T.teal,textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>📂 Pick a topic to study</label>
+              <select value={archiveCat} onChange={e=>setArchiveCat(e.target.value)} style={{...T.inp,width:"100%",fontSize:".92rem",padding:"11px 14px",fontWeight:archiveCat?600:400,color:archiveCat?T.teal:T.txt}}>
+                <option value="">— All topics — select one to filter —</option>
+                {(allCats.length?allCats:TOPICS).map(c=><option key={c} value={c}>{c} {quizByDate&&`(${quizzes.filter(q=>q.cat===c).length} questions)`}</option>)}
+              </select>
             </div>
             <div style={{padding:"14px 22px 22px",overflowY:"auto",flex:1}}>
               {searchResults?
                 <div>
-                  <div style={{fontSize:".76rem",color:T.mute,marginBottom:10}}>{searchResults.length} result{searchResults.length!==1?"s":""}</div>
-                  {searchResults.length===0?<div style={{textAlign:"center",padding:30,color:T.mute,fontSize:".84rem"}}>No questions match "{archiveSearch}"</div>
-                  :searchResults.map(q=><div key={q.id} onClick={()=>{setSelD(q.date);setShowQuizArchive(false);setArchiveSearch("")}} style={{padding:"10px 12px",borderRadius:8,border:"1px solid "+T.border,marginBottom:8,cursor:"pointer"}} onMouseEnter={e=>e.currentTarget.style.background=T.bg} onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
+                  <div style={{fontSize:".76rem",color:T.mute,marginBottom:10}}>{searchResults.length} question{searchResults.length!==1?"s":""} in <b>{archiveCat}</b></div>
+                  {searchResults.length===0?<div style={{textAlign:"center",padding:30,color:T.mute,fontSize:".84rem"}}>No questions found for this topic yet</div>
+                  :searchResults.map(q=><div key={q.id} onClick={()=>{setSelD(q.date);setShowQuizArchive(false);setArchiveCat("")}} style={{padding:"10px 12px",borderRadius:8,border:"1px solid "+T.border,marginBottom:8,cursor:"pointer"}} onMouseEnter={e=>e.currentTarget.style.background=T.bg} onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
                     <div style={{display:"flex",gap:6,marginBottom:4,flexWrap:"wrap"}}><span style={T.tag(T.tealBg,T.teal)}>{q.cat}</span><span style={{fontSize:".7rem",color:T.mute}}>{fD(q.date)}</span></div>
                     <div style={{fontSize:".84rem",color:T.txt,lineHeight:1.4}}>{q.question}</div>
                   </div>)}
